@@ -1,0 +1,25 @@
+name: Test
+on: push
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Note for ${{ github.ref }}
+        run: |
+          echo Testing ${GITHUB_REF}...
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Substrate setup # todo: cache this step somehow if necessary?
+        run: |
+          ./scripts/get_substrate.sh --fast
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v1.0.1
+
+      - name: Cargo Test
+        run: |
+          cargo +nightly-2020-09-27 test
