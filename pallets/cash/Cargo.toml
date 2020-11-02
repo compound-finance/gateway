@@ -1,12 +1,11 @@
 [package]
-authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-description = 'FRAME pallet template for defining custom runtime logic.'
+authors = ['Compound <https://compound.finance>']
+description = 'Pallet for implementing CASH.'
 edition = '2018'
-homepage = 'https://substrate.dev'
-license = 'Unlicense'
-name = 'pallet-template'
-repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
-version = '2.0.0'
+homepage = 'https://compound.cash'
+name = 'pallet-cash'
+repository = 'https://github.com/compound-finance/compound-chain/'
+version = '1.0.0'
 
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']

@@ -2,17 +2,17 @@ version: "3.2"
 
 services:
   dev:
-    container_name: node-template
+    container_name: compound-chain
     image: paritytech/ci-linux:production
-    working_dir: /var/www/node-template
+    working_dir: /var/www/compound-chain
     ports:
       - "9944:9944"
     environment:
-      - CARGO_HOME=/var/www/node-template/.cargo
+      - CARGO_HOME=/var/www/compound-chain/.cargo
       - WASM_BUILD_TOOLCHAIN=nightly-2020-10-05
     volumes:
-      - .:/var/www/node-template
+      - .:/var/www/compound-chain
       - type: bind
         source: ./.local
         target: /root/.local
-    command: bash -c "cargo build --release && ./target/release/node-template --dev --ws-external"
+    command: bash -c "cargo build --release && ./target/release/compound-chain --dev --ws-external"
