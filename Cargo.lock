@@ -750,6 +750,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "parity-scale-codec",
+ "sp-externalities",
+ "sp-runtime-interface",
+]
+
+[[package]]
 name = "const-random"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
