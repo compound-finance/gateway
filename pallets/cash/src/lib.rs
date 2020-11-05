@@ -6,6 +6,8 @@
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get};
 use frame_system::ensure_signed;
 
+mod runtime_interface;
+
 #[cfg(test)]
 mod mock;
 
