@@ -18,7 +18,7 @@ impl Config {
 pub fn new_config(eth_rpc_url: String) -> Config {
     return Config {
         eth_rpc_url: eth_rpc_url,
-    }
+    };
 }
 
 lazy_static! {
@@ -27,7 +27,6 @@ lazy_static! {
 
 #[sp_runtime_interface::runtime_interface]
 pub trait RuntimeInterface {
-
     /// This method is designed to be used by the node as it starts up. The node reads
     /// the chain configuration from the "properties" key in the "chain spec" file. Those
     /// properties determine what goes into the Config object which will then be set here
