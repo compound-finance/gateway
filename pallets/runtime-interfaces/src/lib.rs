@@ -26,7 +26,7 @@ lazy_static! {
 }
 
 #[sp_runtime_interface::runtime_interface]
-pub trait RuntimeInterface {
+pub trait ConfigInterface {
     /// This method is designed to be used by the node as it starts up. The node reads
     /// the chain configuration from the "properties" key in the "chain spec" file. Those
     /// properties determine what goes into the Config object which will then be set here
@@ -52,9 +52,9 @@ mod tests {
         let expected: Vec<u8> = "my eth rpc url".into();
         let config = new_config(expected.clone());
         // set in node
-        runtime_interface::set(config);
+        config_interface::set(config);
         // ...later... in offchain worker context, get the configuration
-        let actual_config = runtime_interface::get();
+        let actual_config = config_interface::get();
         let actual = actual_config.eth_rpc_url;
         assert_eq!(expected, actual);
     }

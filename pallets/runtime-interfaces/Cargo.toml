@@ -1,8 +1,11 @@
 [package]
-name = "config"
-version = "0.1.0"
-authors = ["Compound"]
-edition = "2018"
+authors = ['Compound <https://compound.finance>']
+description = 'Pallet for implementing CASH.'
+edition = '2018'
+homepage = 'https://compound.cash'
+name = 'runtime-interfaces'
+repository = 'https://github.com/compound-finance/compound-chain/'
+version = '1.0.0'
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
