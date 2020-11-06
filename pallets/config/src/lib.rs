@@ -1,5 +1,7 @@
 use sp_runtime_interface::pass_by::PassByCodec;
 
+#[macro_use]
+extern crate lazy_static;
 use std::sync::Mutex;
 
 #[derive(Clone, PassByCodec, codec::Encode, codec::Decode)]
@@ -19,7 +21,7 @@ pub fn new_config(eth_rpc_url: String) -> Config {
     };
 }
 
-lazy_static::lazy_static! {
+lazy_static! {
     static ref CONFIG: Mutex<Config> = Mutex::new(new_config("".into()));
 }
 
@@ -29,13 +31,13 @@ pub trait RuntimeInterface {
     /// the chain configuration from the "properties" key in the "chain spec" file. Those
     /// properties determine what goes into the Config object which will then be set here
     /// on startup.
-    fn set_config(config: Config) {
+    fn set(config: Config) {
         CONFIG.lock().unwrap().update(config);
     }
 
     /// This is desgined for use in the context of an offchain worker. The offchain worker may grab
     /// the configuration to determine where to make RPC calls among other parameters.
-    fn get_config() -> Config {
+    fn get() -> Config {
         CONFIG.lock().unwrap().clone()
     }
 }
@@ -50,9 +52,9 @@ mod tests {
         let expected = "my eth rpc url";
         let config = new_config(expected.into());
         // set in node
-        runtime_interface::set_config(config);
+        runtime_interface::set(config);
         // ...later... in offchain worker context, get the configuration
-        let actual_config = runtime_interface::get_config();
+        let actual_config = runtime_interface::get();
         let actual = actual_config.eth_rpc_url;
         assert_eq!(expected, &actual);
     }
