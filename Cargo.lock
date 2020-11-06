@@ -756,6 +756,7 @@ dependencies = [
  "lazy_static",
  "parity-scale-codec",
  "sp-externalities",
+ "sp-io",
  "sp-runtime-interface",
 ]
 
@@ -3512,6 +3513,7 @@ dependencies = [
 name = "pallet-cash"
 version = "1.0.0"
 dependencies = [
+ "config",
  "frame-support",
  "frame-system",
  "parity-scale-codec",

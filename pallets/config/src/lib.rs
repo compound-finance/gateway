@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 #[derive(Clone, PassByCodec, codec::Encode, codec::Decode)]
 pub struct Config {
-    eth_rpc_url: String,
+    eth_rpc_url: Vec<u8>,
 }
 
 impl Config {
@@ -15,7 +15,7 @@ impl Config {
     }
 }
 
-pub fn new_config(eth_rpc_url: String) -> Config {
+pub fn new_config(eth_rpc_url: Vec<u8>) -> Config {
     return Config {
         eth_rpc_url: eth_rpc_url,
     };
@@ -49,13 +49,13 @@ mod tests {
     #[test]
     fn test_basic() {
         // this gets loaded from the json file "chain config file"
-        let expected = "my eth rpc url";
-        let config = new_config(expected.into());
+        let expected: Vec<u8> = "my eth rpc url".into();
+        let config = new_config(expected.clone());
         // set in node
         runtime_interface::set(config);
         // ...later... in offchain worker context, get the configuration
         let actual_config = runtime_interface::get();
         let actual = actual_config.eth_rpc_url;
-        assert_eq!(expected, &actual);
+        assert_eq!(expected, actual);
     }
 }
