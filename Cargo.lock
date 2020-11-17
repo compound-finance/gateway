@@ -3505,6 +3505,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "parity-scale-codec",
+ "runtime-interfaces",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -4591,6 +4592,17 @@ checksum = "99371657d3c8e4d816fb6221db98fa408242b0b53bac08f8676a41f8554fe99f"
 dependencies = [
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "runtime-interfaces"
+version = "1.0.0"
+dependencies = [
+ "lazy_static",
+ "parity-scale-codec",
+ "sp-externalities",
+ "sp-io",
+ "sp-runtime-interface",
 ]
 
 [[package]]
