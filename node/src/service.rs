@@ -18,7 +18,7 @@ native_executor_instance!(
     pub Executor,
     compound_chain_runtime::api::dispatch,
     compound_chain_runtime::native_version,
-    frame_benchmarking::benchmarking::HostFunctions,
+    (frame_benchmarking::benchmarking::HostFunctions, runtime_interfaces::config_interface::HostFunctions)
 );
 
 type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
@@ -89,7 +89,6 @@ pub fn new_partial(
         sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
     )?;
 
-    /*
     let properties = config.chain_spec.properties();
     let runtime_config = crate::chain_spec::extract_configuration_from_properties(&properties)
         .ok_or_else(|| {
@@ -100,8 +99,6 @@ pub fn new_partial(
         })?;
 
     runtime_interfaces::config_interface::set(runtime_config);
-
-     */
 
     Ok(sc_service::PartialComponents {
         client,

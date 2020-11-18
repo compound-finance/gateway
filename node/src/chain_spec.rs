@@ -36,6 +36,16 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
     (get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
 }
 
+fn get_properties() -> sc_service::Properties {
+    let value = serde_json::json! ({
+        "eth_rpc_url" : "https://kovan.infura.io/v3/a9f65788c3c4481da5f6f6820d4cf5c0"
+        // todo: other things here, starport addresses etc etc
+    });
+    let as_object = value.as_object();
+    let unwrapped = as_object.unwrap();
+    unwrapped.clone()
+}
+
 pub fn development_config() -> Result<ChainSpec, String> {
     let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
 
@@ -69,7 +79,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         // Protocol ID
         None,
         // Properties
-        None,
+        Some(get_properties()),
         // Extensions
         None,
     ))
@@ -119,7 +129,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         // Protocol ID
         None,
         // Properties
-        None,
+        Some(get_properties()),
         // Extensions
         None,
     ))
