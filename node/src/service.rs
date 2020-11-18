@@ -89,6 +89,20 @@ pub fn new_partial(
         sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
     )?;
 
+    /*
+    let properties = config.chain_spec.properties();
+    let runtime_config = crate::chain_spec::extract_configuration_from_properties(&properties)
+        .ok_or_else(|| {
+            sc_service::Error::Other(
+                "could not extract runtime configuration from properties key of chain spec"
+                    .to_owned(),
+            )
+        })?;
+
+    runtime_interfaces::config_interface::set(runtime_config);
+
+     */
+
     Ok(sc_service::PartialComponents {
         client,
         backend,

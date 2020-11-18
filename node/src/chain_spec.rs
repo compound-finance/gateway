@@ -162,3 +162,41 @@ fn testnet_genesis(
         }),
     }
 }
+
+pub fn extract_configuration_from_properties(
+    properties: &sp_chain_spec::Properties,
+) -> Option<runtime_interfaces::Config> {
+    let key = "eth_rpc_url".to_owned();
+    let eth_rpc_url = properties.get::<String>(&key)?;
+    let eth_rpc_url_str = eth_rpc_url.as_str()?;
+    Some(runtime_interfaces::new_config(eth_rpc_url_str.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_configuration_from_properties_happy_path() {
+        let expected = "hello world";
+        let properties = serde_json::json!({ "eth_rpc_url": expected });
+        let properties = properties.as_object().unwrap();
+
+        let config = extract_configuration_from_properties(&properties);
+        assert!(config.is_some());
+        let config = config.unwrap();
+        let actual = config.get_eth_rpc_url();
+        // let actual = String::from_utf8(actual).unwrap();
+
+        assert_eq!(actual.as_slice(), expected.as_bytes());
+    }
+
+    #[test]
+    fn test_extract_configuration_from_properties_missing_keys() {
+        let properties = serde_json::json!({ "wrong_key": "some value" });
+        let properties = properties.as_object().unwrap();
+
+        let config = extract_configuration_from_properties(&properties);
+        assert!(config.is_none());
+    }
+}

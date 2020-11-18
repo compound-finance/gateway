@@ -13,6 +13,10 @@ impl Config {
     pub fn update(&mut self, new: Config) {
         self.eth_rpc_url = new.eth_rpc_url
     }
+
+    pub fn get_eth_rpc_url(&self) -> Vec<u8> {
+        self.eth_rpc_url.clone()
+    }
 }
 
 pub fn new_config(eth_rpc_url: Vec<u8>) -> Config {
@@ -31,12 +35,14 @@ pub trait ConfigInterface {
     /// the chain configuration from the "properties" key in the "chain spec" file. Those
     /// properties determine what goes into the Config object which will then be set here
     /// on startup.
+    #[version(1)]
     fn set(config: Config) {
         CONFIG.lock().unwrap().update(config);
     }
 
-    /// This is desgined for use in the context of an offchain worker. The offchain worker may grab
+    /// This is designed for use in the context of an offchain worker. The offchain worker may grab
     /// the configuration to determine where to make RPC calls among other parameters.
+    #[version(1)]
     fn get() -> Config {
         CONFIG.lock().unwrap().clone()
     }

@@ -23,6 +23,7 @@ structopt = '0.3.8'
 
 # local dependencies
 compound-chain-runtime = { path = '../runtime', version = '1.0.0' }
+runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
 
 # Substrate dependencies
 frame-benchmarking = '2.0.0'
@@ -42,6 +43,7 @@ sc-transaction-pool = '2.0.0'
 sp-api = '2.0.0'
 sp-block-builder = '2.0.0'
 sp-blockchain = '2.0.0'
+sp-chain-spec = '2.0.0'
 sp-consensus = '0.8.0'
 sp-consensus-aura = '0.8.0'
 sp-core = '2.0.0'
@@ -50,6 +52,10 @@ sp-inherents = '2.0.0'
 sp-runtime = '2.0.0'
 sp-transaction-pool = '2.0.0'
 substrate-frame-rpc-system = '2.0.0'
+
+[dev-dependencies]
+serde = { version = "1.0.101", features = ["derive"] }
+serde_json = "1.0.41"
 
 [features]
 default = []
