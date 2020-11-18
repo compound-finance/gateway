@@ -678,6 +678,7 @@ dependencies = [
  "frame-benchmarking-cli",
  "jsonrpc-core",
  "pallet-transaction-payment-rpc",
+ "runtime-interfaces",
  "sc-basic-authorship",
  "sc-cli",
  "sc-client-api",

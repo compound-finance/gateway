@@ -23,6 +23,7 @@ structopt = '0.3.8'
 
 # local dependencies
 compound-chain-runtime = { path = '../runtime', version = '1.0.0' }
+runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
 
 # Substrate dependencies
 frame-benchmarking = '2.0.0'
