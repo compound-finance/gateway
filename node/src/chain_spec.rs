@@ -180,7 +180,7 @@ pub fn extract_configuration_from_properties(
     properties: &sp_chain_spec::Properties,
 ) -> Option<runtime_interfaces::Config> {
     let key = "eth_rpc_url".to_owned();
-    let eth_rpc_url = properties.get::<String>(&key)?;
+    let eth_rpc_url = properties.get(&key)?;
     let eth_rpc_url_str = eth_rpc_url.as_str()?;
     // todo: eager validation of some kind here - basic sanity checking? or no?
     Some(runtime_interfaces::new_config(eth_rpc_url_str.into()))
