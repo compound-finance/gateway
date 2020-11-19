@@ -12,6 +12,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod fixed_precision_number;
+
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Trait: frame_system::Trait {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
