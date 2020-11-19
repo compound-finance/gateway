@@ -9,7 +9,7 @@ services:
       - "9944:9944"
     environment:
       - CARGO_HOME=/var/www/compound-chain/.cargo
-      - WASM_BUILD_TOOLCHAIN=nightly-2020-10-05
+      - WASM_BUILD_TOOLCHAIN=nightly-2020-09-27
     volumes:
       - .:/var/www/compound-chain
       - type: bind
