@@ -188,7 +188,7 @@ fn decode_lock_events(data: String) -> anyhow::Result<LockEvent> {
 }
 
 pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
-    let body_str: String = send_rpc("https://kovan.infura.io/v3/a9f65788c3c4481da5f6f6820d4cf5c0",
+    let body_str: String = send_rpc("https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",
     "eth_getLogs",
     vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"])?;
 
@@ -218,7 +218,7 @@ pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
             continue;
         }
 
-        // TODO add more block_hash and transaction_index field???
+        // TODO add block_hash and transaction_index fields???
         // block_hash: eth_log.block_hash.unwrap(),
         // transaction_index: eth_log.transaction_index.unwrap(),
         lock_events.push(deserialized.unwrap());

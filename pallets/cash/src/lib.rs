@@ -123,7 +123,8 @@ decl_module! {
         fn offchain_worker(block_number: T::BlockNumber) {
             debug::native::info!("Hello World from offchain workers!");
 
-            let _ = ethereum_client::fetch_and_decode_lock_events();
+            let lock_events = ethereum_client::fetch_and_decode_lock_events();
+            debug::native::info!("Lock Events: {:?}", lock_events);
         }
     }
 }
