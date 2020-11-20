@@ -20,7 +20,7 @@ Once the development environment is set up, build the Compound Chain. This comma
 [native](https://substrate.dev/docs/en/knowledgebase/advanced/executor#native-execution) code:
 
 ```bash
-WASM_BUILD_TOOLCHAIN=nightly-2020-10-05 cargo build --release
+WASM_BUILD_TOOLCHAIN=nightly-2020-09-27 cargo build --release
 ```
 
 ## Run
