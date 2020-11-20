@@ -1,0 +1,20 @@
+{
+  "name": "starport",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "bignumber": "^1.1.0",
+    "eth-saddle": "^0.1.21"
+  },
+  "scripts": {
+    "compile": "npx saddle compile",
+    "test": "npx saddle compile && npx saddle test",
+    "console": "npx -n --experimental-repl-await saddle console"
+  },
+  "resolutions": {
+    "**/ganache-core": "https://github.com/compound-finance/ganache-core.git#compound",
+    "scrypt.js": "https://registry.npmjs.org/@compound-finance/ethereumjs-wallet/-/ethereumjs-wallet-0.6.3.tgz",
+    "**/sha3": "^2.1.2"
+  }
+}
