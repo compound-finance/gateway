@@ -83,14 +83,14 @@ fn extract_string(candidate: &ethabi::token::Token) -> anyhow::Result<String> {
     if let ethabi::token::Token::String(s) = candidate {
         return Ok(s.clone());
     }
-    Err(anyhow::anyhow!("candidate is not an address"))
+    Err(anyhow::anyhow!("candidate is not a string"))
 }
 
 fn extract_uint(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::Uint> {
     if let ethabi::token::Token::Uint(u) = candidate {
         return Ok(*u);
     }
-    Err(anyhow::anyhow!("candidate is not an address"))
+    Err(anyhow::anyhow!("candidate is not an uint"))
 }
 
 #[derive(Debug)]
@@ -149,7 +149,10 @@ fn send_rpc(
 }
 
 // this helped me https://codeburst.io/deep-dive-into-ethereum-logs-a8d2047c7371?gi=dfa340e5e3e5
-fn decode_lock_events(data: String) -> anyhow::Result<LockEvent> {
+fn decode_events(
+    data: String,
+    types: Vec<ethabi::param_type::ParamType>,
+) -> anyhow::Result<Vec<ethabi::token::Token>> {
     // the data are a hex encoded string starting with 0x
     if !data.starts_with("0x") {
         return Err(anyhow::anyhow!("missing 0x prefix"));
@@ -159,32 +162,16 @@ fn decode_lock_events(data: String) -> anyhow::Result<LockEvent> {
     let decoded = hex::decode(to_decode.as_bytes()).map_err(anyhow::Error::msg)?;
 
     // event Lock(address asset, address holder, uint amount);
-    let abi_decoded = ethabi::decode(
-        &vec![
-            ethabi::param_type::ParamType::Address,   // asset
-            ethabi::param_type::ParamType::Address,   // holder
-            ethabi::param_type::ParamType::Uint(256), // amount
-        ],
-        &decoded,
-    )
-    .map_err(anyhow::Error::msg)?;
+    let abi_decoded = ethabi::decode(&types[..], &decoded).map_err(anyhow::Error::msg)?;
 
-    // 3 args from above
-    if abi_decoded.len() != 3 {
+    // Check that lengths are the same
+    if abi_decoded.len() != types.len() {
         return Err(anyhow::anyhow!(
             "length of decoded event data is not correct"
         ));
     }
 
-    let asset = extract_address(&abi_decoded[0])?;
-    let holder = extract_address(&abi_decoded[1])?;
-    let amount = extract_uint(&abi_decoded[2])?;
-
-    Ok(LockEvent {
-        asset: asset,
-        holder: holder,
-        amount: amount,
-    })
+    Ok(abi_decoded)
 }
 
 pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
@@ -212,16 +199,34 @@ pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
             continue;
         }
 
-        let deserialized = decode_lock_events(eth_log.data.unwrap());
-        if deserialized.is_err() {
+        //let deserialized = decode_lock_events(eth_log.data.unwrap());
+        let abi_decoded = decode_events(
+            eth_log.data.unwrap(),
+            vec![
+                ethabi::param_type::ParamType::Address,   // asset
+                ethabi::param_type::ParamType::Address,   // holder
+                ethabi::param_type::ParamType::Uint(256), // amount
+            ],
+        );
+
+        if abi_decoded.is_err() {
             // debug::native::info!("Could not deserialize lock event");
             continue;
         }
 
+        let decoded = abi_decoded.unwrap();
+        let asset = extract_address(&decoded[0]).map_err(|_| http::Error::Unknown)?;
+        let holder = extract_address(&decoded[1]).map_err(|_| http::Error::Unknown)?;
+        let amount = extract_uint(&decoded[2]).map_err(|_| http::Error::Unknown)?;
+
         // TODO add block_hash and transaction_index fields???
         // block_hash: eth_log.block_hash.unwrap(),
         // transaction_index: eth_log.transaction_index.unwrap(),
-        lock_events.push(deserialized.unwrap());
+        lock_events.push(LockEvent {
+            asset: asset,
+            holder: holder,
+            amount: amount,
+        });
     }
 
     Ok(lock_events)
