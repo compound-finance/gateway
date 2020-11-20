@@ -3,14 +3,21 @@
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// https://substrate.dev/docs/en/knowledgebase/runtime/frame
-use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get};
+use frame_support::{
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
+};
 use frame_system::ensure_signed;
+
+extern crate ethereum_client;
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
+
+#[macro_use]
+extern crate alloc;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Trait: frame_system::Trait {
@@ -101,6 +108,22 @@ decl_module! {
                     Ok(())
                 },
             }
+        }
+
+        /// Offchain Worker entry point.
+        ///
+        /// By implementing `fn offchain_worker` within `decl_module!` you declare a new offchain
+        /// worker.
+        /// This function will be called when the node is fully synced and a new best block is
+        /// succesfuly imported.
+        /// Note that it's not guaranteed for offchain workers to run on EVERY block, there might
+        /// be cases where some blocks are skipped, or for some the worker runs twice (re-orgs),
+        /// so the code should be able to handle that.
+        /// You can use `Local Storage` API to coordinate runs of the worker.
+        fn offchain_worker(block_number: T::BlockNumber) {
+            debug::native::info!("Hello World from offchain workers!");
+
+            let _ = ethereum_client::fetch_and_decode_lock_events();
         }
     }
 }

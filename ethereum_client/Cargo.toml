@@ -1,0 +1,27 @@
+[package]
+name = "ethereum-client"
+version = "0.1.0"
+authors = ['Compound <https://compound.finance>']
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { version = "1.0.33", default-features = false }
+ethabi = { version = "12.0.0", default-features = false }
+hex = { version = "0.4.2", default-features = false }
+serde = { version = "1.0.116", features = ["derive", "alloc"], default-features = false}
+serde_json = { version = "1.0.58", features=["alloc"], default-features = false}
+sp-runtime = { default-features = false, version = '2.0.0' }
+sp-std = { version = "2.0.0", default-features = false }
+sp-io = { version = "2.0.0", default-features = false, features = ["disable_oom", "disable_panic_handler"] }
+
+[features]
+default = ['std']
+std = [
+    "serde/std",
+    "serde_json/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "sp-io/std",
+]
