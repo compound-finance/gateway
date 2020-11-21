@@ -107,6 +107,46 @@ pub struct LockCashEvent {
     pub yield_index: ethabi::Uint,
 }
 
+#[derive(Debug)]
+pub struct LogEvent<T: DecodableEvent> {
+    pub block_hash: String,
+    pub transaction_index: String,
+    pub event: T,
+}
+
+pub trait DecodableEvent {
+    fn name(&self) -> &'static str;
+    fn new(data: String) -> Self;
+}
+
+impl DecodableEvent for LockEvent {
+    fn new(data: String) -> LockEvent {
+        let abi_decoded = decode_events(
+            data,
+            vec![
+                ethabi::param_type::ParamType::Address,   // asset
+                ethabi::param_type::ParamType::Address,   // holder
+                ethabi::param_type::ParamType::Uint(256), // amount
+            ],
+        );
+
+        let decoded = abi_decoded.unwrap();
+        let asset = extract_address(&decoded[0]).unwrap();
+        let holder = extract_address(&decoded[1]).unwrap();
+        let amount = extract_uint(&decoded[2]).unwrap();
+
+        return LockEvent {
+            asset: asset,
+            holder: holder,
+            amount: amount,
+        };
+    }
+
+    fn name(&self) -> &'static str {
+        "LockEvent"
+    }
+}
+
 fn send_rpc(
     server: &'static str,
     method: &'static str,
@@ -174,7 +214,7 @@ fn decode_events(
     Ok(abi_decoded)
 }
 
-pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
+pub fn fetch_and_decode_events<T: DecodableEvent>() -> Result<Vec<LogEvent<T>>, http::Error> {
     let body_str: String = send_rpc("https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",
     "eth_getLogs",
     vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"])?;
@@ -188,7 +228,7 @@ pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
 
     let body_data = deserialized_body.result.ok_or(http::Error::Unknown)?;
     // debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
-    let mut lock_events: Vec<LockEvent> = Vec::new();
+    let mut log_events: Vec<LogEvent<T>> = Vec::new();
 
     for eth_log in body_data {
         if eth_log.block_hash.is_none()
@@ -199,37 +239,15 @@ pub fn fetch_and_decode_lock_events() -> Result<Vec<LockEvent>, http::Error> {
             continue;
         }
 
-        //let deserialized = decode_lock_events(eth_log.data.unwrap());
-        let abi_decoded = decode_events(
-            eth_log.data.unwrap(),
-            vec![
-                ethabi::param_type::ParamType::Address,   // asset
-                ethabi::param_type::ParamType::Address,   // holder
-                ethabi::param_type::ParamType::Uint(256), // amount
-            ],
-        );
-
-        if abi_decoded.is_err() {
-            // debug::native::info!("Could not deserialize lock event");
-            continue;
-        }
-
-        let decoded = abi_decoded.unwrap();
-        let asset = extract_address(&decoded[0]).map_err(|_| http::Error::Unknown)?;
-        let holder = extract_address(&decoded[1]).map_err(|_| http::Error::Unknown)?;
-        let amount = extract_uint(&decoded[2]).map_err(|_| http::Error::Unknown)?;
-
-        // TODO add block_hash and transaction_index fields???
-        // block_hash: eth_log.block_hash.unwrap(),
-        // transaction_index: eth_log.transaction_index.unwrap(),
-        lock_events.push(LockEvent {
-            asset: asset,
-            holder: holder,
-            amount: amount,
+        let lock_event = DecodableEvent::new(eth_log.data.unwrap());
+        log_events.push(LogEvent {
+            block_hash: eth_log.block_hash.unwrap(),
+            transaction_index: eth_log.transaction_index.unwrap(),
+            event: lock_event,
         });
     }
 
-    Ok(lock_events)
+    Ok(log_events)
 }
 
 // TODO enable tests back
