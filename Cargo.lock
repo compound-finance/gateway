@@ -4601,8 +4601,6 @@ version = "1.0.0"
 dependencies = [
  "lazy_static",
  "parity-scale-codec",
- "sp-externalities",
- "sp-io",
  "sp-runtime-interface",
 ]
 

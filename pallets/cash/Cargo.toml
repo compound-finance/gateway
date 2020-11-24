@@ -21,10 +21,10 @@ version = '1.3.4'
 frame-support = { default-features = false, version = '2.0.0' }
 frame-system = { default-features = false, version = '2.0.0' }
 runtime-interfaces = { default-features = false, version = '1.0.0', path="../runtime-interfaces"}
+sp-io = { version = "2.0.0", default-features = false, features = ["disable_oom", "disable_panic_handler"] }
 
 [dev-dependencies]
 sp-core = { default-features = false, version = '2.0.0' }
-sp-io = { default-features = false, version = '2.0.0' }
 sp-runtime = { default-features = false, version = '2.0.0' }
 
 [features]
@@ -33,4 +33,6 @@ std = [
     'codec/std',
     'frame-support/std',
     'frame-system/std',
+    'runtime-interfaces/std',
+    'sp-io/std'
 ]
