@@ -19,9 +19,10 @@ contract Starport {
 
 	ICash immutable public cash;
 
+	address immutable public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
 	event LockCash(address holder, uint amount, uint yieldIndex);
 	event Lock(address asset, address holder, uint amount);
-	event LockETH(address holder, uint amount);
 
 	constructor(ICash cash_) {
 		cash = cash_;
@@ -37,7 +38,7 @@ contract Starport {
 
 	function lockETH() public payable {
 		// TODO: Check Supply Cap
-		emit LockETH(msg.sender, msg.value);
+		emit Lock(ETH_ADDRESS, msg.sender, msg.value);
 	}
 
 	function lockCashInternal(uint amount, address sender) internal {

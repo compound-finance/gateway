@@ -12,7 +12,10 @@ const getHypotheticalAddr = (acct, nonce) => {
   return '0x' + web3.utils.sha3(RLP.encode([acct, nonce])).slice(12).substring(14);
 }
 
+const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const LOCK_EVENT_TOPIC = "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
 
+// TODO: test fee token
 describe('Starport', () => {
   let starport;
   let cash;
@@ -79,7 +82,9 @@ describe('Starport', () => {
     const bal1 = await web3.eth.getBalance(starport._address);
     expect(bal1).numEquals(amt);
 
-    expect(tx.events.LockETH.returnValues).toMatchObject({
+    expect(tx.events.Lock.signature).toBe(LOCK_EVENT_TOPIC)
+    expect(tx.events.Lock.returnValues).toMatchObject({
+        asset: ETH_ADDRESS,
         holder: a1,
         amount: amt.toString()
       }
@@ -90,9 +95,10 @@ describe('Starport', () => {
     const amt = mantissa(1);
     const bal0 = await web3.eth.getBalance(starport._address);
     expect(bal0).numEquals(0);
-    await web3.eth.sendTransaction({ to: starport._address, from: a1, value: Number(amt)});
+    const tx = await web3.eth.sendTransaction({ to: starport._address, from: a1, value: Number(amt)});
     const bal1 = await web3.eth.getBalance(starport._address);
     expect(bal1).numEquals(amt);
+    expect(tx.logs[0].topics[0]).toBe(LOCK_EVENT_TOPIC);
   });
 
 });
