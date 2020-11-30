@@ -1,3 +1,4 @@
+use frame_support::debug;
 /// for now this will just focus on serialization and deserialization of payloads
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -158,7 +159,7 @@ fn send_rpc(
         method,
         params.join(",")
     );
-    // debug::warn!("dat: {}", dat.clone());
+    debug::warn!("dat: {}", dat.clone());
 
     let request = http::Request::post(server, vec![dat]);
 
@@ -173,7 +174,7 @@ fn send_rpc(
         .map_err(|_| http::Error::DeadlineReached)??;
 
     if response.code != 200 {
-        // debug::warn!("Unexpected status code: {}", response.code);
+        debug::warn!("Unexpected status code: {}", response.code);
         return Err(http::Error::Unknown);
     }
 
@@ -181,7 +182,7 @@ fn send_rpc(
 
     // Create a str slice from the body.
     let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
-        // debug::warn!("No UTF8 body");
+        debug::warn!("No UTF8 body");
         http::Error::Unknown
     })?;
 
@@ -227,7 +228,7 @@ pub fn fetch_and_decode_events<T: DecodableEvent>() -> Result<Vec<LogEvent<T>>, 
     }
 
     let body_data = deserialized_body.result.ok_or(http::Error::Unknown)?;
-    // debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
+    debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
     let mut log_events: Vec<LogEvent<T>> = Vec::new();
 
     for eth_log in body_data {
@@ -235,7 +236,7 @@ pub fn fetch_and_decode_events<T: DecodableEvent>() -> Result<Vec<LogEvent<T>>, 
             || eth_log.transaction_index.is_none()
             || eth_log.data.is_none()
         {
-            // debug::native::info!("Missing critical field from eth log event");
+            debug::native::info!("Missing critical field from eth log event");
             continue;
         }
 
