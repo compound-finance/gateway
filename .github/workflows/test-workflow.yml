@@ -2,8 +2,8 @@ name: Test
 on: push
 
 jobs:
-  test:
-    name: Test
+  substrate-tests:
+    name: substrate-tests
     runs-on: ubuntu-latest
     steps:
       - name: Test Note for ${{ github.ref }}
@@ -23,3 +23,34 @@ jobs:
       - name: Cargo Test
         run: |
           cargo +nightly-2020-09-27 test
+
+  eth-tests:
+    name: eth-tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ethereum
+    strategy:
+      matrix:
+        node-version: [12.x]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '12.x'
+    - uses: actions/cache@v2
+      with:
+        path: '**/node_modules'
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+    - name: Install dependencies
+      run: yarn install
+    - name: Install solc
+      run:
+        |
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.6.10/solc-static-linux -O /usr/local/bin/solc
+          sudo chmod +x /usr/local/bin/solc
+    - name: Run tests
+      run: yarn test

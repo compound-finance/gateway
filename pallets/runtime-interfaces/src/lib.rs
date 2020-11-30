@@ -13,6 +13,10 @@ impl Config {
     pub fn update(&mut self, new: Config) {
         self.eth_rpc_url = new.eth_rpc_url
     }
+
+    pub fn get_eth_rpc_url(&self) -> Vec<u8> {
+        self.eth_rpc_url.clone()
+    }
 }
 
 pub fn new_config(eth_rpc_url: Vec<u8>) -> Config {
@@ -35,7 +39,7 @@ pub trait ConfigInterface {
         CONFIG.lock().unwrap().update(config);
     }
 
-    /// This is desgined for use in the context of an offchain worker. The offchain worker may grab
+    /// This is designed for use in the context of an offchain worker. The offchain worker may grab
     /// the configuration to determine where to make RPC calls among other parameters.
     fn get() -> Config {
         CONFIG.lock().unwrap().clone()

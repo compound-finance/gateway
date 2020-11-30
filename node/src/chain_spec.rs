@@ -36,6 +36,17 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
     (get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
 }
 
+/// Get the properties key of the chain spec file - a basic valid configuration
+fn get_properties() -> sc_service::Properties {
+    let value = serde_json::json! ({
+        "eth_rpc_url" : "https://kovan.infura.io/v3/a9f65788c3c4481da5f6f6820d4cf5c0"
+        // todo: override with environment variable and/or cli param?
+    });
+    let as_object = value.as_object();
+    let unwrapped = as_object.unwrap();
+    unwrapped.clone()
+}
+
 pub fn development_config() -> Result<ChainSpec, String> {
     let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
 
@@ -69,7 +80,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         // Protocol ID
         None,
         // Properties
-        None,
+        Some(get_properties()),
         // Extensions
         None,
     ))
@@ -119,7 +130,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         // Protocol ID
         None,
         // Properties
-        None,
+        Some(get_properties()),
         // Extensions
         None,
     ))
@@ -160,5 +171,59 @@ fn testnet_genesis(
             // Assign network admin rights.
             key: root_key,
         }),
+    }
+}
+
+/// A helper function used to extract the runtime interface configuration used for offchain workers
+/// from the properties attribute of the chain spec file.
+pub fn extract_configuration_from_properties(
+    properties: &sp_chain_spec::Properties,
+) -> Option<runtime_interfaces::Config> {
+    let key = "eth_rpc_url".to_owned();
+    let eth_rpc_url = properties.get(&key)?;
+    let eth_rpc_url_str = eth_rpc_url.as_str()?;
+    // todo: eager validation of some kind here - basic sanity checking? or no?
+    Some(runtime_interfaces::new_config(eth_rpc_url_str.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Best case scenario - we have the key we need in the properties map and we _can_ return
+    /// the OCW configuration
+    #[test]
+    fn test_extract_configuration_from_properties_happy_path() {
+        let expected = "hello world";
+        let properties = serde_json::json!({ "eth_rpc_url": expected });
+        let properties = properties.as_object().unwrap();
+
+        let config = extract_configuration_from_properties(&properties);
+        assert!(config.is_some());
+        let config = config.unwrap();
+        let actual = config.get_eth_rpc_url();
+        // let actual = String::from_utf8(actual).unwrap();
+
+        assert_eq!(actual.as_slice(), expected.as_bytes());
+    }
+
+    /// Bad case - we do _not_ have the keys we need to return the OCW configuration
+    #[test]
+    fn test_extract_configuration_from_properties_missing_keys() {
+        let properties = serde_json::json!({ "wrong_key": "some value" });
+        let properties = properties.as_object().unwrap();
+
+        let config = extract_configuration_from_properties(&properties);
+        assert!(config.is_none());
+    }
+
+    /// Bad case - we do have the keys we need but we have the wrong data types
+    #[test]
+    fn test_extract_configuration_from_properties_wrong_type() {
+        let properties = serde_json::json!({ "eth_rpc_url": 0 });
+        let properties = properties.as_object().unwrap();
+
+        let config = extract_configuration_from_properties(&properties);
+        assert!(config.is_none());
     }
 }

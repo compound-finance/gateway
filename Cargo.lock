@@ -690,9 +690,12 @@ dependencies = [
  "sc-rpc-api",
  "sc-service",
  "sc-transaction-pool",
+ "serde",
+ "serde_json",
  "sp-api",
  "sp-block-builder",
  "sp-blockchain",
+ "sp-chain-spec",
  "sp-consensus",
  "sp-consensus-aura",
  "sp-core",
@@ -4677,8 +4680,6 @@ version = "1.0.0"
 dependencies = [
  "lazy_static",
  "parity-scale-codec",
- "sp-externalities",
- "sp-io",
  "sp-runtime-interface",
 ]
 
