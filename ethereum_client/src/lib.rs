@@ -1,7 +1,6 @@
 use frame_support::debug;
 /// for now this will just focus on serialization and deserialization of payloads
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sp_runtime::offchain::{http, Duration};
 
 #[derive(Serialize)]
@@ -50,23 +49,6 @@ pub struct LogObject {
     pub topics: Option<Vec<String>>,
 }
 
-pub fn serialize_get_logs_request(params: GetLogsParams, id: u64) -> String {
-    serialize_request("eth_getLogs", &params, id)
-}
-
-pub fn serialize_request<T>(method: &str, params: &T, id: u64) -> String
-where
-    T: ?Sized + Serialize,
-{
-    let to_serialize = json!({
-        "jsonprc": "2.0",
-        "method": method,
-        "params": [ params ],
-        "id": id
-    });
-    serde_json::to_string(&to_serialize).unwrap()
-}
-
 pub fn deserialize_get_logs_response(
     response: &str,
 ) -> serde_json::error::Result<ResponseWrapper<LogObject>> {
@@ -80,12 +62,13 @@ fn extract_address(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::A
     Err(anyhow::anyhow!("candidate is not an address"))
 }
 
-fn extract_string(candidate: &ethabi::token::Token) -> anyhow::Result<String> {
-    if let ethabi::token::Token::String(s) = candidate {
-        return Ok(s.clone());
-    }
-    Err(anyhow::anyhow!("candidate is not a string"))
-}
+// TODO enable back if needed later
+// fn extract_string(candidate: &ethabi::token::Token) -> anyhow::Result<String> {
+//     if let ethabi::token::Token::String(s) = candidate {
+//         return Ok(s.clone());
+//     }
+//     Err(anyhow::anyhow!("candidate is not a string"))
+// }
 
 fn extract_uint(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::Uint> {
     if let ethabi::token::Token::Uint(u) = candidate {
@@ -251,25 +234,9 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
     Ok(log_events)
 }
 
-// TODO enable tests back
 #[cfg(test)]
 mod tests {
     //     use crate::*;
-
-    //     #[test]
-    //     fn test_serialize_get_logs_request() {
-    //         const BASIC_REQUEST_SERIALIZATION_EXPECTED: &str = r#"{"id":1,"jsonprc":"2.0","method":"eth_getLogs","params":[{"address":"address","blockHash":"block hash","fromBlock":1234,"toBlock":null,"topics":["topic1","topic2"]}]}"#;
-
-    //         let req = GetLogsParams {
-    //             block_hash: Some("block hash".to_owned()),
-    //             topics: Some(vec!["topic1".to_owned(), "topic2".to_owned()]),
-    //             address: Some("address".to_owned()),
-    //             from_block: Some(1234),
-    //             to_block: None,
-    //         };
-    //         let actual = serialize_get_logs_request(req, 1);
-    //         assert_eq!(BASIC_REQUEST_SERIALIZATION_EXPECTED, actual);
-    //     }
 
     //     #[test]
     //     fn test_deserialize_get_logs_request_happy_path() {

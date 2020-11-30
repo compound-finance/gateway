@@ -7,7 +7,7 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 use frame_system::ensure_signed;
-use sp_runtime::offchain::{http, Duration};
+use sp_runtime::offchain::http;
 use sp_std::vec::Vec;
 
 extern crate ethereum_client;
@@ -125,8 +125,7 @@ decl_module! {
         fn offchain_worker(block_number: T::BlockNumber) {
             debug::native::info!("Hello World from offchain workers!");
 
-            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events("https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",
-            vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
+            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events("https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
             debug::native::info!("Lock Events: {:?}", lock_events);
         }
     }
