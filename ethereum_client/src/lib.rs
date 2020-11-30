@@ -154,14 +154,14 @@ fn send_rpc(
     params: Vec<&str>,
 ) -> Result<String, http::Error> {
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
-    let dat = format!(
+    let data = format!(
         r#"{{"jsonrpc":"2.0","method":"{}","params":[{}],"id":1}}"#,
         method,
         params.join(",")
     );
-    debug::warn!("dat: {}", dat.clone());
+    debug::native::info!("Data for send_rpc: {}", data.clone());
 
-    let request = http::Request::post(server, vec![dat]);
+    let request = http::Request::post(server, vec![data]);
 
     let pending = request
         .deadline(deadline)
@@ -215,11 +215,11 @@ fn decode_events(
     Ok(abi_decoded)
 }
 
-pub fn fetch_and_decode_events<T: DecodableEvent>() -> Result<Vec<LogEvent<T>>, http::Error> {
-    let body_str: String = send_rpc("https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",
-    "eth_getLogs",
-    vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"])?;
-
+pub fn fetch_and_decode_events<T: DecodableEvent>(
+    server: &'static str,
+    params: Vec<&str>,
+) -> Result<Vec<LogEvent<T>>, http::Error> {
+    let body_str: String = send_rpc(server, "eth_getLogs", params)?;
     let deserialized_body =
         deserialize_get_logs_response(&body_str).map_err(|_| http::Error::Unknown)?;
 
