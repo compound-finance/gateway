@@ -49,7 +49,7 @@ pub struct LogObject {
     pub topics: Option<Vec<String>>,
 }
 
-pub fn deserialize_get_logs_response(
+fn deserialize_get_logs_response(
     response: &str,
 ) -> serde_json::error::Result<ResponseWrapper<LogObject>> {
     serde_json::from_str(response)
@@ -131,11 +131,9 @@ impl DecodableEvent for LockEvent {
     }
 }
 
-fn send_rpc(
-    server: &'static str,
-    method: &'static str,
-    params: Vec<&str>,
-) -> Result<String, http::Error> {
+// TODO add implementation of DecodableEvent for LockCashEvent
+
+fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<String, http::Error> {
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
     let data = format!(
         r#"{{"jsonrpc":"2.0","method":"{}","params":[{}],"id":1}}"#,
@@ -199,7 +197,7 @@ fn decode_events(
 }
 
 pub fn fetch_and_decode_events<T: DecodableEvent>(
-    server: &'static str,
+    server: &str,
     params: Vec<&str>,
 ) -> Result<Vec<LogEvent<T>>, http::Error> {
     let body_str: String = send_rpc(server, "eth_getLogs", params)?;
