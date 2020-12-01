@@ -2,7 +2,7 @@ pragma solidity ^0.7.5;
 
 
 
-import "./CashToken.sol";
+import "../CashToken.sol";
 
 contract MockCashToken is CashToken {
 

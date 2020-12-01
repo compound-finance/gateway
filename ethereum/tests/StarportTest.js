@@ -1,4 +1,5 @@
 const RLP = require('rlp');
+const {ethers} = require('ethers');
 
 const bi = num => {
   return BigInt(num);
@@ -13,7 +14,11 @@ const getHypotheticalAddr = (acct, nonce) => {
 }
 
 const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-const LOCK_EVENT_TOPIC = "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
+
+const getLockEventTopic = () => {
+  const i = new ethers.utils.Interface(["event Lock(address asset, address holder, uint amount)"]);
+  return i.events.Lock.topic;
+}
 
 // TODO: test fee token
 describe('Starport', () => {
@@ -82,7 +87,6 @@ describe('Starport', () => {
     const bal1 = await web3.eth.getBalance(starport._address);
     expect(bal1).numEquals(amt);
 
-    expect(tx.events.Lock.signature).toBe(LOCK_EVENT_TOPIC)
     expect(tx.events.Lock.returnValues).toMatchObject({
         asset: ETH_ADDRESS,
         holder: a1,
@@ -98,7 +102,7 @@ describe('Starport', () => {
     const tx = await web3.eth.sendTransaction({ to: starport._address, from: a1, value: Number(amt)});
     const bal1 = await web3.eth.getBalance(starport._address);
     expect(bal1).numEquals(amt);
-    expect(tx.logs[0].topics[0]).toBe(LOCK_EVENT_TOPIC);
+    expect(tx.logs[0].topics[0]).toBe(getLockEventTopic());
   });
 
 });
