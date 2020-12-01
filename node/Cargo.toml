@@ -15,7 +15,7 @@ name = 'compound-chain'
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-build-script-utils = { version = '2.0.0', path = '../../substrate/utils/build-script-utils' }
+substrate-build-script-utils = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a'}
 
 [dependencies]
 jsonrpc-core = '15.0.0'
@@ -29,36 +29,36 @@ compound-chain-runtime = { version = '1.0.0', path = '../runtime' }
 runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
 
 # Substrate dependencies
-sc-cli = { version = '0.8.0', path = '../../substrate/client/cli', features = ['wasmtime'] }
-sp-core = { version = '2.0.0', path = '../../substrate/primitives/core' }
-sc-executor = { version = '0.8.0', path = '../../substrate/client/executor', features = ['wasmtime'] }
-sc-service = { version = '0.8.0', path = '../../substrate/client/service', default-features=false, features = [] }
-sp-inherents = { version = '2.0.0', path = '../../substrate/primitives/inherents' }
-sc-transaction-pool = { version = '2.0.0', path = '../../substrate/client/transaction-pool' }
-sp-transaction-pool = { version = '2.0.0', path = '../../substrate/primitives/transaction-pool' }
-sc-consensus-aura = { version = '0.8.0', path = '../../substrate/client/consensus/aura' }
-sp-consensus-aura = { version = '0.8.0', path = '../../substrate/primitives/consensus/aura' }
-sp-consensus = { version = '0.8.0', path = '../../substrate/primitives/consensus/common' }
-sc-consensus = { version = '0.8.0', path = '../../substrate/client/consensus/common' }
-sc-finality-grandpa = { version = '0.8.0', path = '../../substrate/client/finality-grandpa' }
-sp-finality-grandpa = { version = '2.0.0', path = '../../substrate/primitives/finality-grandpa' }
-sc-client-api = { version = '2.0.0', path = '../../substrate/client/api' }
-sp-runtime = { version = '2.0.0', path = '../../substrate/primitives/runtime' }
+sc-cli = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
+sp-core = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-executor = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
+sc-service = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false, features = [] }
+sp-inherents = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-consensus-aura = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-consensus-aura = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-consensus = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-consensus = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-finality-grandpa = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-finality-grandpa = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-client-api = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-runtime = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
 
 # These dependencies are used for the node template's RPCs
-sc-rpc = { version = '2.0.0', path = '../../substrate/client/rpc' }
-sp-api = { version = '2.0.0', path = '../../substrate/primitives/api' }
-sc-rpc-api = { version = '0.8.0', path = '../../substrate/client/rpc-api' }
-sp-blockchain = { version = '2.0.0', path = '../../substrate/primitives/blockchain' }
-sp-chain-spec = { version = '2.0.0', path = '../../substrate/primitives/chain-spec' }
-sp-block-builder = { version = '2.0.0', path = '../../substrate/primitives/block-builder' }
-sc-basic-authorship = { version = '0.8.0', path = '../../substrate/client/basic-authorship' }
-substrate-frame-rpc-system = { version = '2.0.0', path = '../../substrate/utils/frame/rpc/system' }
-pallet-transaction-payment-rpc = { version = '2.0.0', path = '../../substrate/frame/transaction-payment/rpc/' }
+sc-rpc = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-api = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-rpc-api = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-blockchain = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-chain-spec = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-block-builder = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-basic-authorship = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+substrate-frame-rpc-system = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+pallet-transaction-payment-rpc = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
 
 # These dependencies are used for runtime benchmarking
-frame-benchmarking = { version = '2.0.0', path = '../../substrate/frame/benchmarking' }
-frame-benchmarking-cli = { version = '2.0.0', path = '../../substrate/utils/frame/benchmarking-cli', default-features=false, optional=true }
+frame-benchmarking = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+frame-benchmarking-cli = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false, optional=true }
 
 [features]
 default = []
