@@ -22,7 +22,7 @@ jobs:
 
       - name: Cargo Test
         run: |
-          cargo +nightly-2020-09-27 test
+          cargo test
 
   eth-tests:
     name: eth-tests

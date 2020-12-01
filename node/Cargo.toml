@@ -33,6 +33,7 @@ sc-cli = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git
 sp-core = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
 sc-executor = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
 sc-service = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false, features = [] }
+sc-client-db = { version = "0.8.0", git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false }
 sp-inherents = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
 sc-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
 sp-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
@@ -61,7 +62,9 @@ frame-benchmarking = { version = '2.0.0', git = 'https://github.com/paritytech/s
 frame-benchmarking-cli = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false, optional=true }
 
 [features]
-default = []
+default = ['with-parity-db']
+with-parity-db=['sc-client-db/with-parity-db']
+with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
 runtime-benchmarks = [
 	'compound-chain-runtime/runtime-benchmarks',
 	'frame-benchmarking-cli',

@@ -69,6 +69,7 @@ Start Alice's node first. The command below uses the default TCP port (30333) an
 
 ```bash
 cargo run -- \
+  --db=ParityDB \
   --base-path /tmp/alice \
   --chain=local \
   --alice \
@@ -83,6 +84,7 @@ Alice's on TCP port 30333:
 
 ```bash
 cargo run -- \
+  --db=ParityDB \
   --base-path /tmp/bob \
   --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp \
   --chain=local \

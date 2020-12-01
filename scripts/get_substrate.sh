@@ -69,9 +69,9 @@ else
 	rustup update
 	rustup default stable
 fi
-rustup toolchain install nightly-2020-09-27
+rustup toolchain install nightly
 # rustup update nightly
-rustup target add wasm32-unknown-unknown --toolchain nightly-2020-09-27
+rustup target add wasm32-unknown-unknown --toolchain nightly
 
 if [[ "$1" == "--fast" ]]; then
 	echo "Skipped cargo install of 'substrate' and 'subkey'"
