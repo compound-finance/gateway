@@ -2,14 +2,7 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
-// Make the WASM binary available.
-#[cfg(feature = "std")]
-include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
-use pallet_grandpa::fg_primitives;
-use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 use sp_api::impl_runtime_apis;
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::traits::{
     AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Saturating, Verify,
@@ -20,32 +13,53 @@ use sp_runtime::{
     ApplyExtrinsicResult, MultiSignature,
 };
 use sp_std::prelude::*;
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-// A few exports that help ease life for downstream crates.
-pub use frame_support::{
-    construct_runtime, parameter_types,
-    traits::{KeyOwnerProofSystem, Randomness},
-    weights::{
-        constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-        IdentityFee, Weight,
-    },
-    StorageValue,
-};
-pub use pallet_balances::Call as BalancesCall;
-pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::CurrencyAdapter;
+// A few (re-)exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
-/// Import the CASH pallet.
-pub use pallet_cash;
+pub use frame_support::{
+    construct_runtime, parameter_types,
+    traits::{KeyOwnerProofSystem, Randomness},
+    weights::{
+        constants::{
+            BlockExecutionWeight, ExtrinsicBaseWeight, ParityDbWeight as DbWeight,
+            WEIGHT_PER_SECOND,
+        },
+        IdentityFee, Weight,
+    },
+    StorageValue,
+};
+
+pub use pallet_balances::Call as BalancesCall;
+pub use pallet_grandpa::fg_primitives;
+pub use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
+pub use pallet_timestamp::Call as TimestampCall;
+pub use pallet_transaction_payment::CurrencyAdapter;
+
+// Make the WASM binary available.
+#[cfg(feature = "std")]
+include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
+
+#[cfg(feature = "std")]
+/// Wasm binary unwrapped - if built with `BUILD_DUMMY_WASM_BINARY` (for faster cargo checks), the function panics.
+pub fn wasm_binary_unwrap() -> &'static [u8] {
+    WASM_BINARY.expect(
+        "Development wasm binary is not available. \
+         This means the client is built with `BUILD_DUMMY_WASM_BINARY` flag and it is only usable for production chains. \
+         Please rebuild with the flag disabled.")
+}
 
 /// An index to a block.
 pub type BlockNumber = u32;
+
+/// An instant or duration in time.
+pub type Moment = u64;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -88,7 +102,7 @@ pub mod opaque {
 
     impl_opaque_keys! {
         pub struct SessionKeys {
-            pub aura: Aura,
+            pub babe: Babe,
             pub grandpa: Grandpa,
         }
     }
@@ -104,12 +118,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     transaction_version: 1,
 };
 
-/// This determines the average expected block time that we are targetting.
-/// Blocks will be produced at a minimum duration defined by `SLOT_DURATION`.
-/// `SLOT_DURATION` is picked up by `pallet_timestamp` which is in turn picked
-/// up by `pallet_aura` to implement `fn slot_duration()`.
-///
-/// Change this to adjust the block time.
+pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 4 * HOURS;
+
 pub const MILLISECS_PER_BLOCK: u64 = 6000;
 
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
@@ -170,7 +180,7 @@ impl frame_system::Config for Runtime {
     /// Maximum weight of each block.
     type MaximumBlockWeight = MaximumBlockWeight;
     /// The weight of database operations that the runtime can invoke.
-    type DbWeight = RocksDbWeight;
+    type DbWeight = DbWeight;
     /// The weight of the overhead invoked on the block import process, independent of the
     /// extrinsics included in that block.
     type BlockExecutionWeight = BlockExecutionWeight;
@@ -201,15 +211,38 @@ impl frame_system::Config for Runtime {
     type SystemWeightInfo = ();
 }
 
-impl pallet_aura::Config for Runtime {
-    type AuthorityId = AuraId;
+parameter_types! {
+    pub const EpochDuration: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
+    pub const ExpectedBlockTime: Moment = MILLISECS_PER_BLOCK;
+}
+
+impl pallet_babe::Config for Runtime {
+    type EpochDuration = EpochDuration;
+    type ExpectedBlockTime = ExpectedBlockTime;
+    type EpochChangeTrigger = pallet_babe::ExternalTrigger;
+
+    type KeyOwnerProofSystem = (); // XXX we prob want one?
+
+    type KeyOwnerProof = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        pallet_babe::AuthorityId,
+    )>>::Proof;
+
+    type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        pallet_babe::AuthorityId,
+    )>>::IdentificationTuple;
+
+    type HandleEquivocation = (); // XXX polkadot has one
+
+    type WeightInfo = ();
 }
 
 impl pallet_grandpa::Config for Runtime {
     type Event = Event;
     type Call = Call;
 
-    type KeyOwnerProofSystem = ();
+    type KeyOwnerProofSystem = (); // XXX we prob want one?
 
     type KeyOwnerProof =
         <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
@@ -230,8 +263,8 @@ parameter_types! {
 
 impl pallet_timestamp::Config for Runtime {
     /// A timestamp: milliseconds since the unix epoch.
-    type Moment = u64;
-    type OnTimestampSet = Aura;
+    type Moment = Moment;
+    type OnTimestampSet = Babe;
     type MinimumPeriod = MinimumPeriod;
     type WeightInfo = ();
 }
@@ -284,13 +317,14 @@ construct_runtime!(
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
         RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-        Aura: pallet_aura::{Module, Config<T>, Inherent},
+        Babe: pallet_babe::{Module, Call, Storage, Config, Inherent, ValidateUnsigned},
         Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
         Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: pallet_transaction_payment::{Module, Storage},
         Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
+
         // Include the custom logic from the CASH pallet in the runtime.
-        TemplateModule: pallet_cash::{Module, Call, Storage, Event<T>},
+        Cash: pallet_cash::{Module, Call, Storage, Event<T>},
     }
 );
 
@@ -388,14 +422,46 @@ impl_runtime_apis! {
         }
     }
 
-    impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
-        fn slot_duration() -> u64 {
-            Aura::slot_duration()
+    impl sp_consensus_babe::BabeApi<Block> for Runtime {
+    fn configuration() -> sp_consensus_babe::BabeGenesisConfiguration {
+        // The choice of `c` parameter (where `1 - c` represents the probability of a slot being empty),
+        //  is done in accordance to the slot duration and expected target block time,
+        //   for safely resisting network delays of maximum two seconds.
+        //  <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
+        //  i.e. 1 in 4 blocks (on average, not counting collisions) will be primary babe blocks.
+        let primary_probability: (u64, u64) = (1, 4);
+        sp_consensus_babe::BabeGenesisConfiguration {
+            slot_duration: Babe::slot_duration(),
+            epoch_length: EpochDuration::get(),
+            c: primary_probability,
+            genesis_authorities: Babe::authorities(),
+            randomness: Babe::randomness(),
+            allowed_slots: sp_consensus_babe::AllowedSlots::PrimaryAndSecondaryVRFSlots,
         }
+    }
 
-        fn authorities() -> Vec<AuraId> {
-            Aura::authorities()
-        }
+    fn current_epoch_start() -> sp_consensus_babe::SlotNumber {
+        Babe::current_epoch_start()
+    }
+
+    fn generate_key_ownership_proof(
+        _slot_number: sp_consensus_babe::SlotNumber,
+        _authority_id: sp_consensus_babe::AuthorityId,
+    ) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
+        None // XXX to use Historical, we need session
+    }
+
+    fn submit_report_equivocation_unsigned_extrinsic(
+        equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
+        key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
+    ) -> Option<()> {
+        let key_owner_proof = key_owner_proof.decode()?;
+
+        Babe::submit_unsigned_equivocation_report(
+        equivocation_proof,
+        key_owner_proof,
+        )
+    }
     }
 
     impl sp_session::SessionKeys<Block> for Runtime {
@@ -429,6 +495,7 @@ impl_runtime_apis! {
             _set_id: fg_primitives::SetId,
             _authority_id: GrandpaId,
         ) -> Option<fg_primitives::OpaqueKeyOwnershipProof> {
+            // XXX
             // NOTE: this is the only implementation possible since we've
             // defined our key owner proof type as a bottom type (i.e. a type
             // with no values).
