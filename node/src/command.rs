@@ -17,6 +17,7 @@
 
 use crate::cli::{Cli, Subcommand};
 use crate::{chain_spec, service};
+#[cfg(feature = "runtime-benchmarks")]
 use compound_chain_runtime::Block;
 use sc_cli::{ChainSpec, Role, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
@@ -132,6 +133,7 @@ pub fn run() -> sc_cli::Result<()> {
                 Ok((cmd.run(client, backend), task_manager))
             })
         }
+        #[cfg(feature = "runtime-benchmarks")]
         Some(Subcommand::Benchmark(cmd)) => {
             if cfg!(feature = "runtime-benchmarks") {
                 let runner = cli.create_runner(cmd)?;

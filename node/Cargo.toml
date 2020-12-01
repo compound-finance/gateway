@@ -58,10 +58,11 @@ pallet-transaction-payment-rpc = { version = '2.0.0', path = '../../substrate/fr
 
 # These dependencies are used for runtime benchmarking
 frame-benchmarking = { version = '2.0.0', path = '../../substrate/frame/benchmarking' }
-frame-benchmarking-cli = { version = '2.0.0', path = '../../substrate/utils/frame/benchmarking-cli' }
+frame-benchmarking-cli = { version = '2.0.0', path = '../../substrate/utils/frame/benchmarking-cli', default-features=false, optional=true }
 
 [features]
 default = []
 runtime-benchmarks = [
 	'compound-chain-runtime/runtime-benchmarks',
+	'frame-benchmarking-cli',
 ]
