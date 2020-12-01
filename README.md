@@ -8,19 +8,28 @@ Compound Chain is built on [Substrate](https://substrate.dev).
 
 Follow these steps to prepare a local Substrate development environment :hammer_and_wrench:
 
-### Setup
+### Simple Setup
 
-Setup instructions can be found at the
-[Substrate Developer Hub](https://substrate.dev/docs/en/knowledgebase/getting-started).
+Install all the required dependencies with a single command (be patient, this can take up to 30
+minutes).
+
+```bash
+curl https://getsubstrate.io -sSf | bash -s -- --fast
+```
+
+### Manual Setup
+
+Find manual setup instructions at the
+[Substrate Developer Hub](https://substrate.dev/docs/en/knowledgebase/getting-started/#manual-installation).
 
 ### Build
 
-Once the development environment is set up, build the Compound Chain. This command will build the
+Once the development environment is set up, build Compound Chain. This command will build the
 [Wasm](https://substrate.dev/docs/en/knowledgebase/advanced/executor#wasm-execution) and
 [native](https://substrate.dev/docs/en/knowledgebase/advanced/executor#native-execution) code:
 
 ```bash
-WASM_BUILD_TOOLCHAIN=nightly-2020-09-27 cargo build --release
+cargo build --release
 ```
 
 ## Run
@@ -30,7 +39,7 @@ WASM_BUILD_TOOLCHAIN=nightly-2020-09-27 cargo build --release
 Purge any existing dev chain state:
 
 ```bash
-./target/release/componud-chain purge-chain --dev
+./target/release/compound-chain purge-chain --dev
 ```
 
 Start a dev chain:
@@ -47,10 +56,46 @@ RUST_LOG=debug RUST_BACKTRACE=1 ./target/release/compound-chain -lruntime=debug 
 
 ### Multi-Node Local Testnet
 
-If you want to see the multi-node consensus algorithm in action, refer to
-[our Start a Private Network tutorial](https://substrate.dev/docs/en/tutorials/start-a-private-network/).
+To see the multi-node consensus algorithm in action, run a local testnet with two validator nodes,
+Alice and Bob, that have been [configured](./node/src/chain_spec.rs) as the initial
+authorities of the `local` testnet chain and endowed with testnet units.
 
-## Project Structure
+Note: this will require two terminal sessions (one for each node).
+
+Start Alice's node first. The command below uses the default TCP port (30333) and specifies
+`/tmp/alice` as the chain database location. Alice's node ID will be
+`12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp` (legacy representation:
+`QmRpheLN4JWdAnY7HGJfWFNbfkQCb6tFf4vvA6hgjMZKrR`); this is determined by the `node-key`.
+
+```bash
+cargo run -- \
+  --base-path /tmp/alice \
+  --chain=local \
+  --alice \
+  --node-key 0000000000000000000000000000000000000000000000000000000000000001 \
+  --telemetry-url 'ws://telemetry.polkadot.io:1024 0' \
+  --validator
+```
+
+In another terminal, use the following command to start Bob's node on a different TCP port (30334)
+and with a chain database location of `/tmp/bob`. The `--bootnodes` option will connect his node to
+Alice's on TCP port 30333:
+
+```bash
+cargo run -- \
+  --base-path /tmp/bob \
+  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp \
+  --chain=local \
+  --bob \
+  --port 30334 \
+  --ws-port 9945 \
+  --telemetry-url 'ws://telemetry.polkadot.io:1024 0' \
+  --validator
+```
+
+Execute `cargo run -- --help` to learn more about the Compound Chain''s CLI options.
+
+## Compound Chain Structure
 
 A Substrate project such as this consists of a number of components that are spread across a few
 directories.
@@ -110,7 +155,7 @@ called "pallets". At the heart of FRAME is a helpful
 create pallets and flexibly compose them to create blockchains that can address
 [a variety of needs](https://www.substrate.io/substrate-users/).
 
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in this project and note
+Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in Compound Chain and note
 the following:
 
 -   This file configures several pallets to include in the runtime. Each pallet configuration is
@@ -165,4 +210,3 @@ by appending your own. A few useful ones are as follow.
 
 # Check whether the code is compilable
 ./scripts/docker_run.sh cargo check
-```

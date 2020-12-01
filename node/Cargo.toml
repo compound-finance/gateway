@@ -15,46 +15,53 @@ name = 'compound-chain'
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-build-script-utils = '2.0.0'
+substrate-build-script-utils = { version = '2.0.0', path = '../../substrate/utils/build-script-utils' }
 
 [dependencies]
 jsonrpc-core = '15.0.0'
 structopt = '0.3.8'
 
-# local dependencies
-compound-chain-runtime = { path = '../runtime', version = '1.0.0' }
-runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
-
-# Substrate dependencies
-frame-benchmarking = '2.0.0'
-frame-benchmarking-cli = '2.0.0'
-pallet-transaction-payment-rpc = '2.0.0'
-sc-basic-authorship = '0.8.0'
-sc-cli = { features = ['wasmtime'], version = '0.8.0' }
-sc-client-api = '2.0.0'
-sc-consensus = '0.8.0'
-sc-consensus-aura = '0.8.0'
-sc-executor = { features = ['wasmtime'], version = '0.8.0' }
-sc-finality-grandpa = '0.8.0'
-sc-rpc = '2.0.0'
-sc-rpc-api = '0.8.0'
-sc-service = { features = ['wasmtime'], version = '0.8.0' }
-sc-transaction-pool = '2.0.0'
-sp-api = '2.0.0'
-sp-block-builder = '2.0.0'
-sp-blockchain = '2.0.0'
-sp-chain-spec = '2.0.0'
-sp-consensus = '0.8.0'
-sp-consensus-aura = '0.8.0'
-sp-core = '2.0.0'
-sp-finality-grandpa = '2.0.0'
-sp-inherents = '2.0.0'
-sp-runtime = '2.0.0'
-sp-transaction-pool = '2.0.0'
-substrate-frame-rpc-system = '2.0.0'
 serde = { version = "1.0.101", features = ["derive"] }
 serde_json = "1.0.41"
 
+# Local Dependencies
+compound-chain-runtime = { version = '1.0.0', path = '../runtime' }
+runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
+
+# Substrate dependencies
+sc-cli = { version = '0.8.0', path = '../../substrate/client/cli', features = ['wasmtime'] }
+sp-core = { version = '2.0.0', path = '../../substrate/primitives/core' }
+sc-executor = { version = '0.8.0', path = '../../substrate/client/executor', features = ['wasmtime'] }
+sc-service = { version = '0.8.0', path = '../../substrate/client/service', default-features=false, features = [] }
+sp-inherents = { version = '2.0.0', path = '../../substrate/primitives/inherents' }
+sc-transaction-pool = { version = '2.0.0', path = '../../substrate/client/transaction-pool' }
+sp-transaction-pool = { version = '2.0.0', path = '../../substrate/primitives/transaction-pool' }
+sc-consensus-aura = { version = '0.8.0', path = '../../substrate/client/consensus/aura' }
+sp-consensus-aura = { version = '0.8.0', path = '../../substrate/primitives/consensus/aura' }
+sp-consensus = { version = '0.8.0', path = '../../substrate/primitives/consensus/common' }
+sc-consensus = { version = '0.8.0', path = '../../substrate/client/consensus/common' }
+sc-finality-grandpa = { version = '0.8.0', path = '../../substrate/client/finality-grandpa' }
+sp-finality-grandpa = { version = '2.0.0', path = '../../substrate/primitives/finality-grandpa' }
+sc-client-api = { version = '2.0.0', path = '../../substrate/client/api' }
+sp-runtime = { version = '2.0.0', path = '../../substrate/primitives/runtime' }
+
+# These dependencies are used for the node template's RPCs
+sc-rpc = { version = '2.0.0', path = '../../substrate/client/rpc' }
+sp-api = { version = '2.0.0', path = '../../substrate/primitives/api' }
+sc-rpc-api = { version = '0.8.0', path = '../../substrate/client/rpc-api' }
+sp-blockchain = { version = '2.0.0', path = '../../substrate/primitives/blockchain' }
+sp-chain-spec = { version = '2.0.0', path = '../../substrate/primitives/chain-spec' }
+sp-block-builder = { version = '2.0.0', path = '../../substrate/primitives/block-builder' }
+sc-basic-authorship = { version = '0.8.0', path = '../../substrate/client/basic-authorship' }
+substrate-frame-rpc-system = { version = '2.0.0', path = '../../substrate/utils/frame/rpc/system' }
+pallet-transaction-payment-rpc = { version = '2.0.0', path = '../../substrate/frame/transaction-payment/rpc/' }
+
+# These dependencies are used for runtime benchmarking
+frame-benchmarking = { version = '2.0.0', path = '../../substrate/frame/benchmarking' }
+frame-benchmarking-cli = { version = '2.0.0', path = '../../substrate/utils/frame/benchmarking-cli' }
+
 [features]
 default = []
-runtime-benchmarks = ['compound-chain-runtime/runtime-benchmarks']
+runtime-benchmarks = [
+	'compound-chain-runtime/runtime-benchmarks',
+]
