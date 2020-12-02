@@ -19,7 +19,7 @@ use crate::cli::{Cli, Subcommand};
 use crate::{chain_spec, service};
 #[cfg(feature = "runtime-benchmarks")]
 use compound_chain_runtime::Block;
-use sc_cli::{ChainSpec, Role, RuntimeVersion, SubstrateCli};
+use sc_cli::{arg_enums::Database, ChainSpec, Role, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
 
 impl SubstrateCli for Cli {
@@ -64,7 +64,10 @@ impl SubstrateCli for Cli {
 
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
-    let cli = Cli::from_args();
+    let mut cli = Cli::from_args();
+    if cli.run.import_params.database_params.database.is_none() {
+        cli.run.import_params.database_params.database = Some(Database::ParityDb)
+    }
 
     match &cli.subcommand {
         Some(Subcommand::BuildSpec(cmd)) => {
