@@ -15,46 +15,57 @@ name = 'compound-chain'
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-build-script-utils = '2.0.0'
+substrate-build-script-utils = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a'}
 
 [dependencies]
 jsonrpc-core = '15.0.0'
 structopt = '0.3.8'
 
-# local dependencies
-compound-chain-runtime = { path = '../runtime', version = '1.0.0' }
-runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
-
-# Substrate dependencies
-frame-benchmarking = '2.0.0'
-frame-benchmarking-cli = '2.0.0'
-pallet-transaction-payment-rpc = '2.0.0'
-sc-basic-authorship = '0.8.0'
-sc-cli = { features = ['wasmtime'], version = '0.8.0' }
-sc-client-api = '2.0.0'
-sc-consensus = '0.8.0'
-sc-consensus-aura = '0.8.0'
-sc-executor = { features = ['wasmtime'], version = '0.8.0' }
-sc-finality-grandpa = '0.8.0'
-sc-rpc = '2.0.0'
-sc-rpc-api = '0.8.0'
-sc-service = { features = ['wasmtime'], version = '0.8.0' }
-sc-transaction-pool = '2.0.0'
-sp-api = '2.0.0'
-sp-block-builder = '2.0.0'
-sp-blockchain = '2.0.0'
-sp-chain-spec = '2.0.0'
-sp-consensus = '0.8.0'
-sp-consensus-aura = '0.8.0'
-sp-core = '2.0.0'
-sp-finality-grandpa = '2.0.0'
-sp-inherents = '2.0.0'
-sp-runtime = '2.0.0'
-sp-transaction-pool = '2.0.0'
-substrate-frame-rpc-system = '2.0.0'
 serde = { version = "1.0.101", features = ["derive"] }
 serde_json = "1.0.41"
 
+# Local Dependencies
+compound-chain-runtime = { version = '1.0.0', path = '../runtime' }
+runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0' }
+
+# Substrate dependencies
+sc-cli = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
+sp-core = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-executor = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
+sc-service = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false, features = [] }
+sc-client-db = { version = "0.8.0", git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false }
+sp-inherents = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-consensus-aura = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-consensus-aura = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-consensus = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-consensus = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-finality-grandpa = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-finality-grandpa = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-client-api = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-runtime = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+
+# These dependencies are used for the node template's RPCs
+sc-rpc = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-api = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-rpc-api = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-blockchain = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-chain-spec = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sp-block-builder = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-basic-authorship = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+substrate-frame-rpc-system = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+pallet-transaction-payment-rpc = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+
+# These dependencies are used for runtime benchmarking
+frame-benchmarking = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+frame-benchmarking-cli = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features=false, optional=true }
+
 [features]
-default = []
-runtime-benchmarks = ['compound-chain-runtime/runtime-benchmarks']
+default = ['with-parity-db']
+with-parity-db=['sc-client-db/with-parity-db']
+with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
+runtime-benchmarks = [
+	'compound-chain-runtime/runtime-benchmarks',
+	'frame-benchmarking-cli',
+]
