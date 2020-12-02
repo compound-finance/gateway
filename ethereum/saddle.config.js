@@ -13,11 +13,11 @@ module.exports = {
   tests: ['**/tests/*Test.js'],
   trace: false,                                         // Compile with debug artifacts
   networks: {                                           // Define configuration for each network
-    kovan: {
+    goerli: {
       providers: [
         {env: "PROVIDER"},
-        {file: "~/.ethereum/kovan-url"},              // Load from given file with contents as the URL (e.g. https://infura.io/api-key)
-        {http: "https://kovan.infura.io"}
+        {file: "~/.ethereum/goerli-url"},              // Load from given file with contents as the URL (e.g. https://infura.io/api-key)
+        {http: "https://goerli.infura.io"}
       ],
       web3: {
         gas: [
@@ -35,9 +35,11 @@ module.exports = {
       },
       accounts: [
         {env: "ACCOUNT"},
-        {file: "~/.ethereum/kovan"}                   // Load from given file with contents as the private key (e.g. 0x...)
+        {file: "~/.ethereum/goerli"}                   // Load from given file with contents as the private key (e.g. 0x...)
       ]
     }
   },
-  scripts: {}                                           // Aliases for scripts
+  scripts: {
+    "deploy": "deploy.js"
+  }                                           // Aliases for scripts
 }
