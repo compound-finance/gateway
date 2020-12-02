@@ -3,3 +3,9 @@
 * `yarn install`
 * `yarn compile`
 * `yarn test`
+
+
+## Testnet Deploy
+
+* `npx saddle script deploy -n goerli`
+
