@@ -4,7 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "bignumber": "^1.1.0",
+    "@ethersproject/wallet": "^5.0.9",
     "eth-saddle": "^0.1.21"
   },
   "scripts": {

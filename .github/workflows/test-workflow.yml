@@ -20,9 +20,39 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v1.0.1
 
+      - name: Install cargo2junit
+        run: |
+          cargo install cargo2junit
+
       - name: Cargo Test
         run: |
-          cargo +nightly-2020-09-27 test
+          cargo test -- -Z unstable-options --format json | tee unit-test-results.json
+          cat unit-test-results.json | cargo2junit > unit-test-results.xml
+          test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
+          echo "::set-output name=test_url::$test_url"
+        id: cargo_test
+
+      - name: Link to Results
+        uses: unsplash/comment-on-pr@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          msg: "🫖 [View Test Results](${{steps.cargo_test.outputs.test_url}})"
+          check_for_duplicate_msg: false
+
+      - name: Upload Unit Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Unit Test Results
+          path: unit-test-results.*
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1.6
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: unit-test-results.xml
 
   eth-tests:
     name: eth-tests
@@ -50,7 +80,7 @@ jobs:
     - name: Install solc
       run:
         |
-          sudo wget https://github.com/ethereum/solidity/releases/download/v0.6.10/solc-static-linux -O /usr/local/bin/solc
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
           sudo chmod +x /usr/local/bin/solc
     - name: Run tests
       run: yarn test

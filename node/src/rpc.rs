@@ -58,7 +58,7 @@ where
     // Extend this RPC with a custom API by using the following syntax.
     // `YourRpcStruct` should have a reference to a client, which is needed
     // to call into the runtime.
-    // `io.extend_with(YourRpcTrait::to_delegate(YourRpcStruct::new(ReferenceToClient, ...)));`
+    // `io.extend_with(YourRpcConfig::to_delegate(YourRpcStruct::new(ReferenceToClient, ...)));`
 
     io
 }
