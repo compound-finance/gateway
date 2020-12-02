@@ -54,7 +54,7 @@ mod tests {
     fn test_basic() {
         // this gets loaded from the json file "chain config file"
         let given: Vec<u8> = "my eth rpc url".into();
-        let expected: Vec<u8> = "my eth rpc urlz".into();
+        let expected: Vec<u8> = "my eth rpc url".into();
         let config = new_config(given.clone());
         // set in node
         config_interface::set(config);
