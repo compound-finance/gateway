@@ -1,16 +1,26 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// https://substrate.dev/docs/en/knowledgebase/runtime/frame
-use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get};
+use frame_support::{
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
+};
 use frame_system::ensure_signed;
+use sp_runtime::offchain::http;
+use sp_std::vec::Vec;
+
+extern crate ethereum_client;
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
+
+#[macro_use]
+extern crate alloc;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
@@ -101,6 +111,27 @@ decl_module! {
                     Ok(())
                 },
             }
+        }
+
+        /// Offchain Worker entry point.
+        ///
+        /// By implementing `fn offchain_worker` within `decl_module!` you declare a new offchain
+        /// worker.
+        /// This function will be called when the node is fully synced and a new best block is
+        /// succesfuly imported.
+        /// Note that it's not guaranteed for offchain workers to run on EVERY block, there might
+        /// be cases where some blocks are skipped, or for some the worker runs twice (re-orgs),
+        /// so the code should be able to handle that.
+        /// You can use `Local Storage` API to coordinate runs of the worker.
+        fn offchain_worker(block_number: T::BlockNumber) {
+            debug::native::info!("Hello World from offchain workers!");
+            let config = runtime_interfaces::config_interface::get();
+            let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url()).unwrap();
+            // debug::native::info!("CONFIG: {:?}", eth_rpc_url);
+
+            // TODO create parameter vector from storage variables
+            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
+            debug::native::info!("Lock Events: {:?}", lock_events);
         }
     }
 }
