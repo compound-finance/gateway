@@ -87,7 +87,7 @@ decl_module! {
         #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
         pub fn cause_error(origin) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
-            // let _ = runtime_interfaces::config_interface::get();
+            let _ = runtime_interfaces::config_interface::get();
 
             // Read a value from storage.
             match Something::get() {

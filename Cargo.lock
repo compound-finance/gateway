@@ -1449,7 +1449,7 @@ dependencies = [
  "serde",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-externalities 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-state-machine 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "structopt",
@@ -4906,14 +4906,14 @@ dependencies = [
  "sp-blockchain",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-keyring",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-panic-handler 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-runtime",
  "sp-utils",
  "sp-version",
  "structopt",
  "thiserror",
- "tiny-bip39",
+ "tiny-bip39 0.8.0",
  "tokio 0.2.23",
  "tracing",
  "tracing-log",
@@ -4953,7 +4953,7 @@ dependencies = [
  "sp-database",
  "sp-externalities 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-inherents",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-state-machine 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
@@ -5030,7 +5030,7 @@ dependencies = [
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-inherents",
  "sp-io 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-timestamp",
  "sp-version",
@@ -5074,7 +5074,7 @@ dependencies = [
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-inherents",
  "sp-io 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-timestamp",
  "sp-utils",
@@ -5244,7 +5244,7 @@ dependencies = [
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-finality-grandpa",
  "sp-inherents",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-utils",
  "substrate-prometheus-endpoint",
@@ -5284,7 +5284,7 @@ dependencies = [
  "serde_json",
  "sp-application-crypto",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "subtle 2.3.0",
 ]
 
@@ -5447,7 +5447,7 @@ dependencies = [
  "sp-blockchain",
  "sp-chain-spec",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-offchain",
  "sp-rpc",
  "sp-runtime",
@@ -5547,7 +5547,7 @@ dependencies = [
  "sp-externalities 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-inherents",
  "sp-io 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-session",
  "sp-state-machine 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
@@ -5735,6 +5735,15 @@ checksum = "e3042af939fca8c3453b7af0f1c66e533a15a86169e39de2657310ade8f98d3c"
 dependencies = [
  "ring",
  "untrusted",
+]
+
+[[package]]
+name = "secrecy"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9182278ed645df3477a9c27bfee0621c621aa16f6972635f7f795dae3d81070f"
+dependencies = [
+ "zeroize",
 ]
 
 [[package]]
@@ -6229,7 +6238,7 @@ dependencies = [
  "sp-consensus-vrf",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-inherents",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-timestamp",
@@ -6263,6 +6272,7 @@ dependencies = [
  "base58",
  "blake2-rfc",
  "byteorder",
+ "derive_more",
  "dyn-clonable",
  "ed25519-dalek",
  "futures 0.3.8",
@@ -6282,7 +6292,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "schnorrkel",
- "secrecy",
+ "secrecy 0.6.0",
  "serde",
  "sha2 0.8.2",
  "sp-debug-derive 2.0.0",
@@ -6291,8 +6301,7 @@ dependencies = [
  "sp-std 2.0.0",
  "sp-storage 2.0.0",
  "substrate-bip39",
- "thiserror",
- "tiny-bip39",
+ "tiny-bip39 0.7.3",
  "tiny-keccak",
  "twox-hash",
  "wasmi",
@@ -6326,7 +6335,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "schnorrkel",
- "secrecy",
+ "secrecy 0.7.0",
  "serde",
  "sha2 0.8.2",
  "sp-debug-derive 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
@@ -6336,7 +6345,7 @@ dependencies = [
  "sp-storage 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "substrate-bip39",
  "thiserror",
- "tiny-bip39",
+ "tiny-bip39 0.8.0",
  "tiny-keccak",
  "twox-hash",
  "wasmi",
@@ -6404,7 +6413,7 @@ dependencies = [
  "sp-api",
  "sp-application-crypto",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
 ]
@@ -6433,7 +6442,6 @@ dependencies = [
  "parking_lot 0.10.2",
  "sp-core 2.0.0",
  "sp-externalities 0.8.0",
- "sp-keystore 0.8.0",
  "sp-runtime-interface 2.0.0",
  "sp-state-machine 0.8.0",
  "sp-std 2.0.0",
@@ -6457,7 +6465,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-externalities 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-keystore 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-keystore",
  "sp-runtime-interface 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-state-machine 0.8.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
@@ -6477,21 +6485,6 @@ dependencies = [
  "sp-core 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
  "sp-runtime",
  "strum",
-]
-
-[[package]]
-name = "sp-keystore"
-version = "0.8.0"
-dependencies = [
- "async-trait",
- "derive_more",
- "futures 0.3.8",
- "merlin",
- "parity-scale-codec",
- "parking_lot 0.10.2",
- "schnorrkel",
- "sp-core 2.0.0",
- "sp-externalities 0.8.0",
 ]
 
 [[package]]
@@ -6525,6 +6518,7 @@ name = "sp-panic-handler"
 version = "2.0.0"
 dependencies = [
  "backtrace",
+ "log",
 ]
 
 [[package]]
@@ -6667,7 +6661,6 @@ dependencies = [
  "sp-panic-handler 2.0.0",
  "sp-std 2.0.0",
  "sp-trie 2.0.0",
- "thiserror",
  "trie-db",
  "trie-root",
 ]
@@ -7164,6 +7157,22 @@ dependencies = [
  "libc",
  "wasi 0.10.0+wasi-snapshot-preview1",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "tiny-bip39"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0165e045cc2ae1660270ca65e1676dbaab60feb0f91b10f7d0665e9b47e31f2"
+dependencies = [
+ "failure",
+ "hmac 0.7.1",
+ "once_cell",
+ "pbkdf2 0.3.0",
+ "rand 0.7.3",
+ "rustc-hash",
+ "sha2 0.8.2",
+ "unicode-normalization",
 ]
 
 [[package]]
