@@ -99,7 +99,6 @@ pub struct LogEvent<T: DecodableEvent> {
 }
 
 pub trait DecodableEvent {
-    fn name(&self) -> &'static str;
     fn new(data: String) -> Self;
 }
 
@@ -124,10 +123,6 @@ impl DecodableEvent for LockEvent {
             holder: holder,
             amount: amount,
         };
-    }
-
-    fn name(&self) -> &'static str {
-        "LockEvent"
     }
 }
 
@@ -203,10 +198,6 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
     let body_str: String = send_rpc(server, "eth_getLogs", params)?;
     let deserialized_body =
         deserialize_get_logs_response(&body_str).map_err(|_| http::Error::Unknown)?;
-
-    if deserialized_body.error.is_some() {
-        return Err(http::Error::Unknown);
-    }
 
     let body_data = deserialized_body.result.ok_or(http::Error::Unknown)?;
     debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
