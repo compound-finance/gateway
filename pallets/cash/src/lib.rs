@@ -28,35 +28,30 @@ pub trait Config: frame_system::Config {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 }
 
-// The pallet's runtime storage items.
-// https://substrate.dev/docs/en/knowledgebase/runtime/storage
 decl_storage! {
-    // A unique name is used to ensure that the pallet's storage items are isolated.
-    // This name may be updated, but each pallet in the runtime must use a unique name.
-    // ---------------------------------vvvvvvvvvvvvvv
-    trait Store for Module<T: Config> as TemplateModule {
+    trait Store for Module<T: Config> as CashPalletModule {
+        // XXX
         // Learn more about declaring storage items:
         // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
         Something get(fn something): Option<u32>;
     }
 }
 
-// Pallets use events to inform users when important changes are made.
-// https://substrate.dev/docs/en/knowledgebase/runtime/events
 decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as frame_system::Config>::AccountId,
     {
+        // XXX
         /// Event documentation should end with an array that provides descriptive names for event
         /// parameters. [something, who]
         SomethingStored(u32, AccountId),
     }
 );
 
-// Errors inform users that something went wrong.
 decl_error! {
     pub enum Error for Module<T: Config> {
+        // XXX
         /// Error names should be descriptive.
         NoneValue,
         /// Errors should have helpful documentation associated with them.
@@ -79,9 +74,6 @@ decl_module! {
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn do_something(origin, something: u32) -> dispatch::DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            // This function will return an error if the extrinsic is not signed.
-            // https://substrate.dev/docs/en/knowledgebase/runtime/origin
             let who = ensure_signed(origin)?;
 
             // Update storage.

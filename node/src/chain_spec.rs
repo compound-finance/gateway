@@ -1,13 +1,14 @@
 use compound_chain_runtime::{
-    AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig,
-    SystemConfig, WASM_BINARY,
+    wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
+    Signature, SudoConfig, SystemConfig,
 };
 use sc_service::ChainType;
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_consensus_babe::AuthorityId as BabeId;
 use sp_core::{sr25519, Pair, Public};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
+// XXX are we going to setup our own telemetry server?
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -31,9 +32,12 @@ where
     AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
-    (get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
+/// Generate various keys from seed
+pub fn authority_keys_from_seed(seed: &str) -> (BabeId, GrandpaId) {
+    (
+        get_from_seed::<BabeId>(seed),
+        get_from_seed::<GrandpaId>(seed),
+    )
 }
 
 /// Get the properties key of the chain spec file - a basic valid configuration
@@ -47,32 +51,31 @@ fn get_properties() -> sc_service::Properties {
     unwrapped.clone()
 }
 
-pub fn development_config() -> Result<ChainSpec, String> {
-    let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
+fn development_genesis() -> GenesisConfig {
+    testnet_genesis(
+        // Initial PoA authorities
+        vec![authority_keys_from_seed("Alice")],
+        // Sudo account
+        get_account_id_from_seed::<sr25519::Public>("Alice"),
+        // Pre-funded accounts
+        vec![
+            get_account_id_from_seed::<sr25519::Public>("Alice"),
+            get_account_id_from_seed::<sr25519::Public>("Bob"),
+            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+        ],
+        true,
+    )
+}
 
-    Ok(ChainSpec::from_genesis(
+pub fn development_config() -> ChainSpec {
+    ChainSpec::from_genesis(
         // Name
         "Development",
         // ID
         "dev",
         ChainType::Development,
-        move || {
-            testnet_genesis(
-                wasm_binary,
-                // Initial PoA authorities
-                vec![authority_keys_from_seed("Alice")],
-                // Sudo account
-                get_account_id_from_seed::<sr25519::Public>("Alice"),
-                // Pre-funded accounts
-                vec![
-                    get_account_id_from_seed::<sr25519::Public>("Alice"),
-                    get_account_id_from_seed::<sr25519::Public>("Bob"),
-                    get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-                    get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-                ],
-                true,
-            )
-        },
+        development_genesis,
         // Bootnodes
         vec![],
         // Telemetry
@@ -83,46 +86,45 @@ pub fn development_config() -> Result<ChainSpec, String> {
         Some(get_properties()),
         // Extensions
         None,
-    ))
+    )
 }
 
-pub fn local_testnet_config() -> Result<ChainSpec, String> {
-    let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
+fn local_testnet_genesis() -> GenesisConfig {
+    testnet_genesis(
+        // Initial PoA authorities
+        vec![
+            authority_keys_from_seed("Alice"),
+            authority_keys_from_seed("Bob"),
+        ],
+        // Sudo account
+        get_account_id_from_seed::<sr25519::Public>("Alice"),
+        // Pre-funded accounts
+        vec![
+            get_account_id_from_seed::<sr25519::Public>("Alice"),
+            get_account_id_from_seed::<sr25519::Public>("Bob"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie"),
+            get_account_id_from_seed::<sr25519::Public>("Dave"),
+            get_account_id_from_seed::<sr25519::Public>("Eve"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+        ],
+        true,
+    )
+}
 
-    Ok(ChainSpec::from_genesis(
+pub fn local_testnet_config() -> ChainSpec {
+    ChainSpec::from_genesis(
         // Name
         "Local Testnet",
         // ID
         "local_testnet",
         ChainType::Local,
-        move || {
-            testnet_genesis(
-                wasm_binary,
-                // Initial PoA authorities
-                vec![
-                    authority_keys_from_seed("Alice"),
-                    authority_keys_from_seed("Bob"),
-                ],
-                // Sudo account
-                get_account_id_from_seed::<sr25519::Public>("Alice"),
-                // Pre-funded accounts
-                vec![
-                    get_account_id_from_seed::<sr25519::Public>("Alice"),
-                    get_account_id_from_seed::<sr25519::Public>("Bob"),
-                    get_account_id_from_seed::<sr25519::Public>("Charlie"),
-                    get_account_id_from_seed::<sr25519::Public>("Dave"),
-                    get_account_id_from_seed::<sr25519::Public>("Eve"),
-                    get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-                    get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-                    get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-                    get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-                    get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-                    get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-                    get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-                ],
-                true,
-            )
-        },
+        local_testnet_genesis,
         // Bootnodes
         vec![],
         // Telemetry
@@ -133,13 +135,12 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         Some(get_properties()),
         // Extensions
         None,
-    ))
+    )
 }
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-    wasm_binary: &[u8],
-    initial_authorities: Vec<(AuraId, GrandpaId)>,
+    initial_authorities: Vec<(BabeId, GrandpaId)>,
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
@@ -147,7 +148,7 @@ fn testnet_genesis(
     GenesisConfig {
         frame_system: Some(SystemConfig {
             // Add Wasm runtime to storage.
-            code: wasm_binary.to_vec(),
+            code: wasm_binary_unwrap().to_vec(),
             changes_trie_config: Default::default(),
         }),
         pallet_balances: Some(BalancesConfig {
@@ -158,8 +159,11 @@ fn testnet_genesis(
                 .map(|k| (k, 1 << 60))
                 .collect(),
         }),
-        pallet_aura: Some(AuraConfig {
-            authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+        pallet_babe: Some(BabeConfig {
+            authorities: initial_authorities
+                .iter()
+                .map(|x| (x.0.clone(), 1))
+                .collect(),
         }),
         pallet_grandpa: Some(GrandpaConfig {
             authorities: initial_authorities
@@ -187,8 +191,9 @@ pub fn extract_configuration_from_properties(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use compound_chain_runtime::BuildStorage;
 
     /// Best case scenario - we have the key we need in the properties map and we _can_ return
     /// the OCW configuration
@@ -225,5 +230,54 @@ mod tests {
 
         let config = extract_configuration_from_properties(&properties);
         assert!(config.is_none());
+    }
+
+    #[test]
+    fn test_create_development_chain_spec() {
+        development_config().build_storage().unwrap();
+    }
+
+    #[test]
+    fn test_create_local_testnet_chain_spec() {
+        local_testnet_config().build_storage().unwrap();
+    }
+
+    fn local_testnet_genesis_instant_single() -> GenesisConfig {
+        testnet_genesis(
+            vec![authority_keys_from_seed("Alice")],
+            get_account_id_from_seed::<sr25519::Public>("Alice"),
+            vec![],
+            false,
+        )
+    }
+
+    /// Local testnet config (single validator - Alice)
+    pub fn integration_test_config_with_single_authority() -> ChainSpec {
+        ChainSpec::from_genesis(
+            "Integration Test",
+            "test",
+            ChainType::Development,
+            local_testnet_genesis_instant_single,
+            vec![],
+            None,
+            None,
+            None,
+            Default::default(),
+        )
+    }
+
+    /// Local testnet config (multivalidator Alice + Bob)
+    pub fn integration_test_config_with_two_authorities() -> ChainSpec {
+        ChainSpec::from_genesis(
+            "Integration Test",
+            "test",
+            ChainType::Development,
+            local_testnet_genesis,
+            vec![],
+            None,
+            None,
+            None,
+            Default::default(),
+        )
     }
 }

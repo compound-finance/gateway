@@ -709,20 +709,33 @@ dependencies = [
  "compound-chain-runtime",
  "frame-benchmarking",
  "frame-benchmarking-cli",
+ "frame-system",
+ "futures 0.3.8",
  "jsonrpc-core",
+ "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
+ "parity-scale-codec",
  "runtime-interfaces",
  "sc-basic-authorship",
+ "sc-chain-spec",
  "sc-cli",
  "sc-client-api",
  "sc-client-db",
  "sc-consensus",
- "sc-consensus-aura",
+ "sc-consensus-babe",
+ "sc-consensus-babe-rpc",
+ "sc-consensus-epochs",
+ "sc-consensus-slots",
  "sc-executor",
  "sc-finality-grandpa",
+ "sc-finality-grandpa-rpc",
+ "sc-keystore",
+ "sc-network",
  "sc-rpc",
  "sc-rpc-api",
  "sc-service",
+ "sc-service-test",
+ "sc-sync-state-rpc",
  "sc-transaction-pool",
  "serde",
  "serde_json",
@@ -731,15 +744,19 @@ dependencies = [
  "sp-blockchain",
  "sp-chain-spec",
  "sp-consensus",
- "sp-consensus-aura",
+ "sp-consensus-babe",
  "sp-core",
  "sp-finality-grandpa",
  "sp-inherents",
+ "sp-keyring",
+ "sp-keystore",
  "sp-runtime",
+ "sp-timestamp",
  "sp-transaction-pool",
  "structopt",
  "substrate-build-script-utils",
  "substrate-frame-rpc-system",
+ "tempfile",
 ]
 
 [[package]]
@@ -753,7 +770,7 @@ dependencies = [
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
  "hex-literal",
- "pallet-aura",
+ "pallet-babe",
  "pallet-balances",
  "pallet-cash",
  "pallet-grandpa",
@@ -766,7 +783,7 @@ dependencies = [
  "serde",
  "sp-api",
  "sp-block-builder",
- "sp-consensus-aura",
+ "sp-consensus-babe",
  "sp-core",
  "sp-inherents",
  "sp-offchain",
@@ -3641,25 +3658,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-aura"
-version = "2.0.0"
-source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
-dependencies = [
- "frame-support",
- "frame-system",
- "pallet-session",
- "pallet-timestamp",
- "parity-scale-codec",
- "serde",
- "sp-application-crypto",
- "sp-consensus-aura",
- "sp-inherents",
- "sp-runtime",
- "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
- "sp-timestamp",
-]
-
-[[package]]
 name = "pallet-authorship"
 version = "2.0.0"
 source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
@@ -3672,6 +3670,31 @@ dependencies = [
  "sp-inherents",
  "sp-runtime",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+]
+
+[[package]]
+name = "pallet-babe"
+version = "2.0.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-authorship",
+ "pallet-session",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "serde",
+ "sp-application-crypto",
+ "sp-consensus-babe",
+ "sp-consensus-vrf",
+ "sp-inherents",
+ "sp-io",
+ "sp-runtime",
+ "sp-session",
+ "sp-staking",
+ "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-timestamp",
 ]
 
 [[package]]
@@ -5084,37 +5107,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sc-consensus-aura"
-version = "0.8.0"
-source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
-dependencies = [
- "derive_more",
- "futures 0.3.8",
- "futures-timer 3.0.2",
- "log",
- "parity-scale-codec",
- "parking_lot 0.10.2",
- "sc-block-builder",
- "sc-client-api",
- "sc-consensus-slots",
- "sc-telemetry",
- "sp-api",
- "sp-application-crypto",
- "sp-block-builder",
- "sp-blockchain",
- "sp-consensus",
- "sp-consensus-aura",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-keystore",
- "sp-runtime",
- "sp-timestamp",
- "sp-version",
- "substrate-prometheus-endpoint",
-]
-
-[[package]]
 name = "sc-consensus-babe"
 version = "0.8.0"
 source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
@@ -5157,6 +5149,30 @@ dependencies = [
  "sp-utils",
  "sp-version",
  "substrate-prometheus-endpoint",
+]
+
+[[package]]
+name = "sc-consensus-babe-rpc"
+version = "0.8.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "derive_more",
+ "futures 0.3.8",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "sc-consensus-babe",
+ "sc-consensus-epochs",
+ "sc-rpc-api",
+ "serde",
+ "sp-api",
+ "sp-application-crypto",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-consensus-babe",
+ "sp-core",
+ "sp-keystore",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -5325,6 +5341,30 @@ dependencies = [
  "sp-runtime",
  "sp-utils",
  "substrate-prometheus-endpoint",
+]
+
+[[package]]
+name = "sc-finality-grandpa-rpc"
+version = "0.8.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "derive_more",
+ "finality-grandpa",
+ "futures 0.3.8",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "jsonrpc-pubsub",
+ "log",
+ "parity-scale-codec",
+ "sc-client-api",
+ "sc-finality-grandpa",
+ "sc-rpc",
+ "serde",
+ "serde_json",
+ "sp-blockchain",
+ "sp-core",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -5642,6 +5682,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-service-test"
+version = "2.0.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "fdlimit",
+ "futures 0.1.30",
+ "futures 0.3.8",
+ "hex-literal",
+ "log",
+ "parity-scale-codec",
+ "parking_lot 0.10.2",
+ "sc-block-builder",
+ "sc-client-api",
+ "sc-client-db",
+ "sc-executor",
+ "sc-light",
+ "sc-network",
+ "sc-service",
+ "sp-api",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-core",
+ "sp-externalities",
+ "sp-panic-handler",
+ "sp-runtime",
+ "sp-state-machine",
+ "sp-storage",
+ "sp-tracing",
+ "sp-transaction-pool",
+ "sp-trie",
+ "substrate-test-runtime",
+ "substrate-test-runtime-client",
+ "tempfile",
+ "tokio 0.1.22",
+]
+
+[[package]]
 name = "sc-state-db"
 version = "0.8.0"
 source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
@@ -5653,6 +5730,26 @@ dependencies = [
  "parking_lot 0.10.2",
  "sc-client-api",
  "sp-core",
+ "thiserror",
+]
+
+[[package]]
+name = "sc-sync-state-rpc"
+version = "0.8.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "sc-chain-spec",
+ "sc-client-api",
+ "sc-consensus-babe",
+ "sc-consensus-epochs",
+ "sc-finality-grandpa",
+ "sc-rpc-api",
+ "serde_json",
+ "sp-blockchain",
+ "sp-runtime",
  "thiserror",
 ]
 
@@ -6620,13 +6717,13 @@ dependencies = [
 [[package]]
 name = "sp-std"
 version = "2.0.0"
-source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa2d6e166cead2d3b1d3d8fe0e787d076b7d0296b1760a0d7d340846d0ba42c5"
 
 [[package]]
 name = "sp-std"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa2d6e166cead2d3b1d3d8fe0e787d076b7d0296b1760a0d7d340846d0ba42c5"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
 
 [[package]]
 name = "sp-storage"
@@ -6899,6 +6996,96 @@ dependencies = [
  "log",
  "prometheus",
  "tokio 0.2.23",
+]
+
+[[package]]
+name = "substrate-test-client"
+version = "2.0.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "futures 0.1.30",
+ "futures 0.3.8",
+ "hash-db",
+ "hex",
+ "parity-scale-codec",
+ "sc-client-api",
+ "sc-client-db",
+ "sc-consensus",
+ "sc-executor",
+ "sc-light",
+ "sc-service",
+ "serde",
+ "serde_json",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-core",
+ "sp-keyring",
+ "sp-keystore",
+ "sp-runtime",
+ "sp-state-machine",
+]
+
+[[package]]
+name = "substrate-test-runtime"
+version = "2.0.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "cfg-if 0.1.10",
+ "frame-executive",
+ "frame-support",
+ "frame-system",
+ "frame-system-rpc-runtime-api",
+ "log",
+ "memory-db",
+ "pallet-babe",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "parity-util-mem",
+ "sc-service",
+ "serde",
+ "sp-api",
+ "sp-application-crypto",
+ "sp-block-builder",
+ "sp-consensus-aura",
+ "sp-consensus-babe",
+ "sp-core",
+ "sp-externalities",
+ "sp-finality-grandpa",
+ "sp-inherents",
+ "sp-io",
+ "sp-keyring",
+ "sp-offchain",
+ "sp-runtime",
+ "sp-runtime-interface",
+ "sp-session",
+ "sp-state-machine",
+ "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "sp-transaction-pool",
+ "sp-trie",
+ "sp-version",
+ "substrate-wasm-builder",
+ "trie-db",
+]
+
+[[package]]
+name = "substrate-test-runtime-client"
+version = "2.0.0"
+source = "git+https://github.com/paritytech/substrate.git?rev=dcf6a3a#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+dependencies = [
+ "futures 0.3.8",
+ "parity-scale-codec",
+ "sc-block-builder",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-light",
+ "sc-service",
+ "sp-api",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-core",
+ "sp-runtime",
+ "substrate-test-client",
+ "substrate-test-runtime",
 ]
 
 [[package]]
