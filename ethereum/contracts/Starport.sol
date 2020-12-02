@@ -4,15 +4,15 @@ pragma abicoder v2;
 import "./IERC20.sol";
 
 // via https://github.com/dapphub/ds-math/blob/master/src/math.sol
-function add(uint x, uint y) pure returns (uint z) {
+function add_(uint x, uint y) pure returns (uint z) {
     require((z = x + y) >= x, "ds-math-add-overflow");
 }
 
-function sub(uint x, uint y) pure returns (uint z) {
+function sub_(uint x, uint y) pure returns (uint z) {
     require((z = x - y) <= x, "ds-math-sub-underflow");
 }
 
-function mul(uint x, uint y) pure returns (uint z) {
+function mul_(uint x, uint y) pure returns (uint z) {
     require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
 }
 
@@ -20,17 +20,20 @@ contract Starport {
 
 	ICash immutable public cash;
 
-	bytes32 immutable public CHAIN_TYPE_ETH = keccak256(abi.encodePacked("ETH"));
+	bytes32 immutable public ETH_CHAIN_TYPE = keccak256(abi.encodePacked("ETH"));
 	address immutable public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 	address[] public authorities;
 
 	event LockCash(address holder, uint amount, uint yieldIndex);
 	event Lock(address asset, address holder, uint amount);
+	event ChangeAuthorities(bytes32 authHash);
 
 	constructor(ICash cash_, address[] memory authorities_) {
 		cash = cash_;
 		authorities = authorities_;
 	}
+
+	// ** L1 Asset Interface **
 
 	function lock(uint amount, address asset) public {
 		if (asset == address(cash)) {
@@ -63,49 +66,42 @@ contract Starport {
 		uint balBefore = asset.balanceOf(address(this));
 		require(asset.transferFrom(from, address(this), amount) == true, "TransferIn");
 		uint balAfter = asset.balanceOf(address(this));
-		return sub(balAfter, balBefore);
+		return sub_(balAfter, balBefore);
 	}
 
 	function transferInCash(address from, uint amount) internal {
 		require(cash.transferFrom(from, address(this), amount) == true, "TransferInCash");
 	}
 
-	// ** MESSAGES **
-	function changeAuthorities(bytes calldata changeAuthoritiesNotice, bytes[] calldata signatures) public {
-		// TODO: address[] memory authTemp = authorities;
-		// isMsgAuthorized(changeAuthoritiesNotice, authTemp, signatures);
-		verifyChainType(changeAuthoritiesNotice);
+	receive() external payable {
+		lockETH();
+	}
 
-		uint CHAIN_TYPE_BYTES = 3;
-		uint WORD_SIZE = 32;
+	// ** L2 Message Ports **
+	function changeAuthorities(bytes calldata notice, bytes[] calldata signatures) public {
+		require(notice.length >= 35, "New authority set can not be empty");
+		bytes calldata chainType = notice[0:3]; // first 3 bytes of notice are chain type
+  		require(keccak256(abi.encodePacked(chainType)) == ETH_CHAIN_TYPE, "Invalid Chain Type");
+		bytes calldata body = notice[3:];
+		require(body.length % 32 == 0, "Excess bytes");
 
-		uint len = sub(changeAuthoritiesNotice.length, CHAIN_TYPE_BYTES);
-		require(len % WORD_SIZE == 0, "Excess bytes");
-		uint numAuths = len / WORD_SIZE;
+		isMsgAuthorized(notice, authorities, signatures);
+		uint numAuths = body.length / 32;// evm word size is 32 bytes
 
 		address[] memory newAuths = new address[](numAuths);
 		for (uint i = 0; i < numAuths; i ++) {
-			uint startIdx = add(CHAIN_TYPE_BYTES, mul(i, WORD_SIZE));
-			uint endIdx = add(startIdx, WORD_SIZE);
-			address newAuth = abi.decode(changeAuthoritiesNotice[startIdx:endIdx], (address));
+			uint startIdx = mul_(i, 32);
+			uint endIdx = add_(startIdx, 32);
+			address newAuth = abi.decode(body[startIdx:endIdx], (address));
 			newAuths[i] = newAuth;
 		}
+		bytes32 authHash = keccak256(abi.encodePacked(newAuths));
+		emit ChangeAuthorities(authHash);
 		authorities = newAuths;
-		// TODO: Let authHash = hash(newAuthorities)
-		// Emit ChangeAuthorities(authHash: bytes32)
 	}
 
 
-	function verifyChainType(bytes calldata notice) public view returns (bool) {
-		//ABI Decoding requires padded values, so we have to grab bytes3 manually and pass the full memory slot for addresses
-		// https://solidity.readthedocs.io/en/latest/types.html?highlight=slice#array-slices
-		bytes3 chainType =
-			notice[0] |
-            (bytes3(notice[1]) >> 8) |
-            (bytes3(notice[2]) >> 16);
-
-        require(keccak256(abi.encodePacked(chainType)) == CHAIN_TYPE_ETH, "Invalid Sig");
-	}
+	// ** VIEW HELPERS **
 
 	function getAuthorities() public view returns (address[] memory){
 		return authorities;
@@ -118,8 +114,8 @@ contract Starport {
 	function isMsgAuthorized(
 		bytes calldata message,
 		address[] memory authorities_,
-		bytes[] memory signatures
-	) public pure returns (bool) {
+		bytes[] calldata signatures
+	) public pure {
 		address[] memory sigs = new address[](signatures.length);
 		for (uint i = 0; i < signatures.length; i++) {
 			address signer = recover(keccak256(message), signatures[i]);
@@ -128,7 +124,6 @@ contract Starport {
 			sigs[i] = signer;
 		}
 		require(sigs.length >= getQuorum(authorities_.length), "Below quorum threshold");
-		return true;
 	}
 
 	function contains(address[] memory arr, address elem) internal pure returns (bool) {
@@ -172,9 +167,5 @@ contract Starport {
 	    require(signer != address(0), "ECDSA: invalid signature");
 
 	    return signer;
-	}
-
-	receive() external payable {
-		lockETH();
 	}
 }
