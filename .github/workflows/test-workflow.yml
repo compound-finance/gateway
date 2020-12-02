@@ -20,9 +20,28 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v1.0.1
 
+      - name: Install cargo2junit
+        run: |
+          cargo install cargo2junit
+
       - name: Cargo Test
         run: |
-          cargo test
+          cargo test -- -Z unstable-options --format json | tee unit-test-results.json
+          cat unit-test-results.json | cargo2junit > unit-test-results.xml
+
+      - name: Upload Unit Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Unit Test Results
+          path: unit-test-results.{xml,json}
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1.6
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: unit-test-results.xml
 
   eth-tests:
     name: eth-tests
