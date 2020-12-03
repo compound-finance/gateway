@@ -6,5 +6,5 @@ members = [
     'node',
     'pallets/cash',
     'pallets/runtime-interfaces',
-    'runtime',
+    'runtime'
 ]

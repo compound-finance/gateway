@@ -3715,15 +3715,21 @@ dependencies = [
 name = "pallet-cash"
 version = "1.0.0"
 dependencies = [
+ "ethabi",
  "ethereum-client",
  "frame-support",
  "frame-system",
+ "hex",
+ "hex-literal",
+ "libsecp256k1",
  "parity-scale-codec",
  "runtime-interfaces",
+ "sp-application-crypto",
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sp-std 2.0.0 (git+https://github.com/paritytech/substrate.git?rev=dcf6a3a)",
+ "tiny-keccak 2.0.2",
 ]
 
 [[package]]

@@ -1,11 +1,14 @@
 use tiny_keccak::Hasher;
+use sp_std::vec::Vec;
+use secp256k1;
+use ethabi;
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
 pub type Address = Vec<u8>;
 pub type Asset = (Chain, Address);
 pub type Account = (Chain, Address);
-pub type Amount = u32;
+pub type Amount = Vec<u8>;
 pub type Timestamp = u32;
 pub type Index = u32;
 pub type Rate = u32;
@@ -21,7 +24,7 @@ pub trait Notice {
     fn encode(&self) -> Message;
 }
 
-pub enum Chain { Eth}
+pub enum Chain {Eth}
 
 pub struct ExtractionNotice {
     asset: Asset,
@@ -31,7 +34,7 @@ pub struct ExtractionNotice {
 
 impl Notice for ExtractionNotice {
     fn encode (&self) -> Vec<u8> {
-        ethabi::encode([
+        ethabi::encode(&[
             ethabi::token::Token::FixedBytes(self.asset.1.clone().into()),
             ethabi::token::Token::FixedBytes(self.account.1.clone().into()),
             ethabi::token::Token::Int(self.amount.clone().into()),
