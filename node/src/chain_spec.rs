@@ -43,7 +43,7 @@ pub fn authority_keys_from_seed(seed: &str) -> (BabeId, GrandpaId) {
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_rpc_url" : "https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27"
+        "eth_rpc_url" : "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27"
         // todo: override with environment variable and/or cli param?
     });
     let as_object = value.as_object();
