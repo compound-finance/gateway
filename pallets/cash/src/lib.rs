@@ -29,7 +29,7 @@ pub trait Config: frame_system::Config {
 }
 
 decl_storage! {
-    trait Store for Module<T: Config> as CashPalletModule {
+    trait Store for Module<T: Config> as Cash {
         // XXX
         // Learn more about declaring storage items:
         // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
