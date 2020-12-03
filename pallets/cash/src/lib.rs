@@ -2,7 +2,7 @@
 
 use crate::amount::{Amount, CashAmount};
 use crate::notices::{Notice, EthHash};
-use crate::account::{AccountIdent, ChainIdent};
+use crate::account::{AccountAddr, AccountIdent, ChainIdent};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -10,16 +10,19 @@ use codec::alloc::string::String;
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-use frame_system::{ensure_none, ensure_signed};
+
+use frame_system::{ensure_none, ensure_signed,
+    offchain::{ AppCrypto, SubmitTransaction, CreateSignedTransaction }
+};
 use sp_runtime::{
     offchain::http,
     transaction_validity::{
-        TransactionSource, TransactionValidity, ValidTransaction,
+       TransactionSource, TransactionValidity, ValidTransaction,
     },
 };
 use sp_std::vec::Vec;
-
-extern crate ethereum_client;
+use sp_std::prelude::Box;
+use sp_core::crypto::{KeyTypeId};
 
 #[cfg(test)]
 mod mock;
@@ -35,10 +38,46 @@ extern crate alloc;
 
 mod notices;
 
+extern crate ethereum_client;
+
+pub const ETH_KEY_TYPE: KeyTypeId = KeyTypeId(*b"eth!");
+
+pub mod crypto {
+    use crate::ETH_KEY_TYPE;
+    use sp_core::ecdsa::Signature as EcdsaSignature;
+
+    use sp_runtime::app_crypto::{app_crypto, ecdsa};
+    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner };
+
+    app_crypto!(ecdsa, ETH_KEY_TYPE);
+
+    pub struct TestAuthId;
+	// implemented for ocw-runtime
+	impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
+		type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::ecdsa::Signature;
+        type GenericPublic = sp_core::ecdsa::Public;
+    }
+    
+    	// implemented for mock runtime in test
+	impl frame_system::offchain::AppCrypto<<EcdsaSignature as Verify>::Signer, EcdsaSignature>
+    for TestAuthId
+{
+    type RuntimeAppPublic = Public;
+    type GenericSignature = sp_core::ecdsa::Signature;
+    type GenericPublic = sp_core::ecdsa::Public;
+}
+}
+
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config {
+pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+
+    type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
+    /// The overarching dispatch call type.
+    type Call: From<Call<Self>>;
 }
 
 decl_storage! {
@@ -68,6 +107,7 @@ decl_event!(
 
         // XXX
         MagicExtract(CashAmount, AccountIdent, Notice),
+        Notice(notices::Message, notices::Signature, AccountIdent),
     }
 );
 
@@ -149,6 +189,18 @@ decl_module! {
             }
         }
 
+        #[weight = 0]
+        pub fn emit_notice(origin, notice: notices::NoticePayload) -> dispatch::DispatchResult {
+            // TODO: Move to using unsigned and getting author from signature
+            // TODO I don't know what this comment means ^
+            ensure_none(origin)?;
+    
+            debug::native::info!("emitting notice: {:?}", notice);
+            Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
+    
+            Ok(())
+        }
+
         /// Offchain Worker entry point.
         ///
         /// By implementing `fn offchain_worker` within `decl_module!` you declare a new offchain
@@ -168,32 +220,32 @@ decl_module! {
             // TODO create parameter vector from storage variables
             let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
             debug::native::info!("Lock Events: {:?}", lock_events);
-            Self::process_notices();
+            Self::process_notices(block_number);
         }
     }
 }
 
-/// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
-    pub fn process_notices() {
-        // notice queue stub
+    pub fn process_notices(block_number: T::BlockNumber) {
+        let n = notices::ExtractionNotice{
+            asset: "eth:0xfffff".as_bytes().to_vec(),
+            account: AccountIdent{chain: ChainIdent::Eth, account: "eth:0xF33d".as_bytes().to_vec() },
+            amount: Amount::new(2000_u32, 3)
+        };
 
-        // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for entry in  NoticeQueue::iter() {
-        //     // find parent
-        //     // id = notice.gen_id(parent)
-        //     let message = notice.encode();
-        //     signer.send_unsigned_transaction(
-        //         |account| notices::NoticePayload {
-        //             // id: move id,
-        //             msg: message.clone(),
-        //             sig: notices::sign(&message),
-        //             public: account.public.clone(),
-        //         },
-        //         Call::emit_notice);
-        // }
+        let pending_notices : Vec<Box<dyn notices::Notice>> =  vec![Box::new(n)];
 
-        }
+        for notice in pending_notices.iter() {
+            // find parent
+            // id = notice.gen_id(parent)
+        
+            // submit onchain call for aggregating the price
+            let payload = notice.to_payload();
+            let call = Call::emit_notice(payload);
+        
+            // Unsigned tx
+            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+        };
     }
 }
 
