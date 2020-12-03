@@ -2,16 +2,14 @@ use tiny_keccak::Hasher;
 use sp_std::vec::Vec;
 use secp256k1;
 use ethabi;
+use codec::Encode;
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
 pub type Address = Vec<u8>;
 pub type Asset = (Chain, Address);
 pub type Account = (Chain, Address);
-pub type Amount = Vec<u8>;
-pub type Timestamp = u32;
-pub type Index = u32;
-pub type Rate = u32;
+pub type Amount = u64;
 
 pub struct NoticePayload {
     // id: Vec<u8>,
@@ -29,7 +27,7 @@ pub enum Chain {Eth}
 pub struct ExtractionNotice {
     asset: Asset,
     account: Account,
-    amount: Address,
+    amount: Amount,
 }
 
 impl Notice for ExtractionNotice {
