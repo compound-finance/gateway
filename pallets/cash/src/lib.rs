@@ -122,7 +122,8 @@ decl_module! {
             // debug::native::info!("CONFIG: {:?}", eth_rpc_url);
 
             // TODO create parameter vector from storage variables
-            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
+            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0xbbde1662bC3ED16aA8C618c9833c801F3543B587\", \"fromBlock\": \"earliest\", \"toBlock\": \"latest\", \"topics\":[\"0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3\"]}"]);
+
             debug::native::info!("Lock Events: {:?}", lock_events);
         }
     }
