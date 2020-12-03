@@ -1,17 +1,25 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::alloc::string::String;
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
-use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
-};
-use frame_system::ensure_signed;
-use sp_runtime::offchain::http;
+use frame_support::{decl_error, decl_event, decl_module,};
+use frame_system::{ Module };
 use sp_std::vec::Vec;
+use sp_core::crypto::{CryptoTypePublicPair, KeyTypeId};
+use secp256k1::{PublicKey, SecretKey};
+use sp_application_crypto::ecdsa;
+use tiny_keccak::Hasher;
 
-extern crate ethereum_client;
+use frame_system::{
+    Call,
+    offchain::{ SignedPayload, Signer },
+    transaction_validity::{
+        InvalidTransaction,
+        TransactionSource,
+        TransactionValidity,
+        ValidTransaction,
+    },
+};
+
+mod notices;
 
 #[cfg(test)]
 mod mock;
@@ -19,49 +27,23 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[macro_use]
-extern crate alloc;
-
-/// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
-    /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 }
 
-decl_storage! {
-    trait Store for Module<T: Config> as CashPalletModule {
-        // XXX
-        // Learn more about declaring storage items:
-        // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-        Something get(fn something): Option<u32>;
-    }
-}
-
 decl_event!(
-    pub enum Event<T>
-    where
-        AccountId = <T as frame_system::Config>::AccountId,
-    {
-        // XXX
-        /// Event documentation should end with an array that provides descriptive names for event
-        /// parameters. [something, who]
-        SomethingStored(u32, AccountId),
+    pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
+        Notice(notices::Message, notices::Signature, notices::Address),
     }
 );
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        // XXX
-        /// Error names should be descriptive.
         NoneValue,
-        /// Errors should have helpful documentation associated with them.
         StorageOverflow,
     }
 }
 
-// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-// These functions materialize as "extrinsics", which are often compared to transactions.
-// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
         // Errors must be initialized if they are used by the pallet.
@@ -70,39 +52,85 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
-        /// An example dispatchable that takes a singles value as a parameter, writes the value to
-        /// storage and emits an event. This function must be dispatched by a signed extrinsic.
-        #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn do_something(origin, something: u32) -> dispatch::DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // Update storage.
-            Something::put(something);
-
-            // Emit an event.
-            Self::deposit_event(RawEvent::SomethingStored(something, who));
-            // Return a successful DispatchResult
-            Ok(())
+        fn offchain_worker(block_number: T::BlockNumber) {
+            process_notice_queue();
         }
 
-        /// An example dispatchable that may throw a custom error.
-        #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-        pub fn cause_error(origin) -> dispatch::DispatchResult {
-            let _who = ensure_signed(origin)?;
-            let _ = runtime_interfaces::config_interface::get();
+        pub fn process_notice_queue() {
+            let pending_notices = <Vec<Notice>>
 
-            // Read a value from storage.
-            match Something::get() {
-                // Return an error if the value has not been set.
-                None => Err(Error::<T>::NoneValue)?,
-                Some(old) => {
-                    // Increment the value read from storage; will error in the event of overflow.
-                    let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-                    // Update the value in storage with the incremented result.
-                    Something::put(new);
-                    Ok(())
-                },
+            // notice queue stub
+            pending_notices = [];
+
+            for notice in pending_notices.iter() {
+                // find parent
+                // id = notice.gen_id(parent)
+                let message = encode(&notice);
+                let sig_result = Signer.send_unsigned_transaction(
+                    |account| NoticePayload {
+                        // id: move id,
+                        msg: message.clone(),
+                        sig: sign(&message),
+                        public: account.public.clone(),
+                    },
+                    Call::emit_notice);
+
+                match sig_result {
+                    Some((_, res)) => res.map_err(|_| {
+                        debug::error!("Failed in offchain_unsigned_tx_signed_payload");
+                        <Error<T>>::OffchainUnsignedTxSignedPayloadError
+                    }),
+                    None => {
+                        // The case of `None`: no account is available for sending
+                        debug::error!("No local account available");
+                        Err(<Error<T>>::NoLocalAcctForSigning)
+                    }
+                }
             }
+        }
+
+        #[weight = 0]
+        pub fn emit_notice(origin, notice: NoticePayload, signature: T::Signature) -> DispatchResult {
+            debug::native::info!("Extraction Notice Payload: {:?}", extraction_notice_payload);
+            // TODO: Move to using unsigned and getting author from signature
+            // TODO I don't know what this comment means ^
+            ensure_none(origin)?;
+
+            Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.public, notice.id));
+
+            Ok(())
+        }
+    }
+}
+
+impl<T: Config> for frame_system::Module<T> {
+}
+
+#[allow(deprecated)] // ValidateUnsigned
+impl<T: Config> frame_support::unsigned::ValidateUnsigned for frame_system::Module<T> {
+    type Call = Call<T>;
+
+    /// Validate unsigned call to this module.
+    ///
+    /// By default unsigned transactions are disallowed, but implementing the validator
+    /// here we make sure that some particular calls (the ones produced by offchain worker)
+    /// are being whitelisted and marked as valid.
+    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        match call {
+            Call::emit_notice(ref payload, ref signature) => {
+                let signature_valid =
+                    SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
+                if !signature_valid {
+                    return InvalidTransaction::BadProof.into();
+                }
+                // TODO: other validation? 
+                // Self::validate_extraction_notice_transaction_parameters(
+                //     &payload.msg,
+                //     &payload.sig,
+                //     &payload.who,
+                // )
+            }
+            _ => InvalidTransaction::Call.into(),
         }
 
         /// Offchain Worker entry point.
@@ -127,3 +155,4 @@ decl_module! {
         }
     }
 }
+
