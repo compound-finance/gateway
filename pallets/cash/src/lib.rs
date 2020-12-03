@@ -22,6 +22,9 @@ mod tests;
 #[macro_use]
 extern crate alloc;
 
+pub const ETHEREUM_STARPORT_ADDRESS: &str = "0xbbde1662bC3ED16aA8C618c9833c801F3543B587";
+pub const LOCK_TOPIC: &str = "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"; // lock event topic
+
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
@@ -121,8 +124,8 @@ decl_module! {
             let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url()).unwrap();
             // debug::native::info!("CONFIG: {:?}", eth_rpc_url);
 
-            // TODO create parameter vector from storage variables
-            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0xbbde1662bC3ED16aA8C618c9833c801F3543B587\", \"fromBlock\": \"earliest\", \"toBlock\": \"latest\", \"topics\":[\"0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3\"]}"]);
+            let fetch_events_request = format!(r#"{{"address": "{}", "fromBlock": "earliest", "toBlock": "latest", "topics":["{}"]}}"#, ETHEREUM_STARPORT_ADDRESS, LOCK_TOPIC);
+            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request]);
 
             debug::native::info!("Lock Events: {:?}", lock_events);
         }
