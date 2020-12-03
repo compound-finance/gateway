@@ -16,6 +16,8 @@ extern crate ethereum_client;
 #[cfg(test)]
 mod mock;
 
+mod amount;
+
 #[cfg(test)]
 mod tests;
 
