@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::amount::CashAmount;
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -7,7 +9,7 @@ use codec::alloc::string::String;
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-use frame_system::ensure_signed;
+use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::offchain::http;
 use sp_std::vec::Vec;
 
@@ -15,6 +17,9 @@ extern crate ethereum_client;
 
 #[cfg(test)]
 mod mock;
+
+mod account;
+mod amount;
 
 #[cfg(test)]
 mod tests;
@@ -34,6 +39,9 @@ decl_storage! {
         // Learn more about declaring storage items:
         // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
         Something get(fn something): Option<u32>;
+
+        // XXX
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
     }
 }
 
@@ -46,6 +54,9 @@ decl_event!(
         /// Event documentation should end with an array that provides descriptive names for event
         /// parameters. [something, who]
         SomethingStored(u32, AccountId),
+
+        // XXX
+        MagicExtract(CashAmount, AccountIdent),
     }
 );
 
@@ -69,6 +80,23 @@ decl_module! {
 
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
+
+        /// An example dispatchable that takes a singles value as a parameter, writes the value to
+        /// storage and emits an event. This function must be dispatched by a signed extrinsic.
+        #[weight = 10_000 + T::DbWeight::get().writes(1)]
+        pub fn magic_extract(origin, account: AccountIdent, amount: CashAmount) -> dispatch::DispatchResult {
+            let () = ensure_none(origin)?;
+
+            // Update storage -- TODO: increment this-- sure why not?
+            let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
+            let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
+            CashBalance::insert(&account, next_cash_balance);
+
+            // Emit an event.
+            Self::deposit_event(RawEvent::MagicExtract(amount, account));
+            // Return a successful DispatchResult
+            Ok(())
+        }
 
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
