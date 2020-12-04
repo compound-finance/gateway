@@ -94,6 +94,7 @@ pub struct LockCashEvent {
 #[derive(Debug)]
 pub struct LogEvent<T: DecodableEvent> {
     pub block_hash: String,
+    pub block_number: String,
     pub transaction_index: String,
     pub event: T,
 }
@@ -194,7 +195,7 @@ fn decode_events(
 pub fn fetch_and_decode_events<T: DecodableEvent>(
     server: &str,
     params: Vec<&str>,
-) -> Result<Vec<LogEvent<T>>, http::Error> {
+) -> Result<(i64, Vec<LogEvent<T>>), http::Error> {
     let body_str: String = send_rpc(server, "eth_getLogs", params)?;
     let deserialized_body =
         deserialize_get_logs_response(&body_str).map_err(|_| http::Error::Unknown)?;
@@ -202,6 +203,8 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
     let body_data = deserialized_body.result.ok_or(http::Error::Unknown)?;
     debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
     let mut log_events: Vec<LogEvent<T>> = Vec::new();
+
+    let mut latest_block = 0;
 
     for eth_log in body_data {
         if eth_log.block_hash.is_none()
@@ -212,15 +215,25 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
             continue;
         }
 
+        let block_num_hex = eth_log.block_number.unwrap();
+        let without_prefix = block_num_hex.trim_start_matches("0x");
+        let block_num_int = i64::from_str_radix(without_prefix, 16).unwrap();
+        debug::native::info!("Eth log block number: {:?}", block_num_int);
+
+        if block_num_int > latest_block {
+            latest_block = block_num_int;
+        }
+
         let lock_event = DecodableEvent::new(eth_log.data.unwrap());
         log_events.push(LogEvent {
             block_hash: eth_log.block_hash.unwrap(),
+            block_number: block_num_hex,
             transaction_index: eth_log.transaction_index.unwrap(),
             event: lock_event,
         });
     }
 
-    Ok(log_events)
+    Ok((latest_block, log_events))
 }
 
 #[cfg(test)]
