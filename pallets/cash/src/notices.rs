@@ -2,7 +2,8 @@ use tiny_keccak::Hasher;
 use sp_std::vec::Vec;
 use secp256k1;
 use ethabi;
-use codec::Encode;
+use codec::{Decode, Encode};
+use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
@@ -11,18 +12,26 @@ pub type Asset = (Chain, Address);
 pub type Account = (Chain, Address);
 pub type Amount = u64;
 
-pub struct NoticePayload {
+#[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
+pub struct NoticePayload<Public> {
     // id: Vec<u8>,
-    msg: Vec<u8>,
-    sig: Vec<u8>, 
-    public: Address,
+    pub msg: Vec<u8>,
+    pub sig: Vec<u8>, 
+    pub public: Public,
 }
+
+// pub trait Clone : Notice {
+//     fn clone(&self) -> Self;
+//     // fn clone_from(&mut self, source: &Self) {
+//     //     *self = source.clone()
+//     // }
+// }
 
 pub trait Notice {
     fn encode(&self) -> Message;
 }
 
-pub enum Chain {Eth}
+pub enum Chain {}
 
 pub struct ExtractionNotice {
     asset: Asset,
@@ -40,6 +49,12 @@ impl Notice for ExtractionNotice {
     }
 }
 
+impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
+    fn public(&self) -> T::Public {
+        self.public.clone()
+    }
+}
+
 /// Helper function to quickly run keccak in the Ethereum-style
 fn keccak(input: Vec<u8>) -> [u8; 32] {
     let mut output = [0u8; 32];
@@ -48,6 +63,7 @@ fn keccak(input: Vec<u8>) -> [u8; 32] {
     hasher.finalize(&mut output);
     output
 }
+
 
 // TODO: match by chain for signing algorotih or implement as trait
 pub fn sign(message : &Message) -> Signature {

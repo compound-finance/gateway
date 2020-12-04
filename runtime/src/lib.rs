@@ -10,6 +10,7 @@ use sp_runtime::traits::{
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     transaction_validity::{TransactionSource, TransactionValidity},
+    SaturatedConversion,
     ApplyExtrinsicResult, MultiSignature,
 };
 use sp_std::prelude::*;
@@ -24,7 +25,9 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
 pub use frame_support::{
-    construct_runtime, parameter_types,
+    construct_runtime, 
+    parameter_types,
+    debug,
     traits::{KeyOwnerProofSystem, Randomness},
     weights::{
         constants::{
@@ -302,10 +305,46 @@ impl pallet_sudo::Config for Runtime {
     type Call = Call;
 }
 
+pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
+
 /// Configure the CASH pallet in pallets/cash.
 impl pallet_cash::Config for Runtime {
+    type AuthorityId = pallet_cash::crypto::TestAuthId;
+    type Call = Call;
     type Event = Event;
 }
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+    Call: From<LocalCall>,
+{
+    fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+        call: Call,
+        public: <Signature as sp_runtime::traits::Verify>::Signer,
+        account: AccountId,
+        index: Index,
+    ) -> Option<(
+        Call,
+        <UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
+    )> {
+// cnlficting implementation in colossus and https://substrate.dev/docs/en/knowledgebase/runtime/off-chain-workers#using-off-chain-workers-in-the-runtime, whats up with that?
+        None
+    }
+}
+
+impl frame_system::offchain::SigningTypes for Runtime {
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+where
+    Call: From<C>,
+{
+    type OverarchingCall = Call;
+    type Extrinsic = UncheckedExtrinsic;
+}
+
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -324,7 +363,7 @@ construct_runtime!(
         Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
         // Include the custom logic from the CASH pallet in the runtime.
-        Cash: pallet_cash::{Module, Call, Storage, Event<T>},
+        Cash: pallet_cash::{Module, Call, Storage, Event<T>, ValidateUnsigned},
     }
 );
 

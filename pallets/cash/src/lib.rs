@@ -1,25 +1,23 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
 use codec::alloc::string::String;
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch
 };
 use frame_system::{
     ensure_none,
-    offchain::SignedPayload
+    offchain::{ AppCrypto, CreateSignedTransaction, SendTransactionTypes, SendUnsignedTransaction, SignedPayload, Signer, SigningTypes }
 };
+use sp_core::crypto::{KeyTypeId};
 use sp_runtime::offchain::http;
 use sp_runtime::{
     transaction_validity::{
-        InvalidTransaction, TransactionSource, TransactionValidity
+        ValidTransaction,
+        InvalidTransaction,
+        TransactionSource,
+        TransactionValidity
     },
 };
 use sp_std::vec::Vec;
-
-extern crate ethereum_client;
 
 mod notices;
 
@@ -31,21 +29,86 @@ mod tests;
 
 #[macro_use]
 extern crate alloc;
+extern crate ethereum_client;
 
-pub trait Config: frame_system::Config {
+pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"gran");
+pub const ETH_KEY_TYPE: KeyTypeId = KeyTypeId(*b"eth!");
+
+pub mod crypto {
+    use crate::KEY_TYPE;
+    use sp_core::ed25519::Signature as Ed25519Signature;
+
+    use sp_runtime::app_crypto::{app_crypto, ed25519};
+    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
+
+    app_crypto!(ed25519, KEY_TYPE);
+
+    pub struct TestAuthId;
+    // implemented for ocw-runtime
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::ed25519::Signature;
+        type GenericPublic = sp_core::ed25519::Public;
+    }
+
+    impl frame_system::offchain::AppCrypto<<Ed25519Signature as Verify>::Signer, Ed25519Signature>
+        for TestAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::ed25519::Signature;
+        type GenericPublic = sp_core::ed25519::Public;
+    }
+}
+
+pub mod ecdsa_crypto {
+    use crate::ETH_KEY_TYPE;
+    use sp_core::ecdsa::Signature as EcdsaSignature;
+
+    use sp_runtime::app_crypto::{app_crypto, ecdsa};
+    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
+
+    app_crypto!(ecdsa, ETH_KEY_TYPE);
+
+    pub struct TestEthAuthId;
+
+    // implemented for ocw-runtime
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestEthAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::ecdsa::Signature;
+        type GenericPublic = sp_core::ecdsa::Public;
+    }
+
+    impl frame_system::offchain::AppCrypto<<EcdsaSignature as Verify>::Signer, EcdsaSignature>
+        for TestEthAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::ecdsa::Signature;
+        type GenericPublic = sp_core::ecdsa::Public;
+    }
+}
+
+pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> + SendTransactionTypes<<Self as Config>::Call> {
+    /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+
+     /// The identifier type for an offchain worker.
+     type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
+     /// The overarching dispatch call type.
+     type Call: From<Call<Self>>;
+
+    //  type SubmitUnsignedTransaction: frame_system::offchain::SendUnsignedTransaction<Self, <Self as Config>::Call>;
 }
 
 decl_storage! {
-    trait Store for Module<T: Config> as CashPalletModule {
+    trait Store for Module<T: Config> as Cash {
     }
 }
 
 decl_event!(
     // why does this depend on the un used account id binding? ( wont compile if deleted)
-    pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
-        Hi(AccountId),
-        Notice(notices::Message, notices::Signature, notices::Address),
+    pub enum Event<T> where Public = <T as SigningTypes>::Public {
+        Notice(notices::Message, notices::Signature, Public),
     }
 );
 
@@ -62,14 +125,13 @@ decl_module! {
 
         fn deposit_event() = default;
 
-
         fn offchain_worker(block_number: T::BlockNumber) {
             Self::process_requests();
             Self::process_notices();
         }
 
         #[weight = 0]
-        pub fn emit_notice(origin, notice: notices::NoticePayload, ) -> dispatch::DispatchResult {
+        pub fn emit_notice(origin, notice: notices::NoticePayload<T::Public>, _signature: T::Signature) -> dispatch::DispatchResult {
             // TODO: Move to using unsigned and getting author from signature
             // TODO I don't know what this comment means ^
             ensure_none(origin)?;
@@ -82,7 +144,6 @@ decl_module! {
 }
 
 impl<T: Config> Module<T> {
-
     fn process_requests() {
         debug::native::info!("Hello World from offchain workers!");
         let config = runtime_interfaces::config_interface::get();
@@ -92,24 +153,22 @@ impl<T: Config> Module<T> {
         // TODO create parameter vector from storage variables
         let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
         debug::native::info!("Lock Events: {:?}", lock_events);
-        
     }
 
     pub fn process_notices() {
-        let pending_notices = <Vec<Notice>>;
-
         // notice queue stub
-        pending_notices = [];
+        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
 
+        let signer = Signer::<T, T::AuthorityId>::any_account();
         for notice in pending_notices.iter() {
             // find parent
             // id = notice.gen_id(parent)
-            let message = encode(&notice);
-            Signer.send_unsigned_transaction(
-                move |account| NoticePayload {
+            let message = notice.encode();
+            signer.send_unsigned_transaction(
+                |account| notices::NoticePayload {
                     // id: move id,
                     msg: message.clone(),
-                    sig: sign(&message),
+                    sig: notices::sign(&message),
                     public: account.public.clone(),
                 },
                 Call::emit_notice);
@@ -130,12 +189,14 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
               if !signature_valid {
                   return InvalidTransaction::BadProof.into();
               }
-              // TODO: other validation? 
-              // Self::validate_extraction_notice_transaction_parameters(
-              //     &payload.msg,
-              //     &payload.sig,
-              //     &payload.who,
-              // )
+              ValidTransaction::with_tag_prefix("Cash")
+              // The transaction is only valid for next 10 blocks. After that it's
+              // going to be revalidated by the pool.
+                  // XXX: ? who knows how long ? - CB
+                  .longevity(10)
+                  // XXX: don't propogate, just expect to get it yourself next time? -CB
+                  .propagate(false)
+                  .build()
           }
           _ => InvalidTransaction::Call.into(),
       }
