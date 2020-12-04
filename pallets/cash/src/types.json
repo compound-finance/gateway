@@ -1,0 +1,12 @@
+{
+  "ChainIdent": {
+    "_enum": [
+      "Eth"
+    ]
+  },
+  "AccountAddr": "Vec<u8>",
+  "AccountIdent": {
+    "chain": "ChainIdent",
+    "account": "AccountAddr"
+  }
+}
