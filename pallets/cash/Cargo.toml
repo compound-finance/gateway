@@ -24,6 +24,7 @@ runtime-interfaces = { path = '../runtime-interfaces', version = '1.0.0', defaul
 
 num-bigint = { default-features = false, version = "0.3" }
 num-traits = { default-features = false, version = "0.2" }
+anyhow = { version = "1.0", default-features = false }
 
 ethereum-client = { path = "../../ethereum_client", version = '0.1.0', default-features = false}
 
