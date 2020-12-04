@@ -12,10 +12,10 @@ ethabi = { version = "12.0.0", default-features = false }
 hex = { version = "0.4.2", default-features = false }
 serde = { version = "1.0.116", features = ["derive", "alloc"], default-features = false}
 serde_json = { version = "1.0.58", features=["alloc"], default-features = false}
-frame-support = { default-features = false, version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-io = { version = '2.0.0', default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ["disable_oom", "disable_panic_handler"]}
-sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-std = { version = '2.0.0', default-features = false }
+frame-support = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-io = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git', features = ["disable_oom", "disable_panic_handler"]}
+sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 
 [features]
 default = ['std']
