@@ -1,4 +1,4 @@
-use anyhow::{bail, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use num_bigint::BigUint;
 
 /// The type of the decimal field.
@@ -85,7 +85,18 @@ mod tests {
         assert_eq!(a, Amount::one(2));
         assert_eq!(b, Amount::one(2));
 
-        let expected = Amount::new(200u8, 3);
+        let expected = Amount::new(200u8, 2);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_add_error() {
+        let a = Amount::one(2);
+        let b = Amount::new(2000_u32, 3);
+
+        assert_eq!(
+            a.add(&b).unwrap_err().to_string(),
+            "Mismatched decimals for amounts: 2 vs 3"
+        );
     }
 }
