@@ -157,3 +157,26 @@ decl_module! {
         }
     }
 }
+
+impl<T: Config> Module<T> {
+    pub fn process_notices() {
+        // notice queue stub
+        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
+
+        // let signer = Signer::<T, T::AuthorityId>::any_account();
+        for notice in pending_notices.iter() {
+        //     // find parent
+        //     // id = notice.gen_id(parent)
+        //     let message = notice.encode();
+        //     signer.send_unsigned_transaction(
+        //         |account| notices::NoticePayload {
+        //             // id: move id,
+        //             msg: message.clone(),
+        //             sig: notices::sign(&message),
+        //             public: account.public.clone(),
+        //         },
+        //         Call::emit_notice);
+        }
+    }
+}
+
