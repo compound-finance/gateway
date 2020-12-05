@@ -1,6 +1,6 @@
 use compound_chain_runtime::{
-    wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-    Signature, SudoConfig, SystemConfig,
+    wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
+    GrandpaConfig, Signature, SudoConfig, SystemConfig,
 };
 use sc_service::ChainType;
 use sp_consensus_babe::AuthorityId as BabeId;
@@ -174,6 +174,10 @@ fn testnet_genesis(
         pallet_sudo: Some(SudoConfig {
             // Assign network admin rights.
             key: root_key,
+        }),
+
+        pallet_cash: Some(CashConfig {
+            cash_balance: vec![], // XXX circular broken substrate -> hacked to gen GenesisConfig, but empty
         }),
     }
 }
