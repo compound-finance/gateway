@@ -8,5 +8,7 @@
   "AccountIdent": {
     "chain": "ChainIdent",
     "account": "AccountAddr"
-  }
+  },
+  "CashAmount": "u128",
+  "Address": "MultiAddress<AccountId, ()>"
 }
