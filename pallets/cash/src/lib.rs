@@ -27,6 +27,8 @@ mod tests;
 #[macro_use]
 extern crate alloc;
 
+mod notices;
+
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.

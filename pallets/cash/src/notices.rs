@@ -58,7 +58,7 @@ fn keccak(input: Vec<u8>) -> [u8; 32] {
 }
 
 
-// TODO: match by chain for signing algorotih or implement as trait
+// TODO: match by chain for signing algorithm or implement as trait
 pub fn sign(message : &Message) -> Signature {
     // TODO: get this from somewhere else
     let not_so_secret: [u8; 32] = hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
