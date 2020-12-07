@@ -10,7 +10,12 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 use frame_system::{ensure_none, ensure_signed};
-use sp_runtime::offchain::http;
+use sp_runtime::{
+    offchain::http,
+    transaction_validity::{
+        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+    },
+};
 use sp_std::vec::Vec;
 
 extern crate ethereum_client;
@@ -180,3 +185,27 @@ impl<T: Config> Module<T> {
     }
 }
 
+impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
+    type Call = Call<T>;
+
+    /// Validate unsigned call to this module.
+    ///
+    /// By default unsigned transactions are disallowed, but implementing the validator
+    /// here we make sure that some particular calls (the ones produced by offchain worker)
+    /// are being whitelisted and marked as valid.
+    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        // TODO: This is not ready for prime-time
+        ValidTransaction::with_tag_prefix("CashPallet")
+            // The transaction is only valid for next 10 blocks. After that it's
+            // going to be revalidated by the pool.
+            .longevity(10)
+            .and_provides("fix_this_function")
+            // It's fine to propagate that transaction to other peers, which means it can be
+            // created even by nodes that don't produce blocks.
+            // Note that sometimes it's better to keep it for yourself (if you are the block
+            // producer), since for instance in some schemes others may copy your solution and
+            // claim a reward.
+            .propagate(true)
+            .build()
+    }
+}

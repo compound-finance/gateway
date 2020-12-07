@@ -5,6 +5,8 @@
     ]
   },
   "AccountAddr": "Vec<u8>",
+  "CashAmount": "u128",
+  "Address": "MultiAddress<AccountId, ()>",
   "AccountIdent": {
     "chain": "ChainIdent",
     "account": "AccountAddr"
