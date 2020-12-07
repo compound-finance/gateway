@@ -1,16 +1,16 @@
 use tiny_keccak::Hasher;
+use num_bigint::BigUint;
+use num_traits::ToPrimitive;
 use sp_std::vec::Vec;
 use secp256k1;
 use ethabi;
 use codec::{Decode, Encode};
+use super::{account::AccountIdent, amount::Amount};
 use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
-pub type Address = Vec<u8>;
-pub type Asset = (Chain, Address);
-pub type Account = (Chain, Address);
-pub type Amount = u64;
+pub type Asset = Vec<u8>;
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 pub struct NoticePayload<Public> {
@@ -28,16 +28,17 @@ pub enum Chain {}
 
 pub struct ExtractionNotice {
     asset: Asset,
-    account: Account,
+    account: AccountIdent,
     amount: Amount,
 }
 
 impl Notice for ExtractionNotice {
     fn encode (&self) -> Vec<u8> {
+        let x = self.amount.mantissa.to_u128().unwrap();
         ethabi::encode(&[
-            ethabi::token::Token::FixedBytes(self.asset.1.clone().into()),
-            ethabi::token::Token::FixedBytes(self.account.1.clone().into()),
-            ethabi::token::Token::Int(self.amount.clone().into()),
+            ethabi::token::Token::FixedBytes(self.asset.clone().into()),
+            ethabi::token::Token::FixedBytes(self.account.account.clone().into()),
+            ethabi::token::Token::Int(x.into()),
         ])
     }
 }
