@@ -1,17 +1,7 @@
 use frame_support::debug;
 /// for now this will just focus on serialization and deserialization of payloads
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GetLogsParams {
-    pub block_hash: Option<String>,
-    pub topics: Option<Vec<String>>,
-    pub address: Option<String>,
-    pub from_block: Option<u64>,
-    pub to_block: Option<u64>,
-}
 
 #[derive(Deserialize, Debug)]
 pub struct ResponseError {
@@ -20,9 +10,16 @@ pub struct ResponseError {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ResponseWrapper<T> {
+pub struct EventsResponseWrapper<T> {
     pub id: Option<u64>,
     pub result: Option<Vec<T>>,
+    pub error: Option<ResponseError>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BlockResponseWrapper {
+    pub id: Option<u64>,
+    pub result: Option<String>,
     pub error: Option<ResponseError>,
 }
 
@@ -51,7 +48,15 @@ pub struct LogObject {
 
 fn deserialize_get_logs_response(
     response: &str,
-) -> serde_json::error::Result<ResponseWrapper<LogObject>> {
+) -> serde_json::error::Result<EventsResponseWrapper<LogObject>> {
+    serde_json::from_str(response)
+}
+
+// Ok("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x3b62da\"}")
+
+fn deserialize_get_block_number_response(
+    response: &str,
+) -> serde_json::error::Result<BlockResponseWrapper> {
     serde_json::from_str(response)
 }
 
@@ -195,7 +200,7 @@ fn decode_events(
 pub fn fetch_and_decode_events<T: DecodableEvent>(
     server: &str,
     params: Vec<&str>,
-) -> Result<(i64, Vec<LogEvent<T>>), http::Error> {
+) -> Result<Vec<LogEvent<T>>, http::Error> {
     let body_str: String = send_rpc(server, "eth_getLogs", params)?;
     let deserialized_body =
         deserialize_get_logs_response(&body_str).map_err(|_| http::Error::Unknown)?;
@@ -204,36 +209,35 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
     debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
     let mut log_events: Vec<LogEvent<T>> = Vec::new();
 
-    let mut latest_block = 0;
-
     for eth_log in body_data {
         if eth_log.block_hash.is_none()
             || eth_log.transaction_index.is_none()
             || eth_log.data.is_none()
+            || eth_log.block_number.is_none()
         {
             debug::native::info!("Missing critical field from eth log event");
             continue;
         }
 
-        let block_num_hex = eth_log.block_number.unwrap();
-        let without_prefix = block_num_hex.trim_start_matches("0x");
-        let block_num_int = i64::from_str_radix(without_prefix, 16).unwrap();
-        debug::native::info!("Eth log block number: {:?}", block_num_int);
-
-        if block_num_int > latest_block {
-            latest_block = block_num_int;
-        }
-
         let lock_event = DecodableEvent::new(eth_log.data.unwrap());
         log_events.push(LogEvent {
             block_hash: eth_log.block_hash.unwrap(),
-            block_number: block_num_hex,
+            block_number: eth_log.block_number.unwrap(),
             transaction_index: eth_log.transaction_index.unwrap(),
             event: lock_event,
         });
     }
 
-    Ok((latest_block, log_events))
+    Ok(log_events)
+}
+
+pub fn fetch_latest_block(server: &str) -> Result<String, http::Error> {
+    let body_str: String = send_rpc(server, "eth_blockNumber", vec![])?;
+    let deserialized_body =
+        deserialize_get_block_number_response(&body_str).map_err(|_| http::Error::Unknown)?;
+
+    let block_number = deserialized_body.result.ok_or(http::Error::Unknown)?;
+    return Ok(block_number);
 }
 
 #[cfg(test)]
