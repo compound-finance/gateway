@@ -17,8 +17,8 @@ pub type CashAmount = u128;
 /// 12345.6789. The decimals are stored separately.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Amount {
-    mantissa: MantissaType,
-    decimals: DecimalType,
+    pub mantissa: MantissaType,
+    pub decimals: DecimalType,
 }
 
 /// Error type for fixed precision math.
