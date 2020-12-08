@@ -1,0 +1,42 @@
+
+- hosts: authority_node
+  vars:
+    packages:
+      - vim
+      - wget
+      - curl
+      - htop
+      - cmake
+      - pkg-config
+      - libssl-dev
+      - git
+      - gcc
+      - build-essential
+      - git
+      - clang
+      - libclang-dev
+
+    rustup_init_url: https://sh.rustup.rs
+    ssh_home: "{{ ansible_env.HOME }}/.ssh"
+    git_deploy_key: "{{ ssh_home }}/id_rsa_compound_chain_deploy"
+    cargo_home: "{{ ansible_env.HOME }}/.cargo"
+    rustup_home: "{{ cargo_home }}/bin/rustup"
+    compound_chain_home: "{{ ansible_env.HOME }}/compound_chain"
+    git_repo: "https://github.com/compound-finance/compound-chain.git"
+    git_branch: "master"
+
+  tasks:
+    - name: Add Deploy Key
+      copy:
+        src:  '{{ deploy_key }}'
+        dest: '{{ git_deploy_key }}'
+        owner: ubuntu
+        group: ubuntu
+        mode: '0400'
+
+    - name: Checkout Compound Chain
+      git:
+        repo: '{{ git_repo }}'
+        dest: '{{ compound_chain_home }}'
+        version: '{{ git_branch }}'
+        key_file: '{{ git_deploy_key }}'

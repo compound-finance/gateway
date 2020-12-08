@@ -54,6 +54,18 @@ variable "admin_public_key" {
   type = string
 }
 
+variable "base_instance_ami" {
+  type = string
+  description = "AWS ami image to use for core instances"
+  default = "ami-05ca751716e10fe16" # See https://wiki.centos.org/Cloud/AWS#Official_and_current_CentOS_Public_Images
+}
+
+variable "bastion_instance_type" {
+  type = string
+  description = "Instance type for bastion node"
+  default = "t4g.micro"
+}
+
 # AWS Provider
 terraform {
   required_providers {
@@ -147,17 +159,31 @@ resource "aws_security_group" "bastion_node_sg" {
   vpc_id      = aws_vpc.authority_node_vpc.id
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    ipv6_cidr_blocks = ["::/0"]
   }
   
   egress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    ipv6_cidr_blocks = ["::/0"]
   }
 
   tags = {
@@ -201,8 +227,8 @@ resource "aws_security_group" "authority_node_lb_sg" {
   # TODO: Secure this, as well.
   egress {
     from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    to_port     = 65535
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -221,21 +247,39 @@ resource "aws_network_acl" "authority_node_public_acl" {
 
   # TODO: Consider adding deeper ACL rules
   egress {
-    protocol   = "tcp"
+    protocol   = "-1"
     rule_no    = 200
     action     = "allow"
     cidr_block = "0.0.0.0/0"
     from_port  = 0
-    to_port    = 65535
+    to_port    = 0
+  }
+
+  egress {
+    protocol   = "-1"
+    rule_no    = 201
+    action     = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port  = 0
+    to_port    = 0
   }
 
   ingress {
-    protocol   = "tcp"
+    protocol   = "-1"
     rule_no    = 100
     action     = "allow"
     cidr_block = "0.0.0.0/0"
     from_port  = 0
-    to_port    = 65535
+    to_port    = 0
+  }
+
+  ingress {
+    protocol   = "-1"
+    rule_no    = 101
+    action     = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port  = 0
+    to_port    = 0
   }
 
   tags = {
@@ -250,39 +294,39 @@ resource "aws_network_acl" "authority_node_private_acl" {
 
   # TODO: Consider adding deeper ACL rules
   egress {
-    protocol   = "tcp"
+    protocol   = "-1"
     rule_no    = 200
     action     = "allow"
     cidr_block = aws_subnet.authority_node_public.cidr_block
     from_port  = 0
-    to_port    = 65535
+    to_port    = 0
   }
 
   egress {
-    protocol   = "tcp"
+    protocol   = "-1"
     rule_no    = 201
     action     = "allow"
     cidr_block = aws_subnet.authority_node_public_backup.cidr_block
     from_port  = 0
-    to_port    = 65535
+    to_port    = 0
   }
 
   ingress {
-    protocol   = "tcp"
+    protocol   = "-1"
     rule_no    = 100
     action     = "allow"
     cidr_block = aws_subnet.authority_node_public.cidr_block
     from_port  = 0
-    to_port    = 65535
+    to_port    = 0
   }
 
   ingress {
-    protocol   = "tcp"
+    protocol   = "-1"
     rule_no    = 101
     action     = "allow"
     cidr_block = aws_subnet.authority_node_public_backup.cidr_block
     from_port  = 0
-    to_port    = 65535
+    to_port    = 0
   }
 
   tags = {
@@ -301,30 +345,8 @@ resource "aws_ebs_volume" "authority_node_volume" {
   }
 }
 
-# TODO: What's the best image to use here?
-data "aws_ami" "ubuntu" {
-  most_recent = true
-
-  filter {
-    name   = "architecture"
-    values = ["arm64"]
-  }
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-arm64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  owners = ["099720109477"] # Canonical
-}
-
 resource "aws_instance" "authority_node" {
-  ami                         = data.aws_ami.ubuntu.id
+  ami                         = var.base_instance_ami
   availability_zone           = var.az
   ebs_optimized               = true
   instance_type               = var.authority_node_instance_type
@@ -340,10 +362,10 @@ resource "aws_instance" "authority_node" {
 }
 
 resource "aws_instance" "bastion" {
-  ami                         = data.aws_ami.ubuntu.id
+  ami                         = var.base_instance_ami
   availability_zone           = var.az
   ebs_optimized               = true
-  instance_type               = "t4g.nano"
+  instance_type               = var.bastion_instance_type
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy # Same tenacy as authority node?
   vpc_security_group_ids      = [aws_security_group.bastion_node_sg.id]
