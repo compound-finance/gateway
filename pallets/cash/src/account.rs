@@ -14,6 +14,16 @@ pub struct AccountIdent {
   pub account: AccountAddr,
 }
 
+impl AccountIdent {
+  /// Create a new FixedPrecision number from parts. The mantissa is used "raw" and not scaled
+  /// in any way
+  pub fn new<T: Into<ChainIdent>, D: Into<AccountAddr>>(chainIdent: T, accountAddr: D) -> Self {
+      AccountIdent {
+        chain: chainIdent.into(),
+        account: accountAddr.into(),
+      }
+  }
+}
 #[cfg(test)]
 mod tests {
   use super::*;

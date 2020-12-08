@@ -1,11 +1,11 @@
 use tiny_keccak::Hasher;
 use num_bigint::BigUint;
-use num_traits::ToPrimitive;
+use num_traits::cast::ToPrimitive;
 use sp_std::vec::Vec;
 use secp256k1;
 use ethabi;
-use codec::{Decode, Encode};
-use super::{account::AccountIdent, amount::Amount};
+use codec::{Decode, Encode, Input, Output};
+use super::{account::{AccountIdent, ChainIdent}, amount::Amount};
 use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
@@ -24,7 +24,10 @@ pub trait Notice {
     fn encode(&self) -> Message;
 }
 
-pub enum Chain {}
+// #[derive(Encode, Decode)]
+pub enum Notices{
+    ExtractionNotice(ExtractionNotice)
+}
 
 pub struct ExtractionNotice {
     asset: Asset,
@@ -32,14 +35,28 @@ pub struct ExtractionNotice {
     amount: Amount,
 }
 
-impl Notice for ExtractionNotice {
+impl Encode for Notices {
+
     fn encode (&self) -> Vec<u8> {
-        let x = self.amount.mantissa.to_u128().unwrap();
-        ethabi::encode(&[
-            ethabi::token::Token::FixedBytes(self.asset.clone().into()),
-            ethabi::token::Token::FixedBytes(self.account.account.clone().into()),
-            ethabi::token::Token::Int(x.into()),
-        ])
+        match self {
+            Notices::ExtractionNotice(notice) => {
+                let x = notice.amount.mantissa.to_i128().unwrap();
+                ethabi::encode(&[
+                    ethabi::token::Token::FixedBytes(notice.asset.clone().into()),
+                    ethabi::token::Token::FixedBytes(notice.account.account.clone().into()),
+                    ethabi::token::Token::Int(x.into()),
+                ])
+            }
+        }
+    }
+}
+
+// XXX
+impl Decode for Notices {
+    fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
+        // case Extraction notice: 
+        let mockNotice = ExtractionNotice { asset: Vec::new(), amount: Amount::newCash(BigUint::from(42u32)), account:AccountIdent::new(ChainIdent::Eth, Vec::new()) };
+        return Ok(Notices::ExtractionNotice(mockNotice));
     }
 }
 

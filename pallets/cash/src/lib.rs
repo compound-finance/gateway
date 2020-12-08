@@ -1,7 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use crate::account::{AccountAddr, AccountIdent, ChainIdent};
-use crate::amount::CashAmount;
+use crate::amount::{Amount, CashAmount};
+use crate::notices::{ExtractionNotice, Notices};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -49,6 +50,7 @@ decl_storage! {
 
         // XXX
         CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
+        NoticeQueue: Vec<Notices>;
     }
 }
 
@@ -98,6 +100,10 @@ decl_module! {
             let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
             let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
             CashBalance::insert(&account, next_cash_balance);
+
+            // Add to Notice Queue
+            let notice = ExtractionNotice {asset: Vec::new(), amount: Amount::newCash(amount), account: account};// todo factor out 18
+            NoticeQueue::put(notice);
 
             // Emit an event.
             Self::deposit_event(RawEvent::MagicExtract(amount, account));
@@ -159,10 +165,12 @@ decl_module! {
             // TODO create parameter vector from storage variables
             let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
             debug::native::info!("Lock Events: {:?}", lock_events);
+            Self::process_notices();
         }
     }
 }
 
+/// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
     pub fn process_notices() {
         // notice queue stub
