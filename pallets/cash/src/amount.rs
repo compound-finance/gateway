@@ -22,29 +22,22 @@ pub struct Amount {
     pub decimals: DecimalType,
 }
 
-#[derive(Encode, Decode)]
-pub struct AmountEncodable {
-    pub mantissa: Vec<u8>,
-    pub decimals: DecimalType,
-}
-
 impl Encode for Amount {
     fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
-        let encodable = AmountEncodable {
-            mantissa: self.mantissa.to_bytes_le(),
-            decimals: self.decimals,
-        };
-
-        encodable.using_encoded(f)
+        let mut mantissa_bytes = self.mantissa.to_bytes_le();
+        mantissa_bytes.push(self.decimals);
+        mantissa_bytes.using_encoded(f)
     }
 }
 
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
-        let encodable: AmountEncodable = Decode::decode(value)?;
+        let mut value_bytes: Vec<u8> = Decode::decode(value)?;
+        let decimals: DecimalType = value_bytes.remove(value_bytes.len() - 1);
+        let mantissa_le_encoded = value_bytes;
         let amount = Amount {
-            mantissa: BigUint::from_bytes_le(&encodable.mantissa),
-            decimals: encodable.decimals,
+            mantissa: BigUint::from_bytes_le(&mantissa_le_encoded),
+            decimals: decimals,
         };
 
         Ok(amount)
