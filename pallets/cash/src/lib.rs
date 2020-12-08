@@ -11,6 +11,7 @@ use frame_system::ensure_signed;
 use sp_std::vec::Vec;
 
 use sp_runtime::offchain::{
+    http,
     storage::StorageValueRef,
     storage_lock::{StorageLock, Time},
 };
@@ -128,33 +129,68 @@ decl_module! {
         fn offchain_worker(block_number: T::BlockNumber) {
             debug::native::info!("Hello World from offchain workers from block {} !", block_number);
             let config = runtime_interfaces::config_interface::get();
-            let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url()).unwrap();
-            // debug::native::info!("CONFIG: {:?}", eth_rpc_url);
+            let eth_rpc_url_result = String::from_utf8(config.get_eth_rpc_url());
 
-            let mut lock = StorageLock::<Time>::new(OCW_LOCK_ID);
-            {
-                let _guard = lock.lock();
-                let acc = StorageValueRef::persistent(OCW_LATEST_FETCHED_BLOCK_ID);
-                let from_block : String;
-                if let Some(Some(latest_block)) = acc.get::<u64>() {
-                    debug::native::info!("cached info: {:?}", latest_block);
-                    from_block = format!("{:#X}", latest_block + 1);
-               } else {
-                   debug::native::info!("No latest block was found in the cash");
-                   from_block = String::from("earliest");
-               }
-
-               let fetch_events_request = format!(r#"{{"address": "{}", "fromBlock": "{}", "toBlock": "latest", "topics":["{}"]}}"#, ETHEREUM_STARPORT_ADDRESS, from_block, LOCK_EVENT_TOPIC);
-               let (end_block, lock_events) : (i64, Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>) = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request]).unwrap();
-               debug::native::info!("end_block: {:?}", end_block);
-               debug::native::info!("Lock Events: {:?}", lock_events);
-
-               // Set the latest block if at least one event was retrieved
-               if end_block != 0 {
-                   acc.set(&end_block);
-               }
-               // drop `_guard` implicitly at end of scope
+            if let Err(e) = eth_rpc_url_result {
+                debug::native::error!("Error while getting and decoding eth_rpc_url {:?}", e);
+                return;
             }
+
+            let eth_rpc_url = eth_rpc_url_result.unwrap();
+
+            let fetch_res = Self::fetch_events(eth_rpc_url);
+            match fetch_res {
+                Err(e) => debug::error!("offchain_worker error for fetching events: {:?}", e),
+                Ok(events) => {
+                    debug::native::info!("Fetched events: {:?}", events);
+                    //TODO - add other processing here
+                }
+            };
+        }
+    }
+}
+
+/// Most of the functions are moved outside of the `decl_module!` macro.
+///
+/// This greatly helps with error messages, as the ones inside the macro
+/// can sometimes be hard to debug.
+impl<T: Config> Module<T> {
+    /// Fetch all latest events for the offchain worker.
+    fn fetch_events(
+        eth_rpc_url: String,
+    ) -> Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> {
+        let mut lock = StorageLock::<Time>::new(OCW_LOCK_ID);
+        {
+            let _guard = lock.lock();
+            let acc = StorageValueRef::persistent(OCW_LATEST_FETCHED_BLOCK_ID);
+            let from_block: String;
+            if let Some(Some(latest_block)) = acc.get::<u64>() {
+                debug::native::info!("cached info: {:?}", latest_block);
+                from_block = format!("{:#X}", latest_block + 1);
+            } else {
+                debug::native::info!("No latest block was found in the cache");
+                from_block = String::from("earliest");
+            }
+
+            let fetch_events_request = format!(
+                r#"{{"address": "{}", "fromBlock": "{}", "toBlock": "latest", "topics":["{}"]}}"#,
+                ETHEREUM_STARPORT_ADDRESS, from_block, LOCK_EVENT_TOPIC
+            );
+
+            let (end_block, lock_events) = ethereum_client::fetch_and_decode_events(
+                &eth_rpc_url,
+                vec![&fetch_events_request],
+            )?;
+
+            debug::native::info!("end_block: {:?}", end_block);
+            debug::native::info!("Lock Events: {:?}", lock_events);
+
+            // Set the latest block if at least one event was retrieved
+            if end_block != 0 {
+                acc.set(&end_block);
+            }
+            // drop `_guard` implicitly at end of scope
+            Ok(lock_events)
         }
     }
 }
