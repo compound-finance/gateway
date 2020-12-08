@@ -1,4 +1,5 @@
 use anyhow::{bail, Error, Result};
+use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
 
 /// The type of the decimal field.
@@ -19,6 +20,35 @@ pub type CashAmount = u128;
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
+}
+
+#[derive(Encode, Decode)]
+pub struct AmountEncodable {
+    pub mantissa: Vec<u8>,
+    pub decimals: DecimalType,
+}
+
+impl Encode for Amount {
+    fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
+        let encodable = AmountEncodable {
+            mantissa: self.mantissa.to_bytes_le(),
+            decimals: self.decimals,
+        };
+
+        encodable.using_encoded(f)
+    }
+}
+
+impl Decode for Amount {
+    fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
+        let encodable: AmountEncodable = Decode::decode(value)?;
+        let amount = Amount {
+            mantissa: BigUint::from_bytes_le(&encodable.mantissa),
+            decimals: encodable.decimals,
+        };
+
+        Ok(amount)
+    }
 }
 
 /// Error type for fixed precision math.
@@ -101,5 +131,15 @@ mod tests {
             a.add(&b).unwrap_err().to_string(),
             "Mismatched decimals for amounts: 2 vs 3"
         );
+    }
+
+    #[test]
+    fn test_scale_codec() -> Result<(), codec::Error> {
+        let expected = Amount::new(6000u32, 3);
+        let encoded = expected.encode();
+        let actual: Amount = Decode::decode(&mut encoded.as_slice())?;
+        assert_eq!(expected, actual);
+
+        Ok(())
     }
 }
