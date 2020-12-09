@@ -10,14 +10,14 @@ pub struct ResponseError {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct EventsResponseWrapper<T> {
+pub struct EventsResponse<T> {
     pub id: Option<u64>,
     pub result: Option<Vec<T>>,
     pub error: Option<ResponseError>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct BlockResponseWrapper {
+pub struct BlockResponse {
     pub id: Option<u64>,
     pub result: Option<String>,
     pub error: Option<ResponseError>,
@@ -48,15 +48,13 @@ pub struct LogObject {
 
 fn deserialize_get_logs_response(
     response: &str,
-) -> serde_json::error::Result<EventsResponseWrapper<LogObject>> {
+) -> serde_json::error::Result<EventsResponse<LogObject>> {
     serde_json::from_str(response)
 }
 
-// Ok("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x3b62da\"}")
-
 fn deserialize_get_block_number_response(
     response: &str,
-) -> serde_json::error::Result<BlockResponseWrapper> {
+) -> serde_json::error::Result<BlockResponse> {
     serde_json::from_str(response)
 }
 
@@ -135,6 +133,7 @@ impl DecodableEvent for LockEvent {
 // TODO add implementation of DecodableEvent for LockCashEvent
 
 fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<String, http::Error> {
+    // TODO - move 2_000 to config???
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
     let data = format!(
         r#"{{"jsonrpc":"2.0","method":"{}","params":[{}],"id":1}}"#,
