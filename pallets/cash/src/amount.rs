@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Error, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
 use crate::alloc::{vec::Vec};
