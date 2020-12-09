@@ -109,7 +109,7 @@ impl Amount {
     /// For example, half(3) will give an amount with a mantissa of 500 and decimals of 3
     pub fn one_half<T: Into<DecimalType> + Copy>(decimals: T) -> Result<Self, MathError> {
         let decimals: DecimalType = decimals.into();
-        if decimals == 1 {
+        if decimals == 0 {
             return Err(MathError::InsufficientPrecision);
         }
         let one = Self::one(decimals - 1);
@@ -177,7 +177,6 @@ impl Amount {
 
     /* --- Constants --- */
 
-    // todo: make these compile time constants somehow
     /// A helper function to get a constant with a specific scaled value. Let's say you wanted
     /// to encode two as a constant with the natural decimals of zero, use the pseudocode
     /// to get the idea
@@ -258,13 +257,20 @@ mod tests {
     }
 
     #[test]
-    fn test_half() -> Result<(), MathError> {
+    fn test_one_half() -> Result<(), MathError> {
         let a = Amount::one_half(3)?;
 
         assert_eq!(a.decimals, 3);
         assert_eq!(a.mantissa, 500u32.into());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_one_half_insufficient_precision() {
+        let actual = Amount::one_half(0);
+        let expected = Err(MathError::InsufficientPrecision);
+        assert_eq!(expected, actual);
     }
 
     #[test]
