@@ -1,4 +1,5 @@
 use anyhow::{bail, Error, Result};
+use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
 
 /// The type of the decimal field.
@@ -17,8 +18,30 @@ pub type CashAmount = u128;
 /// 12345.6789. The decimals are stored separately.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Amount {
-    mantissa: MantissaType,
-    decimals: DecimalType,
+    pub mantissa: MantissaType,
+    pub decimals: DecimalType,
+}
+
+impl Encode for Amount {
+    fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
+        let mut mantissa_bytes = self.mantissa.to_bytes_le();
+        mantissa_bytes.push(self.decimals);
+        mantissa_bytes.using_encoded(f)
+    }
+}
+
+impl Decode for Amount {
+    fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
+        let mut value_bytes: Vec<u8> = Decode::decode(value)?;
+        let decimals: DecimalType = value_bytes.remove(value_bytes.len() - 1);
+        let mantissa_le_encoded = value_bytes;
+        let amount = Amount {
+            mantissa: BigUint::from_bytes_le(&mantissa_le_encoded),
+            decimals: decimals,
+        };
+
+        Ok(amount)
+    }
 }
 
 /// Error type for fixed precision math.
@@ -293,5 +316,15 @@ mod tests {
         let actual = Amount::ln2(18);
         let expected = Amount::new(693147180559945300u64, 18);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_scale_codec() -> Result<(), codec::Error> {
+        let expected = Amount::new(6000u32, 3);
+        let encoded = expected.encode();
+        let actual: Amount = Decode::decode(&mut encoded.as_slice())?;
+        assert_eq!(expected, actual);
+
+        Ok(())
     }
 }

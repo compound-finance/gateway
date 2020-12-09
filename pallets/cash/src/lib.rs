@@ -32,6 +32,8 @@ mod tests;
 #[macro_use]
 extern crate alloc;
 
+mod notices;
+
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
@@ -157,6 +159,28 @@ decl_module! {
             // TODO create parameter vector from storage variables
             let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
             debug::native::info!("Lock Events: {:?}", lock_events);
+        }
+    }
+}
+
+impl<T: Config> Module<T> {
+    pub fn process_notices() {
+        // notice queue stub
+        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
+
+        // let signer = Signer::<T, T::AuthorityId>::any_account();
+        for notice in pending_notices.iter() {
+        //     // find parent
+        //     // id = notice.gen_id(parent)
+        //     let message = notice.encode();
+        //     signer.send_unsigned_transaction(
+        //         |account| notices::NoticePayload {
+        //             // id: move id,
+        //             msg: message.clone(),
+        //             sig: notices::sign(&message),
+        //             public: account.public.clone(),
+        //         },
+        //         Call::emit_notice);
         }
     }
 }
