@@ -12,7 +12,7 @@ pub type MantissaType = BigUint;
 /// The type for Cash
 pub type CashAmount = u128;
 
-static CASH_DECIMALS: DecimalType = 18;
+const CASH_DECIMALS: DecimalType = 18;
 
 /// Represents a decimal number in base 10 with fixed precision. The number of decimals depends
 /// on the amount being represented and is not stored alongside the amount.
@@ -35,9 +35,9 @@ impl Encode for Amount {
 
 impl PartialEq for Amount {
     fn eq(&self, other: &Self) -> bool {
-        let decMatch = self.decimals == other.decimals;
-        let mantissaMatch = self.mantissa == other.mantissa;
-        return decMatch && mantissaMatch;
+        let dec_match = self.decimals == other.decimals;
+        let mantissa_match = self.mantissa == other.mantissa;
+        return dec_match && mantissa_match;
     }
 }
 
@@ -74,7 +74,7 @@ impl Amount {
         }
     }
 
-    pub fn newCash<T: Into<MantissaType>>(mantissa: T) -> Self {
+    pub fn new_cash<T: Into<MantissaType>>(mantissa: T) -> Self {
         Amount {
             decimals: CASH_DECIMALS,
             mantissa: mantissa.into(),
@@ -153,6 +153,15 @@ mod tests {
         let actual: Amount = Decode::decode(&mut encoded.as_slice())?;
         assert_eq!(expected, actual);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_partial_eq() -> Result<(), codec::Error> {
+        let a = Amount::new(6000u32, 3);
+        let b = Amount::new(5000u32, 4);
+        assert_eq!(a, a);
+        assert_eq!(a.eq(&b), false);
         Ok(())
     }
 }

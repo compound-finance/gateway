@@ -51,7 +51,7 @@ decl_storage! {
         // XXX
         CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
         // TODO: hash type should match to ChainIdent
-        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) EthHash => Notice;
+        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) EthHash => Option<Notice>;
 
     }
 }
@@ -104,10 +104,9 @@ decl_module! {
             CashBalance::insert(&account, next_cash_balance);
 
             // Add to Notice Queue
-            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::newCash(amount), account: account};
-
-            let dummyHash: [u8; 32] = [0; 32];
-            NoticeQueue::insert(ChainIdent::Eth, dummyHash, notice.clone());
+            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::new_cash(amount), account: account};
+            let dummy_hash: [u8; 32] = [0; 32];
+            NoticeQueue::insert(ChainIdent::Eth, dummy_hash, notice.clone());
 
             // Emit an event.
             Self::deposit_event(RawEvent::MagicExtract(notice));
@@ -177,9 +176,9 @@ decl_module! {
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
     pub fn process_notices() {
-        // notice queue stub
-        // let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
-
+        for (entry) in NoticeQueue::iter() {
+            
+        }
         // let signer = Signer::<T, T::AuthorityId>::any_account();
         // for notice in pending_notices.iter() {
         //     // find parent

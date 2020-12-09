@@ -2,7 +2,7 @@ use tiny_keccak::Hasher;
 use sp_std::vec::Vec;
 use secp256k1;
 use codec::{Decode, Encode};
-use super::{account::{AccountIdent}, amount::Amount};
+use super::{account::{AccountIdent, ChainIdent}, amount::Amount};
 use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
@@ -24,13 +24,6 @@ pub enum Notice{
         asset: Asset,
         account: AccountIdent,
         amount: Amount,
-    },
-    DefaultNotice 
-}
-
-impl Default for Notice {
-    fn default() -> Self { 
-        Notice::DefaultNotice
     }
 }
 

@@ -6,15 +6,6 @@ pub enum ChainIdent {
   Eth,
 }
 
-// trait Chain {
-//   fn hash<ChainIdent>(input: Vec<u8>);
-// }
-
-// impl Chain<Eth> for ChainIdent {
-//   fn hash(input: Vec<u8>) -> [u8; 32] {
-//     return [9];
-//   }
-// }
 
 /// The type of the decimal field.
 pub type AccountAddr = Vec<u8>;
@@ -25,19 +16,13 @@ pub struct AccountIdent {
   pub account: AccountAddr,
 }
 
-// impl Copy for AccountIdent {
-//   fn clone(&self) -> AccountIdent {
-//       *self
-//   }
-// }
-
 impl AccountIdent{
   /// Create a new FixedPrecision number from parts. The mantissa is used "raw" and not scaled
   /// in any way
-  pub fn new<T: Into<ChainIdent>, D: Into<AccountAddr>>(chainIdent: T, accountAddr: D) -> Self {
+  pub fn new<T: Into<ChainIdent>, D: Into<AccountAddr>>(chain_ident: T, account_addr: D) -> Self {
       AccountIdent {
-        chain: chainIdent.into(),
-        account: accountAddr.into(),
+        chain: chain_ident.into(),
+        account: account_addr.into(),
       }
   }
 }
