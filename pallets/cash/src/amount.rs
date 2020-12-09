@@ -109,7 +109,7 @@ impl Amount {
     /// For example, half(3) will give an amount with a mantissa of 500 and decimals of 3
     pub fn one_half<T: Into<DecimalType> + Copy>(decimals: T) -> Result<Self, MathError> {
         let decimals: DecimalType = decimals.into();
-        if decimals < 1 {
+        if decimals == 1 {
             return Err(MathError::InsufficientPrecision);
         }
         let one = Self::one(decimals - 1);
