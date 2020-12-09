@@ -91,7 +91,7 @@ impl Amount {
 
         // need to divide by the mantissa of one to properly scale
         // todo: is there a better way to do this without having to compute so many useless digits?
-        let new_mantissa = self.clone().mantissa * rhs.clone().mantissa / one.mantissa;
+        let new_mantissa = &self.mantissa * &rhs.mantissa / one.mantissa;
 
         Ok(Self::new(new_mantissa, self.decimals))
     }
