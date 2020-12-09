@@ -143,13 +143,13 @@ impl Amount {
     /// when the decimals are increasing
     ///
     /// todo: do we need additional rounding modes?
-    pub fn set_decimals<T: Into<DecimalType> + Copy>(self: &Self, new_decimals: T) -> Self {
+    pub fn set_decimals<T: Into<DecimalType> + Copy>(self: Self, new_decimals: T) -> Self {
         let new_decimals: DecimalType = new_decimals.into();
 
         if new_decimals == self.decimals {
             // not actually changing the decimals at all, just return the current value without doing
             // any work
-            return self.clone();
+            return self;
         }
         let new_mantissa: MantissaType;
         if new_decimals > self.decimals {
@@ -158,7 +158,7 @@ impl Amount {
             // check above
             let difference_in_decimals = new_decimals - self.decimals;
             let pow_ten = 10u64.pow(difference_in_decimals as u32);
-            new_mantissa = self.clone().mantissa * pow_ten;
+            new_mantissa = self.mantissa * pow_ten;
         } else {
             // new_decimals < self.decimals
             // decreasing precision, divide by a power of 10 to properly scale
@@ -166,7 +166,7 @@ impl Amount {
             // logic of this function
             let difference_in_decimals = self.decimals - new_decimals;
             let pow_ten = 10u64.pow(difference_in_decimals as u32);
-            new_mantissa = self.clone().mantissa / pow_ten;
+            new_mantissa = self.mantissa / pow_ten;
         }
 
         Amount {
@@ -282,7 +282,7 @@ mod tests {
     fn test_set_decimals_equal() {
         // 1.23456789 as an amount
         let a = Amount::new(123456789u64, 8);
-        let b = a.set_decimals(8);
+        let b = a.clone().set_decimals(8);
         assert_eq!(a, b);
     }
 
