@@ -16,3 +16,4 @@
 **/.terraform
 **/*.hcl
 **/*.tfstate*
+*/crash.log

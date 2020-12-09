@@ -1,0 +1,8 @@
+[Unit]
+Description=Compound Chain
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory={{ compound_chain_home }}
+ExecStart={{ compound_chain_home }}/target/release/compound-chain --dev

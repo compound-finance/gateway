@@ -11,10 +11,13 @@ For more information on the design, see the [Architecture Doc](./ARCHITECTURE.md
 
 ### Building AWS Infra
 
-From the `ops` directory, run:
+From the `ops` directory, you should first set-up an AWS account and create a bucket to store your terraform state. Then run:
 
 ```sh
-terraform init -upgrade tf 
+AWS_PROFILE=compound-dev-1 terraform init -upgrade \
+  -backend-config="bucket=compound-chain" \
+  -backend-config="key=tfstate" \
+  -backend-config="region=us-east-1"
 ```
 
 Note: if you have an error, you may need to [review your AWS credentials](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#authentication) for Terraform.
@@ -24,7 +27,8 @@ Also, you will need to create a public & private key pair to access your instanc
 Next, plan the terraform changes:
 
 ```sh
- terraform plan -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)" tf
+AWS_PROFILE=compound-dev-1 terraform plan \
+  -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)"
 ```
 
 Then, if that looks good, apply the terraform changes:
@@ -36,3 +40,23 @@ Then, if that looks good, apply the terraform changes:
 ### Setting up Compound Chain application
 
 Lorem ipsum
+
+TODO: Set-up `ssh_config`
+
+First, it's important to set-up basic build essentials on your node (e.g. rust).
+
+```sh
+ansible-playbook -v tasks/build-essentials.yml
+```
+
+Next, you'll need to build the Compound Chain from source. Note: you'll need a deploy key to sync to the node to pull in the source while the project is still not publically available.
+
+```sh
+ansible-playbook -v tasks/compound-chain.yml -e "deploy_key=$(cd ~/.ssh && pwd)/id_rsa_compound_chain_deploy"
+```
+
+Finally, you need to start the Compound Chain service to begin the chain.
+
+```sh
+ansible-playbook -v tasks/compound-service.yml
+```
