@@ -1,7 +1,6 @@
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
-use codec::{Decode, Encode};
 use crate::alloc::{vec::Vec};
 
 /// The type of the decimal field.
@@ -13,14 +12,14 @@ pub type MantissaType = BigUint;
 /// The type for Cash
 pub type CashAmount = u128;
 
-static CashDecimals: DecimalType = 18;
+static CASH_DECIMALS: DecimalType = 18;
 
 /// Represents a decimal number in base 10 with fixed precision. The number of decimals depends
 /// on the amount being represented and is not stored alongside the amount.
 ///
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
@@ -33,6 +32,16 @@ impl Encode for Amount {
         mantissa_bytes.using_encoded(f)
     }
 }
+
+impl PartialEq for Amount {
+    fn eq(&self, other: &Self) -> bool {
+        let decMatch = self.decimals == other.decimals;
+        let mantissaMatch = self.mantissa == other.mantissa;
+        return decMatch && mantissaMatch;
+    }
+}
+
+impl Eq for Amount {}
 
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
@@ -67,7 +76,7 @@ impl Amount {
 
     pub fn newCash<T: Into<MantissaType>>(mantissa: T) -> Self {
         Amount {
-            decimals: CashDecimals,
+            decimals: CASH_DECIMALS,
             mantissa: mantissa.into(),
         }
     }

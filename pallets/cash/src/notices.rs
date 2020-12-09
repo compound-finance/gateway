@@ -1,16 +1,14 @@
 use tiny_keccak::Hasher;
-use num_bigint::BigUint;
-use num_traits::cast::ToPrimitive;
 use sp_std::vec::Vec;
 use secp256k1;
-use ethabi;
-use codec::{Decode, Encode, Input, Output};
-use super::{account::{AccountIdent, ChainIdent}, amount::Amount};
+use codec::{Decode, Encode};
+use super::{account::{AccountIdent}, amount::Amount};
 use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
 pub type Asset = Vec<u8>;
+pub type EthHash = [u8; 32];
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 pub struct NoticePayload<Public> {
@@ -20,45 +18,22 @@ pub struct NoticePayload<Public> {
     pub public: Public,
 }
 
-pub trait Notice {
-    fn encode(&self) -> Message;
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
+pub enum Notice{
+    ExtractionNotice {
+        asset: Asset,
+        account: AccountIdent,
+        amount: Amount,
+    },
+    DefaultNotice 
 }
 
-// #[derive(Encode, Decode)]
-pub enum Notices{
-    ExtractionNotice(ExtractionNotice)
-}
-
-pub struct ExtractionNotice {
-    asset: Asset,
-    account: AccountIdent,
-    amount: Amount,
-}
-
-impl Encode for Notices {
-
-    fn encode (&self) -> Vec<u8> {
-        match self {
-            Notices::ExtractionNotice(notice) => {
-                let x = notice.amount.mantissa.to_i128().unwrap();
-                ethabi::encode(&[
-                    ethabi::token::Token::FixedBytes(notice.asset.clone().into()),
-                    ethabi::token::Token::FixedBytes(notice.account.account.clone().into()),
-                    ethabi::token::Token::Int(x.into()),
-                ])
-            }
-        }
+impl Default for Notice {
+    fn default() -> Self { 
+        Notice::DefaultNotice
     }
 }
 
-// XXX
-impl Decode for Notices {
-    fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
-        // case Extraction notice: 
-        let mockNotice = ExtractionNotice { asset: Vec::new(), amount: Amount::newCash(BigUint::from(42u32)), account:AccountIdent::new(ChainIdent::Eth, Vec::new()) };
-        return Ok(Notices::ExtractionNotice(mockNotice));
-    }
-}
 
 impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
     fn public(&self) -> T::Public {
@@ -67,7 +42,7 @@ impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
 }
 
 /// Helper function to quickly run keccak in the Ethereum-style
-fn keccak(input: Vec<u8>) -> [u8; 32] {
+fn keccak(input: Vec<u8>) -> EthHash {
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
     hasher.update(&input[..]);

@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
-use crate::notices::{ExtractionNotice, Notices};
+use crate::notices::{Notice, EthHash};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -14,7 +14,7 @@ use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::{
     offchain::http,
     transaction_validity::{
-        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+        TransactionSource, TransactionValidity, ValidTransaction,
     },
 };
 use sp_std::vec::Vec;
@@ -50,7 +50,9 @@ decl_storage! {
 
         // XXX
         CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
-        NoticeQueue: Vec<Notices>;
+        // TODO: hash type should match to ChainIdent
+        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) EthHash => Notice;
+
     }
 }
 
@@ -65,7 +67,7 @@ decl_event!(
         SomethingStored(u32, AccountId),
 
         // XXX
-        MagicExtract(CashAmount, AccountIdent),
+        MagicExtract(Notice),
     }
 );
 
@@ -102,11 +104,13 @@ decl_module! {
             CashBalance::insert(&account, next_cash_balance);
 
             // Add to Notice Queue
-            let notice = ExtractionNotice {asset: Vec::new(), amount: Amount::newCash(amount), account: account};// todo factor out 18
-            NoticeQueue::put(notice);
+            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::newCash(amount), account: account};
+
+            let dummyHash: [u8; 32] = [0; 32];
+            NoticeQueue::insert(ChainIdent::Eth, dummyHash, notice.clone());
 
             // Emit an event.
-            Self::deposit_event(RawEvent::MagicExtract(amount, account));
+            Self::deposit_event(RawEvent::MagicExtract(notice));
             // Return a successful DispatchResult
             Ok(())
         }
@@ -174,10 +178,10 @@ decl_module! {
 impl<T: Config> Module<T> {
     pub fn process_notices() {
         // notice queue stub
-        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
+        // let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
 
         // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for notice in pending_notices.iter() {
+        // for notice in pending_notices.iter() {
         //     // find parent
         //     // id = notice.gen_id(parent)
         //     let message = notice.encode();
@@ -189,7 +193,7 @@ impl<T: Config> Module<T> {
         //             public: account.public.clone(),
         //         },
         //         Call::emit_notice);
-        }
+        // }
     }
 }
 
