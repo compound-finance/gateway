@@ -107,7 +107,7 @@ impl Amount {
 
     /// Return the number 0.5 with a given number of decimals
     /// For example, half(3) will give an amount with a mantissa of 500 and decimals of 3
-    pub fn half<T: Into<DecimalType> + Copy>(decimals: T) -> Result<Self, MathError> {
+    pub fn one_half<T: Into<DecimalType> + Copy>(decimals: T) -> Result<Self, MathError> {
         let decimals: DecimalType = decimals.into();
         if decimals < 1 {
             return Err(MathError::InsufficientPrecision);
@@ -128,7 +128,7 @@ impl Amount {
         let low: Amount;
         let k: i64;
         let t = x.clone();
-        let half = Amount::half(x.decimals)?;
+        let half = Amount::one_half(x.decimals)?;
         let ln2 = Amount::ln2(x.decimals);
         let one = Amount::one(x.decimals);
         let ln2_inv = Amount::ln2_inv(x.decimals);
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_half() -> Result<(), MathError> {
-        let a = Amount::half(3)?;
+        let a = Amount::one_half(3)?;
 
         assert_eq!(a.decimals, 3);
         assert_eq!(a.mantissa, 500u32.into());
