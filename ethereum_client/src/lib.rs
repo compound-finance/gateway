@@ -218,11 +218,11 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
             continue;
         }
 
-        let lock_event = DecodableEvent::new(eth_log.data.unwrap());
+        let lock_event = DecodableEvent::new(eth_log.data.ok_or(http::Error::Unknown)?);
         log_events.push(LogEvent {
-            block_hash: eth_log.block_hash.unwrap(),
-            block_number: eth_log.block_number.unwrap(),
-            transaction_index: eth_log.transaction_index.unwrap(),
+            block_hash: eth_log.block_hash.ok_or(http::Error::Unknown)?,
+            block_number: eth_log.block_number.ok_or(http::Error::Unknown)?,
+            transaction_index: eth_log.transaction_index.ok_or(http::Error::Unknown)?,
             event: lock_event,
         });
     }
