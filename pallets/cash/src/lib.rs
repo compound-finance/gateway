@@ -17,7 +17,7 @@ use sp_runtime::{Deserialize, Serialize};
 
 use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
-use crate::notices::{Notice, EthHash};
+use crate::notices::{EthHash, Notice};
 
 extern crate ethereum_client;
 
@@ -240,19 +240,18 @@ impl<T: Config> Module<T> {
 
         // let signer = Signer::<T, T::AuthorityId>::any_account();
         for notice in NoticeQueue::iter() {
-        //     // find parent
-        //     // id = notice.gen_id(parent)
-        //     let message = notice.encode();
-        //     signer.send_unsigned_transaction(
-        //         |account| notices::NoticePayload {
-        //             // id: move id,
-        //             msg: message.clone(),
-        //             sig: notices::sign(&message),
-        //             public: account.public.clone(),
-        //         },
-        //         Call::emit_notice);
-        // }
-
+            //     // find parent
+            //     // id = notice.gen_id(parent)
+            //     let message = notice.encode();
+            //     signer.send_unsigned_transaction(
+            //         |account| notices::NoticePayload {
+            //             // id: move id,
+            //             msg: message.clone(),
+            //             sig: notices::sign(&message),
+            //             public: account.public.clone(),
+            //         },
+            //         Call::emit_notice);
+            // }
         }
     }
 }

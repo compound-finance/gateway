@@ -34,7 +34,6 @@ impl Encode for Amount {
     }
 }
 
-
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
         let mut value_bytes: Vec<u8> = Decode::decode(value)?;
@@ -72,7 +71,6 @@ impl Amount {
             mantissa: mantissa.into(),
         }
     }
-
 
     /// Add two FixedPrecision numbers together. Note the signature uses borrowed values this is
     /// because the underlying storage is arbitrarily large and we do not want to copy the values.
@@ -148,5 +146,4 @@ mod tests {
 
         Ok(())
     }
-
 }
