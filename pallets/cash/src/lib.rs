@@ -1,7 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::account::{AccountAddr, AccountIdent, ChainIdent};
-use crate::amount::CashAmount;
+use crate::amount::{Amount, CashAmount};
+use crate::notices::{Notice, EthHash};
+use crate::account::{AccountIdent, ChainIdent};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -13,7 +14,7 @@ use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::{
     offchain::http,
     transaction_validity::{
-        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+        TransactionSource, TransactionValidity, ValidTransaction,
     },
 };
 use sp_std::vec::Vec;
@@ -49,6 +50,9 @@ decl_storage! {
 
         // XXX
         CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
+        // TODO: hash type should match to ChainIdent
+        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) EthHash => Option<Notice>;
+
     }
 }
 
@@ -63,7 +67,7 @@ decl_event!(
         SomethingStored(u32, AccountId),
 
         // XXX
-        MagicExtract(CashAmount, AccountIdent),
+        MagicExtract(CashAmount, AccountIdent, Notice),
     }
 );
 
@@ -99,8 +103,13 @@ decl_module! {
             let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
             CashBalance::insert(&account, next_cash_balance);
 
+            // Add to Notice Queue
+            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::new_cash(amount), account: account.clone()};
+            let dummy_hash: [u8; 32] = [0; 32];
+            NoticeQueue::insert(ChainIdent::Eth, dummy_hash, &notice);
+
             // Emit an event.
-            Self::deposit_event(RawEvent::MagicExtract(amount, account));
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
             // Return a successful DispatchResult
             Ok(())
         }
@@ -159,17 +168,18 @@ decl_module! {
             // TODO create parameter vector from storage variables
             let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
             debug::native::info!("Lock Events: {:?}", lock_events);
+            Self::process_notices();
         }
     }
 }
 
+/// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
     pub fn process_notices() {
         // notice queue stub
-        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
 
         // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for notice in pending_notices.iter() {
+        for entry in  NoticeQueue::iter() {
         //     // find parent
         //     // id = notice.gen_id(parent)
         //     let message = notice.encode();
@@ -181,6 +191,8 @@ impl<T: Config> Module<T> {
         //             public: account.public.clone(),
         //         },
         //         Call::emit_notice);
+        // }
+
         }
     }
 }

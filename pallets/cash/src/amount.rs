@@ -1,7 +1,9 @@
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
+use num_bigint::BigUint;
 use num_traits::ToPrimitive;
+use sp_std::vec::Vec;
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -12,11 +14,14 @@ pub type MantissaType = BigUint;
 /// The type for Cash
 pub type CashAmount = u128;
 
+const CASH_DECIMALS: DecimalType = 18;
+
 /// Represents a decimal number in base 10 with fixed precision. The number of decimals depends
 /// on the amount being represented and is not stored alongside the amount.
 ///
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Amount {
     pub mantissa: MantissaType,
@@ -62,6 +67,12 @@ impl Amount {
         Amount {
             mantissa: mantissa.into(),
             decimals: decimals.into(),
+        }
+    }
+    pub fn new_cash<T: Into<MantissaType>>(mantissa: T) -> Self {
+        Amount {
+            decimals: CASH_DECIMALS,
+            mantissa: mantissa.into(),
         }
     }
 
@@ -426,6 +437,17 @@ mod tests {
 
         let expected = Amount::new(200u8, 2);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_add_error() {
+        let a = Amount::one(2);
+        let b = Amount::new(2000_u32, 3);
+
+        assert_eq!(
+            a.add(&b).unwrap_err().to_string(),
+            "Mismatched decimals for amounts: 2 vs 3"
+        );
     }
 
     #[test]
