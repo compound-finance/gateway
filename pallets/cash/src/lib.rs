@@ -31,6 +31,7 @@ mod mock;
 
 mod account;
 mod amount;
+mod events;
 
 #[cfg(test)]
 mod tests;
@@ -40,19 +41,9 @@ extern crate alloc;
 
 mod notices;
 
-pub const ETH_STARPORT_ADDRESS: &str = "0xbbde1662bC3ED16aA8C618c9833c801F3543B587";
-pub const LOCK_EVENT_TOPIC: &str =
-    "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
-
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
 pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
-
-#[derive(Debug)]
-struct StarportInfo {
-    latest_eth_block: String,
-    lock_events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
-}
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
@@ -189,6 +180,26 @@ decl_module! {
 /// This greatly helps with error messages, as the ones inside the macro
 /// can sometimes be hard to debug.
 impl<T: Config> Module<T> {
+    pub fn process_notices() {
+        // notice queue stub
+        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
+
+        // let signer = Signer::<T, T::AuthorityId>::any_account();
+        for notice in pending_notices.iter() {
+            //     // find parent
+            //     // id = notice.gen_id(parent)
+            //     let message = notice.encode();
+            //     signer.send_unsigned_transaction(
+            //         |account| notices::NoticePayload {
+            //             // id: move id,
+            //             msg: message.clone(),
+            //             sig: notices::sign(&message),
+            //             public: account.public.clone(),
+            //         },
+            //         Call::emit_notice);
+        }
+    }
+
     fn fetch_events_with_lock() -> Result<(), Error<T>> {
         // Get a validator config from runtime-interfaces pallet
         // Use config to get an address for interacting with Ethereum JSON RPC client
@@ -214,7 +225,7 @@ impl<T: Config> Module<T> {
         if let Some(Some(cached_block_num)) = s_info.get::<String>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
             debug::native::info!("Last cached block number: {:?}", cached_block_num);
-            from_block = Self::get_next_block_hex(cached_block_num)
+            from_block = events::get_next_block_hex(cached_block_num)
                 .map_err(|_| <Error<T>>::HttpFetchingError)?;
         } else {
             // Validator's cache is empty, fetch events from the earliest available block
@@ -238,72 +249,18 @@ impl<T: Config> Module<T> {
         //   executed by previous run of ocw, so the function just returns.
         // ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage_lock/struct.StorageLock.html#method.try_lock
         if let Ok(_guard) = lock.try_lock() {
-            match Self::fetch_events(eth_rpc_url, from_block) {
+            match events::fetch_events(eth_rpc_url, from_block) {
                 Ok(starport_info) => {
                     debug::native::info!("Result: {:?}", starport_info);
                     s_info.set(&starport_info.latest_eth_block);
                 }
                 Err(err) => {
-                    return Err(err);
+                    debug::native::info!("Error while fetching events: {:?}", err);
+                    return Err(Error::<T>::HttpFetchingError);
                 }
             }
         }
         Ok(())
-    }
-
-    /// Fetch all latest Starport events for the offchain worker.
-    fn fetch_events(eth_rpc_url: String, from_block: String) -> Result<StarportInfo, Error<T>> {
-        // Fetch the latest available ethereum block number
-        let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
-            debug::native::error!("fetch_events error: {:?}", e);
-            <Error<T>>::HttpFetchingError
-        })?;
-
-        // Build parameters set for fetching starport `Lock` events
-        let fetch_events_request = format!(
-            r#"{{"address": "{}", "fromBlock": "{}", "toBlock": "{}", "topics":["{}"]}}"#,
-            ETH_STARPORT_ADDRESS, from_block, latest_eth_block, LOCK_EVENT_TOPIC
-        );
-
-        // Fetch `Lock` events using ethereum_client
-        let lock_events =
-            ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request])
-                .map_err(|_| <Error<T>>::HttpFetchingError)?;
-
-        Ok(StarportInfo {
-            lock_events: lock_events,
-            latest_eth_block: latest_eth_block,
-        })
-    }
-
-    fn get_next_block_hex(block_num_hex: String) -> Result<String, Error<T>> {
-        let without_prefix = block_num_hex.trim_start_matches("0x");
-        let block_num =
-            u64::from_str_radix(without_prefix, 16).map_err(|_| <Error<T>>::HttpFetchingError)?;
-        let next_block_num_hex = format!("{:#X}", block_num + 1);
-        Ok(next_block_num_hex)
-    }
-}
-
-impl<T: Config> Module<T> {
-    pub fn process_notices() {
-        // notice queue stub
-        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
-
-        // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for notice in pending_notices.iter() {
-            //     // find parent
-            //     // id = notice.gen_id(parent)
-            //     let message = notice.encode();
-            //     signer.send_unsigned_transaction(
-            //         |account| notices::NoticePayload {
-            //             // id: move id,
-            //             msg: message.clone(),
-            //             sig: notices::sign(&message),
-            //             public: account.public.clone(),
-            //         },
-            //         Call::emit_notice);
-        }
     }
 }
 
