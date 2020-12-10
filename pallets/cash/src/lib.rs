@@ -20,6 +20,10 @@ use sp_runtime::{
 };
 use sp_std::vec::Vec;
 
+use sp_runtime::offchain::{
+    storage::StorageValueRef,
+    storage_lock::{StorageLock, Time},
+};
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
 
@@ -33,6 +37,7 @@ mod mock;
 
 mod account;
 mod amount;
+mod events;
 mod notices;
 
 #[cfg(test)]
@@ -64,6 +69,10 @@ pub fn compute_hash(payload: Payload) -> Hash {
     // XXX where Payload: Hash
     payload // XXX
 }
+
+// OCW storage constants
+pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
+pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
@@ -115,6 +124,9 @@ decl_error! {
         NoneValue,
         /// Errors should have helpful documentation associated with them.
         StorageOverflow,
+
+        // Error returned when fetching starport info
+        HttpFetchingError,
     }
 }
 
@@ -236,14 +248,12 @@ decl_module! {
         /// so the code should be able to handle that.
         /// You can use `Local Storage` API to coordinate runs of the worker.
         fn offchain_worker(block_number: T::BlockNumber) {
-            debug::native::info!("Hello World from offchain workers!");
-            let config = runtime_interfaces::config_interface::get();
-            let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url()).unwrap();
-            // debug::native::info!("CONFIG: {:?}", eth_rpc_url);
+            debug::native::info!("Hello World from offchain workers from block {} !", block_number);
 
-            // TODO create parameter vector from storage variables
-            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
-            debug::native::info!("Lock Events: {:?}", lock_events);
+            let result = Self::fetch_events_with_lock();
+            if let Err(e) = result {
+                debug::native::error!("offchain_worker error: {:?}", e);
+            }
             Self::process_notices(block_number);
         }
     }
@@ -275,6 +285,73 @@ impl<T: Config> Module<T> {
             // Unsigned tx
             SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
         }
+    }
+
+    fn fetch_events_with_lock() -> Result<(), Error<T>> {
+        // Get a validator config from runtime-interfaces pallet
+        // Use config to get an address for interacting with Ethereum JSON RPC client
+        let config = runtime_interfaces::config_interface::get();
+        let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url())
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        // Create a reference to Local Storage value.
+        // Since the local storage is common for all offchain workers, it's a good practice
+        // to prepend our entry with the pallet name.
+        let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_BLOCK);
+
+        // Local storage is persisted and shared between runs of the offchain workers,
+        // offchain workers may run concurrently. We can use the `mutate` function to
+        // write a storage entry in an atomic fashion.
+        //
+        // With a similar API as `StorageValue` with the variables `get`, `set`, `mutate`.
+        // We will likely want to use `mutate` to access
+        // the storage comprehensively.
+        //
+        // Ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
+
+        // TODO Add second check for:
+        // Should be either the block of the latest Pending event which we haven't signed,
+        // or if there are no such events, otherwise the block after the latest event, otherwise the earliest (configuration/genesis) block
+        let from_block: String;
+        if let Some(Some(cached_block_num)) = s_info.get::<String>() {
+            // Ethereum block number has been cached, fetch events starting from the next after cached block
+            debug::native::info!("Last cached block number: {:?}", cached_block_num);
+            from_block = events::get_next_block_hex(cached_block_num)
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+        } else {
+            // Validator's cache is empty, fetch events from the earliest available block
+            debug::native::info!("Block number has not been cached yet");
+            from_block = String::from("earliest");
+        }
+
+        // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
+        //   it before doing heavy computations or write operations.
+        // ref: https://substrate.dev/rustdocs/v2.0.0-rc3/sp_runtime/offchain/storage_lock/index.html
+        //
+        // There are four ways of defining a lock:
+        //   1) `new` - lock with default time and block expiration
+        //   2) `with_deadline` - lock with default block but custom time expiration
+        //   3) `with_block_deadline` - lock with default time but custom block expiration
+        //   4) `with_block_and_time_deadline` - lock with custom time and block expiration
+        // Here we choose the default one for now.
+        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_KEY);
+
+        // We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
+        //   executed by previous run of ocw, so the function just returns.
+        // ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage_lock/struct.StorageLock.html#method.try_lock
+        if let Ok(_guard) = lock.try_lock() {
+            match events::fetch_events(eth_rpc_url, from_block) {
+                Ok(starport_info) => {
+                    debug::native::info!("Result: {:?}", starport_info);
+                    s_info.set(&starport_info.latest_eth_block);
+                }
+                Err(err) => {
+                    debug::native::info!("Error while fetching events: {:?}", err);
+                    return Err(Error::<T>::HttpFetchingError);
+                }
+            }
+        }
+        Ok(())
     }
 }
 

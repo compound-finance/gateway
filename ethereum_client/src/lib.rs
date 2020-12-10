@@ -1,17 +1,7 @@
 use frame_support::debug;
 /// for now this will just focus on serialization and deserialization of payloads
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GetLogsParams {
-    pub block_hash: Option<String>,
-    pub topics: Option<Vec<String>>,
-    pub address: Option<String>,
-    pub from_block: Option<u64>,
-    pub to_block: Option<u64>,
-}
 
 #[derive(Deserialize, Debug)]
 pub struct ResponseError {
@@ -20,9 +10,16 @@ pub struct ResponseError {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ResponseWrapper<T> {
+pub struct EventsResponse<T> {
     pub id: Option<u64>,
     pub result: Option<Vec<T>>,
+    pub error: Option<ResponseError>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BlockResponse {
+    pub id: Option<u64>,
+    pub result: Option<String>,
     pub error: Option<ResponseError>,
 }
 
@@ -51,7 +48,13 @@ pub struct LogObject {
 
 fn deserialize_get_logs_response(
     response: &str,
-) -> serde_json::error::Result<ResponseWrapper<LogObject>> {
+) -> serde_json::error::Result<EventsResponse<LogObject>> {
+    serde_json::from_str(response)
+}
+
+fn deserialize_get_block_number_response(
+    response: &str,
+) -> serde_json::error::Result<BlockResponse> {
     serde_json::from_str(response)
 }
 
@@ -94,6 +97,7 @@ pub struct LockCashEvent {
 #[derive(Debug)]
 pub struct LogEvent<T: DecodableEvent> {
     pub block_hash: String,
+    pub block_number: String,
     pub transaction_index: String,
     pub event: T,
 }
@@ -129,6 +133,7 @@ impl DecodableEvent for LockEvent {
 // TODO add implementation of DecodableEvent for LockCashEvent
 
 fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<String, http::Error> {
+    // TODO - move 2_000 to config???
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
     let data = format!(
         r#"{{"jsonrpc":"2.0","method":"{}","params":[{}],"id":1}}"#,
@@ -207,20 +212,31 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
         if eth_log.block_hash.is_none()
             || eth_log.transaction_index.is_none()
             || eth_log.data.is_none()
+            || eth_log.block_number.is_none()
         {
             debug::native::info!("Missing critical field from eth log event");
             continue;
         }
 
-        let lock_event = DecodableEvent::new(eth_log.data.unwrap());
+        let lock_event = DecodableEvent::new(eth_log.data.ok_or(http::Error::Unknown)?);
         log_events.push(LogEvent {
-            block_hash: eth_log.block_hash.unwrap(),
-            transaction_index: eth_log.transaction_index.unwrap(),
+            block_hash: eth_log.block_hash.ok_or(http::Error::Unknown)?,
+            block_number: eth_log.block_number.ok_or(http::Error::Unknown)?,
+            transaction_index: eth_log.transaction_index.ok_or(http::Error::Unknown)?,
             event: lock_event,
         });
     }
 
     Ok(log_events)
+}
+
+pub fn fetch_latest_block(server: &str) -> Result<String, http::Error> {
+    let body_str: String = send_rpc(server, "eth_blockNumber", vec![])?;
+    let deserialized_body =
+        deserialize_get_block_number_response(&body_str).map_err(|_| http::Error::Unknown)?;
+
+    let block_number = deserialized_body.result.ok_or(http::Error::Unknown)?;
+    return Ok(block_number);
 }
 
 #[cfg(test)]
