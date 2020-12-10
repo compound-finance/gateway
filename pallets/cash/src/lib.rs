@@ -1,12 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::account::{AccountIdent, ChainIdent};
-use crate::amount::{Amount, CashAmount};
-use crate::notices::{EthHash, Notice};
-use codec::alloc::string::String;
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
+use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
@@ -17,13 +11,25 @@ use sp_runtime::{
 };
 use sp_std::vec::Vec;
 
+use sp_runtime::RuntimeDebug;
+#[cfg(feature = "std")]
+use sp_runtime::{Deserialize, Serialize};
+
+use crate::account::{AccountIdent, ChainIdent};
+use crate::amount::{Amount, CashAmount};
+use crate::notices::{Notice, EthHash};
+
 extern crate ethereum_client;
+
+mod chains;
+mod core;
 
 #[cfg(test)]
 mod mock;
 
 mod account;
 mod amount;
+mod notices;
 
 #[cfg(test)]
 mod tests;
@@ -31,23 +37,48 @@ mod tests;
 #[macro_use]
 extern crate alloc;
 
-mod notices;
+// XXX move / unrely
+pub type Hash = Vec<u8>;
+pub type Payload = Vec<u8>;
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub enum Reason {
+    None,
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub enum EthEventStatus {
+    Pending { signers: Vec<u8> },          // XXX set(Public)?
+    Failed { hash: Hash, reason: Reason }, // XXX type for err reasons?
+    Done,
+}
+
+// XXXX experimental
+pub fn compute_hash(payload: Payload) -> Hash {
+    // XXX where Payload: Hash
+    payload // XXX
+}
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+
+    // XXX what should be configurable?
+    //type EthEventStatus: From<EthEventStatus> + Into<EthEventStatus>;
+    //type Payload: From<Vec<u8>> + Into<Vec<u8>>;
 }
 
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
         // XXX
-        // Learn more about declaring storage items:
-        // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-        Something get(fn something): Option<u32>;
+        CashBalance get(fn cash_balance) config(): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
 
-        // XXX
-        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
+        // Mapping of (status of) events witnessed on Ethereum by event id.
+        EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::eth::EventId => Option<EthEventStatus>;
+
         // TODO: hash type should match to ChainIdent
         pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) EthHash => Option<Notice>;
 
@@ -57,15 +88,19 @@ decl_storage! {
 decl_event!(
     pub enum Event<T>
     where
-        AccountId = <T as frame_system::Config>::AccountId,
+        AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
+        Payload = Payload,                                  //XXX<T as Config>::Payload ?,
     {
-        // XXX
-        /// Event documentation should end with an array that provides descriptive names for event
-        /// parameters. [something, who]
-        SomethingStored(u32, AccountId),
+        XXXPhantomFakeEvent(AccountId), // XXX
 
-        // XXX
+        /// XXX
         MagicExtract(CashAmount, AccountIdent, Notice),
+
+        /// An Ethereum event was successfully processed. [payload]
+        ProcessedEthereumEvent(Payload),
+
+        /// An Ethereum event failed during processing. [payload, reason]
+        FailedProcessingEthereumEvent(Payload, Reason),
     }
 );
 
@@ -112,39 +147,66 @@ decl_module! {
             Ok(())
         }
 
-        /// An example dispatchable that takes a singles value as a parameter, writes the value to
-        /// storage and emits an event. This function must be dispatched by a signed extrinsic.
-        #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn do_something(origin, something: u32) -> dispatch::DispatchResult {
-            let who = ensure_signed(origin)?;
+        #[weight = 0] // XXX how are we doing weights?
+        pub fn process_ethereum_event(origin, payload: Payload) -> dispatch::DispatchResult {
+            // XXX
+            // XXX do we want to store/check hash to allow replaying?
+            //let signer = recover(payload);
+            //require(signer == known validator);
+            let event = chains::eth::decode(payload.clone()); // XXX
+            let status = <EthEventStatuses>::get(event.id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
+            match status {
+                EthEventStatus::Pending { signers } => {
+                    // XXX sets?
+                    // let signers_new = {signer | signers};
+                    // if len(signers_new & Validators) > 2/3 * len(Validators) {
+                        match core::apply_ethereum_event_internal(event) {
+                            Ok(_) => {
+                                EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                                Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
+                                Ok(())
+                            }
 
-            // Update storage.
-            Something::put(something);
+                            Err(reason) => {
+                                EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash: compute_hash(payload.clone()), reason: reason.clone() }); // XXX better way?
+                                Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, reason));
+                                Ok(())
+                            }
+                        }
+                    // } else {
+                    //     EthEventStatuses::put(event.id, EthEventStatus::Pending(signers_new));
+                    // }
+                }
 
-            // Emit an event.
-            Self::deposit_event(RawEvent::SomethingStored(something, who));
-            // Return a successful DispatchResult
-            Ok(())
+                // XXX potential retry logic to allow retrying Failures
+                EthEventStatus::Failed { hash, reason } => {
+                    //require(compute_hash(payload) == hash, "event data differs from failure");
+                    match core::apply_ethereum_event_internal(event) {
+                        Ok(_) => {
+                            EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                            Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
+                            Ok(())
+                        }
+
+                        Err(new_reason) => {
+                            EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash, reason: new_reason.clone()}); // XXX
+                            Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, new_reason));
+                            Ok(())
+                        }
+                    }
+                }
+
+                EthEventStatus::Done => Ok(())
+            }
         }
 
+        // XXX
         /// An example dispatchable that may throw a custom error.
         #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
         pub fn cause_error(origin) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _ = runtime_interfaces::config_interface::get();
-
-            // Read a value from storage.
-            match Something::get() {
-                // Return an error if the value has not been set.
-                None => Err(Error::<T>::NoneValue)?,
-                Some(old) => {
-                    // Increment the value read from storage; will error in the event of overflow.
-                    let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-                    // Update the value in storage with the incremented result.
-                    Something::put(new);
-                    Ok(())
-                },
-            }
+            Err(Error::<T>::NoneValue)?
         }
 
         /// Offchain Worker entry point.
@@ -177,19 +239,20 @@ impl<T: Config> Module<T> {
         // notice queue stub
 
         // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for entry in NoticeQueue::iter() {
-            //     // find parent
-            //     // id = notice.gen_id(parent)
-            //     let message = notice.encode();
-            //     signer.send_unsigned_transaction(
-            //         |account| notices::NoticePayload {
-            //             // id: move id,
-            //             msg: message.clone(),
-            //             sig: notices::sign(&message),
-            //             public: account.public.clone(),
-            //         },
-            //         Call::emit_notice);
-            // }
+        for notice in NoticeQueue::iter() {
+        //     // find parent
+        //     // id = notice.gen_id(parent)
+        //     let message = notice.encode();
+        //     signer.send_unsigned_transaction(
+        //         |account| notices::NoticePayload {
+        //             // id: move id,
+        //             msg: message.clone(),
+        //             sig: notices::sign(&message),
+        //             public: account.public.clone(),
+        //         },
+        //         Call::emit_notice);
+        // }
+
         }
     }
 }

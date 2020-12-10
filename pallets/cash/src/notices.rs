@@ -2,6 +2,7 @@ use super::{account::AccountIdent, amount::Amount};
 use codec::{Decode, Encode};
 use ethabi;
 use frame_system::offchain::{SignedPayload, SigningTypes};
+use num_traits::ToPrimitive;
 use secp256k1;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
@@ -20,12 +21,30 @@ pub struct NoticePayload<Public> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
-pub enum Notice {
+pub enum Notice{
     ExtractionNotice {
         asset: Asset,
         account: AccountIdent,
         amount: Amount,
-    },
+}
+
+pub enum Chain {}
+
+pub struct ExtractionNotice {
+    asset: Asset,
+    account: AccountIdent,
+    amount: Amount,
+}
+
+impl Notice for ExtractionNotice {
+    fn encode(&self) -> Vec<u8> {
+        let x = self.amount.mantissa.to_u128().unwrap();
+        ethabi::encode(&[
+            ethabi::token::Token::FixedBytes(self.asset.clone().into()),
+            ethabi::token::Token::FixedBytes(self.account.account.clone().into()),
+            ethabi::token::Token::Int(x.into()),
+        ])
+    }
 }
 
 impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
@@ -36,6 +55,7 @@ impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
 
 /// Helper function to quickly run keccak in the Ethereum-style
 fn keccak(input: Vec<u8>) -> EthHash {
+
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
     hasher.update(&input[..]);

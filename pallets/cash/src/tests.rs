@@ -1,4 +1,4 @@
-use crate::{account::*, amount::*, mock::*, Error};
+use crate::{account::*, mock::*, Error};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
 
 fn andrew() -> AccountIdent {
@@ -40,9 +40,12 @@ fn it_magically_extracts() {
 fn it_works_for_default_value() {
     new_test_ext().execute_with(|| {
         // Dispatch a signed extrinsic.
-        assert_ok!(CashModule::do_something(Origin::signed(1), 42));
+        assert_ok!(CashModule::process_ethereum_event(
+            Origin::signed(1),
+            vec![]
+        ));
         // Read pallet storage and assert an expected result.
-        assert_eq!(CashModule::something(), Some(42));
+        // XXX assert_eq!(CashModule::something(), Some(42));
     });
 }
 

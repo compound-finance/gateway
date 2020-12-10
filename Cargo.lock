@@ -3738,6 +3738,7 @@ dependencies = [
  "num-traits",
  "parity-scale-codec",
  "runtime-interfaces",
+ "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",
