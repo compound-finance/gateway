@@ -10,7 +10,7 @@ use sp_runtime::traits::{
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     transaction_validity::{TransactionSource, TransactionValidity},
-    ApplyExtrinsicResult, MultiSignature, SaturatedConversion
+    ApplyExtrinsicResult, MultiSignature, SaturatedConversion,
 };
 use sp_std::prelude::*;
 
@@ -24,9 +24,7 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
 pub use frame_support::{
-    construct_runtime, 
-    debug,
-    parameter_types,
+    construct_runtime, debug, parameter_types,
     traits::{KeyOwnerProofSystem, Randomness},
     weights::{
         constants::{
@@ -319,58 +317,61 @@ pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
 
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
 where
-	Call: From<LocalCall>,
+    Call: From<LocalCall>,
 {
-	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
-		call: Call,
-		public: <Signature as sp_runtime::traits::Verify>::Signer,
-		account: AccountId,
-		index: Index,
-	) -> Option<(
-		Call,
-		<UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
-	)> {
-		let period = BlockHashCount::get() as u64;
-		let current_block = System::block_number()
-			.saturated_into::<u64>()
-			.saturating_sub(1);
-		let tip = 0;
-		let extra: SignedExtra = (
-			frame_system::CheckSpecVersion::<Runtime>::new(),
-			frame_system::CheckTxVersion::<Runtime>::new(),
-			frame_system::CheckGenesis::<Runtime>::new(),
-			frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
-			frame_system::CheckNonce::<Runtime>::from(index),
-			frame_system::CheckWeight::<Runtime>::new(),
-			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
-		);
+    fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+        call: Call,
+        public: <Signature as sp_runtime::traits::Verify>::Signer,
+        account: AccountId,
+        index: Index,
+    ) -> Option<(
+        Call,
+        <UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
+    )> {
+        let period = BlockHashCount::get() as u64;
+        let current_block = System::block_number()
+            .saturated_into::<u64>()
+            .saturating_sub(1);
+        let tip = 0;
+        let extra: SignedExtra = (
+            frame_system::CheckSpecVersion::<Runtime>::new(),
+            frame_system::CheckTxVersion::<Runtime>::new(),
+            frame_system::CheckGenesis::<Runtime>::new(),
+            frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+            frame_system::CheckNonce::<Runtime>::from(index),
+            frame_system::CheckWeight::<Runtime>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+        );
 
-		#[cfg_attr(not(feature = "std"), allow(unused_variables))]
-		let raw_payload = SignedPayload::new(call, extra)
-			.map_err(|e| {
-				debug::native::warn!("SignedPayload error: {:?}", e);
-			})
-			.ok()?;
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
+        let raw_payload = SignedPayload::new(call, extra)
+            .map_err(|e| {
+                debug::native::warn!("SignedPayload error: {:?}", e);
+            })
+            .ok()?;
 
-		let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+        let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
 
-		// let address = MultiAddress(account, ());
-		let (call, extra, _) = raw_payload.deconstruct();
-		Some((call, (sp_runtime::MultiAddress::Id(account), signature, extra)))
-	}
+        // let address = MultiAddress(account, ());
+        let (call, extra, _) = raw_payload.deconstruct();
+        Some((
+            call,
+            (sp_runtime::MultiAddress::Id(account), signature, extra),
+        ))
+    }
 }
 
 impl frame_system::offchain::SigningTypes for Runtime {
-	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
-	type Signature = Signature;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
 }
 
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 where
-	Call: From<C>,
+    Call: From<C>,
 {
-	type OverarchingCall = Call;
-	type Extrinsic = UncheckedExtrinsic;
+    type OverarchingCall = Call;
+    type Extrinsic = UncheckedExtrinsic;
 }
 
 // ---------------------- End of Recipe Pallet Configurations ----------------------

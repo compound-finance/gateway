@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::amount::{Amount, CashAmount};
-use crate::notices::{Notice, EthHash};
 use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::amount::{Amount, CashAmount};
+use crate::notices::{EthHash, Notice};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -11,18 +11,17 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 
-use frame_system::{ensure_none, ensure_signed,
-    offchain::{ AppCrypto, SubmitTransaction, CreateSignedTransaction }
+use frame_system::{
+    ensure_none, ensure_signed,
+    offchain::{AppCrypto, CreateSignedTransaction, SubmitTransaction},
 };
+use sp_core::crypto::KeyTypeId;
 use sp_runtime::{
     offchain::http,
-    transaction_validity::{
-       TransactionSource, TransactionValidity, ValidTransaction,
-    },
+    transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
 };
-use sp_std::vec::Vec;
 use sp_std::prelude::Box;
-use sp_core::crypto::{KeyTypeId};
+use sp_std::vec::Vec;
 
 #[cfg(test)]
 mod mock;
@@ -47,26 +46,26 @@ pub mod crypto {
     use sp_core::ecdsa::Signature as EcdsaSignature;
 
     use sp_runtime::app_crypto::{app_crypto, ecdsa};
-    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner };
+    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
 
     app_crypto!(ecdsa, ETH_KEY_TYPE);
 
     pub struct TestAuthId;
-	// implemented for ocw-runtime
-	impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
-		type RuntimeAppPublic = Public;
+    // implemented for ocw-runtime
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
+        type RuntimeAppPublic = Public;
         type GenericSignature = sp_core::ecdsa::Signature;
         type GenericPublic = sp_core::ecdsa::Public;
     }
-    
-    	// implemented for mock runtime in test
-	impl frame_system::offchain::AppCrypto<<EcdsaSignature as Verify>::Signer, EcdsaSignature>
-    for TestAuthId
-{
-    type RuntimeAppPublic = Public;
-    type GenericSignature = sp_core::ecdsa::Signature;
-    type GenericPublic = sp_core::ecdsa::Public;
-}
+
+    // implemented for mock runtime in test
+    impl frame_system::offchain::AppCrypto<<EcdsaSignature as Verify>::Signer, EcdsaSignature>
+        for TestAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::ecdsa::Signature;
+        type GenericPublic = sp_core::ecdsa::Public;
+    }
 }
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
@@ -194,10 +193,10 @@ decl_module! {
             // TODO: Move to using unsigned and getting author from signature
             // TODO I don't know what this comment means ^
             ensure_none(origin)?;
-    
+
             debug::native::info!("emitting notice: {:?}", notice);
             Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
-    
+
             Ok(())
         }
 
@@ -227,26 +226,29 @@ decl_module! {
 
 impl<T: Config> Module<T> {
     pub fn process_notices(block_number: T::BlockNumber) {
-        let n = notices::Notice::ExtractionNotice{
+        let n = notices::Notice::ExtractionNotice {
             asset: "eth:0xfffff".as_bytes().to_vec(),
-            account: AccountIdent{chain: ChainIdent::Eth, account: "eth:0xF33d".as_bytes().to_vec() },
-            amount: Amount::new(2000_u32, 3)
+            account: AccountIdent {
+                chain: ChainIdent::Eth,
+                account: "eth:0xF33d".as_bytes().to_vec(),
+            },
+            amount: Amount::new(2000_u32, 3),
         };
 
         // let pending_notices : Vec<Box<Notice>> =  vec![Box::new(n)];
-        let pending_notices : Vec<Notice> =  vec![n];
+        let pending_notices: Vec<Notice> = vec![n];
 
         for notice in pending_notices.iter() {
             // find parent
             // id = notice.gen_id(parent)
-        
+
             // submit onchain call for aggregating the price
             let payload = notices::to_payload(notice);
             let call = Call::emit_notice(payload);
-        
+
             // Unsigned tx
             SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
-        };
+        }
     }
 }
 
