@@ -1,6 +1,7 @@
 use anyhow::{bail, Error, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
+use num_traits::ToPrimitive;
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -50,6 +51,8 @@ impl Decode for Amount {
 pub enum MathError {
     PrecisionMismatch,
     InsufficientPrecision,
+    Underflow,
+    Overflow,
 }
 
 impl Amount {
@@ -82,6 +85,19 @@ impl Amount {
         Ok(Self::new(new_mantissa, self.decimals))
     }
 
+    /// Subtract two FixedPrecision numbers together. Note the signature uses borrowed values this is
+    /// because the underlying storage is arbitrarily large and we do not want to copy the values.
+    pub fn sub(self: &Self, rhs: &Self) -> Result<Self, MathError> {
+        self.check_decimals(rhs)?;
+        if self.lt(rhs)? {
+            return Err(MathError::Underflow);
+        }
+        // note - this cannot fail with BigUint but that will change based on underlying storage
+        let new_mantissa = &self.mantissa - &rhs.mantissa;
+
+        Ok(Self::new(new_mantissa, self.decimals))
+    }
+
     /// Multiply two numbers with the same number of decimals of precision
     /// Example 2 times 2 with 4 digits of precision -> mantissa 40000 digits 4
     pub fn mul(self: &Self, rhs: &Self) -> Result<Self, MathError> {
@@ -94,6 +110,39 @@ impl Amount {
         let new_mantissa = &self.mantissa * &rhs.mantissa / one.mantissa;
 
         Ok(Self::new(new_mantissa, self.decimals))
+    }
+
+    /// Divide two numbers with the same number of decimals of precision
+    ///
+    /// The rounding mode is always truncation
+    pub fn div(self: &Self, rhs: &Self) -> Result<Self, MathError> {
+        self.check_decimals(rhs)?;
+
+        // this is safe because we just checked that decimals is not zero
+        let one = Self::one(self.decimals);
+
+        // need to multiply by the mantissa of one before division to properly scale
+        let new_mantissa = &self.mantissa * &one.mantissa / &rhs.mantissa;
+
+        Ok(Self::new(new_mantissa, self.decimals))
+    }
+
+    /// greater than function
+    ///
+    /// a.gt(b) is the same as a > b
+    pub fn gt(self: &Self, rhs: &Self) -> Result<bool, MathError> {
+        self.check_decimals(rhs)?;
+
+        Ok(self.mantissa > rhs.mantissa)
+    }
+
+    /// less than function
+    ///
+    /// a.gt(b) is the same as a < b
+    pub fn lt(self: &Self, rhs: &Self) -> Result<bool, MathError> {
+        self.check_decimals(rhs)?;
+
+        Ok(self.mantissa < rhs.mantissa)
     }
 
     /// Create the representation of 1 in the number of decimals requested. For example one(3)
@@ -124,16 +173,97 @@ impl Amount {
     /// https://www.netlib.org/fdlibm/e_exp.c
     /// http://developer.classpath.org/doc/java/lang/StrictMath-source.html
     fn exp(x: Amount) -> Result<Amount, MathError> {
+        let one = Amount::one(x.decimals);
+        let zero = Amount::zero(x.decimals);
+        if x == zero {
+            return Ok(one);
+        }
+
         let high: Amount;
         let low: Amount;
-        let k: i64;
+        let k: Amount;
         let t = x.clone();
         let half = Amount::one_half(x.decimals)?;
         let ln2 = Amount::ln2(x.decimals);
-        let one = Amount::one(x.decimals);
+        let ln2_high = Amount::ln2_high(x.decimals);
+        let ln2_low = Amount::ln2_low(x.decimals);
         let ln2_inv = Amount::ln2_inv(x.decimals);
+        let one_point_five = one.add(&half)?;
 
-        Ok(Amount::one(1))
+        if t.gt(&half.mul(&ln2)?)? {
+            if t.lt(&one_point_five.mul(&ln2)?)? {
+                k = one.clone();
+                high = t.sub(&ln2_high)?;
+                low = ln2_low;
+            } else {
+                k = ln2_inv.mul(&t)?.add(&half)?;
+                high = t.sub(&k.mul(&ln2_high)?)?;
+                low = k.mul(&ln2_low)?;
+            }
+        } else {
+            // low = high = k = 0
+            low = zero.clone();
+            high = zero.clone();
+            k = zero.clone();
+        }
+
+        // compute the polynomial
+        // note terms p2 and p4 are actually negative so they must be subtracted
+        // this is a departure from the implementation for floats since they can represent negative numbers
+        // the hope is that the intermediate representation within this approximation
+        // does not require negative values and I don't believe that it will
+
+        let p1 = Amount::p1(x.decimals);
+        let p2_neg = Amount::p2_neg(x.decimals);
+        let p3 = Amount::p3(x.decimals);
+        let p4_neg = Amount::p4_neg(x.decimals);
+        let p5 = Amount::p5(x.decimals);
+
+        // the accumulator will help us compute the polynomial in a readable way
+        // the number in these variable names represents the power eg t^2 t^4 etc
+        let t2 = x.mul(&x)?;
+        let t4 = t2.mul(&t2)?;
+        let t6 = t4.mul(&t2)?;
+        let t8 = t6.mul(&t2)?;
+        let t10 = t8.mul(&t2)?;
+
+        // set up the positive terms first
+        let pos_sum = t2.mul(&p1)?.add(&t6.mul(&p3)?)?.add(&t10.mul(&p5)?)?;
+        // set up negative terms
+        let neg_sum = t4.mul(&p2_neg)?.add(&t8.mul(&p4_neg)?)?;
+        // let's hope the positive terms are greater than the negative terms (they should be..?)
+        let total = pos_sum.sub(&neg_sum)?;
+
+        let c = x.sub(&total)?;
+
+        let two = one.add(&one)?;
+        // x * c / (c - 2)
+        let frac = x.mul(&c.div(&c.sub(&two)?)?)?;
+        if k == zero {
+            // 1 - (x * c / (c - 2) - x)
+            let ans = one.sub(&frac.sub(&x)?);
+            return ans;
+        }
+        // y = 1 - (lo - x * c / (2 - c) - hi)
+        let y = one.sub(&low.sub(&frac)?.sub(&high)?)?;
+        // need to floor k
+        let k_floored = k
+            .set_decimals(0u8)
+            .mantissa
+            .to_u32()
+            .ok_or(MathError::Overflow)?;
+
+        // need y * 2^k
+        // todo: should this be done with bitshifting ... probably but i'm a noob
+        let (scalar, overflowed) = 2u64.overflowing_pow(k_floored);
+        if overflowed {
+            return Err(MathError::Overflow);
+        }
+        let scalar = Amount::new(scalar, 0);
+        let scalar = scalar.set_decimals(x.decimals);
+        let ans = y.mul(&scalar)?;
+
+        return Ok(ans);
     }
 
     /// Set the number of decimals, example mantissa 2000 decimals 3 (2 with 3 decimals of precision)
@@ -212,6 +342,15 @@ impl Amount {
         scaled
     }
 
+    /// the zero value
+    fn zero<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471805599453 16 dec
+        Amount {
+            mantissa: 0u64.into(),
+            decimals: decimals.into(),
+        }
+    }
+
     /// the natural log of 2
     ///
     /// ln(2)
@@ -226,6 +365,39 @@ impl Amount {
     fn ln2_inv<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
         // 1.4426950408889634 16 dec
         Amount::get_constant(decimals, 16u8, 14426950408889634u64)
+    }
+
+    /// a bound for the estimating polynomial within the exp function
+    fn ln2_high<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471803691238 16 dec
+        Amount::get_constant(decimals, 16u8, 6931471803691238u64)
+    }
+
+    /// a bound for the estimating polynomial within the exp function
+    fn ln2_low<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.00000000019082149292705877 26 dec
+        Amount::get_constant(decimals, 26u8, 19082149292705877u64)
+    }
+
+    fn p1<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471803691238 16 dec
+        Amount::get_constant(decimals, 17u8, 16666666666666602u64)
+    }
+    fn p2_neg<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471803691238 16 dec
+        Amount::get_constant(decimals, 19u8, 27777777777015593u64)
+    }
+    fn p3<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471803691238 16 dec
+        Amount::get_constant(decimals, 20u8, 6613756321437934u64)
+    }
+    fn p4_neg<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471803691238 16 dec
+        Amount::get_constant(decimals, 22u8, 16533902205465252u64)
+    }
+    fn p5<D1: Into<DecimalType> + Copy>(decimals: D1) -> Amount {
+        // 0.6931471803691238 16 dec
+        Amount::get_constant(decimals, 24u8, 41381367970572385u64)
     }
 }
 
@@ -330,6 +502,97 @@ mod tests {
         let encoded = expected.encode();
         let actual: Amount = Decode::decode(&mut encoded.as_slice())?;
         assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    fn inequality_test_helper(
+        a: &Amount,
+        b: &Amount,
+        expected_lt: bool,
+        expected_gt: bool,
+    ) -> Result<(), MathError> {
+        let actual_lt = a.lt(b)?;
+        let actual_gt = a.gt(b)?;
+        assert_eq!(expected_lt, actual_lt);
+        assert_eq!(expected_gt, actual_gt);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gt_true_when_greater() -> Result<(), MathError> {
+        let a = Amount::new(30000_u32, 4);
+        let b = Amount::new(20000_u32, 4);
+        inequality_test_helper(&a, &b, false, true)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gt_false_when_equal() -> Result<(), MathError> {
+        let a = Amount::new(30000_u32, 4);
+        let b = Amount::new(30000_u32, 4);
+        inequality_test_helper(&a, &b, false, false)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gt_false_when_less() -> Result<(), MathError> {
+        let a = Amount::new(30000_u32, 4);
+        let b = Amount::new(40000_u32, 4);
+        inequality_test_helper(&a, &b, true, false)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_happy_path() -> Result<(), MathError> {
+        let a = Amount::new(30000_u32, 4);
+        let b = Amount::new(40000_u32, 4);
+        let expected = Amount::new(10000_u32, 4);
+        let actual = b.sub(&a)?;
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_numbers_equal() -> Result<(), MathError> {
+        let a = Amount::new(40000_u32, 4);
+        let b = Amount::new(40000_u32, 4);
+        let expected = Amount::new(0_u32, 4);
+        let actual = b.sub(&a)?;
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_underflow() {
+        let a = Amount::new(30000_u32, 4);
+        let b = Amount::new(40000_u32, 4);
+        let expected = Err(MathError::Underflow);
+        let actual = a.sub(&b);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_div_happy_path() -> Result<(), MathError> {
+        let a = Amount::new(30000_u32, 4);
+        let b = Amount::new(40000_u32, 4);
+        let expected = Amount::new(7500u32, 4);
+        let actual = a.div(&b)?;
+        assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_exp() -> Result<(), MathError> {
+        let x = Amount::one(18);
+        let e = Amount::exp(x)?;
 
         Ok(())
     }
