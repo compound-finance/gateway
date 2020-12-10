@@ -1,10 +1,11 @@
-use tiny_keccak::Hasher;
-use sp_std::vec::Vec;
-use secp256k1;
-use ethabi;
+use super::{account::AccountIdent, amount::Amount};
 use codec::{Decode, Encode};
-use super::{account::{AccountIdent}, amount::Amount};
+use ethabi;
 use frame_system::offchain::{SignedPayload, SigningTypes};
+use num_traits::ToPrimitive;
+use secp256k1;
+use sp_std::vec::Vec;
+use tiny_keccak::Hasher;
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
@@ -25,6 +26,24 @@ pub enum Notice{
         asset: Asset,
         account: AccountIdent,
         amount: Amount,
+}
+
+pub enum Chain {}
+
+pub struct ExtractionNotice {
+    asset: Asset,
+    account: AccountIdent,
+    amount: Amount,
+}
+
+impl Notice for ExtractionNotice {
+    fn encode(&self) -> Vec<u8> {
+        let x = self.amount.mantissa.to_u128().unwrap();
+        ethabi::encode(&[
+            ethabi::token::Token::FixedBytes(self.asset.clone().into()),
+            ethabi::token::Token::FixedBytes(self.account.account.clone().into()),
+            ethabi::token::Token::Int(x.into()),
+        ])
     }
 }
 
@@ -44,11 +63,11 @@ fn keccak(input: Vec<u8>) -> EthHash {
     output
 }
 
-
 // TODO: match by chain for signing algorithm or implement as trait
-pub fn sign(message : &Message) -> Signature {
+pub fn sign(message: &Message) -> Signature {
     // TODO: get this from somewhere else
-    let not_so_secret: [u8; 32] = hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
+    let not_so_secret: [u8; 32] =
+        hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
     let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
 
     let msg = secp256k1::Message::parse(&keccak(message.clone()));
