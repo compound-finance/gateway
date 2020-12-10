@@ -21,11 +21,12 @@ pub struct NoticePayload<Public> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
-pub enum Notice{
+pub enum Notice {
     ExtractionNotice {
         asset: Asset,
         account: AccountIdent,
         amount: Amount,
+    },
 }
 
 pub enum Chain {}
@@ -55,7 +56,6 @@ impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
 
 /// Helper function to quickly run keccak in the Ethereum-style
 fn keccak(input: Vec<u8>) -> EthHash {
-
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
     hasher.update(&input[..]);
