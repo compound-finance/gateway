@@ -9,7 +9,6 @@ use codec::alloc::string::String;
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-
 use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::{
     offchain::http,
@@ -242,7 +241,7 @@ impl<T: Config> Module<T> {
         //   2) `with_deadline` - lock with default block but custom time expiration
         //   3) `with_block_deadline` - lock with default time but custom block expiration
         //   4) `with_block_and_time_deadline` - lock with custom time and block expiration
-        // Here we choose the most custom one for demonstration purpose.
+        // Here we choose the default one for now.
         let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_KEY);
 
         // We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
