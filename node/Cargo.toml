@@ -15,7 +15,7 @@ name = 'compound-chain'
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-build-script-utils = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a'}
+substrate-build-script-utils = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git'}
 
 [dependencies]
 jsonrpc-core = '15.0.0'
@@ -27,46 +27,46 @@ serde = { version = "1.0.101", features = ["derive"] }
 serde_json = "1.0.41"
 
 # Substrate dependencies
-sc-chain-spec = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-client-api = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-cli = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
-sc-client-db = { version = "0.8.0", git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features = false }
-sp-core = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-consensus = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-consensus = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-consensus-babe = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-consensus-babe-rpc = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-consensus-babe = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-consensus-epochs = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-consensus-slots = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-finality-grandpa = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-finality-grandpa-rpc = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-finality-grandpa = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-executor = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ['wasmtime'] }
-sp-inherents = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-keystore = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-keystore = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-network = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-runtime = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-service = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features = false, features = [] }
-sc-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-transaction-pool = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-chain-spec = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-client-api = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-cli = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git', features = ['wasmtime'] }
+sc-client-db = { version = "0.8.0", git = 'https://github.com/compound-finance/substrate.git', default-features = false }
+sp-core = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-consensus = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-consensus = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-consensus-babe = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-consensus-babe-rpc = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-consensus-babe = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-consensus-epochs = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-consensus-slots = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-finality-grandpa = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-finality-grandpa-rpc = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-finality-grandpa = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-executor = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git', features = ['wasmtime'] }
+sp-inherents = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-keystore = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-keystore = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-network = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-runtime = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-service = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git', default-features = false, features = [] }
+sc-transaction-pool = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-transaction-pool = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 
 # These dependencies are used for the node's RPCs
-sc-rpc = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-api = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-rpc-api = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-blockchain = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-chain-spec = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sp-block-builder = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-basic-authorship = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-sync-state-rpc = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-substrate-frame-rpc-system = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-pallet-transaction-payment-rpc = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+sc-rpc = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-api = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-rpc-api = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-blockchain = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-chain-spec = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-block-builder = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-basic-authorship = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-sync-state-rpc = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+substrate-frame-rpc-system = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+pallet-transaction-payment-rpc = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 
 # Used only for runtime benchmarking
-frame-benchmarking = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-frame-benchmarking-cli = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features = false, optional = true }
+frame-benchmarking = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+frame-benchmarking-cli = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git', default-features = false, optional = true }
 
 # Local dependencies
 compound-chain-runtime = { version = '1.0.0', path = '../runtime' }
@@ -75,14 +75,14 @@ runtime-interfaces = { path = '../pallets/runtime-interfaces', version = '1.0.0'
 [dev-dependencies]
 tempfile = "3.1.0"
 
-sc-consensus-babe = { version = '0.8.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', features = ["test-helpers"] }
-sp-keyring = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
-sc-service-test = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features = false, features = [] }
-sp-timestamp = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a', default-features = false }
+sc-consensus-babe = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git', features = ["test-helpers"] }
+sp-keyring = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-service-test = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git', default-features = false, features = [] }
+sp-timestamp = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git', default-features = false }
 
-frame-system = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+frame-system = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 
-pallet-transaction-payment = { version = '2.0.0', git = 'https://github.com/paritytech/substrate.git', rev = 'dcf6a3a' }
+pallet-transaction-payment = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 
 [features]
 default = ['with-parity-db']

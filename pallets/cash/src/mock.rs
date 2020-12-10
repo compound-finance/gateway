@@ -55,7 +55,7 @@ impl Config for Test {
     type Event = ();
 }
 
-pub type TemplateModule = Module<Test>;
+pub type CashModule = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {

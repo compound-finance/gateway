@@ -42,6 +42,18 @@ Purge any existing dev chain state:
 ./target/release/compound-chain purge-chain --dev
 ```
 
+If all else fails the chain state can be purged (on Mac OS X) like:
+
+```bash
+rm -rf ~/Library/Application\ Support/compound-chain/chains/dev
+```
+
+Note: Keep in mind that with BABE, blocks need to be produced at least once per epoch.
+If you turn off your node for longer than an epoch, you can purge the state to start over.
+(Alternatively, the system clock can be set backwards and made to advance faster than normal until caught up.
+ Setting the clock backwards to before the last block was generated,
+  tricks BABE into thinking that the next block is not the first of a new epoch that it won't be able to find.)
+
 Start a dev chain:
 
 ```bash

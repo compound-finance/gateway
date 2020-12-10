@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::amount::CashAmount;
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -7,7 +9,14 @@ use codec::alloc::string::String;
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-use frame_system::ensure_signed;
+
+use frame_system::{ensure_none, ensure_signed};
+use sp_runtime::{
+    offchain::http,
+    transaction_validity::{
+        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+    },
+};
 use sp_std::vec::Vec;
 
 use sp_runtime::offchain::{
@@ -20,11 +29,16 @@ extern crate ethereum_client;
 #[cfg(test)]
 mod mock;
 
+mod account;
+mod amount;
+
 #[cfg(test)]
 mod tests;
 
 #[macro_use]
 extern crate alloc;
+
+mod notices;
 
 pub const ETH_STARPORT_ADDRESS: &str = "0xbbde1662bC3ED16aA8C618c9833c801F3543B587";
 pub const LOCK_EVENT_TOPIC: &str =
@@ -49,11 +63,14 @@ pub trait Config: frame_system::Config {
 }
 
 decl_storage! {
-    trait Store for Module<T: Config> as CashPalletModule {
+    trait Store for Module<T: Config> as Cash {
         // XXX
         // Learn more about declaring storage items:
         // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
         Something get(fn something): Option<u32>;
+
+        // XXX
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
     }
 }
 
@@ -66,6 +83,9 @@ decl_event!(
         /// Event documentation should end with an array that provides descriptive names for event
         /// parameters. [something, who]
         SomethingStored(u32, AccountId),
+
+        // XXX
+        MagicExtract(CashAmount, AccountIdent),
     }
 );
 
@@ -92,6 +112,23 @@ decl_module! {
 
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
+
+        /// An example dispatchable that takes a singles value as a parameter, writes the value to
+        /// storage and emits an event. This function must be dispatched by a signed extrinsic.
+        #[weight = 10_000 + T::DbWeight::get().writes(1)]
+        pub fn magic_extract(origin, account: AccountIdent, amount: CashAmount) -> dispatch::DispatchResult {
+            let () = ensure_none(origin)?;
+
+            // Update storage -- TODO: increment this-- sure why not?
+            let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
+            let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
+            CashBalance::insert(&account, next_cash_balance);
+
+            // Emit an event.
+            Self::deposit_event(RawEvent::MagicExtract(amount, account));
+            // Return a successful DispatchResult
+            Ok(())
+        }
 
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
@@ -247,5 +284,52 @@ impl<T: Config> Module<T> {
             u64::from_str_radix(without_prefix, 16).map_err(|_| <Error<T>>::HttpFetchingError)?;
         let next_block_num_hex = format!("{:#X}", block_num + 1);
         Ok(next_block_num_hex)
+    }
+}
+
+impl<T: Config> Module<T> {
+    pub fn process_notices() {
+        // notice queue stub
+        let pending_notices: Vec<&dyn notices::Notice> = [].to_vec();
+
+        // let signer = Signer::<T, T::AuthorityId>::any_account();
+        for notice in pending_notices.iter() {
+            //     // find parent
+            //     // id = notice.gen_id(parent)
+            //     let message = notice.encode();
+            //     signer.send_unsigned_transaction(
+            //         |account| notices::NoticePayload {
+            //             // id: move id,
+            //             msg: message.clone(),
+            //             sig: notices::sign(&message),
+            //             public: account.public.clone(),
+            //         },
+            //         Call::emit_notice);
+        }
+    }
+}
+
+impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
+    type Call = Call<T>;
+
+    /// Validate unsigned call to this module.
+    ///
+    /// By default unsigned transactions are disallowed, but implementing the validator
+    /// here we make sure that some particular calls (the ones produced by offchain worker)
+    /// are being whitelisted and marked as valid.
+    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        // TODO: This is not ready for prime-time
+        ValidTransaction::with_tag_prefix("CashPallet")
+            // The transaction is only valid for next 10 blocks. After that it's
+            // going to be revalidated by the pool.
+            .longevity(10)
+            .and_provides("fix_this_function")
+            // It's fine to propagate that transaction to other peers, which means it can be
+            // created even by nodes that don't produce blocks.
+            // Note that sometimes it's better to keep it for yourself (if you are the block
+            // producer), since for instance in some schemes others may copy your solution and
+            // claim a reward.
+            .propagate(true)
+            .build()
     }
 }
