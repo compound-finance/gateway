@@ -3,6 +3,7 @@ use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
 use sp_std::vec::Vec;
 
+
 /// The type of the decimal field.
 pub type DecimalType = u8;
 
@@ -33,6 +34,7 @@ impl Encode for Amount {
         mantissa_bytes.using_encoded(f)
     }
 }
+
 
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
@@ -71,6 +73,7 @@ impl Amount {
             mantissa: mantissa.into(),
         }
     }
+
 
     /// Add two FixedPrecision numbers together. Note the signature uses borrowed values this is
     /// because the underlying storage is arbitrarily large and we do not want to copy the values.
@@ -146,4 +149,5 @@ mod tests {
 
         Ok(())
     }
+
 }

@@ -1,10 +1,10 @@
-use super::{account::AccountIdent, amount::Amount};
-use codec::{Decode, Encode};
-use ethabi;
-use frame_system::offchain::{SignedPayload, SigningTypes};
-use secp256k1;
-use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
+use sp_std::vec::Vec;
+use secp256k1;
+use ethabi;
+use codec::{Decode, Encode};
+use super::{account::{AccountIdent}, amount::Amount};
+use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
@@ -20,12 +20,12 @@ pub struct NoticePayload<Public> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
-pub enum Notice {
+pub enum Notice{
     ExtractionNotice {
         asset: Asset,
         account: AccountIdent,
         amount: Amount,
-    },
+    }
 }
 
 impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
@@ -36,6 +36,7 @@ impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
 
 /// Helper function to quickly run keccak in the Ethereum-style
 fn keccak(input: Vec<u8>) -> EthHash {
+
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
     hasher.update(&input[..]);
@@ -43,11 +44,11 @@ fn keccak(input: Vec<u8>) -> EthHash {
     output
 }
 
+
 // TODO: match by chain for signing algorithm or implement as trait
-pub fn sign(message: &Message) -> Signature {
+pub fn sign(message : &Message) -> Signature {
     // TODO: get this from somewhere else
-    let not_so_secret: [u8; 32] =
-        hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
+    let not_so_secret: [u8; 32] = hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
     let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
 
     let msg = secp256k1::Message::parse(&keccak(message.clone()));

@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
-use crate::notices::{EthHash, Notice};
+use crate::notices::{Notice, EthHash};
+use crate::account::{AccountIdent, ChainIdent};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -13,7 +13,9 @@ use frame_support::{
 use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::{
     offchain::http,
-    transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
+    transaction_validity::{
+        TransactionSource, TransactionValidity, ValidTransaction,
+    },
 };
 use sp_std::vec::Vec;
 
@@ -177,19 +179,20 @@ impl<T: Config> Module<T> {
         // notice queue stub
 
         // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for entry in NoticeQueue::iter() {
-            //     // find parent
-            //     // id = notice.gen_id(parent)
-            //     let message = notice.encode();
-            //     signer.send_unsigned_transaction(
-            //         |account| notices::NoticePayload {
-            //             // id: move id,
-            //             msg: message.clone(),
-            //             sig: notices::sign(&message),
-            //             public: account.public.clone(),
-            //         },
-            //         Call::emit_notice);
-            // }
+        for entry in  NoticeQueue::iter() {
+        //     // find parent
+        //     // id = notice.gen_id(parent)
+        //     let message = notice.encode();
+        //     signer.send_unsigned_transaction(
+        //         |account| notices::NoticePayload {
+        //             // id: move id,
+        //             msg: message.clone(),
+        //             sig: notices::sign(&message),
+        //             public: account.public.clone(),
+        //         },
+        //         Call::emit_notice);
+        // }
+
         }
     }
 }
