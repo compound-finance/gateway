@@ -123,3 +123,19 @@ module tf {
   full_node_count = var.full_node_count
   full_node_secondary_count = var.full_node_secondary_count
 }
+
+output "bastion_ip_address" {
+  value = module.tf.bastion_ip_address
+}
+
+output "authority_node_ip_address" {
+  value = module.tf.authority_node_ip_address
+}
+
+output "full_node_ip_address" {
+  value = module.tf.full_node_ip_address
+}
+
+output "full_node_secondary_ip_address" {
+  value = module.tf.full_node_secondary_ip_address
+}

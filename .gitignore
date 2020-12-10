@@ -16,4 +16,6 @@
 **/.terraform
 **/*.hcl
 **/*.tfstate*
+ops/hosts
+ops/ssh_config
 */crash.log

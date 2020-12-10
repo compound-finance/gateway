@@ -1,5 +1,8 @@
 
-- hosts: authority_node
+- hosts:
+    - authority_node
+    - full_node
+
   vars:
     packages:
       - vim

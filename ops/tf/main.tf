@@ -146,7 +146,7 @@ resource "aws_security_group" "full_node_sg" {
   }
 
   tags = {
-    Name = "authority_node_sg"
+    Name = "full_node_sg"
   }
 }
 
@@ -357,6 +357,34 @@ resource "aws_network_acl" "authority_node_private_acl" {
     to_port    = 0
   }
 
+  egress {
+    protocol   = "tcp"
+    rule_no    = 202
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
+  }
+
+  egress {
+    protocol   = "tcp"
+    rule_no    = 203
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 443
+    to_port    = 443
+  }
+
+  # For git access, can remove once repo is public
+  egress {
+    protocol   = "tcp"
+    rule_no    = 204
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 22
+    to_port    = 22
+  }
+
   ingress {
     protocol   = "-1"
     rule_no    = 100
@@ -375,8 +403,26 @@ resource "aws_network_acl" "authority_node_private_acl" {
     to_port    = 0
   }
 
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 102
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 1024
+    to_port    = 65535
+  }
+
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 103
+    action     = "allow"
+    ipv6_cidr_block = "::/0"
+    from_port  = 1024
+    to_port    = 65535
+  }
+
   tags = {
-    Name = "authority_node_public_acl"
+    Name = "authority_node_private_acl"
   }
 }
 
@@ -389,7 +435,7 @@ resource "aws_instance" "full_node_public" {
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.full_node_sg.id]
   subnet_id                   = aws_subnet.authority_node_public.id
-  associate_public_ip_address = false
+  associate_public_ip_address = true
   count                       = var.full_node_count
 }
 
@@ -402,7 +448,7 @@ resource "aws_instance" "full_node_public_secondary" {
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.full_node_sg.id]
   subnet_id                   = aws_subnet.authority_node_public_secondary.id
-  associate_public_ip_address = false
+  associate_public_ip_address = true
   count                       = var.full_node_secondary_count
 }
 
@@ -586,6 +632,11 @@ resource "aws_route_table_association" "authority_node_public_subnet_ig_route_as
   route_table_id = aws_route_table.authority_node_public_subnet_ig_route.id
 }
 
+resource "aws_route_table_association" "authority_node_public_secondary_subnet_ig_route_association" {
+  subnet_id      = aws_subnet.authority_node_public_secondary.id
+  route_table_id = aws_route_table.authority_node_public_subnet_ig_route.id
+}
+
 resource "aws_route_table" "authority_node_private_subnet_nat_ig_route" {
   vpc_id = aws_vpc.compound_chain_vpc.id
 
@@ -602,4 +653,20 @@ resource "aws_route_table" "authority_node_private_subnet_nat_ig_route" {
 resource "aws_route_table_association" "authority_node_private_subnet_nat_ig_route_association" {
   subnet_id      = aws_subnet.authority_node_private.id
   route_table_id = aws_route_table.authority_node_private_subnet_nat_ig_route.id
+}
+
+output "bastion_ip_address" {
+  value = aws_instance.bastion.public_ip
+}
+
+output "authority_node_ip_address" {
+  value = aws_instance.authority_node.private_ip
+}
+
+output "full_node_ip_address" {
+  value = aws_instance.full_node_public.*.private_ip
+}
+
+output "full_node_secondary_ip_address" {
+  value = aws_instance.full_node_public_secondary.*.private_ip
 }

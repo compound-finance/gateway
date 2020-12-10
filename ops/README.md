@@ -34,8 +34,19 @@ AWS_PROFILE=compound-dev-1 terraform plan \
 Then, if that looks good, apply the terraform changes:
 
 ```sh
- terraform apply -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)" tf
+AWS_PROFILE=compound-dev-1 terraform apply \
+  -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)"
 ```
+
+Once you have everything up, you'll need to construct your Ansible inventory and `ssh_config`. This can be done by running:
+
+```sh
+AWS_PROFILE=compound-dev-1 terraform output -json | ./generate_inv.py
+```
+
+Note: you'll need python3 installed. You may need to run this command differently in Powershell.
+
+Note: after you change any nodes created by terraform, you will need to re-run this command.
 
 ### Setting up Compound Chain application
 
