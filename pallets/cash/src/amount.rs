@@ -1,6 +1,8 @@
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
+use sp_std::vec::Vec;
+
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -11,12 +13,15 @@ pub type MantissaType = BigUint;
 /// The type for Cash
 pub type CashAmount = u128;
 
+const CASH_DECIMALS: DecimalType = 18;
+
 /// Represents a decimal number in base 10 with fixed precision. The number of decimals depends
 /// on the amount being represented and is not stored alongside the amount.
 ///
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
-#[derive(Clone, PartialEq, Debug)]
+
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
@@ -29,6 +34,7 @@ impl Encode for Amount {
         mantissa_bytes.using_encoded(f)
     }
 }
+
 
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
@@ -60,6 +66,14 @@ impl Amount {
             decimals: decimals.into(),
         }
     }
+
+    pub fn new_cash<T: Into<MantissaType>>(mantissa: T) -> Self {
+        Amount {
+            decimals: CASH_DECIMALS,
+            mantissa: mantissa.into(),
+        }
+    }
+
 
     /// Add two FixedPrecision numbers together. Note the signature uses borrowed values this is
     /// because the underlying storage is arbitrarily large and we do not want to copy the values.
@@ -135,4 +149,5 @@ mod tests {
 
         Ok(())
     }
+
 }
