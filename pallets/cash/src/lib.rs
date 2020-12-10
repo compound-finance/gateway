@@ -227,20 +227,21 @@ decl_module! {
 
 impl<T: Config> Module<T> {
     pub fn process_notices(block_number: T::BlockNumber) {
-        let n = notices::ExtractionNotice{
+        let n = notices::Notice::ExtractionNotice{
             asset: "eth:0xfffff".as_bytes().to_vec(),
             account: AccountIdent{chain: ChainIdent::Eth, account: "eth:0xF33d".as_bytes().to_vec() },
             amount: Amount::new(2000_u32, 3)
         };
 
-        let pending_notices : Vec<Box<dyn notices::Notice>> =  vec![Box::new(n)];
+        // let pending_notices : Vec<Box<Notice>> =  vec![Box::new(n)];
+        let pending_notices : Vec<Notice> =  vec![n];
 
         for notice in pending_notices.iter() {
             // find parent
             // id = notice.gen_id(parent)
         
             // submit onchain call for aggregating the price
-            let payload = notice.to_payload();
+            let payload = notices::to_payload(notice);
             let call = Call::emit_notice(payload);
         
             // Unsigned tx

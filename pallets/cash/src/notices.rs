@@ -5,11 +5,8 @@ use sp_std::prelude::Box;
 use secp256k1;
 use ethabi;
 use num_bigint::BigUint;
-use num_traits::ToPrimitive;
 use codec::{Decode, Encode};
-use super::{account::{AccountIdent}, amount::Amount};
-use frame_system::offchain::{SignedPayload, SigningTypes};
-use super::{account::AccountIdent, account::ChainIdent, amount::Amount};
+use super::{account::{AccountIdent, ChainIdent}, amount::Amount};
 
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
@@ -33,22 +30,22 @@ pub enum Notice{
     }
 }
 
-fn encode(notice: Notice) -> Vec<u8> {
+fn encode(notice: &Notice) -> Vec<u8> {
     match notice {
         Notice::ExtractionNotice {asset, account, amount} => {
             // TODO: safer decoding of the amount
             let x = amount.mantissa.to_u128().unwrap();
 
             ethabi::encode(&[
-                ethabi::token::Token::FixedBytes(asset.into()),
-                ethabi::token::Token::FixedBytes(account.account.into()),
+                ethabi::token::Token::FixedBytes(asset.clone().into()),
+                ethabi::token::Token::FixedBytes(account.account.clone().into()),
                 ethabi::token::Token::Int(x.into()),
             ])
         }
     }    
 }
 
-fn to_payload(notice: Notice) -> NoticePayload {
+pub fn to_payload(notice: &Notice) -> NoticePayload {
     let message = encode(notice);
     // TODO: do signer by chain
     let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".as_bytes().to_vec();
