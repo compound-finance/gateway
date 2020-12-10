@@ -1,11 +1,9 @@
 use tiny_keccak::Hasher;
-use num_bigint::BigUint;
-use num_traits::ToPrimitive;
 use sp_std::vec::Vec;
 use secp256k1;
 use ethabi;
 use codec::{Decode, Encode};
-use super::{account::{AccountIdent, ChainIdent}, amount::Amount};
+use super::{account::{AccountIdent}, amount::Amount};
 use frame_system::offchain::{SignedPayload, SigningTypes};
 
 pub type Message = Vec<u8>;
@@ -17,7 +15,7 @@ pub type EthHash = [u8; 32];
 pub struct NoticePayload<Public> {
     // id: Vec<u8>,
     pub msg: Vec<u8>,
-    pub sig: Vec<u8>, 
+    pub sig: Vec<u8>,
     pub public: Public,
 }
 

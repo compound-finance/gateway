@@ -1,4 +1,4 @@
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
 use sp_std::vec::Vec;
@@ -35,15 +35,6 @@ impl Encode for Amount {
     }
 }
 
-// impl PartialEq for Amount {
-//     fn eq(&self, other: &Self) -> bool {
-//         let dec_match = self.decimals == other.decimals;
-//         let mantissa_match = self.mantissa == other.mantissa;
-//         return dec_match && mantissa_match;
-//     }
-// }
-
-// impl Eq for Amount {}
 
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
@@ -159,12 +150,4 @@ mod tests {
         Ok(())
     }
 
-//     #[test]
-//     fn test_partial_eq() -> Result<(), codec::Error> {
-//         let a = Amount::new(6000u32, 3);
-//         let b = Amount::new(5000u32, 4);
-//         assert_eq!(a, a);
-//         assert_eq!(a.eq(&b), false);
-//         Ok(())
-//     }
 }

@@ -14,7 +14,7 @@ use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::{
     offchain::http,
     transaction_validity::{
-        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+        TransactionSource, TransactionValidity, ValidTransaction,
     },
 };
 use sp_std::vec::Vec;
@@ -67,7 +67,7 @@ decl_event!(
         SomethingStored(u32, AccountId),
 
         // XXX
-        MagicExtract(Notice),
+        MagicExtract(CashAmount, AccountIdent, Notice),
     }
 );
 
@@ -104,12 +104,12 @@ decl_module! {
             CashBalance::insert(&account, next_cash_balance);
 
             // Add to Notice Queue
-            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::new_cash(amount), account: account};
+            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::new_cash(amount), account: account.clone()};
             let dummy_hash: [u8; 32] = [0; 32];
-            NoticeQueue::insert(ChainIdent::Eth, dummy_hash, notice.clone());
+            NoticeQueue::insert(ChainIdent::Eth, dummy_hash, &notice);
 
             // Emit an event.
-            Self::deposit_event(RawEvent::MagicExtract(notice));
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
             // Return a successful DispatchResult
             Ok(())
         }
