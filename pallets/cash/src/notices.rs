@@ -17,7 +17,7 @@ pub type Asset = Vec<u8>;
 pub type EthHash = [u8; 32];
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
-pub struct NoticePayload<Public> {
+pub struct NoticePayload {
     // id: Vec<u8>,
     pub msg: Message,
     pub sig: Signature,

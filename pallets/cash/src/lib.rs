@@ -4,17 +4,10 @@ use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-use frame_system::{ensure_none, ensure_signed};
+
 use crate::account::{AccountAddr, AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
 use crate::notices::{EthHash, Notice};
-use codec::alloc::string::String;
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
-use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
-};
 
 use frame_system::{
     ensure_none, ensure_signed,
@@ -34,8 +27,6 @@ extern crate ethereum_client;
 
 mod chains;
 mod core;
-use sp_std::prelude::Box;
-use sp_std::vec::Vec;
 
 #[cfg(test)]
 mod mock;
@@ -75,7 +66,7 @@ pub fn compute_hash(payload: Payload) -> Hash {
 }
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config {
+pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
@@ -107,6 +98,7 @@ decl_event!(
 
         /// XXX
         MagicExtract(CashAmount, AccountIdent, Notice),
+        Notice(notices::Message, notices::Signature, AccountIdent),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthereumEvent(Payload),
@@ -252,7 +244,7 @@ decl_module! {
             // TODO create parameter vector from storage variables
             let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
             debug::native::info!("Lock Events: {:?}", lock_events);
-            Self::process_notices();
+            Self::process_notices(block_number);
         }
     }
 }
