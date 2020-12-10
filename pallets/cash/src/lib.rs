@@ -2,7 +2,7 @@
 
 use crate::amount::{Amount, CashAmount};
 use crate::notices::{Notice, EthHash};
-use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::account::{AccountIdent, ChainIdent};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
