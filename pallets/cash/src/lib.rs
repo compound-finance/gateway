@@ -5,24 +5,37 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 use frame_system::{ensure_none, ensure_signed};
+use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::amount::{Amount, CashAmount};
+use crate::notices::{EthHash, Notice};
+use codec::alloc::string::String;
+/// Edit this file to define custom logic or remove it if it is not needed.
+/// Learn more about FRAME and the core library of Substrate FRAME pallets:
+/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
+use frame_support::{
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
+};
+
+use frame_system::{
+    ensure_none, ensure_signed,
+    offchain::{CreateSignedTransaction, SubmitTransaction},
+};
+use sp_runtime::RuntimeDebug;
 use sp_runtime::{
     offchain::http,
     transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
 };
 use sp_std::vec::Vec;
 
-use sp_runtime::RuntimeDebug;
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
-
-use crate::account::{AccountIdent, ChainIdent};
-use crate::amount::{Amount, CashAmount};
-use crate::notices::{EthHash, Notice};
 
 extern crate ethereum_client;
 
 mod chains;
 mod core;
+use sp_std::prelude::Box;
+use sp_std::vec::Vec;
 
 #[cfg(test)]
 mod mock;
@@ -66,9 +79,8 @@ pub trait Config: frame_system::Config {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
-    // XXX what should be configurable?
-    //type EthEventStatus: From<EthEventStatus> + Into<EthEventStatus>;
-    //type Payload: From<Vec<u8>> + Into<Vec<u8>>;
+    /// The overarching dispatch call type.
+    type Call: From<Call<Self>>;
 }
 
 decl_storage! {
@@ -209,6 +221,18 @@ decl_module! {
             Err(Error::<T>::NoneValue)?
         }
 
+        #[weight = 0]
+        pub fn emit_notice(origin, notice: notices::NoticePayload) -> dispatch::DispatchResult {
+            // TODO: Move to using unsigned and getting author from signature
+            // TODO I don't know what this comment means ^
+            ensure_none(origin)?;
+
+            debug::native::info!("emitting notice: {:?}", notice);
+            Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
+
+            Ok(())
+        }
+
         /// Offchain Worker entry point.
         ///
         /// By implementing `fn offchain_worker` within `decl_module!` you declare a new offchain
@@ -235,23 +259,29 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
-    pub fn process_notices() {
-        // notice queue stub
+    pub fn process_notices(block_number: T::BlockNumber) {
+        let n = notices::Notice::ExtractionNotice {
+            asset: "eth:0xfffff".as_bytes().to_vec(),
+            account: AccountIdent {
+                chain: ChainIdent::Eth,
+                account: "eth:0xF33d".as_bytes().to_vec(),
+            },
+            amount: Amount::new(2000_u32, 3),
+        };
 
-        // let signer = Signer::<T, T::AuthorityId>::any_account();
-        for notice in NoticeQueue::iter() {
-            //     // find parent
-            //     // id = notice.gen_id(parent)
-            //     let message = notice.encode();
-            //     signer.send_unsigned_transaction(
-            //         |account| notices::NoticePayload {
-            //             // id: move id,
-            //             msg: message.clone(),
-            //             sig: notices::sign(&message),
-            //             public: account.public.clone(),
-            //         },
-            //         Call::emit_notice);
-            // }
+        // let pending_notices : Vec<Box<Notice>> =  vec![Box::new(n)];
+        let pending_notices: Vec<Notice> = vec![n];
+
+        for notice in pending_notices.iter() {
+            // find parent
+            // id = notice.gen_id(parent)
+
+            // submit onchain call for aggregating the price
+            let payload = notices::to_payload(notice);
+            let call = Call::emit_notice(payload);
+
+            // Unsigned tx
+            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
         }
     }
 }

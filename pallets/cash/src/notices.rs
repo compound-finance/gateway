@@ -1,9 +1,13 @@
-use super::{account::AccountIdent, amount::Amount};
+use super::{
+    account::{AccountIdent, ChainIdent},
+    amount::Amount,
+};
 use codec::{Decode, Encode};
 use ethabi;
-use frame_system::offchain::{SignedPayload, SigningTypes};
+use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use secp256k1;
+use sp_std::prelude::Box;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
 
@@ -15,9 +19,9 @@ pub type EthHash = [u8; 32];
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 pub struct NoticePayload<Public> {
     // id: Vec<u8>,
-    pub msg: Vec<u8>,
-    pub sig: Vec<u8>,
-    pub public: Public,
+    pub msg: Message,
+    pub sig: Signature,
+    pub signer: AccountIdent,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
@@ -29,28 +33,39 @@ pub enum Notice {
     },
 }
 
-pub enum Chain {}
+fn encode(notice: &Notice) -> Vec<u8> {
+    match notice {
+        Notice::ExtractionNotice {
+            asset,
+            account,
+            amount,
+        } => {
+            // TODO: safer decoding of the amount
+            let x = amount.mantissa.to_u128().unwrap();
 
-pub struct ExtractionNotice {
-    asset: Asset,
-    account: AccountIdent,
-    amount: Amount,
-}
-
-impl Notice for ExtractionNotice {
-    fn encode(&self) -> Vec<u8> {
-        let x = self.amount.mantissa.to_u128().unwrap();
-        ethabi::encode(&[
-            ethabi::token::Token::FixedBytes(self.asset.clone().into()),
-            ethabi::token::Token::FixedBytes(self.account.account.clone().into()),
-            ethabi::token::Token::Int(x.into()),
-        ])
+            ethabi::encode(&[
+                ethabi::token::Token::FixedBytes(asset.clone().into()),
+                ethabi::token::Token::FixedBytes(account.account.clone().into()),
+                ethabi::token::Token::Int(x.into()),
+            ])
+        }
     }
 }
 
-impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
-    fn public(&self) -> T::Public {
-        self.public.clone()
+pub fn to_payload(notice: &Notice) -> NoticePayload {
+    let message = encode(notice);
+    // TODO: do signer by chain
+    let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61"
+        .as_bytes()
+        .to_vec();
+    NoticePayload {
+        // id: move id,
+        sig: sign(&message),
+        msg: message.to_vec(),
+        signer: AccountIdent {
+            chain: ChainIdent::Eth,
+            account: signer,
+        },
     }
 }
 
@@ -64,7 +79,7 @@ fn keccak(input: Vec<u8>) -> EthHash {
 }
 
 // TODO: match by chain for signing algorithm or implement as trait
-pub fn sign(message: &Message) -> Signature {
+fn sign(message: &Message) -> Signature {
     // TODO: get this from somewhere else
     let not_so_secret: [u8; 32] =
         hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
