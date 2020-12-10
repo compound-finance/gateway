@@ -41,7 +41,7 @@ AWS_PROFILE=compound-dev-1 terraform apply \
 Once you have everything up, you'll need to construct your Ansible inventory and `ssh_config`. This can be done by running:
 
 ```sh
-AWS_PROFILE=compound-dev-1 terraform output -json | ./generate_inv.py
+AWS_PROFILE=compound-dev-1 terraform output -json | ./tmpl/generate_inv.py
 ```
 
 Note: you'll need python3 installed. You may need to run this command differently in Powershell.

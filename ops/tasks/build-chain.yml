@@ -1,5 +1,7 @@
 
-- hosts: authority_node
+- hosts:
+    - authority_node
+    - full_node
   vars:
     rustup_init_url: https://sh.rustup.rs
     ssh_home: "{{ ansible_env.HOME }}/.ssh"

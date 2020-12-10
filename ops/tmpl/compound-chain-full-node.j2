@@ -1,0 +1,20 @@
+[Unit]
+Description=Compound Chain Full Node
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory={{ compound_chain_home }}
+ExecStartPre={{ compound_chain_home }}/target/release/compound-chain \
+  purge-chain \
+  --base-path {{ compound_chain_home }}/chain-store \
+  --chain dev
+ExecStart={{ compound_chain_home }}/target/release/compound-chain \
+  --base-path {{ compound_chain_home }}/chain-store \
+  --chain dev \
+  --port 30333 \
+  --ws-port 9944 \
+  --rpc-port 9933 \
+  --node-key 0000000000000000000000000000000000000000000000000000000000000001 \
+  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
+  --bootnodes /ip4/{{ groups['authority_node'] | first }}/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
