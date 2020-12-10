@@ -220,6 +220,10 @@ impl<T: Config> Module<T> {
         // the storage comprehensively.
         //
         // Ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
+
+        // TODO Add second check for:
+        // Should be either the block of the latest Pending event which we haven't signed,
+        // or if there are no such events, otherwise the block after the latest event, otherwise the earliest (configuration/genesis) block
         let from_block: String;
         if let Some(Some(cached_block_num)) = s_info.get::<String>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
