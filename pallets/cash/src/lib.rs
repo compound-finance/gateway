@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
 use crate::notices::{Notice, EthHash};
+use crate::account::{AccountAddr, AccountIdent, ChainIdent};
 use codec::alloc::string::String;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -14,7 +14,7 @@ use frame_system::{ensure_none, ensure_signed};
 use sp_runtime::{
     offchain::http,
     transaction_validity::{
-        TransactionSource, TransactionValidity, ValidTransaction,
+        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
     },
 };
 use sp_std::vec::Vec;
@@ -176,11 +176,10 @@ decl_module! {
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
     pub fn process_notices() {
-        for (entry) in NoticeQueue::iter() {
-            
-        }
+        // notice queue stub
+
         // let signer = Signer::<T, T::AuthorityId>::any_account();
-        // for notice in pending_notices.iter() {
+        for entry in  NoticeQueue::iter() {
         //     // find parent
         //     // id = notice.gen_id(parent)
         //     let message = notice.encode();
@@ -193,6 +192,8 @@ impl<T: Config> Module<T> {
         //         },
         //         Call::emit_notice);
         // }
+
+        }
     }
 }
 

@@ -16,6 +16,7 @@ pub struct AccountIdent {
   pub account: AccountAddr,
 }
 
+
 impl AccountIdent{
   /// Create a new FixedPrecision number from parts. The mantissa is used "raw" and not scaled
   /// in any way
@@ -26,6 +27,7 @@ impl AccountIdent{
       }
   }
 }
+
 #[cfg(test)]
 mod tests {
   use super::*;

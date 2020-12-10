@@ -1,6 +1,9 @@
 use tiny_keccak::Hasher;
+use num_bigint::BigUint;
+use num_traits::ToPrimitive;
 use sp_std::vec::Vec;
 use secp256k1;
+use ethabi;
 use codec::{Decode, Encode};
 use super::{account::{AccountIdent, ChainIdent}, amount::Amount};
 use frame_system::offchain::{SignedPayload, SigningTypes};
@@ -27,7 +30,6 @@ pub enum Notice{
     }
 }
 
-
 impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
     fn public(&self) -> T::Public {
         self.public.clone()
@@ -36,6 +38,7 @@ impl<T: SigningTypes> SignedPayload<T> for NoticePayload<T::Public> {
 
 /// Helper function to quickly run keccak in the Ethereum-style
 fn keccak(input: Vec<u8>) -> EthHash {
+
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
     hasher.update(&input[..]);

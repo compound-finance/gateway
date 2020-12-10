@@ -1,7 +1,7 @@
 use anyhow::{bail, Error, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
-use crate::alloc::{vec::Vec};
+
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -19,7 +19,8 @@ const CASH_DECIMALS: DecimalType = 18;
 ///
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
-#[derive(Clone, Debug)]
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
@@ -33,15 +34,15 @@ impl Encode for Amount {
     }
 }
 
-impl PartialEq for Amount {
-    fn eq(&self, other: &Self) -> bool {
-        let dec_match = self.decimals == other.decimals;
-        let mantissa_match = self.mantissa == other.mantissa;
-        return dec_match && mantissa_match;
-    }
-}
+// impl PartialEq for Amount {
+//     fn eq(&self, other: &Self) -> bool {
+//         let dec_match = self.decimals == other.decimals;
+//         let mantissa_match = self.mantissa == other.mantissa;
+//         return dec_match && mantissa_match;
+//     }
+// }
 
-impl Eq for Amount {}
+// impl Eq for Amount {}
 
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
@@ -80,6 +81,7 @@ impl Amount {
             mantissa: mantissa.into(),
         }
     }
+
 
     /// Add two FixedPrecision numbers together. Note the signature uses borrowed values this is
     /// because the underlying storage is arbitrarily large and we do not want to copy the values.
@@ -156,12 +158,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_partial_eq() -> Result<(), codec::Error> {
-        let a = Amount::new(6000u32, 3);
-        let b = Amount::new(5000u32, 4);
-        assert_eq!(a, a);
-        assert_eq!(a.eq(&b), false);
-        Ok(())
-    }
+//     #[test]
+//     fn test_partial_eq() -> Result<(), codec::Error> {
+//         let a = Amount::new(6000u32, 3);
+//         let b = Amount::new(5000u32, 4);
+//         assert_eq!(a, a);
+//         assert_eq!(a.eq(&b), false);
+//         Ok(())
+//     }
 }
