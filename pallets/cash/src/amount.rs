@@ -1,7 +1,6 @@
 use anyhow::{bail, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
-use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use sp_std::vec::Vec;
 
@@ -22,7 +21,7 @@ const CASH_DECIMALS: DecimalType = 18;
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
