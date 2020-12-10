@@ -39,41 +39,10 @@ mod notices;
 
 extern crate ethereum_client;
 
-pub const ETH_KEY_TYPE: KeyTypeId = KeyTypeId(*b"eth!");
-
-pub mod crypto {
-    use crate::ETH_KEY_TYPE;
-    use sp_core::ecdsa::Signature as EcdsaSignature;
-
-    use sp_runtime::app_crypto::{app_crypto, ecdsa};
-    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
-
-    app_crypto!(ecdsa, ETH_KEY_TYPE);
-
-    pub struct TestAuthId;
-    // implemented for ocw-runtime
-    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
-        type RuntimeAppPublic = Public;
-        type GenericSignature = sp_core::ecdsa::Signature;
-        type GenericPublic = sp_core::ecdsa::Public;
-    }
-
-    // implemented for mock runtime in test
-    impl frame_system::offchain::AppCrypto<<EcdsaSignature as Verify>::Signer, EcdsaSignature>
-        for TestAuthId
-    {
-        type RuntimeAppPublic = Public;
-        type GenericSignature = sp_core::ecdsa::Signature;
-        type GenericPublic = sp_core::ecdsa::Public;
-    }
-}
-
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-
-    type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
     /// The overarching dispatch call type.
     type Call: From<Call<Self>>;

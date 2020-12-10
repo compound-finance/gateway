@@ -304,7 +304,6 @@ impl pallet_sudo::Config for Runtime {
 
 /// Configure the CASH pallet in pallets/cash.
 impl pallet_cash::Config for Runtime {
-    type AuthorityId = pallet_cash::crypto::TestAuthId;
     type Event = Event;
     type Call = Call;
 }
