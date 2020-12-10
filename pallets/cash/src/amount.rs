@@ -1,6 +1,7 @@
 use anyhow::{bail, Error, Result};
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
+use sp_std::vec::Vec;
 
 /// The type of the decimal field.
 pub type DecimalType = u8;

@@ -47,8 +47,6 @@ pub const LOCK_EVENT_TOPIC: &str =
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
 pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
-// pub const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
-// pub const LOCK_BLOCK_EXPIRATION: u32 = 3; // in block number
 
 #[derive(Debug)]
 struct StarportInfo {
