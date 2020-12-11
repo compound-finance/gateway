@@ -4,7 +4,7 @@ use super::{
 };
 use codec::{Decode, Encode};
 use ethabi;
-use num_bigint::BigUint;
+use frame_support::debug;
 use num_traits::ToPrimitive;
 use secp256k1;
 use sp_std::vec::Vec;
@@ -39,7 +39,24 @@ pub enum Notice {
     },
 }
 
-fn encode(notice: &Notice) -> Vec<u8> {
+pub fn debug(notice: &Notice) {
+    match notice {
+        Notice::ExtractionNotice {
+            id: _,
+            chain: _,
+            parent: _,
+            asset,
+            account,
+            amount,
+        } => {
+            // TODO: safer decoding of the amount
+            let x = amount.mantissa.to_u128().unwrap();
+            debug::native::info!("notice amount is: {:?}", amount);
+        }
+    }
+}
+
+fn encode(notice: Notice) -> Vec<u8> {
     match notice {
         Notice::ExtractionNotice {
             chain: _,
@@ -53,15 +70,15 @@ fn encode(notice: &Notice) -> Vec<u8> {
             let x = amount.mantissa.to_u128().unwrap();
 
             ethabi::encode(&[
-                ethabi::token::Token::FixedBytes(asset.clone().into()),
-                ethabi::token::Token::FixedBytes(account.account.clone().into()),
+                ethabi::token::Token::FixedBytes(asset.into()),
+                ethabi::token::Token::FixedBytes(account.account.into()),
                 ethabi::token::Token::Int(x.into()),
             ])
         }
     }
 }
 
-pub fn to_payload(notice: &Notice) -> NoticePayload {
+pub fn to_payload(notice: Notice) -> NoticePayload {
     let message = encode(notice);
     // TODO: do signer by chain
     let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61"
