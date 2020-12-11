@@ -1,7 +1,6 @@
 // XXX where should this live? with e.g. ethereum_client?
 
 pub mod eth {
-    use codec::{Decode, Encode};
 
     // Note: The substrate build requires these be imported
     pub use sp_std::vec::Vec;
@@ -11,7 +10,7 @@ pub mod eth {
     pub type LogIndex = u32;
     pub type EventId = (BlockNumber, LogIndex);
 
-    #[derive(Clone, Copy, Encode, Decode)]
+    #[derive(Clone, Copy)]
     pub struct Event {
         pub id: EventId,
     }
