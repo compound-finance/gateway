@@ -5,6 +5,8 @@ use sp_std::vec::Vec;
 
 extern crate ethereum_client;
 
+use crate::chains;
+
 pub const ETH_STARPORT_ADDRESS: &str = "0xbbde1662bC3ED16aA8C618c9833c801F3543B587";
 pub const LOCK_EVENT_TOPIC: &str =
     "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
@@ -19,8 +21,8 @@ pub struct StarportInfo {
 pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<StarportInfo> {
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
-        debug::native::error!("fetch_events error: {:?}", e);
-        return anyhow::anyhow!("missing 0x prefix");
+        debug::native::error!("Error while fetching latest eth block number: {:?}", e);
+        return anyhow::anyhow!("Fetching latest eth block failed: {:?}", e);
     })?;
 
     // Build parameters set for fetching starport `Lock` events
@@ -32,7 +34,10 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
     // Fetch `Lock` events using ethereum_client
     let lock_events =
         ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request])
-            .map_err(|e| return anyhow::anyhow!("missing 0x prefix"))?;
+            .map_err(|e| {
+                debug::native::error!("Error while fetching and decoding starport events: {:?}", e);
+                return anyhow::anyhow!("Fetching and/or decoding starport events failed: {:?}", e);
+            })?;
 
     Ok(StarportInfo {
         lock_events: lock_events,
@@ -48,21 +53,20 @@ pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
     Ok(next_block_num_hex)
 }
 
-// pub fn to_lock_payload(
-//     event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
-// ) -> NoticePayload {
-//     let message = encode(notice);
-//     // TODO: do signer by chain
-//     let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61"
-//         .as_bytes()
-//         .to_vec();
-//     NoticePayload {
-//         // id: move id,
-//         sig: sign(&message),
-//         msg: message.to_vec(),
-//         signer: AccountIdent {
-//             chain: ChainIdent::Eth,
-//             account: signer,
-//         },
-//     }
-// }
+pub fn to_payload(
+    event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
+) -> anyhow::Result<chains::eth::Payload> {
+    let block_number: u32 = u32::from_str_radix(&event.block_number, 16).map_err(|e| {
+        debug::native::error!("Error decoding an event's block_number: {:?}", e);
+        return anyhow::anyhow!("Failed decoding an event's block_number: {:?}", e);
+    })?;
+    let log_index: u32 = u32::from_str_radix(&event.log_index, 16).map_err(|e| {
+        debug::native::error!("Error decoding an event's log_index: {:?}", e);
+        return anyhow::anyhow!("Failed decoding an event's log_index: {:?}", e);
+    })?;
+    let event = chains::eth::Event {
+        id: (block_number, log_index),
+    };
+    let payload: Vec<u8> = chains::eth::encode(&event);
+    Ok(payload)
+}

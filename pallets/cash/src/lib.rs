@@ -48,7 +48,6 @@ extern crate alloc;
 
 // XXX move / unrely
 pub type Hash = Vec<u8>;
-pub type Payload = Vec<u8>;
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -65,7 +64,7 @@ pub enum EthEventStatus {
 }
 
 // XXXX experimental
-pub fn compute_hash(payload: Payload) -> Hash {
+pub fn compute_hash(payload: chains::eth::Payload) -> Hash {
     // XXX where Payload: Hash
     payload // XXX
 }
@@ -101,7 +100,7 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
-        Payload = Payload,                                  //XXX<T as Config>::Payload ?,
+        Payload = chains::eth::Payload,                     //XXX<T as Config>::Payload ?,
     {
         XXXPhantomFakeEvent(AccountId), // XXX
 
@@ -125,8 +124,11 @@ decl_error! {
         /// Errors should have helpful documentation associated with them.
         StorageOverflow,
 
-        // Error returned when fetching starport info
+        // Error while fetching starport info
         HttpFetchingError,
+
+        // Error when processing `Lock` event while sending `process_ethereum_event` extrinsic
+        ProcessLockEventError,
     }
 }
 
@@ -164,7 +166,7 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: Payload) -> dispatch::DispatchResult {
+        pub fn process_ethereum_event(origin, payload: chains::eth::Payload) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload);
@@ -343,7 +345,11 @@ impl<T: Config> Module<T> {
             match events::fetch_events(eth_rpc_url, from_block) {
                 Ok(starport_info) => {
                     debug::native::info!("Result: {:?}", starport_info);
-                    Self::process_lock_events(starport_info.lock_events);
+
+                    // Send extrinsics for all events
+                    let _ = Self::process_lock_events(starport_info.lock_events);
+
+                    // Save latest block in ocw storage
                     s_info.set(&starport_info.latest_eth_block);
                 }
                 Err(err) => {
@@ -359,22 +365,16 @@ impl<T: Config> Module<T> {
         events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
     ) -> Result<(), Error<T>> {
         for event in events.iter() {
-            debug::native::info!("Processing event and send extrinsics: {:?}", event);
+            debug::native::info!(
+                "Processing `Lock` event and sending extrinsics: {:?}",
+                event
+            );
 
-            // let payload = events::to_payload(event);
-            // TODO change http error to something better
-            let block_number: u32 = u32::from_str_radix(&event.block_number, 16)
-                .map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let log_index: u32 = u32::from_str_radix(&event.log_index, 16)
-                .map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let payload = chains::eth::Event {
-                id: (block_number, log_index),
-            };
-
-            let call = Call::process_ethereum_event(chains::eth::encode(&payload.clone()));
+            let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let call = Call::process_ethereum_event(payload);
 
             // Unsigned tx
-            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            let _ = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
         }
         Ok(())
     }

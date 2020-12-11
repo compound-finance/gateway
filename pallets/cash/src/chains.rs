@@ -6,6 +6,7 @@ pub mod eth {
     // Note: The substrate build requires these be imported
     pub use sp_std::vec::Vec;
 
+    pub type Payload = Vec<u8>;
     pub type BlockNumber = u32;
     pub type LogIndex = u32;
     pub type EventId = (BlockNumber, LogIndex);
