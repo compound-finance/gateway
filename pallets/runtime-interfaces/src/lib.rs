@@ -11,6 +11,7 @@ pub struct Config {
     eth_lock_event_topic: Vec<u8>,
 }
 
+/// XXX Possible sanity checks for config fields here
 impl Config {
     pub fn update(&mut self, new: Config) {
         self.eth_rpc_url = new.eth_rpc_url;
