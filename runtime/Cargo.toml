@@ -74,6 +74,7 @@ std = [
     'pallet-babe/std',
     'pallet-balances/std',
     'pallet-cash/std',
+    'pallet-cash/full_crypto',
     'pallet-grandpa/std',
     'pallet-randomness-collective-flip/std',
     'pallet-sudo/std',

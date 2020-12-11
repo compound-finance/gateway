@@ -99,6 +99,7 @@ pub struct LogEvent<T: DecodableEvent> {
     pub block_hash: String,
     pub block_number: String,
     pub transaction_index: String,
+    pub log_index: String,
     pub event: T,
 }
 
@@ -213,6 +214,7 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
             || eth_log.transaction_index.is_none()
             || eth_log.data.is_none()
             || eth_log.block_number.is_none()
+            || eth_log.log_index.is_none()
         {
             debug::native::info!("Missing critical field from eth log event");
             continue;
@@ -223,6 +225,7 @@ pub fn fetch_and_decode_events<T: DecodableEvent>(
             block_hash: eth_log.block_hash.ok_or(http::Error::Unknown)?,
             block_number: eth_log.block_number.ok_or(http::Error::Unknown)?,
             transaction_index: eth_log.transaction_index.ok_or(http::Error::Unknown)?,
+            log_index: eth_log.log_index.ok_or(http::Error::Unknown)?,
             event: lock_event,
         });
     }
