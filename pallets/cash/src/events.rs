@@ -46,9 +46,7 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
 }
 
 pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
-    let without_prefix = block_num_hex.trim_start_matches("0x");
-    let block_num = u64::from_str_radix(without_prefix, 16)
-        .map_err(|_| return anyhow::anyhow!("missing 0x prefix"))?;
+    let block_num = hex_to_u32(block_num_hex)?;
     let next_block_num_hex = format!("{:#X}", block_num + 1);
     Ok(next_block_num_hex)
 }
@@ -56,27 +54,28 @@ pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
 pub fn to_payload(
     event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
 ) -> anyhow::Result<chains::eth::Payload> {
-    let block_number_without_prefix = &event.block_number.trim_start_matches("0x");
-    let block_number: u32 = u32::from_str_radix(block_number_without_prefix, 16).map_err(|e| {
-        debug::native::error!(
-            "Error decoding an event's block_number {:?}: {:?}",
-            &event.block_number,
-            e
-        );
-        return anyhow::anyhow!(
-            "Failed decoding an event's block_number {:?}: {:?}",
-            &event.block_number,
-            e
-        );
-    })?;
-    let log_index_without_prefix = &event.log_index.trim_start_matches("0x");
-    let log_index: u32 = u32::from_str_radix(log_index_without_prefix, 16).map_err(|e| {
-        debug::native::error!("Error decoding an event's log_index: {:?}", e);
-        return anyhow::anyhow!("Failed decoding an event's log_index: {:?}", e);
-    })?;
+    let block_number: u32 = hex_to_u32(event.block_number.clone())?;
+    let log_index: u32 = hex_to_u32(event.log_index.clone())?;
     let event = chains::eth::Event {
         id: (block_number, log_index),
     };
     let payload: Vec<u8> = chains::eth::encode(&event);
     Ok(payload)
+}
+
+fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
+    let without_prefix = hex_data.trim_start_matches("0x");
+    let u32_data = u32::from_str_radix(without_prefix, 16).map_err(|e| {
+        debug::native::error!(
+            "Error decoding number in hex format {:?}: {:?}",
+            without_prefix,
+            e
+        );
+        return anyhow::anyhow!(
+            "Error decoding number in hex format {:?}: {:?}",
+            without_prefix,
+            e
+        );
+    })?;
+    Ok(u32_data)
 }
