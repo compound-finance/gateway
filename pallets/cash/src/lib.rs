@@ -2,7 +2,8 @@
 
 use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, storage::StorageDoubleMap,
+    traits::Get,
 };
 
 use crate::account::{AccountIdent, ChainIdent};
@@ -20,6 +21,7 @@ use sp_runtime::{
         storage_lock::{StorageLock, Time},
     },
     transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
+    SaturatedConversion,
 };
 use sp_std::vec::Vec;
 
@@ -151,10 +153,11 @@ decl_module! {
             let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
             CashBalance::insert(&account, next_cash_balance);
 
+            let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
             let notice = Notice::ExtractionNotice {
                 chain: ChainIdent::Eth, // XXX
-                id: (0, 0),  // XXX need to keep state of current gen/within gen for each, also parent
+                id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
                 asset: Vec::new(),
                 amount: Amount::new_cash(amount),
@@ -268,26 +271,12 @@ decl_module! {
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
     pub fn process_notices(block_number: T::BlockNumber) {
-        let n = notices::Notice::ExtractionNotice {
-            chain: ChainIdent::Eth, // XXX redundant for extract w/ account?
-            id: (0, 0),             // XXX
-            parent: [0u8; 32],      // XXX
-            asset: "eth:0xfffff".as_bytes().to_vec(),
-            account: AccountIdent {
-                chain: ChainIdent::Eth,
-                account: "eth:0xF33d".as_bytes().to_vec(),
-            },
-            amount: Amount::new(2000_u32, 3),
-        };
-
-        // let pending_notices : Vec<Box<Notice>> =  vec![Box::new(n)];
-        let pending_notices: Vec<Notice> = vec![n];
-
-        for notice in pending_notices.iter() {
+        for notice in NoticeQueue::iter_prefix_values(ChainIdent::Eth) {
             // find parent
             // id = notice.gen_id(parent)
 
             // submit onchain call for aggregating the price
+            notices::debug(&notice);
             let payload = notices::to_payload(notice);
             let call = Call::emit_notice(payload);
 
