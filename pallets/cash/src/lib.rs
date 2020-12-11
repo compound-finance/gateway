@@ -394,6 +394,8 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             // The transaction is only valid for next 10 blocks. After that it's
             // going to be revalidated by the pool.
             .longevity(10)
+            // XXXX Figure out if we need it and why we need it???
+            .priority(10)
             .and_provides("fix_this_function")
             // It's fine to propagate that transaction to other peers, which means it can be
             // created even by nodes that don't produce blocks.

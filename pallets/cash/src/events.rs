@@ -56,11 +56,21 @@ pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
 pub fn to_payload(
     event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
 ) -> anyhow::Result<chains::eth::Payload> {
-    let block_number: u32 = u32::from_str_radix(&event.block_number, 16).map_err(|e| {
-        debug::native::error!("Error decoding an event's block_number: {:?}", e);
-        return anyhow::anyhow!("Failed decoding an event's block_number: {:?}", e);
+    let block_number_without_prefix = &event.block_number.trim_start_matches("0x");
+    let block_number: u32 = u32::from_str_radix(block_number_without_prefix, 16).map_err(|e| {
+        debug::native::error!(
+            "Error decoding an event's block_number {:?}: {:?}",
+            &event.block_number,
+            e
+        );
+        return anyhow::anyhow!(
+            "Failed decoding an event's block_number {:?}: {:?}",
+            &event.block_number,
+            e
+        );
     })?;
-    let log_index: u32 = u32::from_str_radix(&event.log_index, 16).map_err(|e| {
+    let log_index_without_prefix = &event.log_index.trim_start_matches("0x");
+    let log_index: u32 = u32::from_str_radix(log_index_without_prefix, 16).map_err(|e| {
         debug::native::error!("Error decoding an event's log_index: {:?}", e);
         return anyhow::anyhow!("Failed decoding an event's log_index: {:?}", e);
     })?;
