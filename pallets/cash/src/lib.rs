@@ -365,10 +365,7 @@ impl<T: Config> Module<T> {
         events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
     ) -> Result<(), Error<T>> {
         for event in events.iter() {
-            debug::native::info!(
-                "Processing `Lock` event and sending extrinsics: {:?}",
-                event
-            );
+            debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
             let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
             let call = Call::process_ethereum_event(payload);
@@ -394,8 +391,6 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             // The transaction is only valid for next 10 blocks. After that it's
             // going to be revalidated by the pool.
             .longevity(10)
-            // XXXX Figure out if we need it and why we need it???
-            .priority(10)
             .and_provides("fix_this_function")
             // It's fine to propagate that transaction to other peers, which means it can be
             // created even by nodes that don't produce blocks.
