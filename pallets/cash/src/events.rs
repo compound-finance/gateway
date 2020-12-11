@@ -17,11 +17,15 @@ pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
     // Use config to get an address for interacting with Ethereum JSON RPC client
     let config = runtime_interfaces::config_interface::get();
     let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url())
-        .map_err(|_| return anyhow::anyhow!("config error"))?;
-    let eth_starport_address = String::from_utf8(config.get_eth_starport_address())
-        .map_err(|_| return anyhow::anyhow!("config error"))?;
-    let eth_lock_event_topic = String::from_utf8(config.get_eth_lock_event_topic())
-        .map_err(|_| return anyhow::anyhow!("config error"))?;
+        .map_err(|e| return anyhow::anyhow!("Error reading `eth_rpc_url` from config {:?}", e))?;
+    let eth_starport_address =
+        String::from_utf8(config.get_eth_starport_address()).map_err(|e| {
+            return anyhow::anyhow!("Error reading `eth_starport_address` from config {:?}", e);
+        })?;
+    let eth_lock_event_topic =
+        String::from_utf8(config.get_eth_lock_event_topic()).map_err(|e| {
+            return anyhow::anyhow!("Error reading `eth_lock_event_topic` from config {:?}", e);
+        })?;
 
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
