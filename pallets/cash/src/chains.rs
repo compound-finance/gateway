@@ -18,12 +18,13 @@ pub mod eth {
         Event { id: (13, 37) } // XXX
     }
 
-    /// XXX
+    /// XXX Work on sending proper Payload,
+    /// XXX is Decoding and encoding useless here
     pub fn encode(event: &Event) -> Vec<u8> {
         let (block_number, log_index): (u32, u32) = event.id;
         ethabi::encode(&[
-            ethabi::token::Token::Int(block_number.clone().into()),
-            ethabi::token::Token::Int(log_index.clone().into()),
+            ethabi::token::Token::Int(block_number.into()),
+            ethabi::token::Token::Int(log_index.into()),
         ])
     }
 }

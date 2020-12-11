@@ -129,6 +129,9 @@ decl_error! {
 
         // Error when processing `Lock` event while sending `process_ethereum_event` extrinsic
         ProcessLockEventError,
+
+        // Error sending `process_ethereum_event` extrinsic
+        OffchainUnsignedLockTxError,
     }
 }
 
@@ -347,7 +350,7 @@ impl<T: Config> Module<T> {
                     debug::native::info!("Result: {:?}", starport_info);
 
                     // Send extrinsics for all events
-                    let _ = Self::process_lock_events(starport_info.lock_events);
+                    let _ = Self::process_lock_events(starport_info.lock_events)?;
 
                     // Save latest block in ocw storage
                     s_info.set(&starport_info.latest_eth_block);
@@ -370,8 +373,12 @@ impl<T: Config> Module<T> {
             let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
             let call = Call::process_ethereum_event(payload);
 
-            // Unsigned tx
-            let _ = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            // XXX Unsigned tx for now
+            let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            if res.is_err() {
+                debug::native::error!("Error while sending `Lock` event extrinsic");
+                return Err(Error::<T>::OffchainUnsignedLockTxError);
+            }
         }
         Ok(())
     }
