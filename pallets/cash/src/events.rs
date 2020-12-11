@@ -7,10 +7,6 @@ extern crate ethereum_client;
 
 use crate::chains;
 
-pub const ETH_STARPORT_ADDRESS: &str = "0xbbde1662bC3ED16aA8C618c9833c801F3543B587";
-pub const LOCK_EVENT_TOPIC: &str =
-    "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
-
 #[derive(Debug)]
 pub struct StarportInfo {
     pub latest_eth_block: String,
@@ -18,7 +14,21 @@ pub struct StarportInfo {
 }
 
 /// Fetch all latest Starport events for the offchain worker.
-pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<StarportInfo> {
+pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
+    // Get a validator config from runtime-interfaces pallet
+    // Use config to get an address for interacting with Ethereum JSON RPC client
+    let config = runtime_interfaces::config_interface::get();
+    let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url())
+        .map_err(|e| return anyhow::anyhow!("Error reading `eth_rpc_url` from config {:?}", e))?;
+    let eth_starport_address =
+        String::from_utf8(config.get_eth_starport_address()).map_err(|e| {
+            return anyhow::anyhow!("Error reading `eth_starport_address` from config {:?}", e);
+        })?;
+    let eth_lock_event_topic =
+        String::from_utf8(config.get_eth_lock_event_topic()).map_err(|e| {
+            return anyhow::anyhow!("Error reading `eth_lock_event_topic` from config {:?}", e);
+        })?;
+
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
         debug::native::error!("fetch_events error: {:?}", e);
@@ -28,7 +38,7 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
     // Build parameters set for fetching starport `Lock` events
     let fetch_events_request = format!(
         r#"{{"address": "{}", "fromBlock": "{}", "toBlock": "{}", "topics":["{}"]}}"#,
-        ETH_STARPORT_ADDRESS, from_block, latest_eth_block, LOCK_EVENT_TOPIC
+        eth_starport_address, from_block, latest_eth_block, eth_lock_event_topic
     );
 
     // Fetch `Lock` events using ethereum_client
