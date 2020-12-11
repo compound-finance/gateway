@@ -124,7 +124,7 @@ decl_error! {
         /// Errors should have helpful documentation associated with them.
         StorageOverflow,
 
-        // Error while fetching starport info
+        // Error returned when fetching starport info
         HttpFetchingError,
 
         // Error when processing `Lock` event while sending `process_ethereum_event` extrinsic

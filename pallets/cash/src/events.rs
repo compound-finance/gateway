@@ -21,7 +21,7 @@ pub struct StarportInfo {
 pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<StarportInfo> {
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
-        debug::native::error!("Error while fetching latest eth block number: {:?}", e);
+        debug::native::error!("fetch_events error: {:?}", e);
         return anyhow::anyhow!("Fetching latest eth block failed: {:?}", e);
     })?;
 
@@ -35,7 +35,7 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
     let lock_events =
         ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request])
             .map_err(|e| {
-                debug::native::error!("Error while fetching and decoding starport events: {:?}", e);
+                debug::native::error!("fetch_and_decode_events error: {:?}", e);
                 return anyhow::anyhow!("Fetching and/or decoding starport events failed: {:?}", e);
             })?;
 
@@ -66,11 +66,7 @@ pub fn to_payload(
 fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
     let without_prefix = hex_data.trim_start_matches("0x");
     let u32_data = u32::from_str_radix(without_prefix, 16).map_err(|e| {
-        debug::native::error!(
-            "Error decoding number in hex format {:?}: {:?}",
-            without_prefix,
-            e
-        );
+        debug::native::error!("hex_to_u32 error {:?}", e);
         return anyhow::anyhow!(
             "Error decoding number in hex format {:?}: {:?}",
             without_prefix,

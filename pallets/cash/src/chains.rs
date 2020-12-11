@@ -1,7 +1,6 @@
 // XXX where should this live? with e.g. ethereum_client?
 
 pub mod eth {
-
     // Note: The substrate build requires these be imported
     pub use sp_std::vec::Vec;
 
