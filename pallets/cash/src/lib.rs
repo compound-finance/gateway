@@ -286,12 +286,6 @@ impl<T: Config> Module<T> {
     }
 
     fn fetch_events_with_lock() -> Result<(), Error<T>> {
-        // Get a validator config from runtime-interfaces pallet
-        // Use config to get an address for interacting with Ethereum JSON RPC client
-        let config = runtime_interfaces::config_interface::get();
-        let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url())
-            .map_err(|_| <Error<T>>::HttpFetchingError)?;
-
         // Create a reference to Local Storage value.
         // Since the local storage is common for all offchain workers, it's a good practice
         // to prepend our entry with the pallet name.
@@ -338,7 +332,7 @@ impl<T: Config> Module<T> {
         //   executed by previous run of ocw, so the function just returns.
         // ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage_lock/struct.StorageLock.html#method.try_lock
         if let Ok(_guard) = lock.try_lock() {
-            match events::fetch_events(eth_rpc_url, from_block) {
+            match events::fetch_events(from_block) {
                 Ok(starport_info) => {
                     debug::native::info!("Result: {:?}", starport_info);
                     s_info.set(&starport_info.latest_eth_block);
