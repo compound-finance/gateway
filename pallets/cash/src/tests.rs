@@ -13,7 +13,7 @@ fn it_fails_magic_extract_signed() {
     new_test_ext().execute_with(|| {
         // Dispatch a signed extrinsic.
         assert_err!(
-            CashModule::magic_extract(Origin::signed(1), andrew(), 42),
+            CashModule::magic_extract(Origin::signed(Default::default()), andrew(), 42),
             DispatchError::BadOrigin
         );
         // Read pallet storage and assert an expected result.
@@ -41,7 +41,7 @@ fn it_works_for_default_value() {
     new_test_ext().execute_with(|| {
         // Dispatch a signed extrinsic.
         assert_ok!(CashModule::process_ethereum_event(
-            Origin::signed(1),
+            Origin::signed(Default::default()),
             vec![]
         ));
         // Read pallet storage and assert an expected result.
@@ -54,7 +54,7 @@ fn correct_error_for_none_value() {
     new_test_ext().execute_with(|| {
         // Ensure the expected error is thrown when no value is present.
         assert_noop!(
-            CashModule::cause_error(Origin::signed(1)),
+            CashModule::cause_error(Origin::signed(Default::default())),
             Error::<Test>::NoneValue
         );
     });
