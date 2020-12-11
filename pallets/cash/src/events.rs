@@ -47,3 +47,22 @@ pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
     let next_block_num_hex = format!("{:#X}", block_num + 1);
     Ok(next_block_num_hex)
 }
+
+// pub fn to_lock_payload(
+//     event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
+// ) -> NoticePayload {
+//     let message = encode(notice);
+//     // TODO: do signer by chain
+//     let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61"
+//         .as_bytes()
+//         .to_vec();
+//     NoticePayload {
+//         // id: move id,
+//         sig: sign(&message),
+//         msg: message.to_vec(),
+//         signer: AccountIdent {
+//             chain: ChainIdent::Eth,
+//             account: signer,
+//         },
+//     }
+// }

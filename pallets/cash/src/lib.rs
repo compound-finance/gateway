@@ -309,7 +309,7 @@ impl<T: Config> Module<T> {
         //
         // Ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
 
-        // TODO Add second check for:
+        // XXXX TODO Add second check for:
         // Should be either the block of the latest Pending event which we haven't signed,
         // or if there are no such events, otherwise the block after the latest event, otherwise the earliest (configuration/genesis) block
         let from_block: String;
@@ -343,6 +343,7 @@ impl<T: Config> Module<T> {
             match events::fetch_events(eth_rpc_url, from_block) {
                 Ok(starport_info) => {
                     debug::native::info!("Result: {:?}", starport_info);
+                    Self::process_lock_events(starport_info.lock_events);
                     s_info.set(&starport_info.latest_eth_block);
                 }
                 Err(err) => {
@@ -350,6 +351,30 @@ impl<T: Config> Module<T> {
                     return Err(Error::<T>::HttpFetchingError);
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn process_lock_events(
+        events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
+    ) -> Result<(), Error<T>> {
+        for event in events.iter() {
+            debug::native::info!("Processing event and send extrinsics: {:?}", event);
+
+            // let payload = events::to_payload(event);
+            // TODO change http error to something better
+            let block_number: u32 = u32::from_str_radix(&event.block_number, 16)
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let log_index: u32 = u32::from_str_radix(&event.log_index, 16)
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let payload = chains::eth::Event {
+                id: (block_number, log_index),
+            };
+
+            let call = Call::process_ethereum_event(chains::eth::encode(&payload.clone()));
+
+            // Unsigned tx
+            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
         }
         Ok(())
     }
