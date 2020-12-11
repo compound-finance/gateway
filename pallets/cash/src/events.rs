@@ -5,6 +5,8 @@ use sp_std::vec::Vec;
 
 extern crate ethereum_client;
 
+use crate::chains;
+
 pub const ETH_STARPORT_ADDRESS: &str = "0xbbde1662bC3ED16aA8C618c9833c801F3543B587";
 pub const LOCK_EVENT_TOPIC: &str =
     "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
@@ -20,7 +22,7 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
         debug::native::error!("fetch_events error: {:?}", e);
-        return anyhow::anyhow!("missing 0x prefix");
+        return anyhow::anyhow!("Fetching latest eth block failed: {:?}", e);
     })?;
 
     // Build parameters set for fetching starport `Lock` events
@@ -32,7 +34,10 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
     // Fetch `Lock` events using ethereum_client
     let lock_events =
         ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request])
-            .map_err(|e| return anyhow::anyhow!("missing 0x prefix"))?;
+            .map_err(|e| {
+                debug::native::error!("fetch_and_decode_events error: {:?}", e);
+                return anyhow::anyhow!("Fetching and/or decoding starport events failed: {:?}", e);
+            })?;
 
     Ok(StarportInfo {
         lock_events: lock_events,
@@ -41,9 +46,32 @@ pub fn fetch_events(eth_rpc_url: String, from_block: String) -> anyhow::Result<S
 }
 
 pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
-    let without_prefix = block_num_hex.trim_start_matches("0x");
-    let block_num = u64::from_str_radix(without_prefix, 16)
-        .map_err(|_| return anyhow::anyhow!("missing 0x prefix"))?;
+    let block_num = hex_to_u32(block_num_hex)?;
     let next_block_num_hex = format!("{:#X}", block_num + 1);
     Ok(next_block_num_hex)
+}
+
+pub fn to_payload(
+    event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
+) -> anyhow::Result<chains::eth::Payload> {
+    let block_number: u32 = hex_to_u32(event.block_number.clone())?;
+    let log_index: u32 = hex_to_u32(event.log_index.clone())?;
+    let event = chains::eth::Event {
+        id: (block_number, log_index),
+    };
+    let payload: Vec<u8> = chains::eth::encode(&event);
+    Ok(payload)
+}
+
+fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
+    let without_prefix = hex_data.trim_start_matches("0x");
+    let u32_data = u32::from_str_radix(without_prefix, 16).map_err(|e| {
+        debug::native::error!("hex_to_u32 error {:?}", e);
+        return anyhow::anyhow!(
+            "Error decoding number in hex format {:?}: {:?}",
+            without_prefix,
+            e
+        );
+    })?;
+    Ok(u32_data)
 }

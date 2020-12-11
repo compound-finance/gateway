@@ -51,7 +51,6 @@ extern crate alloc;
 
 // XXX move / unrely
 pub type Hash = Vec<u8>;
-pub type Payload = Vec<u8>;
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -68,7 +67,7 @@ pub enum EthEventStatus {
 }
 
 // XXXX experimental
-pub fn compute_hash(payload: Payload) -> Hash {
+pub fn compute_hash(payload: chains::eth::Payload) -> Hash {
     // XXX where Payload: Hash
     payload // XXX
 }
@@ -103,7 +102,7 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
-        Payload = Payload,                                  //XXX<T as Config>::Payload ?,
+        Payload = chains::eth::Payload,                     //XXX<T as Config>::Payload ?,
     {
         XXXPhantomFakeEvent(AccountId), // XXX
 
@@ -129,6 +128,12 @@ decl_error! {
 
         // Error returned when fetching starport info
         HttpFetchingError,
+
+        // Error when processing `Lock` event while sending `process_ethereum_event` extrinsic
+        ProcessLockEventError,
+
+        // Error sending `process_ethereum_event` extrinsic
+        OffchainUnsignedLockTxError,
     }
 }
 
@@ -175,7 +180,7 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: Payload) -> dispatch::DispatchResult {
+        pub fn process_ethereum_event(origin, payload: chains::eth::Payload) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload);
@@ -309,7 +314,7 @@ impl<T: Config> Module<T> {
         //
         // Ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
 
-        // TODO Add second check for:
+        // XXXX TODO Add second check for:
         // Should be either the block of the latest Pending event which we haven't signed,
         // or if there are no such events, otherwise the block after the latest event, otherwise the earliest (configuration/genesis) block
         let from_block: String;
@@ -343,12 +348,36 @@ impl<T: Config> Module<T> {
             match events::fetch_events(eth_rpc_url, from_block) {
                 Ok(starport_info) => {
                     debug::native::info!("Result: {:?}", starport_info);
+
+                    // Send extrinsics for all events
+                    let _ = Self::process_lock_events(starport_info.lock_events)?;
+
+                    // Save latest block in ocw storage
                     s_info.set(&starport_info.latest_eth_block);
                 }
                 Err(err) => {
                     debug::native::info!("Error while fetching events: {:?}", err);
                     return Err(Error::<T>::HttpFetchingError);
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn process_lock_events(
+        events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
+    ) -> Result<(), Error<T>> {
+        for event in events.iter() {
+            debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
+
+            let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let call = Call::process_ethereum_event(payload);
+
+            // XXX Unsigned tx for now
+            let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            if res.is_err() {
+                debug::native::error!("Error while sending `Lock` event extrinsic");
+                return Err(Error::<T>::OffchainUnsignedLockTxError);
             }
         }
         Ok(())
