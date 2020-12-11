@@ -7,7 +7,6 @@ use ethabi;
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use secp256k1;
-use sp_std::prelude::Box;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
 
@@ -15,6 +14,10 @@ pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
 pub type Asset = Vec<u8>;
 pub type EthHash = [u8; 32];
+
+pub type GenerationId = i32;
+pub type WithinGenerationId = i32;
+pub type NoticeId = (GenerationId, WithinGenerationId);
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 pub struct NoticePayload {
@@ -27,6 +30,9 @@ pub struct NoticePayload {
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
 pub enum Notice {
     ExtractionNotice {
+        chain: ChainIdent,
+        id: NoticeId,
+        parent: EthHash, // XXX how to parameterize per chain? or generic trait?
         asset: Asset,
         account: AccountIdent,
         amount: Amount,
@@ -36,6 +42,9 @@ pub enum Notice {
 fn encode(notice: &Notice) -> Vec<u8> {
     match notice {
         Notice::ExtractionNotice {
+            chain: _,
+            id: _,
+            parent: _,
             asset,
             account,
             amount,

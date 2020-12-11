@@ -5,9 +5,9 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 
-use crate::account::{AccountAddr, AccountIdent, ChainIdent};
+use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
-use crate::notices::{EthHash, Notice};
+use crate::notices::{Notice, NoticeId};
 
 use frame_system::{
     ensure_none, ensure_signed,
@@ -15,15 +15,14 @@ use frame_system::{
 };
 use sp_runtime::RuntimeDebug;
 use sp_runtime::{
-    offchain::http,
+    offchain::{
+        storage::StorageValueRef,
+        storage_lock::{StorageLock, Time},
+    },
     transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
 };
 use sp_std::vec::Vec;
 
-use sp_runtime::offchain::{
-    storage::StorageValueRef,
-    storage_lock::{StorageLock, Time},
-};
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
 
@@ -92,8 +91,7 @@ decl_storage! {
         EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::eth::EventId => Option<EthEventStatus>;
 
         // TODO: hash type should match to ChainIdent
-        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) EthHash => Option<Notice>;
-
+        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
     }
 }
 
@@ -141,6 +139,7 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
+        // XXX this function is temporary and will be deleted after we reach a certain point
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
@@ -153,9 +152,16 @@ decl_module! {
             CashBalance::insert(&account, next_cash_balance);
 
             // Add to Notice Queue
-            let notice = Notice::ExtractionNotice {asset: Vec::new(), amount: Amount::new_cash(amount), account: account.clone()};
-            let dummy_hash: [u8; 32] = [0; 32];
-            NoticeQueue::insert(ChainIdent::Eth, dummy_hash, &notice);
+            let notice = Notice::ExtractionNotice {
+                chain: ChainIdent::Eth, // XXX
+                id: (0, 0),  // XXX need to keep state of current gen/within gen for each, also parent
+                parent: [0u8; 32], // XXX,
+                asset: Vec::new(),
+                amount: Amount::new_cash(amount),
+                account: account.clone()
+            };
+            let Notice::ExtractionNotice { chain, id, .. } = &notice; // XXX dont see a better way in Rust
+            NoticeQueue::insert(chain, id, &notice);
 
             // Emit an event.
             Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
@@ -263,6 +269,9 @@ decl_module! {
 impl<T: Config> Module<T> {
     pub fn process_notices(block_number: T::BlockNumber) {
         let n = notices::Notice::ExtractionNotice {
+            chain: ChainIdent::Eth, // XXX redundant for extract w/ account?
+            id: (0, 0),             // XXX
+            parent: [0u8; 32],      // XXX
             asset: "eth:0xfffff".as_bytes().to_vec(),
             account: AccountIdent {
                 chain: ChainIdent::Eth,
