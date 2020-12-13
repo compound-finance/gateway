@@ -1,0 +1,15 @@
+
+packages:
+  - vim
+  - wget
+  - curl
+  - htop
+  - cmake
+  - pkg-config
+  - libssl-dev
+  - git
+  - gcc
+  - build-essential
+  - git
+  - clang
+  - libclang-dev

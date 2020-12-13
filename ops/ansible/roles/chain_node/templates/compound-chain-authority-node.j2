@@ -1,0 +1,25 @@
+[Unit]
+Description=Compound Chain Validator Node
+
+[Service]
+User=compound
+Group=compound
+WorkingDirectory={{ compound_user_home }}
+ExecStartPre={{ compound_chain_bin }} \
+  purge-chain -y \
+  --base-path {{ chain_data_dir }} \
+  --chain local \
+  --database paritydb
+ExecStart={{ compound_chain_bin }} \
+  --base-path {{ chain_data_dir }} \
+  --chain local \
+  --alice \
+  --port 30333 \
+  --ws-port 9944 \
+  --rpc-port 9933 \
+  --node-key-file {{ node_key_priv_file }} \
+  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
+  {% for peer in peers -%}
+  --bootnodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
+  {% endfor -%}
+  --validator

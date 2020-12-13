@@ -21,15 +21,15 @@ def build_inventory_file(inv):
     hosts_file = build_hosts_tmpl(authority_node_ip_address,
                                   bastion_ip_address, full_node_ip_addresses)
 
-    with open('hosts', 'w') as f:
+    with open('ansible/hosts', 'w') as f:
         f.write(hosts_file)
 
 
 def build_ssh_config(inv):
-    with open('ssh_config.template', 'r') as f:
+    with open('ansible/ssh_config.template', 'r') as f:
         tmpl = f.read()
     res = tmpl.replace('{bastion}', inv['bastion_ip_address']['value'])
-    with open('ssh_config', 'w') as f:
+    with open('ansible/ssh_config', 'w') as f:
         f.write(res)
 
 

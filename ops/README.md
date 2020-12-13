@@ -41,7 +41,7 @@ AWS_PROFILE=compound-dev-1 terraform apply \
 Once you have everything up, you'll need to construct your Ansible inventory and `ssh_config`. This can be done by running:
 
 ```sh
-AWS_PROFILE=compound-dev-1 terraform output -json | ./tmpl/generate_inv.py
+AWS_PROFILE=compound-dev-1 terraform output -json | ./ansible/generate_inv.py
 ```
 
 Note: you'll need python3 installed. You may need to run this command differently in Powershell.
@@ -52,12 +52,14 @@ Note: after you change any nodes created by terraform, you will need to re-run t
 
 Lorem ipsum
 
-TODO: Set-up `ssh_config`
+```sh
+ansible-playbook chain.yml
+```
 
-First, it's important to set-up basic build essentials on your node (e.g. rust).
+Note: TODO: You may need to add a deploy key, via:
 
 ```sh
-ansible-playbook -v tasks/build-essentials.yml
+env deploy_key="$HOME/.ssh/id_rsa_deploy_key" ansible-playbook chain.yml
 ```
 
 Next, you'll need to build the Compound Chain from source. Note: you'll need a deploy key to sync to the node to pull in the source while the project is still not publically available.

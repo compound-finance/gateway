@@ -17,30 +17,30 @@ variable "az_secondary" {
   default = "us-east-1c"
 }
 
-variable "authority_node_private_subnet_cidr" {
+variable "compound_chain_private_subnet_cidr" {
   type = string
   default = "10.0.1.0/24"
 }
 
-variable "authority_node_public_subnet_cidr" {
+variable "compound_chain_public_subnet_cidr" {
   type = string
   default = "10.0.2.0/24"
 }
 
-variable "authority_node_public_secondary_subnet_cidr" {
+variable "compound_chain_public_secondary_subnet_cidr" {
   type = string
   default = "10.0.3.0/24"
 }
 
-variable "authority_node_disk_size" {
+variable "node_root_disk_size" {
   type = number
-  description = "Disk size to allocate for authority node in GB"
-  default = 1024 # 1 TB
+  description = "Disk size to allocate for nodes' root disk in GiB"
+  default = 512 # GB
 }
 
 variable "authority_node_instance_type" {
   type = string
-  description = "Instance ID (AMI) to use for authority node"
+  description = "Instance ID (AMI) to use for compound chain nodes"
   default = "m6g.large" # TODO: Choose best default instance type
 }
 
@@ -89,38 +89,38 @@ resource "aws_key_pair" "admin_key_pair" {
   public_key = var.admin_public_key
 }
 
-# Create a VPC for our authority node instance
+# Create a VPC for our compound chain instances
 resource "aws_vpc" "compound_chain_vpc" {
   cidr_block = "10.0.0.0/16"
 }
 
-resource "aws_subnet" "authority_node_private" {
+resource "aws_subnet" "compound_chain_private" {
   availability_zone = var.az
   vpc_id = aws_vpc.compound_chain_vpc.id
-  cidr_block = var.authority_node_private_subnet_cidr
+  cidr_block = var.compound_chain_private_subnet_cidr
 
   tags = {
-    Name = "authority_node_private_subnet"
+    Name = "compound_chain_private_subnet"
   }
 }
 
-resource "aws_subnet" "authority_node_public" {
+resource "aws_subnet" "compound_chain_public" {
   availability_zone = var.az
   vpc_id = aws_vpc.compound_chain_vpc.id
-  cidr_block = var.authority_node_public_subnet_cidr
+  cidr_block = var.compound_chain_public_subnet_cidr
 
   tags = {
-    Name = "authority_node_public_subnet"
+    Name = "compound_chain_public_subnet"
   }
 }
 
-resource "aws_subnet" "authority_node_public_secondary" {
+resource "aws_subnet" "compound_chain_public_secondary" {
   availability_zone = var.az_secondary
   vpc_id = aws_vpc.compound_chain_vpc.id
-  cidr_block = var.authority_node_public_secondary_subnet_cidr
+  cidr_block = var.compound_chain_public_secondary_subnet_cidr
 
   tags = {
-    Name = "authority_node_public_secondary_subnet"
+    Name = "compound_chain_public_secondary_subnet"
   }
 }
 
@@ -213,82 +213,12 @@ resource "aws_security_group" "bastion_node_sg" {
   }
 }
 
-# Security group restrictions
-resource "aws_security_group" "authority_node_lb_sg" {
-  name        = "authority_node_lb_sg"
-  description = "Allow gossip, rpc and ws traffic in. All traffic out."
-  vpc_id      = aws_vpc.compound_chain_vpc.id
-
-  # TODO: Consider securing this
-  ingress {
-    description = "Gossip port"
-    from_port   = 30333
-    to_port     = 30333
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Gossip port v6"
-    from_port   = 30333
-    to_port     = 30333
-    protocol    = "tcp"
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  # TODO: Consider securing this
-  ingress {
-    description = "RPC port"
-    from_port   = 9933
-    to_port     = 9933
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "RPC port v6"
-    from_port   = 9933
-    to_port     = 9933
-    protocol    = "tcp"
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  # TODO: Consider securing this
-  ingress {
-    description = "Websocket port"
-    from_port   = 9944
-    to_port     = 9944
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Websocket port v6"
-    from_port   = 9944
-    to_port     = 9944
-    protocol    = "tcp"
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  # Allow outbound communication
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "authority_node_lb_sg"
-  }
-}
-
 # Open communication on public subnet
-resource "aws_network_acl" "authority_node_public_acl" {
+resource "aws_network_acl" "compound_chain_public_subnet_acl" {
   vpc_id = aws_vpc.compound_chain_vpc.id
   subnet_ids = [
-    aws_subnet.authority_node_public.id,
-    aws_subnet.authority_node_public_secondary.id
+    aws_subnet.compound_chain_public.id,
+    aws_subnet.compound_chain_public_secondary.id
   ]
 
   # TODO: Consider adding deeper ACL rules
@@ -329,21 +259,21 @@ resource "aws_network_acl" "authority_node_public_acl" {
   }
 
   tags = {
-    Name = "authority_node_public_acl"
+    Name = "compound_chain_public_subnet_acl"
   }
 }
 
 # Restrict communication on private subnet to only traffic from public
-resource "aws_network_acl" "authority_node_private_acl" {
+resource "aws_network_acl" "compound_chain_private_subnet_acl" {
   vpc_id = aws_vpc.compound_chain_vpc.id
-  subnet_ids = [aws_subnet.authority_node_private.id]
+  subnet_ids = [aws_subnet.compound_chain_private.id]
 
   # TODO: Consider adding deeper ACL rules
   egress {
     protocol   = "-1"
     rule_no    = 200
     action     = "allow"
-    cidr_block = aws_subnet.authority_node_public.cidr_block
+    cidr_block = aws_subnet.compound_chain_public.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -352,7 +282,7 @@ resource "aws_network_acl" "authority_node_private_acl" {
     protocol   = "-1"
     rule_no    = 201
     action     = "allow"
-    cidr_block = aws_subnet.authority_node_public_secondary.cidr_block
+    cidr_block = aws_subnet.compound_chain_public_secondary.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -389,7 +319,7 @@ resource "aws_network_acl" "authority_node_private_acl" {
     protocol   = "-1"
     rule_no    = 100
     action     = "allow"
-    cidr_block = aws_subnet.authority_node_public.cidr_block
+    cidr_block = aws_subnet.compound_chain_public.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -398,7 +328,7 @@ resource "aws_network_acl" "authority_node_private_acl" {
     protocol   = "-1"
     rule_no    = 101
     action     = "allow"
-    cidr_block = aws_subnet.authority_node_public_secondary.cidr_block
+    cidr_block = aws_subnet.compound_chain_public_secondary.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -422,7 +352,7 @@ resource "aws_network_acl" "authority_node_private_acl" {
   }
 
   tags = {
-    Name = "authority_node_private_acl"
+    Name = "compound_chain_private_subnet_acl"
   }
 }
 
@@ -434,8 +364,14 @@ resource "aws_instance" "full_node_public" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.full_node_sg.id]
-  subnet_id                   = aws_subnet.authority_node_public.id
+  subnet_id                   = aws_subnet.compound_chain_public.id
   associate_public_ip_address = true
+
+  root_block_device {
+    volume_size               = var.node_root_disk_size
+    delete_on_termination     = false
+  }
+
   count                       = var.full_node_count
 }
 
@@ -447,20 +383,15 @@ resource "aws_instance" "full_node_public_secondary" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.full_node_sg.id]
-  subnet_id                   = aws_subnet.authority_node_public_secondary.id
+  subnet_id                   = aws_subnet.compound_chain_public_secondary.id
   associate_public_ip_address = true
-  count                       = var.full_node_secondary_count
-}
 
-resource "aws_ebs_volume" "authority_node_volume" {
-  availability_zone = var.az
-  size              = var.authority_node_disk_size
-  type              = "gp2"
-  # encrypted?
-
-  tags = {
-    Name = "authority_node_volume"
+  root_block_device {
+    volume_size               = var.node_root_disk_size
+    delete_on_termination     = false
   }
+
+  count                       = var.full_node_secondary_count
 }
 
 resource "aws_instance" "authority_node" {
@@ -471,10 +402,15 @@ resource "aws_instance" "authority_node" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.authority_node_sg.id]
-  subnet_id                   = aws_subnet.authority_node_private.id
+  subnet_id                   = aws_subnet.compound_chain_private.id
   associate_public_ip_address = false
+
+  root_block_device {
+    volume_size               = var.node_root_disk_size
+    delete_on_termination     = false
+  }
 }
- 
+
 resource "aws_instance" "bastion" {
   ami                         = var.base_instance_ami
   availability_zone           = var.az
@@ -483,52 +419,44 @@ resource "aws_instance" "bastion" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy # Same tenacy as authority node?
   vpc_security_group_ids      = [aws_security_group.bastion_node_sg.id]
-  subnet_id                   = aws_subnet.authority_node_public.id
+  subnet_id                   = aws_subnet.compound_chain_public.id
   associate_public_ip_address = true
 }
 
-resource "aws_eip" "authority_node_nat_gw_eip" {
+resource "aws_eip" "compound_chain_nat_gw_eip" {
   vpc = true
 
   tags = {
-    Name = "authority_node_nat_gw_eip"
+    Name = "compound_chain_nat_gw_eip"
   }
 }
 
-resource "aws_internet_gateway" "authority_node_ig_gw" {
+resource "aws_internet_gateway" "compound_chain_ig_gw" {
   vpc_id = aws_vpc.compound_chain_vpc.id
 }
 
-resource "aws_nat_gateway" "authority_node_nat_gw" {
-  allocation_id = aws_eip.authority_node_nat_gw_eip.id
-  subnet_id     = aws_subnet.authority_node_public.id
+resource "aws_nat_gateway" "compound_chain_nat_gw" {
+  allocation_id = aws_eip.compound_chain_nat_gw_eip.id
+  subnet_id     = aws_subnet.compound_chain_public.id
 
-  depends_on = [aws_internet_gateway.authority_node_ig_gw]
+  depends_on = [aws_internet_gateway.compound_chain_ig_gw]
 }
 
-# TODO: Remove `authority_node_lb_sg`
-resource "aws_lb" "authority_node_load_balancer" {
-  name                       = "authority-node-load-balancer"
+resource "aws_lb" "full_node_ext_load_balancer" {
+  name                       = "full-node-ext-load-balancer"
   internal                   = false
   load_balancer_type         = "network"
   drop_invalid_header_fields = true
-  subnets                    = [aws_subnet.authority_node_public.id, aws_subnet.authority_node_public_secondary.id]
+  subnets                    = [aws_subnet.compound_chain_public.id, aws_subnet.compound_chain_public_secondary.id]
   idle_timeout               = 60
 
-  # TODO: Add access logs?
-  # access_logs {
-  #   bucket  = aws_s3_bucket.lb_logs.bucket
-  #   prefix  = "test-lb"
-  #   enabled = true
-  # }
-
   tags = {
-    Name = "authority_node_load_balancer"
+    Name = "full_node_ext_load_balancer"
   }
 }
 
-resource "aws_lb_target_group" "authority_node_target_group_rpc" {
-  name     = "authority-node-tg-rpc"
+resource "aws_lb_target_group" "full_node_ext_lb_target_group_rpc" {
+  name     = "full-node-ext-lb-tg-rpc"
   port     = 9933
   protocol = "TCP"
   vpc_id   = aws_vpc.compound_chain_vpc.id
@@ -539,25 +467,33 @@ resource "aws_lb_target_group" "authority_node_target_group_rpc" {
   }
 }
 
-resource "aws_lb_listener" "authority_node_lb_listener_rpc" {
-  load_balancer_arn = aws_lb.authority_node_load_balancer.arn
+resource "aws_lb_listener" "full_node_ext_lb_listener_rpc" {
+  load_balancer_arn = aws_lb.full_node_ext_load_balancer.arn
   port              = 9933
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.authority_node_target_group_rpc.arn
+    target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_rpc.arn
   }
 }
 
-resource "aws_lb_target_group_attachment" "authority_node_lb_target_group_attachment_rpc" {
-  target_group_arn = aws_lb_target_group.authority_node_target_group_rpc.arn
-  target_id        = aws_instance.authority_node.id
+resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_primary_attachment_rpc" {
+  count            = length(aws_instance.full_node_public)
+  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_rpc.arn
+  target_id        = aws_instance.full_node_public[count.index].id
   port             = 9933
 }
 
-resource "aws_lb_target_group" "authority_node_target_group_ws" {
-  name     = "authority-node-tg-ws"
+resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_secondary_attachment_rpc" {
+  count            = length(aws_instance.full_node_public_secondary)
+  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_rpc.arn
+  target_id        = aws_instance.full_node_public_secondary[count.index].id
+  port             = 9933
+}
+
+resource "aws_lb_target_group" "full_node_ext_lb_target_group_ws" {
+  name     = "full-node-ext-lb-tg-ws"
   port     = 9944
   protocol = "TCP"
   vpc_id   = aws_vpc.compound_chain_vpc.id
@@ -568,91 +504,101 @@ resource "aws_lb_target_group" "authority_node_target_group_ws" {
   }
 }
 
-resource "aws_lb_listener" "authority_node_lb_listener_ws" {
-  load_balancer_arn = aws_lb.authority_node_load_balancer.arn
+resource "aws_lb_listener" "full_node_ext_lb_listener_ws" {
+  load_balancer_arn = aws_lb.full_node_ext_load_balancer.arn
   port              = 9944
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.authority_node_target_group_ws.arn
+    target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_ws.arn
   }
 }
 
-resource "aws_lb_target_group_attachment" "authority_node_lb_target_group_attachment_ws" {
-  target_group_arn = aws_lb_target_group.authority_node_target_group_ws.arn
-  target_id        = aws_instance.authority_node.id
+resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_primary_attachment_ws" {
+  count            = length(aws_instance.full_node_public)
+  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_ws.arn
+  target_id        = aws_instance.full_node_public[count.index].id
   port             = 9944
 }
 
-resource "aws_lb_target_group" "authority_node_target_group_gossip" {
-  name     = "authority-node-tg-gossip"
-  port     = 30333
-  protocol = "TCP"
-  vpc_id   = aws_vpc.compound_chain_vpc.id
-
-  health_check {
-    protocol = "TCP"
-    port = 30333
-  }
+resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_secondary_attachment_ws" {
+  count            = length(aws_instance.full_node_public_secondary)
+  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_ws.arn
+  target_id        = aws_instance.full_node_public_secondary[count.index].id
+  port             = 9944
 }
 
-resource "aws_lb_listener" "authority_node_lb_listener_gossip" {
-  load_balancer_arn = aws_lb.authority_node_load_balancer.arn
-  port              = 30333
-  protocol          = "TCP"
+# TODO: Consider gossip protocol
+# resource "aws_lb_target_group" "full_node_ext_lb_target_group_gossip" {
+#   name     = "full-node-ext-lb-tg-gossip"
+#   port     = 30333
+#   protocol = "TCP"
+#   vpc_id   = aws_vpc.compound_chain_vpc.id
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.authority_node_target_group_gossip.arn
-  }
-}
+#   health_check {
+#     protocol = "TCP"
+#     port = 30333
+#   }
+# }
 
-resource "aws_lb_target_group_attachment" "authority_node_lb_target_group_attachment_gossip" {
-  target_group_arn = aws_lb_target_group.authority_node_target_group_gossip.arn
-  target_id        = aws_instance.authority_node.id
-  port             = 30333
-}
+# resource "aws_lb_listener" "full_node_ext_lb_listener_gossip" {
+#   load_balancer_arn = aws_lb.full_node_ext_load_balancer.arn
+#   port              = 30333
+#   protocol          = "TCP"
 
-resource "aws_route_table" "authority_node_public_subnet_ig_route" {
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_gossip.arn
+#   }
+# }
+
+# TODO: Form an attachment
+# resource "aws_lb_target_group_attachment" "authority_node_lb_target_group_attachment_gossip" {
+#   target_group_arn = aws_lb_target_group.authority_node_target_group_gossip.arn
+#   target_id        = aws_instance.authority_node.id
+#   port             = 30333
+# }
+
+resource "aws_route_table" "public_ig_route" {
   vpc_id = aws_vpc.compound_chain_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.authority_node_ig_gw.id
+    gateway_id = aws_internet_gateway.compound_chain_ig_gw.id
   }
 
   tags = {
-    Name = "authority_node_public_subnet_ig_route"
+    Name = "public_subnet_ig_route"
   }
 }
 
-resource "aws_route_table_association" "authority_node_public_subnet_ig_route_association" {
-  subnet_id      = aws_subnet.authority_node_public.id
-  route_table_id = aws_route_table.authority_node_public_subnet_ig_route.id
+resource "aws_route_table_association" "public_subnet_ig_route_association" {
+  subnet_id      = aws_subnet.compound_chain_public.id
+  route_table_id = aws_route_table.public_ig_route.id
 }
 
-resource "aws_route_table_association" "authority_node_public_secondary_subnet_ig_route_association" {
-  subnet_id      = aws_subnet.authority_node_public_secondary.id
-  route_table_id = aws_route_table.authority_node_public_subnet_ig_route.id
+resource "aws_route_table_association" "public_secondary_subnet_ig_route_association" {
+  subnet_id      = aws_subnet.compound_chain_public_secondary.id
+  route_table_id = aws_route_table.public_ig_route.id
 }
 
-resource "aws_route_table" "authority_node_private_subnet_nat_ig_route" {
+resource "aws_route_table" "private_nat_ig_route" {
   vpc_id = aws_vpc.compound_chain_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.authority_node_nat_gw.id
+    nat_gateway_id = aws_nat_gateway.compound_chain_nat_gw.id
   }
 
   tags = {
-    Name = "authority_node_private_subnet_nat_ig_route"
+    Name = "private_subnet_nat_ig_route"
   }
 }
 
-resource "aws_route_table_association" "authority_node_private_subnet_nat_ig_route_association" {
-  subnet_id      = aws_subnet.authority_node_private.id
-  route_table_id = aws_route_table.authority_node_private_subnet_nat_ig_route.id
+resource "aws_route_table_association" "private_subnet_nat_ig_route_association" {
+  subnet_id      = aws_subnet.compound_chain_private.id
+  route_table_id = aws_route_table.private_nat_ig_route.id
 }
 
 output "bastion_ip_address" {
