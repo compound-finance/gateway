@@ -50,26 +50,16 @@ Note: after you change any nodes created by terraform, you will need to re-run t
 
 ### Setting up Compound Chain application
 
-Lorem ipsum
+Setting up each node is a matter of simply running the Ansible playbooks. Make sure your inventory is up-to-date by running the `generate_inv.py` command above!
+
+To run the playbook and configure the servers, run:
 
 ```sh
 ansible-playbook chain.yml
 ```
 
-Note: TODO: You may need to add a deploy key, via:
+Note: while Compound Chain is private, you will need to add a deploy key to the repo and give that deploy key to the servers, like so:
 
 ```sh
 env deploy_key="$HOME/.ssh/id_rsa_deploy_key" ansible-playbook chain.yml
-```
-
-Next, you'll need to build the Compound Chain from source. Note: you'll need a deploy key to sync to the node to pull in the source while the project is still not publically available.
-
-```sh
-ansible-playbook -v tasks/compound-chain.yml -e "deploy_key=$(cd ~/.ssh && pwd)/id_rsa_compound_chain_deploy"
-```
-
-Finally, you need to start the Compound Chain service to begin the chain.
-
-```sh
-ansible-playbook -v tasks/compound-service.yml
 ```
