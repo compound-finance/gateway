@@ -5,11 +5,6 @@ Description=Compound Chain Validator Node
 User=compound
 Group=compound
 WorkingDirectory={{ compound_user_home }}
-ExecStartPre={{ compound_chain_bin }} \
-  purge-chain -y \
-  --base-path {{ chain_data_dir }} \
-  --chain local \
-  --database paritydb
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
   --chain local \

@@ -5,19 +5,18 @@ Description=Compound Chain Full Node
 User=compound
 Group=compound
 WorkingDirectory={{ compound_user_home }}
-ExecStartPre={{ compound_chain_bin }} \
-  purge-chain -y \
-  --base-path {{ chain_data_dir }} \
-  --chain local \
-  --database paritydb
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
   --chain local \
   --port 30333 \
   --ws-port 9944 \
+  --ws-external \
   --rpc-port 9933 \
+  --rpc-external \
   --node-key-file {{ node_key_priv_file }} \
   {% for peer in peers -%}
   --bootnodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
   {% endfor -%}
-  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0'
+  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
+  --ws-max-connections 1000 \
+  --rpc-cors=all

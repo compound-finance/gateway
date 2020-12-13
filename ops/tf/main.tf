@@ -442,8 +442,8 @@ resource "aws_nat_gateway" "compound_chain_nat_gw" {
   depends_on = [aws_internet_gateway.compound_chain_ig_gw]
 }
 
-resource "aws_lb" "full_node_ext_load_balancer" {
-  name                       = "full-node-ext-load-balancer"
+resource "aws_lb" "full_node_ext_rpc_load_balancer" {
+  name                       = "full-node-ext-rpc-load-balancer"
   internal                   = false
   load_balancer_type         = "network"
   drop_invalid_header_fields = true
@@ -451,12 +451,12 @@ resource "aws_lb" "full_node_ext_load_balancer" {
   idle_timeout               = 60
 
   tags = {
-    Name = "full_node_ext_load_balancer"
+    Name = "full_node_ext_rpc_load_balancer"
   }
 }
 
-resource "aws_lb_target_group" "full_node_ext_lb_target_group_rpc" {
-  name     = "full-node-ext-lb-tg-rpc"
+resource "aws_lb_target_group" "full_node_ext_rpc_lb_target_group" {
+  name     = "full-node-ext-rpc-lb-tg-rpc"
   port     = 9933
   protocol = "TCP"
   vpc_id   = aws_vpc.compound_chain_vpc.id
@@ -467,33 +467,46 @@ resource "aws_lb_target_group" "full_node_ext_lb_target_group_rpc" {
   }
 }
 
-resource "aws_lb_listener" "full_node_ext_lb_listener_rpc" {
-  load_balancer_arn = aws_lb.full_node_ext_load_balancer.arn
-  port              = 9933
+resource "aws_lb_listener" "full_node_ext_rpc_lb_listener" {
+  load_balancer_arn = aws_lb.full_node_ext_rpc_load_balancer.arn
+  port              = 80
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_rpc.arn
+    target_group_arn = aws_lb_target_group.full_node_ext_rpc_lb_target_group.arn
   }
 }
 
-resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_primary_attachment_rpc" {
+resource "aws_lb_target_group_attachment" "full_node_ext_rpc_lb_target_group_primary_attachment" {
   count            = length(aws_instance.full_node_public)
-  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_rpc.arn
+  target_group_arn = aws_lb_target_group.full_node_ext_rpc_lb_target_group.arn
   target_id        = aws_instance.full_node_public[count.index].id
   port             = 9933
 }
 
-resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_secondary_attachment_rpc" {
+resource "aws_lb_target_group_attachment" "full_node_ext_rpc_lb_target_group_secondary_attachment" {
   count            = length(aws_instance.full_node_public_secondary)
-  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_rpc.arn
+  target_group_arn = aws_lb_target_group.full_node_ext_rpc_lb_target_group.arn
   target_id        = aws_instance.full_node_public_secondary[count.index].id
   port             = 9933
 }
 
-resource "aws_lb_target_group" "full_node_ext_lb_target_group_ws" {
-  name     = "full-node-ext-lb-tg-ws"
+resource "aws_lb" "full_node_ext_ws_load_balancer" {
+  name                       = "full-node-ext-ws-load-balancer"
+  internal                   = false
+  load_balancer_type         = "network"
+  drop_invalid_header_fields = true
+  subnets                    = [aws_subnet.compound_chain_public.id, aws_subnet.compound_chain_public_secondary.id]
+  idle_timeout               = 60
+
+  tags = {
+    Name = "full_node_ext_ws_load_balancer"
+  }
+}
+
+resource "aws_lb_target_group" "full_node_ext_ws_lb_target_group" {
+  name     = "full-node-ext-ws-lb-tg"
   port     = 9944
   protocol = "TCP"
   vpc_id   = aws_vpc.compound_chain_vpc.id
@@ -504,27 +517,27 @@ resource "aws_lb_target_group" "full_node_ext_lb_target_group_ws" {
   }
 }
 
-resource "aws_lb_listener" "full_node_ext_lb_listener_ws" {
-  load_balancer_arn = aws_lb.full_node_ext_load_balancer.arn
-  port              = 9944
+resource "aws_lb_listener" "full_node_ext_ws_lb_listener" {
+  load_balancer_arn = aws_lb.full_node_ext_ws_load_balancer.arn
+  port              = 80
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_ws.arn
+    target_group_arn = aws_lb_target_group.full_node_ext_ws_lb_target_group.arn
   }
 }
 
-resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_primary_attachment_ws" {
+resource "aws_lb_target_group_attachment" "full_node_ext_ws_lb_target_group_primary_attachment" {
   count            = length(aws_instance.full_node_public)
-  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_ws.arn
+  target_group_arn = aws_lb_target_group.full_node_ext_ws_lb_target_group.arn
   target_id        = aws_instance.full_node_public[count.index].id
   port             = 9944
 }
 
-resource "aws_lb_target_group_attachment" "full_node_ext_lb_target_group_secondary_attachment_ws" {
+resource "aws_lb_target_group_attachment" "full_node_ext_ws_lb_target_group_secondary_attachment" {
   count            = length(aws_instance.full_node_public_secondary)
-  target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_ws.arn
+  target_group_arn = aws_lb_target_group.full_node_ext_ws_lb_target_group.arn
   target_id        = aws_instance.full_node_public_secondary[count.index].id
   port             = 9944
 }
