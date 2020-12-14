@@ -1,20 +1,47 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(associated_type_defaults)]
+#![feature(const_generics)]
 
-use codec::alloc::string::String;
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
+use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, storage::StorageDoubleMap,
+    traits::Get,
 };
-use frame_system::ensure_signed;
-use sp_runtime::offchain::http;
+
+use crate::account::{AccountIdent, ChainIdent};
+use crate::amount::{Amount, CashAmount};
+use crate::notices::{Notice, NoticeId};
+
+use frame_system::{
+    ensure_none, ensure_signed,
+    offchain::{CreateSignedTransaction, SubmitTransaction},
+};
+use sp_runtime::RuntimeDebug;
+use sp_runtime::{
+    offchain::{
+        storage::StorageValueRef,
+        storage_lock::{StorageLock, Time},
+    },
+    transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
+    SaturatedConversion,
+};
 use sp_std::vec::Vec;
+
+#[cfg(feature = "std")]
+use sp_runtime::{Deserialize, Serialize};
 
 extern crate ethereum_client;
 
+mod chains;
+mod core;
+
 #[cfg(test)]
 mod mock;
+
+mod account;
+mod amount;
+mod events;
+mod notices;
 
 #[cfg(test)]
 mod tests;
@@ -22,30 +49,72 @@ mod tests;
 #[macro_use]
 extern crate alloc;
 
+// XXX move / unrely
+pub type Hash = Vec<u8>;
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub enum Reason {
+    None,
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub enum EthEventStatus {
+    Pending { signers: Vec<u8> },          // XXX set(Public)?
+    Failed { hash: Hash, reason: Reason }, // XXX type for err reasons?
+    Done,
+}
+
+// XXXX experimental
+pub fn compute_hash(payload: chains::eth::Payload) -> Hash {
+    // XXX where Payload: Hash
+    payload // XXX
+}
+
+// OCW storage constants
+pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
+pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
+
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config {
+pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+
+    /// The overarching dispatch call type.
+    type Call: From<Call<Self>>;
 }
 
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
         // XXX
-        // Learn more about declaring storage items:
-        // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-        Something get(fn something): Option<u32>;
+        CashBalance get(fn cash_balance) config(): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
+
+        // Mapping of (status of) events witnessed on Ethereum by event id.
+        EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::eth::EventId => Option<EthEventStatus>;
+
+        // TODO: hash type should match to ChainIdent
+        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
     }
 }
 
 decl_event!(
     pub enum Event<T>
     where
-        AccountId = <T as frame_system::Config>::AccountId,
+        AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
+        Payload = chains::eth::Payload,                     //XXX<T as Config>::Payload ?,
     {
-        // XXX
-        /// Event documentation should end with an array that provides descriptive names for event
-        /// parameters. [something, who]
-        SomethingStored(u32, AccountId),
+        XXXPhantomFakeEvent(AccountId), // XXX
+
+        /// XXX
+        MagicExtract(CashAmount, AccountIdent, Notice),
+        Notice(notices::Message, notices::Signature, AccountIdent),
+
+        /// An Ethereum event was successfully processed. [payload]
+        ProcessedEthereumEvent(Payload),
+
+        /// An Ethereum event failed during processing. [payload, reason]
+        FailedProcessingEthereumEvent(Payload, Reason),
     }
 );
 
@@ -56,6 +125,15 @@ decl_error! {
         NoneValue,
         /// Errors should have helpful documentation associated with them.
         StorageOverflow,
+
+        // Error returned when fetching starport info
+        HttpFetchingError,
+
+        // Error when processing `Lock` event while sending `process_ethereum_event` extrinsic
+        ProcessLockEventError,
+
+        // Error sending `process_ethereum_event` extrinsic
+        OffchainUnsignedLockTxError,
     }
 }
 
@@ -70,39 +148,109 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
+        // XXX this function is temporary and will be deleted after we reach a certain point
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn do_something(origin, something: u32) -> dispatch::DispatchResult {
-            let who = ensure_signed(origin)?;
+        pub fn magic_extract(origin, account: AccountIdent, amount: CashAmount) -> dispatch::DispatchResult {
+            let () = ensure_none(origin)?;
 
-            // Update storage.
-            Something::put(something);
+            // Update storage -- TODO: increment this-- sure why not?
+            let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
+            let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
+            CashBalance::insert(&account, next_cash_balance);
+
+            let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
+            // Add to Notice Queue
+            let notice = Notice::ExtractionNotice {
+                chain: ChainIdent::Eth, // XXX
+                id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
+                parent: [0u8; 32], // XXX,
+                asset: Vec::new(),
+                amount: Amount::new_cash(amount),
+                account: account.clone()
+            };
+            let Notice::ExtractionNotice { chain, id, .. } = &notice; // XXX dont see a better way in Rust
+            NoticeQueue::insert(chain, id, &notice);
 
             // Emit an event.
-            Self::deposit_event(RawEvent::SomethingStored(something, who));
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
             // Return a successful DispatchResult
             Ok(())
         }
 
+        #[weight = 0] // XXX how are we doing weights?
+        pub fn process_ethereum_event(origin, payload: chains::eth::Payload) -> dispatch::DispatchResult {
+            // XXX
+            // XXX do we want to store/check hash to allow replaying?
+            //let signer = recover(payload);
+            //require(signer == known validator);
+            let event = chains::eth::decode(payload.clone()); // XXX
+            let status = <EthEventStatuses>::get(event.id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
+            match status {
+                EthEventStatus::Pending { signers } => {
+                    // XXX sets?
+                    // let signers_new = {signer | signers};
+                    // if len(signers_new & Validators) > 2/3 * len(Validators) {
+                        match core::apply_ethereum_event_internal(event) {
+                            Ok(_) => {
+                                EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                                Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
+                                Ok(())
+                            }
+
+                            Err(reason) => {
+                                EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash: compute_hash(payload.clone()), reason: reason.clone() }); // XXX better way?
+                                Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, reason));
+                                Ok(())
+                            }
+                        }
+                    // } else {
+                    //     EthEventStatuses::put(event.id, EthEventStatus::Pending(signers_new));
+                    // }
+                }
+
+                // XXX potential retry logic to allow retrying Failures
+                EthEventStatus::Failed { hash, reason } => {
+                    //require(compute_hash(payload) == hash, "event data differs from failure");
+                    match core::apply_ethereum_event_internal(event) {
+                        Ok(_) => {
+                            EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                            Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
+                            Ok(())
+                        }
+
+                        Err(new_reason) => {
+                            EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash, reason: new_reason.clone()}); // XXX
+                            Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, new_reason));
+                            Ok(())
+                        }
+                    }
+                }
+
+                EthEventStatus::Done => Ok(())
+            }
+        }
+
+        // XXX
         /// An example dispatchable that may throw a custom error.
         #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
         pub fn cause_error(origin) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _ = runtime_interfaces::config_interface::get();
+            Err(Error::<T>::NoneValue)?
+        }
 
-            // Read a value from storage.
-            match Something::get() {
-                // Return an error if the value has not been set.
-                None => Err(Error::<T>::NoneValue)?,
-                Some(old) => {
-                    // Increment the value read from storage; will error in the event of overflow.
-                    let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-                    // Update the value in storage with the incremented result.
-                    Something::put(new);
-                    Ok(())
-                },
-            }
+        #[weight = 0]
+        pub fn emit_notice(origin, notice: notices::NoticePayload) -> dispatch::DispatchResult {
+            // TODO: Move to using unsigned and getting author from signature
+            // TODO I don't know what this comment means ^
+            ensure_none(origin)?;
+
+            debug::native::info!("emitting notice: {:?}", notice);
+            Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
+
+            Ok(())
         }
 
         /// Offchain Worker entry point.
@@ -116,14 +264,141 @@ decl_module! {
         /// so the code should be able to handle that.
         /// You can use `Local Storage` API to coordinate runs of the worker.
         fn offchain_worker(block_number: T::BlockNumber) {
-            debug::native::info!("Hello World from offchain workers!");
-            let config = runtime_interfaces::config_interface::get();
-            let eth_rpc_url = String::from_utf8(config.get_eth_rpc_url()).unwrap();
-            // debug::native::info!("CONFIG: {:?}", eth_rpc_url);
+            debug::native::info!("Hello World from offchain workers from block {} !", block_number);
 
-            // TODO create parameter vector from storage variables
-            let lock_events: Result<Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>, http::Error> = ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec!["{\"address\": \"0x3f861853B41e19D5BBe03363Bb2f50D191a723A2\", \"fromBlock\": \"0x146A47D\", \"toBlock\" : \"latest\", \"topics\":[\"0xddd0ae9ae645d3e7702ed6a55b29d04590c55af248d51c92c674638f3fb9d575\"]}"]);
-            debug::native::info!("Lock Events: {:?}", lock_events);
+            let result = Self::fetch_events_with_lock();
+            if let Err(e) = result {
+                debug::native::error!("offchain_worker error: {:?}", e);
+            }
+            Self::process_notices(block_number);
         }
+    }
+}
+
+/// Reading error messages inside `decl_module!` can be difficult, so we move them here.
+impl<T: Config> Module<T> {
+    pub fn process_notices(block_number: T::BlockNumber) {
+        for notice in NoticeQueue::iter_prefix_values(ChainIdent::Eth) {
+            // find parent
+            // id = notice.gen_id(parent)
+
+            // submit onchain call for aggregating the price
+            notices::debug(&notice);
+            let payload = notices::to_payload(notice);
+            let call = Call::emit_notice(payload);
+
+            // Unsigned tx
+            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+        }
+    }
+
+    fn fetch_events_with_lock() -> Result<(), Error<T>> {
+        // Create a reference to Local Storage value.
+        // Since the local storage is common for all offchain workers, it's a good practice
+        // to prepend our entry with the pallet name.
+        let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_BLOCK);
+
+        // Local storage is persisted and shared between runs of the offchain workers,
+        // offchain workers may run concurrently. We can use the `mutate` function to
+        // write a storage entry in an atomic fashion.
+        //
+        // With a similar API as `StorageValue` with the variables `get`, `set`, `mutate`.
+        // We will likely want to use `mutate` to access
+        // the storage comprehensively.
+        //
+        // Ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
+
+        // XXXX TODO Add second check for:
+        // Should be either the block of the latest Pending event which we haven't signed,
+        // or if there are no such events, otherwise the block after the latest event, otherwise the earliest (configuration/genesis) block
+        let from_block: String;
+        if let Some(Some(cached_block_num)) = s_info.get::<String>() {
+            // Ethereum block number has been cached, fetch events starting from the next after cached block
+            debug::native::info!("Last cached block number: {:?}", cached_block_num);
+            from_block = events::get_next_block_hex(cached_block_num)
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+        } else {
+            // Validator's cache is empty, fetch events from the earliest available block
+            debug::native::info!("Block number has not been cached yet");
+            from_block = String::from("earliest");
+        }
+
+        // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
+        //   it before doing heavy computations or write operations.
+        // ref: https://substrate.dev/rustdocs/v2.0.0-rc3/sp_runtime/offchain/storage_lock/index.html
+        //
+        // There are four ways of defining a lock:
+        //   1) `new` - lock with default time and block expiration
+        //   2) `with_deadline` - lock with default block but custom time expiration
+        //   3) `with_block_deadline` - lock with default time but custom block expiration
+        //   4) `with_block_and_time_deadline` - lock with custom time and block expiration
+        // Here we choose the default one for now.
+        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_KEY);
+
+        // We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
+        //   executed by previous run of ocw, so the function just returns.
+        // ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage_lock/struct.StorageLock.html#method.try_lock
+        if let Ok(_guard) = lock.try_lock() {
+            match events::fetch_events(from_block) {
+                Ok(starport_info) => {
+                    debug::native::info!("Result: {:?}", starport_info);
+
+                    // Send extrinsics for all events
+                    let _ = Self::process_lock_events(starport_info.lock_events)?;
+
+                    // Save latest block in ocw storage
+                    s_info.set(&starport_info.latest_eth_block);
+                }
+                Err(err) => {
+                    debug::native::info!("Error while fetching events: {:?}", err);
+                    return Err(Error::<T>::HttpFetchingError);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn process_lock_events(
+        events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
+    ) -> Result<(), Error<T>> {
+        for event in events.iter() {
+            debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
+
+            let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let call = Call::process_ethereum_event(payload);
+
+            // XXX Unsigned tx for now
+            let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            if res.is_err() {
+                debug::native::error!("Error while sending `Lock` event extrinsic");
+                return Err(Error::<T>::OffchainUnsignedLockTxError);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
+    type Call = Call<T>;
+
+    /// Validate unsigned call to this module.
+    ///
+    /// By default unsigned transactions are disallowed, but implementing the validator
+    /// here we make sure that some particular calls (the ones produced by offchain worker)
+    /// are being whitelisted and marked as valid.
+    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        // TODO: This is not ready for prime-time
+        ValidTransaction::with_tag_prefix("CashPallet")
+            // The transaction is only valid for next 10 blocks. After that it's
+            // going to be revalidated by the pool.
+            .longevity(10)
+            .and_provides("fix_this_function")
+            // It's fine to propagate that transaction to other peers, which means it can be
+            // created even by nodes that don't produce blocks.
+            // Note that sometimes it's better to keep it for yourself (if you are the block
+            // producer), since for instance in some schemes others may copy your solution and
+            // claim a reward.
+            .propagate(true)
+            .build()
     }
 }

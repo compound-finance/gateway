@@ -1,10 +1,9 @@
-use crate::{Config, Module};
+use crate::{Call, Config, Module};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
-use frame_system as system;
-use sp_core::H256;
+use sp_core::{sr25519::Signature, H256};
 use sp_runtime::{
-    testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
+    testing::{Header, TestXt},
+    traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
     Perbill,
 };
 
@@ -23,7 +22,7 @@ parameter_types! {
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
 }
 
-impl system::Config for Test {
+impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
     type Call = ();
@@ -31,7 +30,7 @@ impl system::Config for Test {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = u64;
+    type AccountId = sp_core::sr25519::Public;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = ();
@@ -51,15 +50,46 @@ impl system::Config for Test {
     type SystemWeightInfo = ();
 }
 
-impl Config for Test {
-    type Event = ();
+type Extrinsic = TestXt<Call<Test>, ()>;
+type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+
+impl frame_system::offchain::SigningTypes for Test {
+    type Public = <Signature as Verify>::Signer;
+    type Signature = Signature;
 }
 
-pub type TemplateModule = Module<Test>;
+impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
+where
+    Call<Test>: From<LocalCall>,
+{
+    type OverarchingCall = Call<Test>;
+    type Extrinsic = Extrinsic;
+}
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
+where
+    Call<Test>: From<LocalCall>,
+{
+    fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+        call: Call<Test>,
+        _public: <Signature as Verify>::Signer,
+        _account: AccountId,
+        nonce: u64,
+    ) -> Option<(Call<Test>, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
+        Some((call, (nonce, ())))
+    }
+}
+
+impl Config for Test {
+    type Event = ();
+    type Call = Call<Test>;
+}
+
+pub type CashModule = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    system::GenesisConfig::default()
+    frame_system::GenesisConfig::default()
         .build_storage::<Test>()
         .unwrap()
         .into()

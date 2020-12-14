@@ -1,6 +1,6 @@
 use compound_chain_runtime::{
-    wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-    Signature, SudoConfig, SystemConfig,
+    wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
+    GrandpaConfig, Signature, SudoConfig, SystemConfig,
 };
 use sc_service::ChainType;
 use sp_consensus_babe::AuthorityId as BabeId;
@@ -43,7 +43,9 @@ pub fn authority_keys_from_seed(seed: &str) -> (BabeId, GrandpaId) {
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_rpc_url" : "https://kovan.infura.io/v3/975c0c48e2ca4649b7b332f310050e27"
+        "eth_rpc_url" : "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",
+        "eth_starport_address" : "0xbbde1662bC3ED16aA8C618c9833c801F3543B587",
+        "eth_lock_event_topic" : "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"
         // todo: override with environment variable and/or cli param?
     });
     let as_object = value.as_object();
@@ -175,6 +177,10 @@ fn testnet_genesis(
             // Assign network admin rights.
             key: root_key,
         }),
+
+        pallet_cash: Some(CashConfig {
+            cash_balance: vec![], // XXX circular broken substrate -> hacked to gen GenesisConfig, but empty
+        }),
     }
 }
 
@@ -183,11 +189,24 @@ fn testnet_genesis(
 pub fn extract_configuration_from_properties(
     properties: &sp_chain_spec::Properties,
 ) -> Option<runtime_interfaces::Config> {
-    let key = "eth_rpc_url".to_owned();
-    let eth_rpc_url = properties.get(&key)?;
+    let key_url = "eth_rpc_url".to_owned();
+    let eth_rpc_url = properties.get(&key_url)?;
     let eth_rpc_url_str = eth_rpc_url.as_str()?;
+
+    let key_address = "eth_starport_address".to_owned();
+    let eth_starport_address = properties.get(&key_address)?;
+    let eth_starport_address_str = eth_starport_address.as_str()?;
+
+    let key_topic = "eth_lock_event_topic".to_owned();
+    let eth_lock_event_topic = properties.get(&key_topic)?;
+    let eth_lock_event_topic_str = eth_lock_event_topic.as_str()?;
+
     // todo: eager validation of some kind here - basic sanity checking? or no?
-    Some(runtime_interfaces::new_config(eth_rpc_url_str.into()))
+    Some(runtime_interfaces::new_config(
+        eth_rpc_url_str.into(),
+        eth_starport_address_str.into(),
+        eth_lock_event_topic_str.into(),
+    ))
 }
 
 #[cfg(test)]
@@ -199,17 +218,29 @@ pub(crate) mod tests {
     /// the OCW configuration
     #[test]
     fn test_extract_configuration_from_properties_happy_path() {
-        let expected = "hello world";
-        let properties = serde_json::json!({ "eth_rpc_url": expected });
+        let expected_url = "hello world";
+        let expected_starport = "hello starport";
+        let expected_topic = "hello topic";
+        let properties = serde_json::json!({ "eth_rpc_url": expected_url, "eth_starport_address": expected_starport, "eth_lock_event_topic": expected_topic });
         let properties = properties.as_object().unwrap();
 
         let config = extract_configuration_from_properties(&properties);
         assert!(config.is_some());
         let config = config.unwrap();
-        let actual = config.get_eth_rpc_url();
+        let actual_eth_rpc_url = config.get_eth_rpc_url();
+        let actual_eth_starport_address = config.get_eth_starport_address();
+        let actual_eth_lock_event_topic = config.get_eth_lock_event_topic();
         // let actual = String::from_utf8(actual).unwrap();
 
-        assert_eq!(actual.as_slice(), expected.as_bytes());
+        assert_eq!(actual_eth_rpc_url.as_slice(), expected_url.as_bytes());
+        assert_eq!(
+            actual_eth_starport_address.as_slice(),
+            expected_starport.as_bytes()
+        );
+        assert_eq!(
+            actual_eth_lock_event_topic.as_slice(),
+            expected_topic.as_bytes()
+        );
     }
 
     /// Bad case - we do _not_ have the keys we need to return the OCW configuration
