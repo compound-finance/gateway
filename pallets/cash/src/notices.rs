@@ -10,13 +10,14 @@ use secp256k1;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
 
+// XXX
 pub type Message = Vec<u8>;
 pub type Signature = Vec<u8>;
-pub type Asset = Vec<u8>;
+pub type Asset = Vec<u8>; // XXX this should be a tuple like account
 pub type EthHash = [u8; 32];
 
-pub type GenerationId = i32;
-pub type WithinGenerationId = i32;
+pub type GenerationId = u32;
+pub type WithinGenerationId = u32;
 pub type NoticeId = (GenerationId, WithinGenerationId);
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]

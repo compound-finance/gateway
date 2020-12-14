@@ -1,4 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(associated_type_defaults)]
+#![feature(const_generics)]
 
 use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
