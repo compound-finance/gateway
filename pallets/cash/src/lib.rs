@@ -44,8 +44,6 @@ mod notices;
 #[cfg(test)]
 mod tests;
 
-mod ecdsa_eth;
-
 #[macro_use]
 extern crate alloc;
 
