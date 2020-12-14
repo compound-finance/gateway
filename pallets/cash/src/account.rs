@@ -39,6 +39,3 @@ mod tests {
     #[test]
     fn test_nothing() {}
 }
-
-
-this is broken and should not compile and should fail CI
