@@ -17,7 +17,7 @@ serde = { version = "1.0.101", features = ["derive"] }
 
 frame-support = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 frame-system = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
-sp-core = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git'}
+sp-core = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 sp-io = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git', features = ["disable_oom", "disable_panic_handler"]}
 sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
@@ -26,10 +26,6 @@ hex = { version = "0.4.2", default-features = false }
 hex-literal = {version = "0.3.1", default-features = false}
 libsecp256k1 = { version = "0.3.2", default-features = false, features = ["hmac"] }
 tiny-keccak = { version = "2.0.0", features = ["keccak"], default-features = false }
-tiny-bip39 = { version = "0.7", default-features = false, optional = true}
-substrate-bip39 = { version = "0.4.2", default-features = false, optional = true}
-sp-runtime-interface = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git'}
-blake2-rfc = { version = "0.2.18", default-features = false, optional = true}
 
 num-bigint = { default-features = false, version = "0.3" }
 num-traits = { default-features = false, version = "0.2" }
@@ -49,14 +45,4 @@ std = [
     'runtime-interfaces/std',
     'sp-io/std',
     'sp-core/std',
-    'sp-core/full_crypto',
-    'sp-runtime-interface/std',
-    'blake2-rfc/std',
-    'full_crypto',
-]
-full_crypto = [
-    'sp-core/full_crypto',
-    'tiny-bip39',
-    'substrate-bip39',
-    'blake2-rfc'
 ]
