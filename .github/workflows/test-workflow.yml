@@ -13,7 +13,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Substrate setup # todo: cache this step somehow if necessary?
+      # TODO: cache this step somehow if necessary?
+      #  could use parity/substrate image maybe but requires entrypoint on every step
+      - name: Substrate setup
         run: |
           ./scripts/get_substrate.sh --fast
 
@@ -30,6 +32,7 @@ jobs:
 
       - name: Cargo Test
         run: |
+          set -eo pipefail
           cargo test -- -Z unstable-options --format json | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
