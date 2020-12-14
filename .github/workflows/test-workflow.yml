@@ -31,6 +31,11 @@ jobs:
       - name: Cargo Test
         run: |
           cargo test -- -Z unstable-options --format json | tee unit-test-results.json
+        id: cargo_test
+
+
+      - name: Upload results
+        run: |
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
