@@ -1,0 +1,10 @@
+[package]
+authors = ['Compound <https://compound.finance>']
+description = 'Cryptographic operations for compound chain'
+edition = '2018'
+homepage = 'https://compound.cash'
+name = 'compound-crypto'
+repository = 'https://github.com/compound-finance/compound-chain/'
+version = '1.0.0'
+
+[dependencies]
