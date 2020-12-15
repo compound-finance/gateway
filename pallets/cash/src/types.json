@@ -1,14 +1,56 @@
 {
   "ChainIdent": {
-    "_enum": [
-      "Eth"
-    ]
+    "_enum": ["Eth"]
   },
   "AccountAddr": "Vec<u8>",
-  "CashAmount": "u128",
-  "Address": "MultiAddress<AccountId, ()>",
   "AccountIdent": {
     "chain": "ChainIdent",
     "account": "AccountAddr"
+  },
+  "CashAmount": "u128",
+  "Amount": {
+    "mantissa": "Vec<u8>",
+    "decimals": "u8"
+  },
+  "Notice": {
+    "_enum": {
+      "ExtractionNotice": "ExtractionNotice"
+    }
+  },
+  "ExtractionNotice": {
+    "chain": "ChainIdent",
+    "id": "NoticeId",
+    "parent": "EthHash",
+    "asset": "Asset",
+    "account": "AccountIdent",
+    "amount": "Amount"
+  },
+  "Message": "Vec<u8>",
+  "Signature": "Vec<u8>",
+  "Asset": "Vec<u8>",
+  "EthHash": "[u8; 32]",
+  "EthEventStatus": {
+    "_enum": {
+      "Pending": {
+        "signers": "Vec<u8>"
+      },
+      "Failed": {
+        "hash": "Hash",
+        "reason": "Reason"
+      },
+      "Done": null
+    }
+  },
+  "NoticeId": "(GenerationId, WithinGenerationId)",
+  "GenerationId": "u32",
+  "WithinGenerationId": "u32",
+  "NoticePayload": {
+    "msg": "Message",
+    "sig": "Signature",
+    "signer": "AccountIdent"
+  },
+  "Payload": "Vec<u8>",
+  "Reason": {
+    "_enum": ["None"]
   }
 }
