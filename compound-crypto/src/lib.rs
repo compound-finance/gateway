@@ -27,7 +27,7 @@ pub trait Keyring {
     /// "sign all of these messages with the same key" and the implementation of that
     /// function may make use of async or existing batch functionality.
     /// In general, this function should do the hashing.
-    fn sign(messages: Vec<Vec<u8>>, key_id: &KeyId) -> Result<Vec<u8>, CryptoError>;
+    fn sign(messages: Vec<Vec<u8>>, key_id: &KeyId) -> Vec<Result<Vec<u8>, CryptoError>>;
 
     /// Get the unencoded public key data for the key id provided
     /// Fails whenever the key_id is not found in the keyring
@@ -38,7 +38,7 @@ pub trait Keyring {
 pub struct DevKeyring {}
 
 impl Keyring for DevKeyring {
-    fn sign(message: Vec<Vec<u8>>, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+    fn sign(message: Vec<Vec<u8>>, key_id: &KeyId) -> Vec<Result<Vec<u8>, CryptoError>> {
         unimplemented!()
     }
 
