@@ -315,14 +315,14 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
     to_port    = 22
   }
 
-  # For libp2p
+  # For libp2p, open ephemeral ports
   egress {
     protocol   = "tcp"
     rule_no    = 205
     action     = "allow"
     cidr_block = "0.0.0.0/0"
-    from_port  = 30333
-    to_port    = 30333
+    from_port  = 1024
+    to_port    = 65535
   }
 
   ingress {
