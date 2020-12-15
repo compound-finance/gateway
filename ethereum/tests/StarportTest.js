@@ -42,6 +42,9 @@ const ethChainType = () => {
   return decoded.slice(2).substring(6,0);
 }
 
+const encodeUint = (num) => {
+  return ethers.utils.defaultAbiCoder.encode(['uint'], [num]).slice(2);
+}
 
 const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -58,8 +61,9 @@ describe('Starport', () => {
   const authorityAccts = createAccounts(3);
   const authorityAddrs = authorityAccts.map(acct => acct.address);
   let [root, a1] = saddle.accounts;
-  const testMsg = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+  // chain type, gen ID, gen index, random bytes
+  const testMsg = "0x" + ethChainType() + encodeUint(0) + encodeUint(1) + "abcd";
 
   beforeEach(async () => {
     const nonce = await web3.eth.getTransactionCount(root);
@@ -96,25 +100,31 @@ describe('Starport', () => {
 
     it('should authorize message', async () => {
       const sigs = authorityAccts.map(acct => sign(testMsg, acct).sig);
-      await call(starport, 'isMsgAuthorized', [testMsg, authorityAddrs, sigs]);
+    await call(starport, 'assertNoticeAuthorized', [testMsg, authorityAddrs, sigs]);
+    });
+
+    it('should not authorize message without current genID', async () => {
+      const msg = "0x" + ethChainType() + encodeUint(4) + encodeUint(1) + "1234567890";
+      const sigs = authorityAccts.map(acct => sign(msg, acct).sig);
+      await expect(call(starport, 'assertNoticeAuthorized', [msg, authorityAddrs, sigs])).rejects.toRevert('revert Notice must use current era');
     });
 
     it('should not authorize duplicate sigs', async () => {
       const dupAccts = Array(3).fill(authorityAccts[0]);
       const sigs = dupAccts.map(acct => sign(testMsg, acct).sig);
-      await expect(call(starport, 'isMsgAuthorized', [testMsg, authorityAddrs, sigs])).rejects.toRevert('revert Duplicated sig');
+      await expect(call(starport, 'assertNoticeAuthorized', [testMsg, authorityAddrs, sigs])).rejects.toRevert('revert Duplicated sig');
     });
 
     it('should not authorize with too few sigs', async () => {
       const acct = authorityAccts[0];
       const sig = sign(testMsg, acct).sig;
-      await expect(call(starport, 'isMsgAuthorized', [testMsg, authorityAddrs, [sig]])).rejects.toRevert('revert Below quorum threshold');
+      await expect(call(starport, 'assertNoticeAuthorized', [testMsg, authorityAddrs, [sig]])).rejects.toRevert('revert Below quorum threshold');
     });
 
     it('should not authorize with unauthorized signer', async () => {
       const badAccts = createAccounts(2);
       const sigs = badAccts.map(acct => sign(testMsg, acct).sig);
-      await expect(call(starport, 'isMsgAuthorized', [testMsg, authorityAddrs, sigs])).rejects.toRevert('revert Unauthorized signer');
+      await expect(call(starport, 'assertNoticeAuthorized', [testMsg, authorityAddrs, sigs])).rejects.toRevert('revert Unauthorized signer');
     });
   });
 
@@ -124,8 +134,7 @@ describe('Starport', () => {
       const paramTypes = Array(2).fill('address');
       const newAuthNoticeBytes = ethers.utils.defaultAbiCoder.encode(paramTypes, newAuths).slice(2);
 
-      const notice = "0x" + ethChainType() + newAuthNoticeBytes;
-
+      const notice = "0x" + ethChainType() + encodeUint(0) + encodeUint(4) + newAuthNoticeBytes;
       const sigs = authorityAccts.map(acct => sign(notice, acct).sig);
 
       const tx = await send(starport, 'changeAuthorities', [notice, sigs]);
@@ -134,10 +143,12 @@ describe('Starport', () => {
 
       const authHash = ethers.utils.keccak256(ethers.utils.solidityPack(['address[]'], [newAuths]));
       expect(tx.events.ChangeAuthorities.returnValues.authHash).toBe(authHash);
+
+      await expect(send(starport, 'changeAuthorities', [notice, sigs])).rejects.toRevert('revert Notice can not be reused');
     });
 
     it('should not change authorities with invalid signers', async () => {
-      const validNotice = "0x" + ethChainType() + newAuthNoticeBytes(2);
+      const validNotice = "0x" + ethChainType() + encodeUint(0) + encodeUint(4) + newAuthNoticeBytes(2);
       const badSigners = createAccounts(1);
       const badSigs = badSigners.map(acct => sign(validNotice, acct).sig);
       await expect(send(starport, 'changeAuthorities', [validNotice, badSigs])).rejects.toRevert('revert Unauthorized signer');
@@ -148,14 +159,14 @@ describe('Starport', () => {
     });
 
     it('should not change authorities with wrong chain type', async () => {
-      const notice = "0x" + "123456" + newAuthNoticeBytes(2);
+      const notice = "0x" + "123456" + encodeUint(0) + encodeUint(4) + newAuthNoticeBytes(2);
       const sigs = authorityAccts.map(acct => sign(notice, acct).sig);
 
       await expect(send(starport, 'changeAuthorities', [notice, sigs])).rejects.toRevert('revert Invalid Chain Type');
     });
 
     it('should revert if notice has wrong number of bytes', async () => {
-      const notice = "0x" + ethChainType() + newAuthNoticeBytes(2) + "abcd"
+      const notice = "0x" + ethChainType() + encodeUint(0) + encodeUint(4) + newAuthNoticeBytes(2) + "abcd"
       const sigs = authorityAccts.map(acct => sign(notice, acct).sig);
       await expect(send(starport, 'changeAuthorities', [notice, sigs])).rejects.toRevert('revert Excess bytes');
     });

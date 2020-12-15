@@ -20,12 +20,16 @@ contract Starport {
 
 	ICash immutable public cash;
 
-	bytes32 immutable public ETH_CHAIN_TYPE = keccak256(abi.encodePacked("ETH"));
-	address immutable public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+	address constant public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+	bytes32 constant public ETH_CHAIN_IDENT = keccak256(abi.encodePacked("ETH"));
 	address[] public authorities;
+
+	uint32 public currentEraId;
+	mapping(bytes32 => bool) public isNoticeUsed;
 
 	event LockCash(address holder, uint amount, uint yieldIndex);
 	event Lock(address asset, address holder, uint amount);
+	event Unlock(address asset, address account, uint amount);
 	event ChangeAuthorities(bytes32 authHash);
 
 	constructor(ICash cash_, address[] memory authorities_) {
@@ -78,16 +82,32 @@ contract Starport {
 	}
 
 	// ** L2 Message Ports **
-	function changeAuthorities(bytes calldata notice, bytes[] calldata signatures) public {
-		require(notice.length >= 35, "New authority set can not be empty");
-		bytes calldata chainType = notice[0:3]; // first 3 bytes of notice are chain type
-  		require(keccak256(abi.encodePacked(chainType)) == ETH_CHAIN_TYPE, "Invalid Chain Type");
-		bytes calldata body = notice[3:];
-		require(body.length % 32 == 0, "Excess bytes");
+	
+	// @dev notice = (bytes3 chainIdent, uint32 generationId, uint32 interGenerationId, address asset, address account, uint amount)
+	function unlock(bytes calldata notice, bytes[] calldata signatures) external {
+		require(notice.length == 99, "Invalid unlock length");
 
-		isMsgAuthorized(notice, authorities, signatures);
+		assertNoticeAuthorized(notice, authorities, signatures);
+
+		// Decode the notice
+		address asset = abi.decode(notice[3:35], (address));
+		address account = abi.decode(notice[35:67], (address));
+		uint amount = abi.decode(notice[67:99], (uint));
+
+		isNoticeUsed[hash(notice)] = true;
+		emit Unlock(asset, account, amount);
+		// IERC20(asset).transfer(amount, account);
+	}
+	// @dev notice = (bytes3 chainIdent, uint256 eraId, uint256 eraIndex, address[] newAuths)
+	function changeAuthorities(bytes calldata notice, bytes[] calldata signatures) external {
+		require(notice.length >= 99, "New authority set can not be empty");//67 bytes of header, 32 * n bytes of auths
+		assertNoticeAuthorized(notice, authorities, signatures);
+
+		bytes calldata body = notice[67:];
+		require(body.length % 32 == 0, "Excess bytes");
 		uint numAuths = body.length / 32;// evm word size is 32 bytes
 
+		// Decode the notice into a new auth array
 		address[] memory newAuths = new address[](numAuths);
 		for (uint i = 0; i < numAuths; i ++) {
 			uint startIdx = mul_(i, 32);
@@ -95,9 +115,10 @@ contract Starport {
 			address newAuth = abi.decode(body[startIdx:endIdx], (address));
 			newAuths[i] = newAuth;
 		}
-		bytes32 authHash = keccak256(abi.encodePacked(newAuths));
+		bytes32 authHash = hash(newAuths);
 		emit ChangeAuthorities(authHash);
 		authorities = newAuths;
+		isNoticeUsed[hash(notice)] = true;
 	}
 
 
@@ -107,15 +128,23 @@ contract Starport {
 		return authorities;
 	}
 
-	// ** PURE HELPERS **
-
-
-	// @dev Reverts if message is not authorized
-	function isMsgAuthorized(
+	// @dev Reverts if notice is not authorized
+	// * the first 7 bytes of a notice is always {bytes3 chainIdent, uint256 eraId}
+	function assertNoticeAuthorized(
 		bytes calldata message,
 		address[] memory authorities_,
 		bytes[] calldata signatures
-	) public pure {
+	) public view {
+		bytes calldata chainIdent = message[0:3];
+		require(hash(chainIdent) == ETH_CHAIN_IDENT, "Invalid Chain Type");
+		require(message.length >= 35, "Messsage too short");
+
+		uint eraId = abi.decode(message[3:35], (uint));
+		require(eraId == currentEraId, "Notice must use current era");
+
+		bytes32 noticeHash = hash(message);
+		require(isNoticeUsed[noticeHash] == false, "Notice can not be reused");
+
 		address[] memory sigs = new address[](signatures.length);
 		for (uint i = 0; i < signatures.length; i++) {
 			address signer = recover(keccak256(message), signatures[i]);
@@ -124,6 +153,16 @@ contract Starport {
 			sigs[i] = signer;
 		}
 		require(sigs.length >= getQuorum(authorities_.length), "Below quorum threshold");
+	}
+
+	// ** PURE HELPERS **
+
+	function hash(address[] memory data) public pure returns (bytes32) {
+		return keccak256((abi.encodePacked(data)));
+	}
+
+	function hash(bytes calldata data) public pure returns (bytes32) {
+		return keccak256((abi.encodePacked(data)));
 	}
 
 	function contains(address[] memory arr, address elem) internal pure returns (bool) {
@@ -140,7 +179,7 @@ contract Starport {
 
 
 	// @dev Adapted from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/cryptography/ECDSA.sol
-	function recover(bytes32 hash, bytes memory signature) public pure returns (address) {
+	function recover(bytes32 hashedMsg, bytes memory signature) public pure returns (address) {
 	    // Check the signature length
 	    if (signature.length != 65) {
 	        revert("ECDSA: invalid signature length");
@@ -163,7 +202,7 @@ contract Starport {
 	    require(v == 27 || v == 28, "ECDSA: invalid signature 'v' value");
 
 	    // If the signature is valid (and not malleable), return the signer address
-	    address signer = ecrecover(hash, v, r, s);
+	    address signer = ecrecover(hashedMsg, v, r, s);
 	    require(signer != address(0), "ECDSA: invalid signature");
 
 	    return signer;
