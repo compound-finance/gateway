@@ -29,8 +29,10 @@ Once the development environment is set up, build Compound Chain. This command w
 [native](https://substrate.dev/docs/en/knowledgebase/advanced/executor#native-execution) code:
 
 ```bash
-cargo build --release
+cargo +nightly build --release
 ```
+
+Note that we require the rust `nightly` toolchain as we rely on unstable features (notably `const_generics`).
 
 ## Run
 
@@ -80,7 +82,7 @@ Start Alice's node first. The command below uses the default TCP port (30333) an
 `QmRpheLN4JWdAnY7HGJfWFNbfkQCb6tFf4vvA6hgjMZKrR`); this is determined by the `node-key`.
 
 ```bash
-cargo run -- \
+cargo +nightly run -- \
   --db=ParityDB \
   --base-path /tmp/alice \
   --chain=local \
@@ -95,7 +97,7 @@ and with a chain database location of `/tmp/bob`. The `--bootnodes` option will 
 Alice's on TCP port 30333:
 
 ```bash
-cargo run -- \
+cargo +nightly run -- \
   --db=ParityDB \
   --base-path /tmp/bob \
   --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp \
@@ -107,7 +109,7 @@ cargo run -- \
   --validator
 ```
 
-Execute `cargo run -- --help` to learn more about the Compound Chain''s CLI options.
+Execute `cargo +nightly run -- --help` to learn more about the Compound Chain''s CLI options.
 
 ## Compound Chain Structure
 
@@ -212,7 +214,7 @@ Then run the following command to start a single node development chain.
 ```
 
 This command will firstly compile your code, and then start a local development network. You can
-also replace the default command (`cargo build --release && ./target/release/compound-chain --dev --ws-external`)
+also replace the default command (`cargo +nightly build --release && ./target/release/compound-chain --dev --ws-external`)
 by appending your own. A few useful ones are as follow.
 
 ```bash
@@ -223,4 +225,4 @@ by appending your own. A few useful ones are as follow.
 ./scripts/docker_run.sh ./target/release/compound-chain purge-chain --dev
 
 # Check whether the code is compilable
-./scripts/docker_run.sh cargo check
+./scripts/docker_run.sh cargo +nightly check
