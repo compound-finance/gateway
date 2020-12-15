@@ -13,7 +13,7 @@
 .local
 
 # Terraform ignores
-**/.terraform
+**/.terraform*
 **/*.hcl
 **/*.tfstate*
 ops/**/hosts

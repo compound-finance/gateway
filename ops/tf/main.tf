@@ -315,6 +315,16 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
     to_port    = 22
   }
 
+  # For libp2p
+  egress {
+    protocol   = "tcp"
+    rule_no    = 205
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 30333
+    to_port    = 30333
+  }
+
   ingress {
     protocol   = "-1"
     rule_no    = 100
@@ -542,36 +552,47 @@ resource "aws_lb_target_group_attachment" "full_node_ext_ws_lb_target_group_seco
   port             = 9944
 }
 
-# TODO: Consider gossip protocol
-# resource "aws_lb_target_group" "full_node_ext_lb_target_group_gossip" {
-#   name     = "full-node-ext-lb-tg-gossip"
-#   port     = 30333
-#   protocol = "TCP"
-#   vpc_id   = aws_vpc.compound_chain_vpc.id
+resource "aws_lb" "authority_node_ext_gossip_load_balancer" {
+  name                       = "authority-node-ext-gossip-lb"
+  internal                   = false
+  load_balancer_type         = "network"
+  drop_invalid_header_fields = true
+  subnets                    = [aws_subnet.compound_chain_public.id, aws_subnet.compound_chain_public_secondary.id]
+  idle_timeout               = 60
 
-#   health_check {
-#     protocol = "TCP"
-#     port = 30333
-#   }
-# }
+  tags = {
+    Name = "authority_node_ext_gossip_load_balancer"
+  }
+}
 
-# resource "aws_lb_listener" "full_node_ext_lb_listener_gossip" {
-#   load_balancer_arn = aws_lb.full_node_ext_load_balancer.arn
-#   port              = 30333
-#   protocol          = "TCP"
+resource "aws_lb_target_group" "authority_node_ext_gossip_lb_target_group" {
+  name     = "authority-node-ext-gossip-lb-tg"
+  port     = 30333
+  protocol = "TCP"
+  vpc_id   = aws_vpc.compound_chain_vpc.id
 
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.full_node_ext_lb_target_group_gossip.arn
-#   }
-# }
+  health_check {
+    protocol = "TCP"
+    port = 30333
+  }
+}
 
-# TODO: Form an attachment
-# resource "aws_lb_target_group_attachment" "authority_node_lb_target_group_attachment_gossip" {
-#   target_group_arn = aws_lb_target_group.authority_node_target_group_gossip.arn
-#   target_id        = aws_instance.authority_node.id
-#   port             = 30333
-# }
+resource "aws_lb_listener" "authority_node_ext_gossip_lb_listener" {
+  load_balancer_arn = aws_lb.authority_node_ext_gossip_load_balancer.arn
+  port              = 30333
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.authority_node_ext_gossip_lb_target_group.arn
+  }
+}
+
+resource "aws_lb_target_group_attachment" "authority_node_ext_gossip_lb_target_group_attachment" {
+  target_group_arn = aws_lb_target_group.authority_node_ext_gossip_lb_target_group.arn
+  target_id        = aws_instance.authority_node.id
+  port             = 30333
+}
 
 resource "aws_route_table" "public_ig_route" {
   vpc_id = aws_vpc.compound_chain_vpc.id

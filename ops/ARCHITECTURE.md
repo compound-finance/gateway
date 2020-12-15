@@ -7,8 +7,6 @@ This doc describes the architecture for Compound Chain that is deployed via Terr
 
 We deploy a VPC with three sub-nets (`private`, `public` and `public-backup`). Note: `public-backup` is a requirement for Amazon Application Load Balancers, since they require two subnets to route to. As expected, the `public` sub-nets are accessible to the external Internet via an Internet Gateway. The `private` sub-net is inaccessible to the greater Internet and all requests must be routed through a VPN node in the `public` subnet. We sync full nodes in the `public` sub-nets which peer with the authority node in the `private` subnet. RPC and ws requests will only go to the full nodes to prevent DoS or other attacks to the authority node itself. Additionally, ssh access to any `private` node must be routed through a bastion node in the `public` subnet.
 
-Question: how do we peer the authority node with other authority nodes? [Note to self: with Sentry nodes]
-
 This set-up generally ensures safety as the core node (i.e. the Compound Chain Authority Node) is heavily firewalled (via network security, security groups, network ACLs and firewalls). We are currently routing RPC and websocket requests directly to the Authority Node, but we will likely replace this with a Full Node which itself is peered to the Authority Node to add an additional layer of protection (e.g. against DoS attacks).
 
 #### Network TODOs
