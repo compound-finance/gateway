@@ -42,7 +42,8 @@ fn it_works_for_default_value() {
         // Dispatch a signed extrinsic.
         assert_ok!(CashModule::process_eth_event(
             Origin::signed(Default::default()),
-            vec![]
+            vec![],
+            [0; 65]
         ));
         // Read pallet storage and assert an expected result.
         // XXX assert_eq!(CashModule::something(), Some(42));
