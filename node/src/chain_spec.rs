@@ -43,7 +43,6 @@ pub fn authority_keys_from_seed(seed: &str) -> (BabeId, GrandpaId) {
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_rpc_url" : "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27",
         "eth_starport_address" : "0xbbde1662bC3ED16aA8C618c9833c801F3543B587",
         "eth_lock_event_topic" : "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"
         // todo: override with environment variable and/or cli param?
@@ -189,10 +188,6 @@ fn testnet_genesis(
 pub fn extract_configuration_from_properties(
     properties: &sp_chain_spec::Properties,
 ) -> Option<runtime_interfaces::Config> {
-    let key_url = "eth_rpc_url".to_owned();
-    let eth_rpc_url = properties.get(&key_url)?;
-    let eth_rpc_url_str = eth_rpc_url.as_str()?;
-
     let key_address = "eth_starport_address".to_owned();
     let eth_starport_address = properties.get(&key_address)?;
     let eth_starport_address_str = eth_starport_address.as_str()?;
@@ -203,7 +198,6 @@ pub fn extract_configuration_from_properties(
 
     // todo: eager validation of some kind here - basic sanity checking? or no?
     Some(runtime_interfaces::new_config(
-        eth_rpc_url_str.into(),
         eth_starport_address_str.into(),
         eth_lock_event_topic_str.into(),
     ))

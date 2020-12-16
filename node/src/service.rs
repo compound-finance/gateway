@@ -24,7 +24,8 @@ native_executor_instance!(
     node_runtime::native_version,
     (
         frame_benchmarking::benchmarking::HostFunctions,
-        runtime_interfaces::config_interface::HostFunctions
+        runtime_interfaces::config_interface::HostFunctions,
+        runtime_interfaces::validator_config_interface::HostFunctions,
     ),
 );
 
