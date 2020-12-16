@@ -24,7 +24,7 @@ contract Starport {
 	bytes32 constant public ETH_CHAIN_IDENT = keccak256(abi.encodePacked("ETH"));
 	address[] public authorities;
 
-	uint32 public currentEraId;
+	uint public eraId; // TODO: could bitpack here and use uint32
 	mapping(bytes32 => bool) public isNoticeUsed;
 
 	event LockCash(address holder, uint amount, uint yieldIndex);
@@ -83,25 +83,27 @@ contract Starport {
 
 	// ** L2 Message Ports **
 	
-	// @dev notice = (bytes3 chainIdent, uint32 generationId, uint32 interGenerationId, address asset, address account, uint amount)
+	// @dev notice = (bytes3 chainIdent, uint generationId, uint interGenerationId, address asset, address account, uint amount)
 	function unlock(bytes calldata notice, bytes[] calldata signatures) external {
-		require(notice.length == 99, "Invalid unlock length");
+		require(notice.length == 163, "Invalid unlock length"); // 67 + 96
 
-		assertNoticeAuthorized(notice, authorities, signatures);
+		assertNoticeAuthorized(notice, authorities, signatures, false);
 
+		bytes calldata body = notice[67:];
 		// Decode the notice
-		address asset = abi.decode(notice[3:35], (address));
-		address account = abi.decode(notice[35:67], (address));
-		uint amount = abi.decode(notice[67:99], (uint));
+		address asset = abi.decode(body[:32], (address));
+		address account = abi.decode(body[32:64], (address));
+		uint amount = abi.decode(body[64:96], (uint));
 
 		isNoticeUsed[hash(notice)] = true;
 		emit Unlock(asset, account, amount);
 		// IERC20(asset).transfer(amount, account);
 	}
+
 	// @dev notice = (bytes3 chainIdent, uint256 eraId, uint256 eraIndex, address[] newAuths)
 	function changeAuthorities(bytes calldata notice, bytes[] calldata signatures) external {
 		require(notice.length >= 99, "New authority set can not be empty");//67 bytes of header, 32 * n bytes of auths
-		assertNoticeAuthorized(notice, authorities, signatures);
+		assertNoticeAuthorized(notice, authorities, signatures, true);
 
 		bytes calldata body = notice[67:];
 		require(body.length % 32 == 0, "Excess bytes");
@@ -119,6 +121,7 @@ contract Starport {
 		emit ChangeAuthorities(authHash);
 		authorities = newAuths;
 		isNoticeUsed[hash(notice)] = true;
+		eraId = add_(eraId, 1);
 	}
 
 
@@ -133,14 +136,19 @@ contract Starport {
 	function assertNoticeAuthorized(
 		bytes calldata message,
 		address[] memory authorities_,
-		bytes[] calldata signatures
+		bytes[] calldata signatures,
+		bool isAdminNotice
 	) public view {
 		bytes calldata chainIdent = message[0:3];
 		require(hash(chainIdent) == ETH_CHAIN_IDENT, "Invalid Chain Type");
 		require(message.length >= 35, "Messsage too short");
 
-		uint eraId = abi.decode(message[3:35], (uint));
-		require(eraId == currentEraId, "Notice must use current era");
+		uint noticeEraId = abi.decode(message[3:35], (uint));
+		if (isAdminNotice) {
+			require(noticeEraId == add_(eraId, 1), "Admin notice must increment era");
+		} else {
+			require(noticeEraId == eraId, "Notice must use current era");
+		}
 
 		bytes32 noticeHash = hash(message);
 		require(isNoticeUsed[noticeHash] == false, "Notice can not be reused");
