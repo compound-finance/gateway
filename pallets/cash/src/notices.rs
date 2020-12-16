@@ -1,3 +1,4 @@
+// XXX not used but keep until merge with Coburn
 use super::{
     account::{AccountIdent, ChainIdent},
     amount::Amount,

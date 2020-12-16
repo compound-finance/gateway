@@ -61,14 +61,14 @@ pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
 
 pub fn to_payload(
     event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
-) -> anyhow::Result<chains::eth::Payload> {
+) -> anyhow::Result<Vec<u8>> {
+    // XXX does this simplify?
     let block_number: u32 = hex_to_u32(event.block_number.clone())?;
     let log_index: u32 = hex_to_u32(event.log_index.clone())?;
     let event = chains::eth::Event {
         id: (block_number, log_index),
     };
-    let payload: Vec<u8> = chains::eth::encode(&event);
-    Ok(payload)
+    Ok(chains::eth::encode(&event))
 }
 
 fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
