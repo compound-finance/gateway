@@ -212,21 +212,18 @@ pub(crate) mod tests {
     /// the OCW configuration
     #[test]
     fn test_extract_configuration_from_properties_happy_path() {
-        let expected_url = "hello world";
         let expected_starport = "hello starport";
         let expected_topic = "hello topic";
-        let properties = serde_json::json!({ "eth_rpc_url": expected_url, "eth_starport_address": expected_starport, "eth_lock_event_topic": expected_topic });
+        let properties = serde_json::json!({"eth_starport_address": expected_starport, "eth_lock_event_topic": expected_topic });
         let properties = properties.as_object().unwrap();
 
         let config = extract_configuration_from_properties(&properties);
         assert!(config.is_some());
         let config = config.unwrap();
-        let actual_eth_rpc_url = config.get_eth_rpc_url();
         let actual_eth_starport_address = config.get_eth_starport_address();
         let actual_eth_lock_event_topic = config.get_eth_lock_event_topic();
         // let actual = String::from_utf8(actual).unwrap();
 
-        assert_eq!(actual_eth_rpc_url.as_slice(), expected_url.as_bytes());
         assert_eq!(
             actual_eth_starport_address.as_slice(),
             expected_starport.as_bytes()
