@@ -7,4 +7,5 @@ members = [
     'pallets/cash',
     'pallets/runtime-interfaces',
     'runtime',
+    'compound-crypto',
 ]
