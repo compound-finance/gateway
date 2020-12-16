@@ -8,6 +8,8 @@ use frame_support::{
     traits::Get,
 };
 
+use secp256k1::{PublicKey, RecoveryId, SecretKey, Signature};
+
 use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
 use crate::notices::{Notice, NoticeId};
@@ -180,7 +182,7 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: chains::eth::Payload) -> dispatch::DispatchResult {
+        pub fn process_ethereum_event(origin, payload: chains::eth::Payload, signature: [u8; 65]) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload);
@@ -365,7 +367,10 @@ impl<T: Config> Module<T> {
             debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
             let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let call = Call::process_ethereum_event(payload);
+
+            let signature = Self::sign_payload(payload.clone());
+
+            let call = Call::process_ethereum_event(payload, signature);
 
             // XXX Unsigned tx for now
             let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
@@ -375,6 +380,20 @@ impl<T: Config> Module<T> {
             }
         }
         Ok(())
+    }
+
+    /// XXX this part will be rewritten as soon as keys are done
+    fn sign_payload(payload: Vec<u8>) -> [u8; 65] {
+        // XXX HORRIBLE, but something to move on, at least I can decode signature
+        let not_so_secret: [u8; 32] =
+            hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
+        let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
+        let message = secp256k1::Message::parse(&notices::keccak(payload.clone()));
+        let sig = secp256k1::sign(&message, &private_key);
+        let mut r: [u8; 65] = [0; 65];
+        r[0..64].copy_from_slice(&sig.0.serialize()[..]);
+        r[64] = sig.1.serialize();
+        return r;
     }
 }
 
