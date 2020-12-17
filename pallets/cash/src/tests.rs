@@ -40,12 +40,10 @@ fn it_magically_extracts() {
 fn it_works_for_default_value() {
     new_test_ext().execute_with(|| {
         // Dispatch a signed extrinsic.
-        assert_ok!(CashModule::process_ethereum_event(
-            Origin::signed(Default::default()),
-            vec![]
-        ));
-        // Read pallet storage and assert an expected result.
-        // XXX assert_eq!(CashModule::something(), Some(42));
+        assert_err!(
+            CashModule::process_ethereum_event(Origin::signed(Default::default()), vec![], [0; 65]),
+            Error::<Test>::SignedPayloadError
+        );
     });
 }
 
