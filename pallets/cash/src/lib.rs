@@ -8,7 +8,7 @@ use frame_support::{
     traits::Get,
 };
 
-use secp256k1::{PublicKey, RecoveryId, SecretKey, Signature};
+use secp256k1::{Message, PublicKey, RecoveryId, SecretKey, Signature};
 
 use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
@@ -53,6 +53,7 @@ extern crate alloc;
 
 // XXX move / unrely
 pub type Hash = Vec<u8>;
+type PayloadSignature = [u8; 65];
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -136,6 +137,8 @@ decl_error! {
 
         // Error sending `process_ethereum_event` extrinsic
         OffchainUnsignedLockTxError,
+
+        SignedPayloadError,
     }
 }
 
@@ -182,11 +185,26 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: chains::eth::Payload, signature: [u8; 65]) -> dispatch::DispatchResult {
+        pub fn process_ethereum_event(origin, payload: chains::eth::Payload, sig: PayloadSignature) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload);
             //require(signer == known validator);
+
+            // Recover signature part
+            let mut sig_part: [u8; 64] = [0; 64];
+            sig_part[0..64].copy_from_slice(&sig[0..64]);
+            let signature = Signature::parse(&sig_part);
+
+            // Recover RecoveryId part
+            let recovery_id = RecoveryId::parse(sig[64]).map_err(|_| <Error<T>>::SignedPayloadError)?;
+
+            // Recover validator's public key from signature
+            let message = Message::parse(&notices::keccak(payload.clone()));
+            let validator = secp256k1::recover(&message, &signature, &recovery_id);
+
+            debug::native::info!("Validator public key: {:?}", validator);
+
             let event = chains::eth::decode(payload.clone()); // XXX
             let status = <EthEventStatuses>::get(event.id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
             match status {
@@ -383,12 +401,12 @@ impl<T: Config> Module<T> {
     }
 
     /// XXX this part will be rewritten as soon as keys are done
-    fn sign_payload(payload: Vec<u8>) -> [u8; 65] {
+    fn sign_payload(payload: Vec<u8>) -> PayloadSignature {
         // XXX HORRIBLE, but something to move on, at least I can decode signature
         let not_so_secret: [u8; 32] =
             hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
-        let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
-        let message = secp256k1::Message::parse(&notices::keccak(payload.clone()));
+        let private_key = SecretKey::parse(&not_so_secret).unwrap();
+        let message = Message::parse(&notices::keccak(payload.clone()));
         let sig = secp256k1::sign(&message, &private_key);
         let mut r: [u8; 65] = [0; 65];
         r[0..64].copy_from_slice(&sig.0.serialize()[..]);
