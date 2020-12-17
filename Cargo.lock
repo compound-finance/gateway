@@ -3670,6 +3670,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
+name = "our-std"
+version = "0.0.1"
+dependencies = [
+ "our-std-proc-macro",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "our-std-proc-macro"
+version = "0.0.1"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "owning_ref"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3746,13 +3763,13 @@ dependencies = [
  "libsecp256k1",
  "num-bigint 0.3.1",
  "num-traits",
+ "our-std",
  "parity-scale-codec",
  "runtime-interfaces",
  "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std",
  "tiny-keccak 2.0.2",
 ]
 

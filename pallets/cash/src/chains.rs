@@ -1,9 +1,14 @@
+// Note: The substrate build requires these be imported
+pub use our_std::vec::Vec;
+
+use codec::{Decode, Encode};
+use our_std::{Debuggable, Deserialize, RuntimeDebug, Serialize};
+
 // XXX where should this live? with e.g. ethereum_client?
 pub mod eth {
     // Note: The substrate build requires these be imported
-    pub use sp_std::vec::Vec;
+    pub use our_std::vec::Vec;
 
-    pub type Payload = Vec<u8>;
     pub type BlockNumber = u32;
     pub type LogIndex = u32;
     pub type EventId = (BlockNumber, LogIndex);
@@ -13,11 +18,10 @@ pub mod eth {
         pub id: EventId,
     }
 
-    pub fn decode(data: Vec<u8>) -> Event {
+    pub fn decode(data: &[u8]) -> Event {
         Event { id: (13, 37) } // XXX
     }
 
-    /// XXX Work on sending proper Payload,
     /// XXX is Decoding and encoding useless here
     pub fn encode(event: &Event) -> Vec<u8> {
         let (block_number, log_index): (u32, u32) = event.id;
@@ -28,76 +32,120 @@ pub mod eth {
     }
 }
 
-pub type Amount = u128; // XXX not really
-pub type Index = u128; // XXX
-pub type Rate = u128; // XXX
-pub type Timestamp = u32; // XXX
-
-pub type GenerationId = u32;
-pub type WithinGenerationId = u32;
-pub type NoticeId = (GenerationId, WithinGenerationId);
+pub type EraId = u32;
+pub type EraIndex = u32;
+pub type NoticeId = (EraId, EraIndex);
 
 pub trait L1 {
-    type Address = [u8; 20];
-    type Account = Self::Address;
-    type Asset = Self::Address;
-    type Hash = [u8; 32];
-    type Public = [u8; 32];
+    type Address: Debuggable = [u8; 20];
+    type Account: Debuggable = Self::Address;
+    type Asset: Debuggable = Self::Address;
+    type Amount: Debuggable = u128;
+    type Index: Debuggable = u128;
+    type Rate: Debuggable = u128;
+    type Timestamp: Debuggable = u128;
+    type Hash: Debuggable = [u8; 32];
+    type Public: Debuggable = [u8; 32];
+
+    fn hash_bytes(data: &[u8]) -> Self::Hash;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Ethereum {}
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Polkadot {}
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Solana {}
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Tezos {}
 
-impl L1 for Ethereum {}
-impl L1 for Polkadot {}
-impl L1 for Solana {}
-impl L1 for Tezos {}
+impl L1 for Ethereum {
+    fn hash_bytes(data: &[u8]) -> Self::Hash {
+        [0u8; 32] // XXX
+    }
+}
 
-#[derive(Debug)]
-pub enum Notice<'a, Chain: L1> {
+impl L1 for Polkadot {
+    fn hash_bytes(data: &[u8]) -> Self::Hash {
+        [1u8; 32] // XXX
+    }
+}
+
+impl L1 for Solana {
+    fn hash_bytes(data: &[u8]) -> Self::Hash {
+        [2u8; 32] // XXX
+    }
+}
+
+impl L1 for Tezos {
+    fn hash_bytes(data: &[u8]) -> Self::Hash {
+        [3u8; 32] // XXX
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+pub enum EventStatus<Chain: L1> {
+    Pending {
+        signers: Vec<u8>,
+    }, // XXX set(Public)?
+    Failed {
+        hash: Chain::Hash,
+        reason: crate::Reason,
+    }, // XXX type for err reasons?
+    Done,
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum Notice<Chain: L1> {
     ExtractionNotice {
         id: NoticeId,
         parent: Chain::Hash,
         asset: Chain::Asset,
         account: Chain::Account,
-        amount: Amount,
+        amount: Chain::Amount,
     },
 
     CashExtractionNotice {
         id: NoticeId,
         parent: Chain::Hash,
-        account: Chain::Asset,
-        amount: Chain::Account,
-        cash_yield_index: Index,
+        account: Chain::Account,
+        amount: Chain::Amount,
+        cash_yield_index: Chain::Index,
     },
 
     FutureYieldNotice {
         id: NoticeId,
         parent: Chain::Hash,
-        next_cash_yield: Rate,
-        next_cash_yield_start_at: Timestamp,
-        next_cash_yield_index: Index,
+        next_cash_yield: Chain::Rate,
+        next_cash_yield_start_at: Chain::Timestamp,
+        next_cash_yield_index: Chain::Index,
     },
 
     SetSupplyCapNotice {
         id: NoticeId,
         parent: Chain::Hash,
         asset: Chain::Asset,
-        amount: Amount,
+        amount: Chain::Amount,
     },
 
     ChangeAuthorityNotice {
         id: NoticeId,
         parent: Chain::Hash,
-        new_authorities: &'a [Chain::Public],
+        new_authorities: Vec<Chain::Public>,
     },
+}
+
+impl<Chain: L1> Notice<Chain> {
+    pub fn id(&self) -> NoticeId {
+        match self {
+            Notice::ExtractionNotice { id, .. } => *id,
+            Notice::CashExtractionNotice { id, .. } => *id,
+            Notice::FutureYieldNotice { id, .. } => *id,
+            Notice::SetSupplyCapNotice { id, .. } => *id,
+            Notice::ChangeAuthorityNotice { id, .. } => *id,
+        }
+    }
 }

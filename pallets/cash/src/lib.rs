@@ -1,75 +1,51 @@
-#![cfg_attr(not(feature = "std"), no_std)]
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
+#![feature(trivial_bounds)]
+
+#[macro_use]
+extern crate alloc;
+extern crate ethereum_client;
+
+mod account;
+mod amount;
+mod chains;
+mod core;
+mod events;
+
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
+use crate::account::AccountIdent;
+use crate::amount::CashAmount;
+use crate::chains::{Ethereum, EventStatus, Notice, NoticeId, L1};
 
 use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, storage::StorageDoubleMap,
-    traits::Get,
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-
-use crate::account::{AccountIdent, ChainIdent};
-use crate::amount::{Amount, CashAmount};
-use crate::notices::{Notice, NoticeId};
-
 use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use sp_runtime::RuntimeDebug;
+use our_std::{convert::TryInto, vec::Vec, Deserialize, Serialize};
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
         storage_lock::{StorageLock, Time},
     },
     transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
-    SaturatedConversion,
+    RuntimeDebug, SaturatedConversion,
 };
-use sp_std::vec::Vec;
 
-#[cfg(feature = "std")]
-use sp_runtime::{Deserialize, Serialize};
+/// Type for an encoded payload within an extrinsic.
+pub type Payload = Vec<u8>;
 
-extern crate ethereum_client;
-
-mod chains;
-mod core;
-
-#[cfg(test)]
-mod mock;
-
-mod account;
-mod amount;
-mod events;
-mod notices;
-
-#[cfg(test)]
-mod tests;
-
-#[macro_use]
-extern crate alloc;
-
-// XXX move / unrely
-pub type Hash = Vec<u8>;
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum Reason {
     None,
-}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub enum EthEventStatus {
-    Pending { signers: Vec<u8> },          // XXX set(Public)?
-    Failed { hash: Hash, reason: Reason }, // XXX type for err reasons?
-    Done,
-}
-
-// XXXX experimental
-pub fn compute_hash(payload: chains::eth::Payload) -> Hash {
-    // XXX where Payload: Hash
-    payload // XXX
 }
 
 // OCW storage constants
@@ -90,11 +66,11 @@ decl_storage! {
         // XXX
         CashBalance get(fn cash_balance) config(): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
 
-        // Mapping of (status of) events witnessed on Ethereum by event id.
-        EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::eth::EventId => Option<EthEventStatus>;
+        // Mapping of (status of) events witnessed on Ethereum, by event id.
+        EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
-        // TODO: hash type should match to ChainIdent
-        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
+        // Mapping of (status of) notices to be signed for Ethereum, by notice id.
+        EthNoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<Notice<Ethereum>>;
     }
 }
 
@@ -102,13 +78,11 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
-        Payload = chains::eth::Payload,                     //XXX<T as Config>::Payload ?,
     {
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX
-        MagicExtract(CashAmount, AccountIdent, Notice),
-        Notice(notices::Message, notices::Signature, AccountIdent),
+        MagicExtract(CashAmount, AccountIdent, Notice<Ethereum>),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthereumEvent(Payload),
@@ -163,15 +137,14 @@ decl_module! {
             let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
             let notice = Notice::ExtractionNotice {
-                chain: ChainIdent::Eth, // XXX
                 id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
-                asset: Vec::new(),
-                amount: Amount::new_cash(amount),
-                account: account.clone()
+                asset: [0u8; 20],
+                amount: amount,
+                account: account.address.clone().try_into() // XXX avoid clone?
+                    .unwrap_or_else(|_| panic!("Address has wrong number of bytes"))
             };
-            let Notice::ExtractionNotice { chain, id, .. } = &notice; // XXX dont see a better way in Rust
-            NoticeQueue::insert(chain, id, &notice);
+            EthNoticeQueue::insert(notice.id(), &notice);
 
             // Emit an event.
             Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
@@ -180,55 +153,55 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: chains::eth::Payload) -> dispatch::DispatchResult {
+        pub fn process_ethereum_event(origin, payload: Payload) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload);
             //require(signer == known validator);
-            let event = chains::eth::decode(payload.clone()); // XXX
-            let status = <EthEventStatuses>::get(event.id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
+            let event = chains::eth::decode(payload.as_slice()); // XXX
+            let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
-                EthEventStatus::Pending { signers } => {
+                EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
                         match core::apply_ethereum_event_internal(event) {
                             Ok(_) => {
-                                EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                                EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                                 Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
                                 Ok(())
                             }
 
                             Err(reason) => {
-                                EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash: compute_hash(payload.clone()), reason: reason.clone() }); // XXX better way?
+                                EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash: Ethereum::hash_bytes(payload.as_slice()), reason: reason });
                                 Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, reason));
                                 Ok(())
                             }
                         }
                     // } else {
-                    //     EthEventStatuses::put(event.id, EthEventStatus::Pending(signers_new));
+                    //     EthEventQueue::put(event.id, EthEventStatus::<Ethereum>::Pending(signers_new));
                     // }
                 }
 
                 // XXX potential retry logic to allow retrying Failures
-                EthEventStatus::Failed { hash, reason } => {
-                    //require(compute_hash(payload) == hash, "event data differs from failure");
+                EventStatus::<Ethereum>::Failed { hash, .. } => {
+                    // XXX require(compute_hash(payload) == hash, "event data differs from failure");
                     match core::apply_ethereum_event_internal(event) {
                         Ok(_) => {
-                            EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                            EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                             Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
                             Ok(())
                         }
 
                         Err(new_reason) => {
-                            EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash, reason: new_reason.clone()}); // XXX
+                            EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
                             Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, new_reason));
                             Ok(())
                         }
                     }
                 }
 
-                EthEventStatus::Done => Ok(())
+                EventStatus::<Ethereum>::Done => Ok(())
             }
         }
 
@@ -241,28 +214,20 @@ decl_module! {
             Err(Error::<T>::NoneValue)?
         }
 
-        #[weight = 0]
-        pub fn emit_notice(origin, notice: notices::NoticePayload) -> dispatch::DispatchResult {
+        // XXX what is this fn for??
+        // #[weight = 0]
+        // pub fn emit_notice(origin, notice: notices::NoticePayload) -> dispatch::DispatchResult {
             // TODO: Move to using unsigned and getting author from signature
             // TODO I don't know what this comment means ^
-            ensure_none(origin)?;
+            // ensure_none(origin)?;
 
-            debug::native::info!("emitting notice: {:?}", notice);
-            Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
+            // debug::native::info!("emitting notice: {:?}", notice);
+            // Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
 
-            Ok(())
-        }
+        //     Ok(())
+        // }
 
         /// Offchain Worker entry point.
-        ///
-        /// By implementing `fn offchain_worker` within `decl_module!` you declare a new offchain
-        /// worker.
-        /// This function will be called when the node is fully synced and a new best block is
-        /// succesfuly imported.
-        /// Note that it's not guaranteed for offchain workers to run on EVERY block, there might
-        /// be cases where some blocks are skipped, or for some the worker runs twice (re-orgs),
-        /// so the code should be able to handle that.
-        /// You can use `Local Storage` API to coordinate runs of the worker.
         fn offchain_worker(block_number: T::BlockNumber) {
             debug::native::info!("Hello World from offchain workers from block {} !", block_number);
 
@@ -270,28 +235,28 @@ decl_module! {
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error: {:?}", e);
             }
-            Self::process_notices(block_number);
+            Self::process_ethereum_notices(block_number);
         }
     }
 }
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
-    pub fn process_notices(block_number: T::BlockNumber) {
-        for notice in NoticeQueue::iter_prefix_values(ChainIdent::Eth) {
+    pub fn process_ethereum_notices(block_number: T::BlockNumber) {
+        for notice in EthNoticeQueue::iter_values() {
             // find parent
             // id = notice.gen_id(parent)
 
             // submit onchain call for aggregating the price
-            notices::debug(&notice);
-            let payload = notices::to_payload(notice);
-            let call = Call::emit_notice(payload);
+            // let payload = notices::to_payload(notice);
+            // let call = Call::emit_notice(payload);
 
             // Unsigned tx
-            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            // SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
         }
     }
 
+    // XXX disambiguate whats for ethereum vs not
     fn fetch_events_with_lock() -> Result<(), Error<T>> {
         // Create a reference to Local Storage value.
         // Since the local storage is common for all offchain workers, it's a good practice

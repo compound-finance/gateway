@@ -4,7 +4,7 @@ use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError}
 fn andrew() -> AccountIdent {
     AccountIdent {
         chain: ChainIdent::Eth,
-        account: vec![1, 2, 3],
+        address: [123; 20].to_vec(),
     }
 }
 
