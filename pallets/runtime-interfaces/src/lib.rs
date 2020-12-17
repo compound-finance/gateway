@@ -60,8 +60,10 @@ pub trait ConfigInterface {
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
-
+const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = "my_eth_key_id";
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
+const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str =
+    "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set
@@ -87,6 +89,26 @@ pub trait ValidatorConfigInterface {
     fn get_eth_rpc_url() -> Option<Vec<u8>> {
         std::env::var(ETH_RPC_URL_ENV_VAR).ok().map(Into::into)
     }
+}
+
+/// Set an environment variable to a value if it is not already set to an existing value.
+fn set_validator_config_dev_default(key: &str, value: &str) {
+    let existing = std::env::var(key);
+    if existing.is_ok() {
+        return;
+    }
+
+    std::env::set_var(key, value);
+}
+
+/// For the local dev environment we want some sane defaults for these configuration values
+/// without always having to set up the developer's machine, with, say, a `.env` file
+/// or a run shell script. We would like to just stick with `cargo run -- ...`. To that end
+/// when the `--dev` flag is passed, these defaults are used but only when an existing environment
+/// variable is not already set.
+pub fn set_validator_config_dev_defaults() {
+    set_validator_config_dev_default(ETH_KEY_ID_ENV_VAR, ETH_KEY_ID_ENV_VAR_DEV_DEFAULT);
+    set_validator_config_dev_default(ETH_RPC_URL_ENV_VAR, ETH_RPC_URL_ENV_VAR_DEV_DEFAULT);
 }
 
 #[cfg(test)]

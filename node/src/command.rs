@@ -31,6 +31,11 @@ impl SubstrateCli for Cli {
     }
 
     fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+        if id == "dev" {
+            // check for our required environment variables and set them to the defaults if necessary
+            runtime_interfaces::set_validator_config_dev_defaults();
+        }
+
         Ok(match id {
             "dev" => Box::new(chain_spec::development_config()),
             "" | "local" => Box::new(chain_spec::local_testnet_config()),
