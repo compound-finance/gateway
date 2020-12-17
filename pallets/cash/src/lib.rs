@@ -11,6 +11,8 @@ use frame_support::{
 use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
 use crate::notices::{Notice, NoticeId};
+use crate::chains::{Chain};
+
 
 use frame_system::{
     ensure_none, ensure_signed,
@@ -25,14 +27,13 @@ use sp_runtime::{
     transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
     SaturatedConversion,
 };
-use sp_std::vec::Vec;
+use sp_std::{convert::TryInto, vec::Vec};
 
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
 
 extern crate ethereum_client;
 
-mod chains;
 mod core;
 
 #[cfg(test)]
@@ -42,6 +43,7 @@ mod account;
 mod amount;
 mod events;
 mod notices;
+mod chains;
 
 #[cfg(test)]
 mod tests;
@@ -94,7 +96,7 @@ decl_storage! {
         EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::eth::EventId => Option<EthEventStatus>;
 
         // TODO: hash type should match to ChainIdent
-        pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
+        pub EthNoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<Notice<chains::Ethereum>>;
     }
 }
 
@@ -107,7 +109,7 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX
-        MagicExtract(CashAmount, AccountIdent, Notice),
+        // MagicExtract(CashAmount, AccountIdent, Notice),
         Notice(notices::Message, notices::Signature, AccountIdent),
 
         /// An Ethereum event was successfully processed. [payload]
@@ -162,19 +164,20 @@ decl_module! {
 
             let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
-            let notice = Notice::ExtractionNotice {
-                chain: ChainIdent::Eth, // XXX
-                id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
+            let id = (now.into(), 0); 
+            let notice = notices::Notice::ExtractionNotice {
+                id: id,  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
-                asset: Vec::new(),
+                asset: [0u8; 20],
                 amount: Amount::new_cash(amount),
-                account: account.clone()
+                account: account.address.clone().try_into().unwrap_or_else(|_| panic!("Address has wrong number of bytes"))
+                // XXX avoid clone?
             };
-            let Notice::ExtractionNotice { chain, id, .. } = &notice; // XXX dont see a better way in Rust
-            NoticeQueue::insert(chain, id, &notice);
+            // let Notice::ExtractionNotice { id, .. } = &notice; // XXX dont see a better way in Rust
+            EthNoticeQueue::insert(id, &notice);
 
             // Emit an event.
-            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
+            // Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
             // Return a successful DispatchResult
             Ok(())
         }
@@ -278,17 +281,17 @@ decl_module! {
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
     pub fn process_notices(block_number: T::BlockNumber) {
-        for notice in NoticeQueue::iter_prefix_values(ChainIdent::Eth) {
+        for notice in EthNoticeQueue::iter_values() {
             // find parent
             // id = notice.gen_id(parent)
 
             // submit onchain call for aggregating the price
-            notices::debug(&notice);
-            let payload = notices::to_payload(notice);
-            let call = Call::emit_notice(payload);
+            // notices::debug(&notice);
+            // let payload = notices::to_payload(notice);
+            // let call = Call::emit_notice(payload);
 
-            // Unsigned tx
-            SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
+            // // Unsigned tx
+            // SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
         }
     }
 

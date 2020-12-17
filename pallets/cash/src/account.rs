@@ -18,7 +18,7 @@ pub type AccountAddr = Vec<u8>;
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct AccountIdent {
     pub chain: ChainIdent,
-    pub account: AccountAddr,
+    pub address: AccountAddr,
 }
 
 impl AccountIdent {
@@ -27,7 +27,7 @@ impl AccountIdent {
     pub fn new<T: Into<ChainIdent>, D: Into<AccountAddr>>(chain_ident: T, account_addr: D) -> Self {
         AccountIdent {
             chain: chain_ident.into(),
-            account: account_addr.into(),
+            address: account_addr.into(),
         }
     }
 }

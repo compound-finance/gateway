@@ -28,16 +28,7 @@ pub mod eth {
     }
 }
 
-pub type Amount = u128; // XXX not really
-pub type Index = u128; // XXX
-pub type Rate = u128; // XXX
-pub type Timestamp = u32; // XXX
-
-pub type GenerationId = u32;
-pub type WithinGenerationId = u32;
-pub type NoticeId = (GenerationId, WithinGenerationId);
-
-pub trait L1 {
+pub trait Chain {
     type Address = [u8; 20];
     type Account = Self::Address;
     type Asset = Self::Address;
@@ -46,7 +37,16 @@ pub trait L1 {
 }
 
 #[derive(Debug)]
-pub struct Ethereum {}
+pub struct Ethereum {
+
+}
+
+// impl from<Vec<u8>> for <self::Ethereum as Chain>::Address {
+//     fn from(x: Vec<u8>) -> Self {
+
+//     } 
+// }
+
 
 #[derive(Debug)]
 pub struct Polkadot {}
@@ -57,47 +57,9 @@ pub struct Solana {}
 #[derive(Debug)]
 pub struct Tezos {}
 
-impl L1 for Ethereum {}
-impl L1 for Polkadot {}
-impl L1 for Solana {}
-impl L1 for Tezos {}
+impl Chain for Ethereum {
 
-#[derive(Debug)]
-pub enum Notice<'a, Chain: L1> {
-    ExtractionNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        asset: Chain::Asset,
-        account: Chain::Account,
-        amount: Amount,
-    },
-
-    CashExtractionNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        account: Chain::Asset,
-        amount: Chain::Account,
-        cash_yield_index: Index,
-    },
-
-    FutureYieldNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        next_cash_yield: Rate,
-        next_cash_yield_start_at: Timestamp,
-        next_cash_yield_index: Index,
-    },
-
-    SetSupplyCapNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        asset: Chain::Asset,
-        amount: Amount,
-    },
-
-    ChangeAuthorityNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        new_authorities: &'a [Chain::Public],
-    },
 }
+impl Chain for Polkadot {}
+impl Chain for Solana {}
+impl Chain for Tezos {}
