@@ -799,6 +799,7 @@ dependencies = [
 name = "compound-crypto"
 version = "1.0.0"
 dependencies = [
+ "hex",
  "libsecp256k1",
  "sp-core",
  "tiny-keccak 2.0.2",

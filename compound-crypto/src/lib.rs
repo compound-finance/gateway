@@ -1,6 +1,6 @@
 use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
-use sp_core::{Pair, Public};
+use sp_core::{keccak_256, Pair};
 use std::collections::hash_map::HashMap;
 use tiny_keccak::Hasher;
 
@@ -27,6 +27,7 @@ pub struct KeyId {
 /// * The key id provided is unknown
 /// * The HSM is not available
 /// * The HSM failed to sign this request for some other reason
+#[derive(Debug)]
 pub enum CryptoError {
     KeyNotFound,
     Unknown,
@@ -59,16 +60,17 @@ pub trait Keyring {
     fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError>;
 }
 
-/// In memory keyring
-pub struct InMemoryKeyring {
-    /// for now only support ECDSA with curve secp256k1
-    keys: HashMap<String, EcdsaPair>,
-}
+/// For compatibility this is required.
+const ETH_MESSAGE_PREAMBLE: &[u8] = "\x19Ethereum Signed Message:\n".as_bytes();
+/// For compatibility this is required.
+const ETH_ADD_TO_V: u8 = 27u8;
 
 /// Helper function to quickly run keccak in the Ethereum-style
-fn keccak(input: &[u8]) -> [u8; 32] {
+fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
+    hasher.update(ETH_MESSAGE_PREAMBLE);
+    hasher.update(format!("{}", input.len()).as_bytes());
     hasher.update(input);
     hasher.finalize(&mut output);
     output
@@ -77,16 +79,41 @@ fn keccak(input: &[u8]) -> [u8; 32] {
 /// A helper function to sign a message in the style of ethereum
 ///
 /// Does not add the Ethereum prelude, perhaps it should?
+///
+/// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
+/// This is called by web3.js https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/packages/web3-eth-accounts/package.json#L18
 fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
-    let hashed = keccak(message);
+    let hashed = eth_keccak_for_signature(message);
     // todo: there is something in this function that says "it is ok for the message to overflow.." that seems bad.
     let message = secp256k1::Message::parse(&hashed);
-    let (sig, _) = secp256k1::sign(&message, &private_key);
-    let sig: Vec<u8> = sig.serialize().into();
+    let (sig, recovery) = secp256k1::sign(&message, &private_key);
+    let why_is_this_here = recovery.serialize() + ETH_ADD_TO_V;
+    let mut sig: Vec<u8> = sig.serialize().into();
+    sig.push(why_is_this_here);
     sig
 }
 
+/// In memory keyring
+pub struct InMemoryKeyring {
+    /// for now only support ECDSA with curve secp256k1
+    keys: HashMap<String, EcdsaPair>,
+}
+
+/// The in memory keyring is designed for use in development and not encouraged for use in
+/// production. Please use the HSM keyring for production use.
 impl InMemoryKeyring {
+    /// Create a new in memory keyring
+    pub fn new() -> InMemoryKeyring {
+        InMemoryKeyring {
+            keys: HashMap::new(),
+        }
+    }
+
+    /// Add a key to the keyring with the given key id
+    pub fn add(self: &mut Self, key_id: &KeyId, pair: EcdsaPair) {
+        self.keys.insert(key_id.data.clone(), pair);
+    }
+
     /// Get the keypair associated with the given key id
     fn get_keypair(self: &Self, key_id: &KeyId) -> Result<&EcdsaPair, CryptoError> {
         self.keys.get(&key_id.data).ok_or(CryptoError::KeyNotFound)
@@ -103,8 +130,18 @@ impl InMemoryKeyring {
 
         Ok(private_key)
     }
+
+    /// Get the eth address (bytes) associated with the given key id.
+    fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+        let public_key = self.get_public_key(key_id)?;
+        let public_hash = keccak_256(&public_key); // 32 bytes
+        let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
+        Ok(Vec::from(public_hash_tail))
+    }
 }
 
+/// Implement the keyring for the in memory keyring. This allows us to use in memory or HSM
+/// mode downstream.
 impl Keyring for InMemoryKeyring {
     /// Sign the messages with the given Key ID
     fn sign(
@@ -124,9 +161,13 @@ impl Keyring for InMemoryKeyring {
 
     /// Get the public key associated with the given key id.
     fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
-        let keypair = self.get_keypair(key_id)?;
-        let public = keypair.public().to_raw_vec();
-        Ok(public)
+        let private = self.get_private_key(key_id)?;
+        // could not call serialize from the keypair so I had to re-derive the public key here
+        let public = secp256k1::PublicKey::from_secret_key(&private);
+        // some tag is added here - i think for SCALE encoding but [1..] strips it
+        let serialized: &[u8] = &public.serialize()[1..];
+        let serialized: Vec<u8> = serialized.iter().map(Clone::clone).collect();
+        Ok(serialized)
     }
 }
 
@@ -134,40 +175,96 @@ impl Keyring for InMemoryKeyring {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_sign() {
-        // todo: write tests for dev setup
+    #[derive(Clone)]
+    struct TestCase {
+        address: String,
+        private_key: String,
+        data: String,
+        signature: String,
     }
 
-    // note- took keccak test cases from tiny_keccak crate
-
-    #[test]
-    fn empty_keccak() {
-        let mut output = [0; 32];
-        let input = [0u8; 0];
-
-        let expected = b"\
-            \xc5\xd2\x46\x01\x86\xf7\x23\x3c\x92\x7e\x7d\xb2\xdc\xc7\x03\xc0\
-            \xe5\x00\xb6\x53\xca\x82\x27\x3b\x7b\xfa\xd8\x04\x5d\x85\xa4\x70\
-        ";
-
-        let output = keccak(&input);
-        assert_eq!(expected, &output);
+    /// These test cases come from web3.js
+    fn get_test_cases() -> Vec<TestCase> {
+        vec![
+            TestCase {
+                address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
+                private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
+                data: "Some data".into(),
+                signature: "0xa8037a6116c176a25e6fc224947fde9e79a2deaa0dd8b67b366fbdfdbffc01f953e41351267b20d4a89ebfe9c8f03c04de9b345add4a52f15bd026b63c8fb1501b".into(),
+            }, TestCase {
+                address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
+                private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
+                data: "Some data!%$$%&@*".into(),
+                signature: "0x05252412b097c5d080c994d1ea12abcee6f1cae23feb225517a0b691a66e12866b3f54292f9cfef98f390670b4d010fc4af7fcd46e41d72870602c117b14921c1c".into(),
+            }, /* TestCase { // for now this test case is excluded because the data are encoded as binary
+                address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
+                private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
+                data: "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".into(),
+                signature: "0xddd493679d80c9c74e0e5abd256a496dfb31b51cd39ea2c7c9e8a2a07de94a90257107a00d9cb631bacb85b208d66bfa7a80c639536b34884505eff352677dd01c".into(),
+            } */
+        ]
     }
 
-    #[test]
-    fn string_keccak_256() {
-        let mut input: [u8; 5] = [1, 2, 3, 4, 5];
-        let expected = b"\
-            \x7d\x87\xc5\xea\x75\xf7\x37\x8b\xb7\x01\xe4\x04\xc5\x06\x39\x16\
-            \x1a\xf3\xef\xf6\x62\x93\xe9\xf3\x75\xb5\xf1\x7e\xb5\x04\x76\xf4\
-        ";
-        let output = keccak(&input[0..5]);
-        assert_eq!(expected, &output);
+    /// Helper function to decode 0x... to bytes
+    fn eth_decode_hex(hex: String) -> Vec<u8> {
+        let hex = hex.as_bytes();
+        hex::decode(&hex[2..]).unwrap()
+    }
+
+    /// Test out eth signature function
+    fn test_eth_sign_case(case: TestCase) {
+        let private_key = eth_decode_hex(case.private_key);
+        let message: Vec<u8> = case.data.into();
+        let secret_key = SecretKey::parse_slice(&private_key).unwrap();
+        let actual_sig = eth_sign(&message, &secret_key);
+        let expected_sig = eth_decode_hex(case.signature);
+        assert_eq!(actual_sig, expected_sig);
     }
 
     #[test]
     fn test_eth_sign() {
-        // todo: need some good test data for this one. Somewhat unclear to me how best to obtain it
+        // Test cases found in web3js
+        // https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/test/eth.accounts.sign.js#L7
+        get_test_cases().drain(..).for_each(test_eth_sign_case);
+    }
+
+    fn get_test_keyring(case: &TestCase) -> (KeyId, InMemoryKeyring) {
+        let key_id = KeyId {
+            data: "hello".into(),
+        };
+        let mut keyring = InMemoryKeyring::new();
+        let private_key_bytes = eth_decode_hex(case.private_key.clone());
+        let pair = EcdsaPair::from_seed_slice(&private_key_bytes).unwrap();
+        keyring.add(&key_id, pair);
+
+        (key_id, keyring)
+    }
+
+    fn test_sign_case(case: TestCase) {
+        let (key_id, keyring) = get_test_keyring(&case);
+        let message: Vec<u8> = case.data.into();
+        let messages = vec![message];
+        let sigs = keyring.sign(messages, &key_id).unwrap();
+        assert_eq!(sigs.len(), 1);
+        let actual_sig = sigs[0].as_ref().unwrap();
+        let expected_sig = &eth_decode_hex(case.signature);
+        assert_eq!(actual_sig, expected_sig);
+    }
+
+    #[test]
+    fn test_sign() {
+        get_test_cases().drain(..).for_each(test_sign_case);
+    }
+
+    fn test_public_key_case(case: TestCase) {
+        let (key_id, keyring) = get_test_keyring(&case);
+        let actual_address = keyring.get_eth_address(&key_id).unwrap();
+        let expected_address = eth_decode_hex(case.address);
+        assert_eq!(actual_address, expected_address);
+    }
+
+    #[test]
+    fn test_public_key() {
+        get_test_cases().drain(..).for_each(test_public_key_case);
     }
 }
