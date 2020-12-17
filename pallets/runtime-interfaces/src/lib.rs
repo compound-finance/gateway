@@ -91,6 +91,7 @@ pub trait ValidatorConfigInterface {
     }
 }
 
+/// Set an environment variable to a value if it is not already set to an existing value.
 fn set_validator_config_dev_default(key: &str, value: &str) {
     let existing = std::env::var(key);
     if existing.is_ok() {
@@ -100,6 +101,11 @@ fn set_validator_config_dev_default(key: &str, value: &str) {
     std::env::set_var(key, value);
 }
 
+/// For the local dev environment we want some sane defaults for these configuration values
+/// without always having to set up the developer's machine, with, say, a `.env` file
+/// or a run shell script. We would like to just stick with `cargo run -- ...`. To that end
+/// when the `--dev` flag is passed, these defaults are used but only when an existing environment
+/// variable is not already set.
 pub fn set_validator_config_dev_defaults() {
     set_validator_config_dev_default(ETH_KEY_ID_ENV_VAR, ETH_KEY_ID_ENV_VAR_DEV_DEFAULT);
     set_validator_config_dev_default(ETH_RPC_URL_ENV_VAR, ETH_RPC_URL_ENV_VAR_DEV_DEFAULT);
