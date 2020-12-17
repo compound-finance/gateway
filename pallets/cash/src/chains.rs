@@ -1,10 +1,13 @@
 // Note: The substrate build requires these be imported
-pub use sp_std::vec::Vec;
+pub use our_std::vec::Vec;
+
+use codec::{Decode, Encode};
+use our_std::{Debuggable, Deserialize, RuntimeDebug, Serialize};
 
 // XXX where should this live? with e.g. ethereum_client?
 pub mod eth {
     // Note: The substrate build requires these be imported
-    pub use sp_std::vec::Vec;
+    pub use our_std::vec::Vec;
 
     pub type BlockNumber = u32;
     pub type LogIndex = u32;
@@ -33,17 +36,16 @@ pub type EraId = u32;
 pub type EraIndex = u32;
 pub type NoticeId = (EraId, EraIndex);
 
-// XXX can we elim Debug / bound on our own catch all?
 pub trait L1 {
-    type Address: std::fmt::Debug = [u8; 20];
-    type Account: std::fmt::Debug = Self::Address;
-    type Asset: std::fmt::Debug = Self::Address;
-    type Amount: std::fmt::Debug = u128;
-    type Index: std::fmt::Debug = u128;
-    type Rate: std::fmt::Debug = u128;
-    type Timestamp: std::fmt::Debug = u128;
-    type Hash: std::fmt::Debug = [u8; 32];
-    type Public: std::fmt::Debug = [u8; 32];
+    type Address: Debuggable = [u8; 20];
+    type Account: Debuggable = Self::Address;
+    type Asset: Debuggable = Self::Address;
+    type Amount: Debuggable = u128;
+    type Index: Debuggable = u128;
+    type Rate: Debuggable = u128;
+    type Timestamp: Debuggable = u128;
+    type Hash: Debuggable = [u8; 32];
+    type Public: Debuggable = [u8; 32];
 
     fn hash_bytes(data: &[u8]) -> Self::Hash;
 }
@@ -84,14 +86,7 @@ impl L1 for Tezos {
     }
 }
 
-// XXX better way to use these?
-use codec::{Decode, Encode};
-use sp_runtime::RuntimeDebug;
-#[cfg(feature = "std")]
-use sp_runtime::{Deserialize, Serialize};
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum EventStatus<Chain: L1> {
     Pending {
         signers: Vec<u8>,

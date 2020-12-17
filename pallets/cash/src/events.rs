@@ -1,13 +1,12 @@
 use codec::alloc::string::String;
 use frame_support::debug;
-
-use sp_std::vec::Vec;
+use our_std::{vec::Vec, RuntimeDebug};
 
 extern crate ethereum_client;
 
 use crate::chains;
 
-#[derive(Debug)]
+#[derive(RuntimeDebug)]
 pub struct StarportInfo {
     pub latest_eth_block: String,
     pub lock_events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,

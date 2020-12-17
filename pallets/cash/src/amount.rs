@@ -1,7 +1,7 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Result}; // XXX
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
-use sp_std::vec::Vec;
+use our_std::{vec::Vec, RuntimeDebug};
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -20,7 +20,7 @@ const CASH_DECIMALS: DecimalType = 18;
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
@@ -50,7 +50,7 @@ impl Decode for Amount {
 
 /// Error type for fixed precision math.
 /// todo: is this necessary now?
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, RuntimeDebug)]
 pub enum MathError {
     PrecisionMismatch,
 }

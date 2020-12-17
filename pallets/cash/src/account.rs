@@ -1,12 +1,7 @@
 use codec::{Decode, Encode};
-use sp_std::vec::Vec;
+use our_std::{vec::Vec, Deserialize, RuntimeDebug, Serialize};
 
-use sp_runtime::RuntimeDebug;
-#[cfg(feature = "std")]
-use sp_runtime::{Deserialize, Serialize}; // XXX wrap these
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum ChainIdent {
     Eth,
 }
@@ -14,8 +9,7 @@ pub enum ChainIdent {
 /// The type of the decimal field.
 pub type AccountAddr = Vec<u8>;
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub struct AccountIdent {
     pub chain: ChainIdent,
     pub address: AccountAddr,

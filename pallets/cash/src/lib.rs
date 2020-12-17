@@ -1,20 +1,36 @@
-#![cfg_attr(not(feature = "std"), no_std)]
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
+#![feature(trivial_bounds)]
 
-use codec::{alloc::string::String, Decode, Encode};
-use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
-};
+#[macro_use]
+extern crate alloc;
+extern crate ethereum_client;
+
+mod account;
+mod amount;
+mod chains;
+mod core;
+mod events;
+
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
 
 use crate::account::AccountIdent;
 use crate::amount::CashAmount;
 use crate::chains::{Ethereum, EventStatus, Notice, NoticeId, L1};
 
+use codec::{alloc::string::String, Decode, Encode};
+use frame_support::{
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
+};
 use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
+use our_std::{convert::TryInto, vec::Vec, Deserialize, Serialize};
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
@@ -23,34 +39,11 @@ use sp_runtime::{
     transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
     RuntimeDebug, SaturatedConversion,
 };
-use sp_std::{convert::TryInto, vec::Vec};
-
-#[cfg(feature = "std")]
-use sp_runtime::{Deserialize, Serialize};
-
-extern crate ethereum_client;
-
-mod chains;
-mod core;
-
-#[cfg(test)]
-mod mock;
-
-mod account;
-mod amount;
-mod events;
-
-#[cfg(test)]
-mod tests;
-
-#[macro_use]
-extern crate alloc;
 
 /// Type for an encoded payload within an extrinsic.
 pub type Payload = Vec<u8>;
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum Reason {
     None,
 }

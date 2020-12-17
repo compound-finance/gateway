@@ -1,0 +1,24 @@
+[package]
+authors = ["Compound <https://compound.finance>"]
+description = "Things we use from std, in pallets."
+edition = "2018"
+homepage = "https://compound.cash"
+name = "our-std"
+repository = "https://github.com/compound-finance/compound-chain/"
+version = "0.0.1"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+
+our-std-proc-macro = { path = "./proc-macro" }
+
+[features]
+default = ["std"]
+std = [
+    "sp-runtime/std",
+    "sp-std/std",
+]

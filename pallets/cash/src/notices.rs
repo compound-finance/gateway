@@ -8,7 +8,7 @@ use ethabi;
 use frame_support::debug;
 use num_traits::ToPrimitive;
 use secp256k1;
-use sp_std::vec::Vec;
+use our_std::{vec::Vec, RuntimeDebug};
 use tiny_keccak::Hasher;
 
 // XXX
@@ -21,7 +21,7 @@ pub type GenerationId = u32;
 pub type WithinGenerationId = u32;
 pub type NoticeId = (GenerationId, WithinGenerationId);
 
-#[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
 pub struct NoticePayload {
     // id: Vec<u8>,
     pub msg: Message,
@@ -29,7 +29,7 @@ pub struct NoticePayload {
     pub signer: AccountIdent,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
 pub enum Notice {
     ExtractionNotice {
         chain: ChainIdent,
