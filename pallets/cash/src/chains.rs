@@ -37,16 +37,13 @@ pub trait Chain {
 }
 
 #[derive(Debug)]
-pub struct Ethereum {
-
-}
+pub struct Ethereum {}
 
 // impl from<Vec<u8>> for <self::Ethereum as Chain>::Address {
 //     fn from(x: Vec<u8>) -> Self {
 
-//     } 
+//     }
 // }
-
 
 #[derive(Debug)]
 pub struct Polkadot {}
@@ -57,9 +54,7 @@ pub struct Solana {}
 #[derive(Debug)]
 pub struct Tezos {}
 
-impl Chain for Ethereum {
-
-}
+impl Chain for Ethereum {}
 impl Chain for Polkadot {}
 impl Chain for Solana {}
 impl Chain for Tezos {}

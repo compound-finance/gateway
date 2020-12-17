@@ -1,7 +1,7 @@
 use super::{
     account::{AccountIdent, ChainIdent},
     amount::Amount,
-    chains
+    chains,
 };
 use codec::{Decode, Encode};
 use ethabi;
@@ -9,8 +9,6 @@ use num_traits::ToPrimitive;
 use secp256k1;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
-
-
 
 // XXX
 pub type Message = Vec<u8>;
@@ -102,23 +100,22 @@ fn encode_ethereum_notice(notice: Notice<chains::Ethereum>) -> Vec<u8> {
                 ethabi::token::Token::FixedBytes(account.into()),
                 ethabi::token::Token::Int(x.into()),
             ])
-        },
-        Notice::CashExtractionNotice {..} => {
+        }
+        Notice::CashExtractionNotice { .. } => {
             vec![]
-        },
-    
+        }
+
         Notice::FutureYieldNotice { .. } => {
             vec![]
-        },
-    
+        }
+
         Notice::SetSupplyCapNotice { .. } => {
             vec![]
-        },
-    
+        }
+
         Notice::ChangeAuthorityNotice { .. } => {
             vec![]
         }
-    
     }
 }
 
@@ -164,7 +161,6 @@ fn sign(message: &Message) -> Signature {
     sp_core::ecdsa::Signature::from_raw(r).encode()
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -173,14 +169,19 @@ mod tests {
     #[test]
     fn test_encodes_extraction_notice() {
         let notice = notices::Notice::ExtractionNotice {
-            id: (80, 0),  // XXX need to keep state of current gen/within gen for each, also parent
+            id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [0u8; 32], // XXX,
             asset: [2u8; 20],
             amount: Amount::new_cash(50 as u128),
-            account: [1u8; 20]
+            account: [1u8; 20],
         };
 
-        let expected = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50];
+        let expected = [
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 50,
+        ];
         let encoded = notices::encode_ethereum_notice(notice);
         assert_eq!(encoded, expected);
     }

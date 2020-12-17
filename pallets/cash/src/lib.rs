@@ -10,9 +10,8 @@ use frame_support::{
 
 use crate::account::{AccountIdent, ChainIdent};
 use crate::amount::{Amount, CashAmount};
+use crate::chains::Chain;
 use crate::notices::{Notice, NoticeId};
-use crate::chains::{Chain};
-
 
 use frame_system::{
     ensure_none, ensure_signed,
@@ -41,9 +40,9 @@ mod mock;
 
 mod account;
 mod amount;
+mod chains;
 mod events;
 mod notices;
-mod chains;
 
 #[cfg(test)]
 mod tests;
@@ -164,7 +163,7 @@ decl_module! {
 
             let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
-            let id = (now.into(), 0); 
+            let id = (now.into(), 0);
             let notice = notices::Notice::ExtractionNotice {
                 id: id,  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
