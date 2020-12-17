@@ -2,7 +2,7 @@
 use super::{
     account::{AccountIdent, ChainIdent},
     amount::Amount,
-    chains::{L1, Ethereum},
+    chains::{Ethereum, L1},
 };
 use codec::{Decode, Encode};
 use ethabi;
@@ -245,7 +245,7 @@ fn sign(message: &Message) -> Signature {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use our_std::{vec::Vec};
+    use our_std::vec::Vec;
 
     #[test]
     fn test_encodes_extraction_notice() {
