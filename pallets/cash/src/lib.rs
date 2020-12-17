@@ -64,7 +64,7 @@ pub enum Reason {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum EthEventStatus {
-    Pending { signers: Vec<u8> },          // XXX set(Public)?
+    Pending { signers: Vec<String> },      // XXX set(Public)?
     Failed { hash: Hash, reason: Reason }, // XXX type for err reasons?
     Done,
 }
@@ -98,6 +98,10 @@ decl_storage! {
 
         // TODO: hash type should match to ChainIdent
         pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
+
+        // List of validators' public keys
+        Validators get(fn get_validators): Vec<String> = vec![String::from("0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba"),
+        String::from("04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4")];
     }
 }
 
@@ -138,7 +142,15 @@ decl_error! {
         // Error sending `process_ethereum_event` extrinsic
         OffchainUnsignedLockTxError,
 
+        // Error decoding payload
         SignedPayloadError,
+
+        // Public key doesn't belong to known validator
+        UnknownValidator,
+
+        // Validator has already signed and submitted this payload
+        AlreadySigned
+
     }
 }
 
@@ -188,10 +200,8 @@ decl_module! {
         pub fn process_ethereum_event(origin, payload: chains::eth::Payload, sig: PayloadSignature) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
-            //let signer = recover(payload);
-            //require(signer == known validator);
 
-            // Recover signature part
+            // Recover Signature part
             let mut sig_part: [u8; 64] = [0; 64];
             sig_part[0..64].copy_from_slice(&sig[0..64]);
             let signature = Signature::parse(&sig_part);
@@ -201,17 +211,36 @@ decl_module! {
 
             // Recover validator's public key from signature
             let message = Message::parse(&notices::keccak(payload.clone()));
-            let validator = secp256k1::recover(&message, &signature, &recovery_id);
+            let validator_key = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
 
-            debug::native::info!("Validator public key: {:?}", validator);
+            // Decode to PublicKey to String format
+            let signer = hex::encode(validator_key.serialize());
+            debug::native::info!("Validator public key: {:?} was recovered", signer);
+
+            // Check that signer is a known validator, otherwise throw an error
+            let validators = Self::get_validators();
+            if !validators.contains(&signer) {
+                debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
+                return Err(Error::<T>::UnknownValidator)?
+            }
 
             let event = chains::eth::decode(payload.clone()); // XXX
             let status = <EthEventStatuses>::get(event.id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
             match status {
                 EthEventStatus::Pending { signers } => {
                     // XXX sets?
+                    if !signers.contains(&signer) {
+                        debug::native::error!("Validator has already signed this payload {:?}", signer);
+                        return Err(Error::<T>::AlreadySigned)?
+                    }
+
+                    // Add new validator to the signers
+                    let mut new_signers  = signers.clone();
+                    new_signers.push(signer.clone());
+
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
+                    if signers.len() > 2/3 * validators.len() {
                         match core::apply_ethereum_event_internal(event) {
                             Ok(_) => {
                                 EthEventStatuses::insert(event.id, EthEventStatus::Done);
@@ -225,9 +254,10 @@ decl_module! {
                                 Ok(())
                             }
                         }
-                    // } else {
-                    //     EthEventStatuses::put(event.id, EthEventStatus::Pending(signers_new));
-                    // }
+                    } else {
+                        EthEventStatuses::insert(event.id, EthEventStatus::Pending{ signers: new_signers});
+                        Ok(())
+                    }
                 }
 
                 // XXX potential retry logic to allow retrying Failures
