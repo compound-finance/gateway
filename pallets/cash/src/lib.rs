@@ -6,26 +6,22 @@
 extern crate alloc;
 extern crate ethereum_client;
 
-mod account;
-mod amount;
-mod chains;
-mod core;
-mod events;
-
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
 
-use crate::account::AccountIdent;
-use crate::amount::CashAmount;
-use crate::chains::{Ethereum, EventStatus, Notice, NoticeId, L1};
-
 use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
+
+use crate::account::{AccountIdent, ChainIdent};
+use crate::amount::{Amount, CashAmount};
+use crate::chains::{Ethereum, EventStatus, L1};
+use crate::notices::{Notice, NoticeId};
+
 use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
@@ -42,6 +38,17 @@ use sp_runtime::{
 
 /// Type for an encoded payload within an extrinsic.
 pub type Payload = Vec<u8>;
+
+mod core;
+
+mod account;
+mod amount;
+mod chains;
+mod events;
+mod notices;
+
+// XXX move / unrely
+pub type Hash = Vec<u8>;
 
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum Reason {
@@ -83,6 +90,7 @@ decl_event!(
 
         /// XXX
         MagicExtract(CashAmount, AccountIdent, Notice<Ethereum>),
+        Notice(notices::Message, notices::Signature, AccountIdent),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthereumEvent(Payload),
@@ -140,14 +148,14 @@ decl_module! {
                 id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
                 asset: [0u8; 20],
-                amount: amount,
+                amount: Amount::new_cash(amount),
                 account: account.address.clone().try_into() // XXX avoid clone?
                     .unwrap_or_else(|_| panic!("Address has wrong number of bytes"))
             };
             EthNoticeQueue::insert(notice.id(), &notice);
 
             // Emit an event.
-            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
+            // Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
             // Return a successful DispatchResult
             Ok(())
         }
