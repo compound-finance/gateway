@@ -47,6 +47,9 @@ mod chains;
 mod events;
 mod notices;
 
+// XXX move / unrely
+pub type Hash = Vec<u8>;
+
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum Reason {
     None,

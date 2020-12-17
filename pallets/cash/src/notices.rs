@@ -2,7 +2,7 @@
 use super::{
     account::{AccountIdent, ChainIdent},
     amount::Amount,
-    chains::{Ethereum, L1},
+    chains::{L1, Ethereum},
 };
 use codec::{Decode, Encode};
 use ethabi;
@@ -75,7 +75,7 @@ pub enum Notice<Chain: L1> {
         id: NoticeId,
         parent: Chain::Hash,
         asset: Chain::Asset,
-        amount: Amount,
+        amount: Amount
     },
 
     ChangeAuthorityNotice {
@@ -245,7 +245,7 @@ fn sign(message: &Message) -> Signature {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use our_std::vec::Vec;
+    use our_std::{vec::Vec};
 
     #[test]
     fn test_encodes_extraction_notice() {
