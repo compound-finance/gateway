@@ -45,7 +45,6 @@ fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
         "eth_starport_address" : "0xbbde1662bC3ED16aA8C618c9833c801F3543B587",
         "eth_lock_event_topic" : "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"
-        // todo: override with environment variable and/or cli param?
     });
     let as_object = value.as_object();
     let unwrapped = as_object.unwrap();
@@ -179,6 +178,7 @@ fn testnet_genesis(
 
         pallet_cash: Some(CashConfig {
             cash_balance: vec![], // XXX circular broken substrate -> hacked to gen GenesisConfig, but empty
+            Validators: 0,
         }),
     }
 }

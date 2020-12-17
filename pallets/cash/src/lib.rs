@@ -96,6 +96,12 @@ decl_storage! {
         // TODO: hash type should match to ChainIdent
         pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
     }
+    add_extra_genesis {
+        config(Validators): u8;
+        build(|_: &Self| {
+            // modification of storage
+        })
+    }
 }
 
 decl_event!(
