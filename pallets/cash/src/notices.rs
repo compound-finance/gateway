@@ -5,11 +5,11 @@ use super::{
 };
 use codec::{Decode, Encode};
 use ethabi;
+use hex::ToHex;
 use num_traits::ToPrimitive;
 use secp256k1;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
-use hex::ToHex;
 
 // XXX
 pub type Message = Vec<u8>;
@@ -84,15 +84,16 @@ pub enum Notice<Chain: chains::Chain> {
     },
 }
 
-
 fn encode_ethereum_notice(notice: Notice<chains::Ethereum>) -> Vec<u8> {
     let chain_ident: Vec<u8> = "ETH".into(); // XX make const?
-    let encode_addr = |raw: [u8; 20]| -> Vec<u8> { ethabi::encode(&[ethabi::Token::FixedBytes(raw.into())]) };
-   
+    let encode_addr =
+        |raw: [u8; 20]| -> Vec<u8> { ethabi::encode(&[ethabi::Token::FixedBytes(raw.into())]) };
+
     // XXX do this better, maybe figure out how to use dyn Into<ethereum_types::U256> ?
     let encode_int32 = |raw: u32| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
-    let encode_int128 = |raw: u128| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
-    
+    let encode_int128 =
+        |raw: u128| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
+
     match notice {
         Notice::ExtractionNotice {
             id,
@@ -104,10 +105,19 @@ fn encode_ethereum_notice(notice: Notice<chains::Ethereum>) -> Vec<u8> {
             let era_id: Vec<u8> = encode_int32(id.0);
             let era_index: Vec<u8> = encode_int32(id.1);
             let asset = encode_addr(asset_arr);
-            let amount = encode_int128(amount_tup.mantissa.to_u128().unwrap().into());// XXX cast more safely
+            let amount = encode_int128(amount_tup.mantissa.to_u128().unwrap().into()); // XXX cast more safely
             let account = encode_addr(account_arr);
 
-            [chain_ident, era_id, era_index, parent.into(), asset, amount, account].concat()
+            [
+                chain_ident,
+                era_id,
+                era_index,
+                parent.into(),
+                asset,
+                amount,
+                account,
+            ]
+            .concat()
         }
         Notice::CashExtractionNotice { .. } => {
             vec![]
@@ -186,12 +196,18 @@ mod tests {
 
         let expected = [
             69, 84, 72, // chainType::ETH
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, // eraID
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // eraIndex
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, // parent
-            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // asset
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, // amount
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // account
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 80, // eraID
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, // eraIndex
+            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+            3, 3, 3, // parent
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, // asset
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 50, // amount
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, // account
         ];
 
         let encoded = notices::encode_ethereum_notice(notice);
