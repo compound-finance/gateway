@@ -78,8 +78,6 @@ fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
 
 /// A helper function to sign a message in the style of ethereum
 ///
-/// Does not add the Ethereum prelude, perhaps it should?
-///
 /// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
 /// This is called by web3.js https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/packages/web3-eth-accounts/package.json#L18
 fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
