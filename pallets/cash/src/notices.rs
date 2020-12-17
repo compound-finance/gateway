@@ -9,6 +9,7 @@ use num_traits::ToPrimitive;
 use secp256k1;
 use sp_std::vec::Vec;
 use tiny_keccak::Hasher;
+use hex::ToHex;
 
 // XXX
 pub type Message = Vec<u8>;
@@ -83,23 +84,30 @@ pub enum Notice<Chain: chains::Chain> {
     },
 }
 
+
 fn encode_ethereum_notice(notice: Notice<chains::Ethereum>) -> Vec<u8> {
+    let chain_ident: Vec<u8> = "ETH".into(); // XX make const?
+    let encode_addr = |raw: [u8; 20]| -> Vec<u8> { ethabi::encode(&[ethabi::Token::FixedBytes(raw.into())]) };
+   
+    // XXX do this better, maybe figure out how to use dyn Into<ethereum_types::U256> ?
+    let encode_int32 = |raw: u32| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
+    let encode_int128 = |raw: u128| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
+    
     match notice {
         Notice::ExtractionNotice {
-            id: _,
-            parent: _,
-            asset,
-            account,
-            amount,
+            id,
+            parent,
+            asset: asset_arr,
+            account: account_arr,
+            amount: amount_tup,
         } => {
-            // TODO: safer decoding of the amount
-            let x = amount.mantissa.to_u128().unwrap();
+            let era_id: Vec<u8> = encode_int32(id.0);
+            let era_index: Vec<u8> = encode_int32(id.1);
+            let asset = encode_addr(asset_arr);
+            let amount = encode_int128(amount_tup.mantissa.to_u128().unwrap().into());// XXX cast more safely
+            let account = encode_addr(account_arr);
 
-            ethabi::encode(&[
-                ethabi::token::Token::FixedBytes(asset.into()),
-                ethabi::token::Token::FixedBytes(account.into()),
-                ethabi::token::Token::Int(x.into()),
-            ])
+            [chain_ident, era_id, era_index, parent.into(), asset, amount, account].concat()
         }
         Notice::CashExtractionNotice { .. } => {
             vec![]
@@ -120,7 +128,7 @@ fn encode_ethereum_notice(notice: Notice<chains::Ethereum>) -> Vec<u8> {
 }
 
 // pub fn to_eth_payload(notice: Notice) -> NoticePayload {
-//     let message = encode(notice);
+//     let message = encode_ethereum_notice(notice);
 //     // TODO: do signer by chain
 //     let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61"
 //         .as_bytes()
@@ -128,7 +136,7 @@ fn encode_ethereum_notice(notice: Notice<chains::Ethereum>) -> Vec<u8> {
 //     NoticePayload {
 //         // id: move id,
 //         sig: sign(&message),
-//         msg: message.to_vec(),
+//         msg: message.to_vec(), // perhaps hex::encode(message)
 //         signer: AccountIdent {
 //             chain: ChainIdent::Eth,
 //             account: signer,
@@ -170,18 +178,22 @@ mod tests {
     fn test_encodes_extraction_notice() {
         let notice = notices::Notice::ExtractionNotice {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
-            parent: [0u8; 32], // XXX,
+            parent: [3u8; 32],
             asset: [2u8; 20],
             amount: Amount::new_cash(50 as u128),
             account: [1u8; 20],
         };
 
         let expected = [
-            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 50,
+            69, 84, 72, // chainType::ETH
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, // eraID
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // eraIndex
+            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, // parent
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // asset
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, // amount
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // account
         ];
+
         let encoded = notices::encode_ethereum_notice(notice);
         assert_eq!(encoded, expected);
     }
