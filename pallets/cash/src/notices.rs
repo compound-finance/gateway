@@ -74,7 +74,7 @@ pub enum Notice<Chain: L1> {
         id: NoticeId,
         parent: Chain::Hash,
         asset: Chain::Asset,
-        amount: Amount
+        amount: Amount,
     },
 
     ChangeAuthorityNotice {

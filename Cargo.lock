@@ -3754,6 +3754,7 @@ name = "pallet-cash"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "ethabi",
  "ethereum-client",
  "frame-support",
  "frame-system",
