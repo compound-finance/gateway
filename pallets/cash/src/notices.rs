@@ -93,13 +93,13 @@ fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
         res.to_vec()
     };
 
-    let encode_int32 = |raw: u32| -> Vec<u8> { 
+    let encode_int32 = |raw: u32| -> Vec<u8> {
         let mut res: [u8; 32] = [0; 32];
         res[28..32].clone_from_slice(&raw.to_be_bytes());
         res.to_vec()
     };
 
-    let encode_int128 = |raw: u128| -> Vec<u8> { 
+    let encode_int128 = |raw: u128| -> Vec<u8> {
         let mut res: [u8; 32] = [0; 32];
         res[16..32].clone_from_slice(&raw.to_be_bytes());
         res.to_vec()
