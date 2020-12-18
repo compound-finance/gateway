@@ -13,17 +13,27 @@ pub mod eth {
         pub id: EventId,
     }
 
+    // XX Decode more fields and more event types
     pub fn decode(data: Vec<u8>) -> Event {
-        Event { id: (13, 37) } // XXX
+        let types = vec![
+            ethabi::param_type::ParamType::Uint(256),
+            ethabi::param_type::ParamType::Uint(256),
+        ];
+        let abi_decoded = ethabi::decode(&types[..], &data);
+        let decoded = abi_decoded.unwrap();
+        let block_number = ethereum_client::extract_uint(&decoded[0]).unwrap();
+        let log_index = ethereum_client::extract_uint(&decoded[1]).unwrap();
+        Event {
+            id: (block_number.as_u32(), log_index.as_u32()),
+        } // XXX
     }
 
     /// XXX Work on sending proper Payload,
-    /// XXX is Decoding and encoding useless here
     pub fn encode(event: &Event) -> Vec<u8> {
         let (block_number, log_index): (u32, u32) = event.id;
         ethabi::encode(&[
-            ethabi::token::Token::Int(block_number.into()),
-            ethabi::token::Token::Int(log_index.into()),
+            ethabi::token::Token::Uint(block_number.into()),
+            ethabi::token::Token::Uint(log_index.into()),
         ])
     }
 }
