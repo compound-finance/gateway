@@ -41,24 +41,26 @@ pub type BlockNumber = u32;
 pub type LogIndex = u32;
 pub type EventId = (BlockNumber, LogIndex);
 pub type EthPayload = Vec<u8>;
+type EthAddress = [u8; 20];
+type EthAccount = EthAddress;
+type EthAsset = EthAddress;
 
 #[derive(Debug, Encode, Decode)]
 pub enum EthereumEvent {
     LockEvent {
         id: EventId,
-        //parent: Chain::Hash,
-        // asset: Chain::Asset,
-        // account: Chain::Account,
-        // amount: Amount,
+        asset: EthAddress,
+        holder: EthAddress,
+        amount: Amount,
     },
 
     LockCashEvent {
         id: EventId,
-        //parent: Chain::Hash,
-        // account: Chain::Asset,
-        // amount: Chain::Account,
-        // cash_yield_index: Index,
+        holder: EthAddress,
+        amount: Amount,
+        yield_index: Amount,
     },
+
     GovEvent {
         id: EventId,
     },

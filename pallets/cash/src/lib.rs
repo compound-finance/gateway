@@ -425,7 +425,8 @@ impl<T: Config> Module<T> {
         for event in events.iter() {
             debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
-            let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let payload =
+                events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
 
             let signature = Self::sign_payload(payload.clone());
 
@@ -445,9 +446,9 @@ impl<T: Config> Module<T> {
         event: &chains::EthereumEvent,
     ) -> Result<chains::EventId, Error<T>> {
         match event {
-            chains::EthereumEvent::LockEvent { id } => Ok(*id),
-            chains::EthereumEvent::LockCashEvent { id } => Ok(*id),
-            chains::EthereumEvent::GovEvent { id } => Ok(*id),
+            chains::EthereumEvent::LockEvent { id, .. } => Ok(*id),
+            chains::EthereumEvent::LockCashEvent { id, .. } => Ok(*id),
+            chains::EthereumEvent::GovEvent { id, .. } => Ok(*id),
             _ => Err(Error::<T>::UnknownEthereumEventType),
         }
     }
