@@ -251,7 +251,7 @@ decl_module! {
 
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                    if signers.len() > 2/3 * validators.len() {
+                    if signers.len() > 2 * validators.len() / 3  {
                         match core::apply_ethereum_event_internal(event) {
                             Ok(_) => {
                                 EthEventStatuses::insert(event_id, EthEventStatus::Done);
