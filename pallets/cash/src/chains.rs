@@ -45,7 +45,7 @@ pub trait L1 {
     type Rate: Debuggable = u128;
     type Timestamp: Debuggable = u128;
     type Hash: Debuggable = [u8; 32];
-    type Public: Debuggable = [u8; 32];
+    type Public: Debuggable;
 
     fn hash_bytes(data: &[u8]) -> Self::Hash;
 }
@@ -63,24 +63,28 @@ pub struct Solana {}
 pub struct Tezos {}
 
 impl L1 for Ethereum {
+    type Public = [u8; 20];
     fn hash_bytes(data: &[u8]) -> Self::Hash {
         [0u8; 32] // XXX
     }
 }
 
 impl L1 for Polkadot {
+    type Public = [u8; 20]; //XXX placeholder
     fn hash_bytes(data: &[u8]) -> Self::Hash {
         [1u8; 32] // XXX
     }
 }
 
 impl L1 for Solana {
+    type Public = [u8; 20]; //XXX placeholder
     fn hash_bytes(data: &[u8]) -> Self::Hash {
         [2u8; 32] // XXX
     }
 }
 
 impl L1 for Tezos {
+    type Public = [u8; 20]; //XXX placeholder
     fn hash_bytes(data: &[u8]) -> Self::Hash {
         [3u8; 32] // XXX
     }

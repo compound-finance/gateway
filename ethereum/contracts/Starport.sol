@@ -22,6 +22,7 @@ contract Starport {
 
 	address constant public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 	bytes32 constant public ETH_CHAIN_IDENT = keccak256(abi.encodePacked("ETH"));
+	uint constant HEAD_BYTES = 99; // bytes3 chainIdent, uint256 eraId, uint256 eraIndex, address parent
 	address[] public authorities;
 
 	uint public eraId; // TODO: could bitpack here and use uint32
@@ -29,7 +30,7 @@ contract Starport {
 
 	event LockCash(address holder, uint amount, uint yieldIndex);
 	event Lock(address asset, address holder, uint amount);
-	event Unlock(address asset, address account, uint amount);
+	event Unlock(address account, uint amount, address asset);
 	event ChangeAuthorities(bytes32 authHash);
 
 	constructor(ICash cash_, address[] memory authorities_) {
@@ -85,27 +86,27 @@ contract Starport {
 	
 	// @dev notice = (bytes3 chainIdent, uint generationId, uint interGenerationId, address asset, address account, uint amount)
 	function unlock(bytes calldata notice, bytes[] calldata signatures) external {
-		require(notice.length == 163, "Invalid unlock length"); // 67 + 96
+		require(notice.length == 195, "Invalid unlock length"); // 99 + 96
 
 		assertNoticeAuthorized(notice, authorities, signatures, false);
 
-		bytes calldata body = notice[67:];
+		bytes calldata body = notice[HEAD_BYTES:];
 		// Decode the notice
-		address asset = abi.decode(body[:32], (address));
-		address account = abi.decode(body[32:64], (address));
-		uint amount = abi.decode(body[64:96], (uint));
+		address account = abi.decode(body[:32], (address));
+		uint amount = abi.decode(body[32:64], (uint));
+		address asset = abi.decode(body[64:96], (address));
 
 		isNoticeUsed[hash(notice)] = true;
-		emit Unlock(asset, account, amount);
+		emit Unlock(account, amount, asset);
 		// IERC20(asset).transfer(amount, account);
 	}
 
 	// @dev notice = (bytes3 chainIdent, uint256 eraId, uint256 eraIndex, address[] newAuths)
 	function changeAuthorities(bytes calldata notice, bytes[] calldata signatures) external {
-		require(notice.length >= 99, "New authority set can not be empty");//67 bytes of header, 32 * n bytes of auths
+		require(notice.length >= 99, "New authority set can not be empty");//99 bytes of header, 32 * n bytes of auths
 		assertNoticeAuthorized(notice, authorities, signatures, true);
 
-		bytes calldata body = notice[67:];
+		bytes calldata body = notice[HEAD_BYTES:];
 		require(body.length % 32 == 0, "Excess bytes");
 		uint numAuths = body.length / 32;// evm word size is 32 bytes
 
