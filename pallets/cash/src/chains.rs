@@ -1,42 +1,6 @@
 // XXX where should this live? with e.g. ethereum_client?
-pub mod eth {
-    // Note: The substrate build requires these be imported
-    pub use sp_std::vec::Vec;
-
-    pub type Payload = Vec<u8>;
-    pub type BlockNumber = u32;
-    pub type LogIndex = u32;
-    pub type EventId = (BlockNumber, LogIndex);
-
-    #[derive(Clone, Copy)]
-    pub struct Event {
-        pub id: EventId,
-    }
-
-    // XX Decode more fields and more event types
-    pub fn decode(data: Vec<u8>) -> Event {
-        let types = vec![
-            ethabi::param_type::ParamType::Uint(256),
-            ethabi::param_type::ParamType::Uint(256),
-        ];
-        let abi_decoded = ethabi::decode(&types[..], &data);
-        let decoded = abi_decoded.unwrap();
-        let block_number = ethereum_client::extract_uint(&decoded[0]).unwrap();
-        let log_index = ethereum_client::extract_uint(&decoded[1]).unwrap();
-        Event {
-            id: (block_number.as_u32(), log_index.as_u32()),
-        } // XXX
-    }
-
-    /// XXX Work on sending proper Payload,
-    pub fn encode(event: &Event) -> Vec<u8> {
-        let (block_number, log_index): (u32, u32) = event.id;
-        ethabi::encode(&[
-            ethabi::token::Token::Uint(block_number.into()),
-            ethabi::token::Token::Uint(log_index.into()),
-        ])
-    }
-}
+use codec::{Decode, Encode};
+use sp_std::vec::Vec;
 
 pub type Amount = u128; // XXX not really
 pub type Index = u128; // XXX
@@ -71,6 +35,34 @@ impl L1 for Ethereum {}
 impl L1 for Polkadot {}
 impl L1 for Solana {}
 impl L1 for Tezos {}
+
+// Ethereum events types
+pub type BlockNumber = u32;
+pub type LogIndex = u32;
+pub type EventId = (BlockNumber, LogIndex);
+pub type EthPayload = Vec<u8>;
+
+#[derive(Debug, Encode, Decode)]
+pub enum EthereumEvent {
+    LockEvent {
+        id: EventId,
+        //parent: Chain::Hash,
+        // asset: Chain::Asset,
+        // account: Chain::Account,
+        // amount: Amount,
+    },
+
+    LockCashEvent {
+        id: EventId,
+        //parent: Chain::Hash,
+        // account: Chain::Asset,
+        // amount: Chain::Account,
+        // cash_yield_index: Index,
+    },
+    GovEvent {
+        id: EventId,
+    },
+}
 
 #[derive(Debug)]
 pub enum Notice<'a, Chain: L1> {

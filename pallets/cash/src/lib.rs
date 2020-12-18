@@ -70,7 +70,7 @@ pub enum EthEventStatus {
 }
 
 // XXXX experimental
-pub fn compute_hash(payload: chains::eth::Payload) -> Hash {
+pub fn compute_hash(payload: chains::EthPayload) -> Hash {
     // XXX where Payload: Hash
     payload // XXX
 }
@@ -94,7 +94,7 @@ decl_storage! {
         CashBalance get(fn cash_balance) config(): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
 
         // Mapping of (status of) events witnessed on Ethereum by event id.
-        EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::eth::EventId => Option<EthEventStatus>;
+        EthEventStatuses get(fn eth_event_statuses): map hasher(twox_64_concat) chains::EventId => Option<EthEventStatus>;
 
         // TODO: hash type should match to ChainIdent
         pub NoticeQueue get(fn notice_queue): double_map hasher(blake2_128_concat) ChainIdent, hasher(blake2_128_concat) NoticeId => Option<Notice>;
@@ -109,7 +109,7 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
-        Payload = chains::eth::Payload,                     //XXX<T as Config>::Payload ?,
+        Payload = chains::EthPayload,                       //XXX<T as Config>::Payload ?,
     {
         XXXPhantomFakeEvent(AccountId), // XXX
 
@@ -149,7 +149,13 @@ decl_error! {
         UnknownValidator,
 
         // Validator has already signed and submitted this payload
-        AlreadySigned
+        AlreadySigned,
+
+        // Error while decoding ethereum event from payload
+        DecodeEthereumEventError,
+
+        // Fetched event type is not known
+        UnknownEthereumEventType
 
     }
 }
@@ -197,7 +203,7 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: chains::eth::Payload, sig: PayloadSignature) -> dispatch::DispatchResult {
+        pub fn process_ethereum_event(origin, payload: chains::EthPayload, sig: PayloadSignature) -> dispatch::DispatchResult {
             // XXX
             // XXX do we want to store/check hash to allow replaying?
 
@@ -224,8 +230,12 @@ decl_module! {
                 return Err(Error::<T>::UnknownValidator)?
             }
 
-            let event = chains::eth::decode(payload.clone()); // XXX
-            let status = <EthEventStatuses>::get(event.id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
+            let event = chains::EthereumEvent::decode(&mut &*payload).map_err(|_| <Error<T>>::DecodeEthereumEventError)?;
+            debug::native::info!("Processing ethereum event {:?}", event);
+
+            let event_id = Self::get_id_from_ethereum_event(&event)?;
+
+            let status = <EthEventStatuses>::get(event_id).unwrap_or(EthEventStatus::Pending { signers: vec![] }); // XXX
             match status {
                 EthEventStatus::Pending { signers } => {
                     // XXX sets?
@@ -244,19 +254,19 @@ decl_module! {
                     if signers.len() > 2/3 * validators.len() {
                         match core::apply_ethereum_event_internal(event) {
                             Ok(_) => {
-                                EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                                EthEventStatuses::insert(event_id, EthEventStatus::Done);
                                 Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
                                 Ok(())
                             }
 
                             Err(reason) => {
-                                EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash: compute_hash(payload.clone()), reason: reason.clone() }); // XXX better way?
+                                EthEventStatuses::insert(event_id, EthEventStatus::Failed { hash: compute_hash(payload.clone()), reason: reason.clone() }); // XXX better way?
                                 Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, reason));
                                 Ok(())
                             }
                         }
                     } else {
-                        EthEventStatuses::insert(event.id, EthEventStatus::Pending{ signers: new_signers});
+                        EthEventStatuses::insert(event_id, EthEventStatus::Pending{ signers: new_signers});
                         Ok(())
                     }
                 }
@@ -266,13 +276,13 @@ decl_module! {
                     //require(compute_hash(payload) == hash, "event data differs from failure");
                     match core::apply_ethereum_event_internal(event) {
                         Ok(_) => {
-                            EthEventStatuses::insert(event.id, EthEventStatus::Done);
+                            EthEventStatuses::insert(event_id, EthEventStatus::Done);
                             Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
                             Ok(())
                         }
 
                         Err(new_reason) => {
-                            EthEventStatuses::insert(event.id, EthEventStatus::Failed { hash, reason: new_reason.clone()}); // XXX
+                            EthEventStatuses::insert(event_id, EthEventStatus::Failed { hash, reason: new_reason.clone()}); // XXX
                             Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, new_reason));
                             Ok(())
                         }
@@ -429,6 +439,17 @@ impl<T: Config> Module<T> {
             }
         }
         Ok(())
+    }
+
+    fn get_id_from_ethereum_event(
+        event: &chains::EthereumEvent,
+    ) -> Result<chains::EventId, Error<T>> {
+        match event {
+            chains::EthereumEvent::LockEvent { id } => Ok(*id),
+            chains::EthereumEvent::LockCashEvent { id } => Ok(*id),
+            chains::EthereumEvent::GovEvent { id } => Ok(*id),
+            _ => Err(Error::<T>::UnknownEthereumEventType),
+        }
     }
 
     /// XXX this part will be rewritten as soon as keys are done
