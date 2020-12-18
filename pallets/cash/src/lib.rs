@@ -229,7 +229,8 @@ decl_module! {
             match status {
                 EthEventStatus::Pending { signers } => {
                     // XXX sets?
-                    if !signers.contains(&signer) {
+                    debug::native::info!("Signers {:?}", signers);
+                    if signers.contains(&signer) {
                         debug::native::error!("Validator has already signed this payload {:?}", signer);
                         return Err(Error::<T>::AlreadySigned)?
                     }
@@ -459,7 +460,8 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             // The transaction is only valid for next 10 blocks. After that it's
             // going to be revalidated by the pool.
             .longevity(10)
-            .and_provides("fix_this_function")
+            /// XXX this causes an error, disable for now
+            // .and_provides("fix_this_function")
             // It's fine to propagate that transaction to other peers, which means it can be
             // created even by nodes that don't produce blocks.
             // Note that sometimes it's better to keep it for yourself (if you are the block
