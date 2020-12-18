@@ -4,7 +4,7 @@ use frame_support::debug;
 use sp_std::vec::Vec;
 
 extern crate ethereum_client;
-use codec::{Decode, Encode};
+use codec::Encode;
 
 use crate::chains;
 
