@@ -22,7 +22,7 @@ contract Starport {
 
 	address constant public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 	bytes32 constant public ETH_CHAIN_IDENT = keccak256(abi.encodePacked("ETH"));
-	uint constant HEAD_BYTES = 99; // bytes3 chainIdent, uint256 eraId, uint256 eraIndex, address parent
+	uint constant HEAD_BYTES = 99; // bytes3 chainIdent, uint256 eraId, uint256 eraIndex, bytes32 parent
 	address[] public authorities;
 
 	uint public eraId; // TODO: could bitpack here and use uint32
