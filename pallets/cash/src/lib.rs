@@ -6,26 +6,11 @@
 extern crate alloc;
 extern crate ethereum_client;
 
-mod account;
-mod amount;
-mod chains;
-mod core;
-mod events;
-
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
-
-use crate::account::AccountIdent;
-use crate::amount::CashAmount;
-use crate::chains::{Ethereum, EventStatus, Notice, NoticeId, L1};
-
 use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
+
 use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
@@ -40,13 +25,40 @@ use sp_runtime::{
     RuntimeDebug, SaturatedConversion,
 };
 
-/// Type for an encoded payload within an extrinsic.
-pub type Payload = Vec<u8>;
+use crate::account::AccountIdent;
+use crate::amount::{Amount, CashAmount};
+use crate::chains::{Chain, Ethereum, EventStatus}; // XXX events mod?
+use crate::notices::{Notice, NoticeId, NoticeStatus};
+
+mod account;
+mod amount;
+mod chains;
+mod core;
+mod events;
+mod notices; // XXX
+
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum Reason {
     None,
 }
+
+/// Type for an encoded payload within an extrinsic.
+pub type SignedPayload = Vec<u8>; // XXX
+
+/// Type for signature used to verify that a signed payload comes from a validator.
+pub type ValidatorSig = [u8; 32]; // XXX
+
+/// Type for a public key used to identify a validator.
+pub type ValidatorKey = [u8; 32]; // XXX
+
+/// Type for a set of validator identities.
+pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
@@ -70,7 +82,7 @@ decl_storage! {
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
         // Mapping of (status of) notices to be signed for Ethereum, by notice id.
-        EthNoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<Notice<Ethereum>>;
+        EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
     }
 }
 
@@ -85,10 +97,13 @@ decl_event!(
         MagicExtract(CashAmount, AccountIdent, Notice<Ethereum>),
 
         /// An Ethereum event was successfully processed. [payload]
-        ProcessedEthereumEvent(Payload),
+        ProcessedEthEvent(SignedPayload),
 
         /// An Ethereum event failed during processing. [payload, reason]
-        FailedProcessingEthereumEvent(Payload, Reason),
+        FailedProcessingEthEvent(SignedPayload, Reason),
+
+        /// Signed Ethereum notice. [message, signatures]
+        SignedNotice(notices::Message, notices::Signatures), // XXX emit Payload? NoticePayload? should be common to all notices
     }
 );
 
@@ -103,10 +118,10 @@ decl_error! {
         // Error returned when fetching starport info
         HttpFetchingError,
 
-        // Error when processing `Lock` event while sending `process_ethereum_event` extrinsic
+        // Error when processing `Lock` event while sending `process_eth_event` extrinsic
         ProcessLockEventError,
 
-        // Error sending `process_ethereum_event` extrinsic
+        // Error sending `process_eth_event` extrinsic
         OffchainUnsignedLockTxError,
     }
 }
@@ -144,20 +159,19 @@ decl_module! {
                 account: account.address.clone().try_into() // XXX avoid clone?
                     .unwrap_or_else(|_| panic!("Address has wrong number of bytes"))
             };
-            EthNoticeQueue::insert(notice.id(), &notice);
+            EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
             // Emit an event.
-            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
+            // Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
             // Return a successful DispatchResult
             Ok(())
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_ethereum_event(origin, payload: Payload) -> dispatch::DispatchResult {
-            // XXX
+        pub fn process_eth_event(origin, payload: SignedPayload) -> dispatch::DispatchResult {
             // XXX do we want to store/check hash to allow replaying?
-            //let signer = recover(payload);
-            //require(signer == known validator);
+            //let signer = recover(payload); // XXX
+            //require(signer == known validator); // XXX
             let event = chains::eth::decode(payload.as_slice()); // XXX
             let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
@@ -165,43 +179,79 @@ decl_module! {
                     // XXX sets?
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                        match core::apply_ethereum_event_internal(event) {
+                        match core::apply_eth_event_internal(event) {
                             Ok(_) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                                Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
+                                Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
                                 Ok(())
                             }
 
                             Err(reason) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash: Ethereum::hash_bytes(payload.as_slice()), reason: reason });
-                                Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, reason));
+                                Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, reason));
                                 Ok(())
                             }
                         }
                     // } else {
-                    //     EthEventQueue::put(event.id, EthEventStatus::<Ethereum>::Pending(signers_new));
+                    //     EthEventQueue::insert(event.id, EthEventStatus::<Ethereum>::Pending { signers: signers_new });
+                    //     Ok(())
                     // }
                 }
 
                 // XXX potential retry logic to allow retrying Failures
                 EventStatus::<Ethereum>::Failed { hash, .. } => {
                     // XXX require(compute_hash(payload) == hash, "event data differs from failure");
-                    match core::apply_ethereum_event_internal(event) {
+                    match core::apply_eth_event_internal(event) {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                            Self::deposit_event(RawEvent::ProcessedEthereumEvent(payload));
+                            Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
                             Ok(())
                         }
 
                         Err(new_reason) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
-                            Self::deposit_event(RawEvent::FailedProcessingEthereumEvent(payload, new_reason));
+                            Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, new_reason));
                             Ok(())
                         }
                     }
                 }
 
-                EventStatus::<Ethereum>::Done => Ok(())
+                EventStatus::<Ethereum>::Done => {
+                    // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
+                    Ok(())
+                }
+            }
+        }
+
+        #[weight = 0] // XXX
+        pub fn publish_eth_signature(origin, notice_id: NoticeId, signature: ValidatorSig) -> dispatch::DispatchResult {
+            //let signer = recover(payload); // XXX
+            //require(signer == known validator); // XXX
+
+            let status = <EthNoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::<Ethereum>::Missing);
+            match status {
+                NoticeStatus::<Ethereum>::Missing => {
+                    Ok(())
+                }
+
+                NoticeStatus::<Ethereum>::Pending { signers, signatures, notice } => {
+                    // XXX sets?
+                    // let signers_new = {signer | signers};
+                    // let signatures_new = {signature | signatures };
+                    // if len(signers_new & Validators) > 2/3 * len(Validators) {
+                           EthNoticeQueue::insert(notice_id, NoticeStatus::<Ethereum>::Done);
+                           Self::deposit_event(RawEvent::SignedNotice(notices::encode_ethereum_notice(notice), signatures)); // XXX generic
+                           Ok(())
+                    // } else {
+                    //     EthNoticeQueue::insert(event.id, NoticeStatus::<Ethereum>::Pending { signers: signers_new, signatures, notice});
+                    //     Ok(())
+                    // }
+                }
+
+                NoticeStatus::<Ethereum>::Done => {
+                    // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
+                    Ok(())
+                }
             }
         }
 
@@ -214,18 +264,6 @@ decl_module! {
             Err(Error::<T>::NoneValue)?
         }
 
-        // XXX what is this fn for??
-        // #[weight = 0]
-        // pub fn emit_notice(origin, notice: notices::NoticePayload) -> dispatch::DispatchResult {
-            // TODO: Move to using unsigned and getting author from signature
-            // TODO I don't know what this comment means ^
-            // ensure_none(origin)?;
-
-            // debug::native::info!("emitting notice: {:?}", notice);
-            // Self::deposit_event(RawEvent::Notice(notice.msg, notice.sig, notice.signer));
-
-        //     Ok(())
-        // }
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
@@ -235,21 +273,21 @@ decl_module! {
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error: {:?}", e);
             }
-            Self::process_ethereum_notices(block_number);
+            Self::process_eth_notices(block_number);
         }
     }
 }
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
-    pub fn process_ethereum_notices(block_number: T::BlockNumber) {
+    pub fn process_eth_notices(block_number: T::BlockNumber) {
         for notice in EthNoticeQueue::iter_values() {
             // find parent
             // id = notice.gen_id(parent)
 
             // submit onchain call for aggregating the price
             // let payload = notices::to_payload(notice);
-            // let call = Call::emit_notice(payload);
+            // let call = Call::publish_eth_signature(payload);
 
             // Unsigned tx
             // SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
@@ -330,7 +368,7 @@ impl<T: Config> Module<T> {
             debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
             let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let call = Call::process_ethereum_event(payload);
+            let call = Call::process_eth_event(payload);
 
             // XXX Unsigned tx for now
             let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
