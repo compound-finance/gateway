@@ -1,39 +1,43 @@
 use crate::amount::{Amount, DecimalType, MathError};
 use num_traits::{Pow, ToPrimitive};
 
-/// The interest rate number of decimals as a float eg 12 decimals of precision
-pub const RATE_DECIMALS_FLOAT: f64 = 12f64;
-/// The interest rate mantissa scalar for rates as stored in i64 eg 1,000,000,000,000 1 trillion
-pub const RATE_ONE_MANTISSA: u64 = 1000000000000;
+/// 1 in decimal is 10000 basis points
+pub const DECIMAL_TO_BASIS_POINTS: f64 = 10000f64;
 /// Approximate number of seconds in one year.
 /// 1 year = 365.2425 days = (365.2425 days) × (24 hours/day) × (3600 seconds/hour) = 31556952 seconds
 pub const SECONDS_PER_YEAR: u64 = 31556952u64;
 
 /// Struct to store the interest rate on the compound chain. This interest rate may go negative. This
-/// interest rate is a number that represents something like 3% APY and is changed via governance.
-/// In that sense it does not change as time progresses as the interest index does.
+/// interest rate is a number that represents something like 3% APR and is changed via governance.
+/// In that sense it does not change naturally as time progresses as the interest index does.
 ///
-/// The rate is stored as an i64 and is stored as DECIMAL type as opposed to PERCENT or BASIS POINTS.
-/// So if the RATE_DECIMALS_FLOAT value is 5 and we wanted to store 3 percent per year as our rate
-/// the value of the Mantissa field should be 3000. The rate is signed and as such it may become
-/// negative. Calling code should expect this case and account for it.
+/// The rate is stored as an i16 and is stored as BASIS POINTS as an INTEGER. The extremum are
+/// plus or minus 163.84% per year.
 struct Rate {
-    mantissa: i64,
+    basis_points_per_year: i16,
 }
 
 impl Rate {
-    pub fn new(mantissa: i64) -> Rate {
-        Rate { mantissa }
+    /// Create a new interest rate
+    pub fn new(basis_points_per_year: i16) -> Rate {
+        Rate {
+            basis_points_per_year,
+        }
     }
 
-    pub fn to_f64(self: &Self) -> Result<f64, MathError> {
-        let mantissa: f64 = self.mantissa.to_f64().ok_or(MathError::ConversionError)?;
-        let ten = 10f64;
-        let pow_ten: f64 = ten.pow(RATE_DECIMALS_FLOAT);
-        let result = mantissa / pow_ten;
+    /// Convert a rate to a float as decimals. For example if your rate is 300 basis points
+    /// then this function returns 0.03f64. This is useful for interest rate calculations.
+    pub fn to_f64_as_decimal(self: &Self) -> Result<f64, MathError> {
+        let mantissa: f64 = self
+            .basis_points_per_year
+            .to_f64()
+            .ok_or(MathError::ConversionError)?;
+        let result = mantissa / DECIMAL_TO_BASIS_POINTS;
         Ok(result)
     }
 
+    /// The exponential function applied to the current value. If the current value is 300 basis points
+    /// then this function returns exp(0.03)
     pub fn exp(self: &Self, destination_decimals: DecimalType) -> Result<Amount, MathError> {
         self.to_index(destination_decimals, SECONDS_PER_YEAR)
     }
@@ -48,7 +52,7 @@ impl Rate {
         time_in_seconds: u64,
     ) -> Result<Amount, MathError> {
         // this is something like 0.03 now
-        let converted = self.to_f64()?;
+        let converted = self.to_f64_as_decimal()?;
         // Now, need to scale by our time factor, because our interest rate is represented as DECIMAL
         // we do not need to "divide by 100" as you would with percent. Because our interest rate
         // is annualized, we must annualize our time as well, the given time is in units of seconds
@@ -65,15 +69,15 @@ impl Rate {
 mod tests {
     use super::*;
 
-    fn rate_from_percent(percent: i64) -> Rate {
-        Rate::new(percent * (RATE_ONE_MANTISSA as i64) / 100i64)
+    fn rate_from_percent(percent: i16) -> Rate {
+        Rate::new(percent * 100)
     }
 
     #[test]
     fn test_into_float() {
         let one_half = rate_from_percent(50);
         let expected = 0.5f64;
-        let actual: f64 = one_half.to_f64().unwrap();
+        let actual: f64 = one_half.to_f64_as_decimal().unwrap();
         assert_eq!(expected, actual);
     }
 
