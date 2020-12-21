@@ -46,6 +46,7 @@ mod amount;
 mod chains;
 mod events;
 mod notices;
+mod rate;
 
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
 pub enum Reason {

@@ -1,7 +1,9 @@
 use anyhow::{bail, Result}; // XXX
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
+use num_traits::{FromPrimitive, ToPrimitive};
 use our_std::{vec::Vec, RuntimeDebug};
+use sp_runtime::traits::Zero;
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -53,6 +55,8 @@ impl Decode for Amount {
 #[derive(Copy, Clone, PartialEq, RuntimeDebug)]
 pub enum MathError {
     PrecisionMismatch,
+    ConversionError,
+    DivisionByZero,
 }
 
 impl Amount {
@@ -97,11 +101,29 @@ impl Amount {
         let new_mantissa = ten.pow(decimals_cast as u32);
         Self::new(new_mantissa, decimals)
     }
+
+    pub fn from_f64_lossy(source: f64, decimals: DecimalType) -> Result<Amount, MathError> {
+        let one = Self::one(decimals);
+        let pow_ten = one.mantissa.to_f64().ok_or(MathError::ConversionError)?;
+        let new_mantissa = source * pow_ten;
+        let new_mantissa_truncated =
+            MantissaType::from_f64(new_mantissa).ok_or(MathError::ConversionError)?;
+
+        Ok(Self::new(new_mantissa_truncated, decimals))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_from_f64_lossy() {
+        let source = 0.5f64;
+        let expected = Amount::new(500u64, 3);
+        let actual = Amount::from_f64_lossy(source, 3).unwrap();
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn test_one() {
