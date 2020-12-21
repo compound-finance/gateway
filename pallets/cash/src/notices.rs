@@ -1,38 +1,72 @@
-// XXX not used but keep until merge with Coburn
-use super::{
-    account::{AccountIdent, ChainIdent},
-    amount::Amount,
-    chains::{Ethereum, L1},
-};
+use super::chains::{Chain, Ethereum};
 use codec::{Decode, Encode};
 use hex::ToHex;
 use num_traits::ToPrimitive;
-use our_std::{vec::Vec, RuntimeDebug};
+use our_std::{vec::Vec, Deserialize, RuntimeDebug, Serialize};
 use secp256k1;
 use tiny_keccak::Hasher;
 
 // XXX
 pub type Message = Vec<u8>;
-pub type Signature = Vec<u8>;
-pub type Asset = Vec<u8>; // XXX this should be a tuple like account
+pub type Signature = Vec<u8>; // XXX bunch of Signature types now, rename to avoid confusion?
+pub type Signatures = Vec<Signature>;
 
-pub type Index = u128; // XXX
-pub type Rate = u128; // XXX
-pub type Timestamp = u32; // XXX
+pub type EraId = u32;
+pub type EraIndex = u32;
+pub type NoticeId = (EraId, EraIndex); // XXX make totally ordered trait
 
-pub type GenerationId = u32;
-pub type WithinGenerationId = u32;
-pub type NoticeId = (GenerationId, WithinGenerationId);
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+pub enum Notice<C: Chain> {
+    ExtractionNotice {
+        id: NoticeId,
+        parent: C::Hash,
+        asset: C::Asset,
+        account: C::Account,
+        amount: C::Amount,
+    },
 
-#[derive(Encode, Decode, Clone, RuntimeDebug, PartialEq, Eq)]
-pub struct NoticePayload {
-    // id: Vec<u8>,
-    pub msg: Message,
-    pub sig: Signature,
-    pub signer: AccountIdent,
+    CashExtractionNotice {
+        id: NoticeId,
+        parent: C::Hash,
+        account: C::Account,
+        amount: C::Amount,
+        cash_yield_index: C::Index,
+    },
+
+    FutureYieldNotice {
+        id: NoticeId,
+        parent: C::Hash,
+        next_cash_yield: C::Rate,
+        next_cash_yield_start_at: C::Timestamp,
+        next_cash_yield_index: C::Index,
+    },
+
+    SetSupplyCapNotice {
+        id: NoticeId,
+        parent: C::Hash,
+        asset: C::Asset,
+        amount: C::Amount,
+    },
+
+    ChangeAuthorityNotice {
+        id: NoticeId,
+        parent: C::Hash,
+        new_authorities: Vec<C::PublicKey>,
+    },
 }
 
-impl<Chain: L1> Notice<Chain> {
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+pub enum NoticeStatus<C: Chain> {
+    Missing,
+    Pending {
+        signers: crate::ValidatorSet,
+        signatures: Signatures,
+        notice: Notice<C>,
+    },
+    Done,
+}
+
+impl<C: Chain> Notice<C> {
     pub fn id(&self) -> NoticeId {
         match self {
             Notice::ExtractionNotice { id, .. } => *id,
@@ -44,47 +78,8 @@ impl<Chain: L1> Notice<Chain> {
     }
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
-pub enum Notice<Chain: L1> {
-    ExtractionNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        asset: Chain::Asset,
-        account: Chain::Account,
-        amount: Amount,
-    },
-
-    CashExtractionNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        account: Chain::Account,
-        amount: Amount,
-        cash_yield_index: Index,
-    },
-
-    FutureYieldNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        next_cash_yield: Rate,
-        next_cash_yield_start_at: Timestamp,
-        next_cash_yield_index: Index,
-    },
-
-    SetSupplyCapNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        asset: Chain::Asset,
-        amount: Amount,
-    },
-
-    ChangeAuthorityNotice {
-        id: NoticeId,
-        parent: Chain::Hash,
-        new_authorities: Vec<Chain::Public>,
-    },
-}
-
-fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
+pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
+    // XXX
     let chain_ident: Vec<u8> = "ETH".into(); // XX make const?
 
     let encode_addr = |raw: [u8; 20]| -> Vec<u8> {
@@ -109,24 +104,24 @@ fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
         Notice::ExtractionNotice {
             id,
             parent,
-            asset: asset_arr,
-            account: account_arr,
-            amount: amount_tup,
+            asset,
+            account,
+            amount: amount,
         } => {
             let era_id: Vec<u8> = encode_int32(id.0);
             let era_index: Vec<u8> = encode_int32(id.1);
-            let asset = encode_addr(asset_arr);
-            let amount = encode_int128(amount_tup.mantissa.to_u128().unwrap().into()); // XXX cast more safely
-            let account = encode_addr(account_arr);
+            let asset_encoded = encode_addr(asset);
+            let amount_encoded = encode_int128(amount);
+            let account_encoded = encode_addr(account);
 
             [
                 chain_ident,
                 era_id,
                 era_index,
                 parent.into(),
-                asset,
-                amount,
-                account,
+                asset_encoded,
+                amount_encoded,
+                account_encoded,
             ]
             .concat()
         }
@@ -137,7 +132,7 @@ fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
             amount,
             cash_yield_index,
         } => {
-            let amount_encoded = encode_int128(amount.mantissa.to_u128().unwrap().into()); // XXX cast more safely
+            let amount_encoded = encode_int128(amount); // XXX cast more safely XXX JF: already converted I think
             [
                 chain_ident,
                 encode_int32(id.0),
@@ -162,18 +157,18 @@ fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
             encode_int32(id.1),
             parent.into(),
             encode_int128(next_cash_yield),
-            encode_int32(next_cash_yield_start_at),
+            encode_int128(next_cash_yield_start_at),
             encode_int128(next_cash_yield_index),
         ]
         .concat(),
 
         Notice::SetSupplyCapNotice {
             id,     //: NoticeId,
-            parent, //: Chain::Hash,
-            asset,  //: Chain::Asset,
+            parent, //: C::Hash,
+            asset,  //: C::Asset,
             amount, //: Amount,
         } => {
-            let amount_encoded = encode_int128(amount.mantissa.to_u128().unwrap().into()); // XXX cast more safely
+            let amount_encoded = encode_int128(amount); // XXX cast more safely XXX JF: already converted I think
 
             [
                 chain_ident,
@@ -188,8 +183,8 @@ fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
 
         Notice::ChangeAuthorityNotice {
             id,              //: NoticeId,
-            parent,          //: Chain::Hash,
-            new_authorities, //: Vec<Chain::Public>
+            parent,          //: C::Hash,
+            new_authorities, //: Vec<C::PublicKey>
         } => {
             let authorities_encoded: Vec<Vec<u8>> = new_authorities
                 .iter()
@@ -207,6 +202,7 @@ fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Vec<u8> {
     }
 }
 
+// XXX whats this?
 // pub fn to_eth_payload(notice: Notice) -> NoticePayload {
 //     let message = encode_ethereum_notice(notice);
 //     // TODO: do signer by chain
@@ -252,7 +248,6 @@ fn sign(message: &Message) -> Signature {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use our_std::vec::Vec;
 
     #[test]
     fn test_encodes_extraction_notice() {
@@ -260,7 +255,7 @@ mod tests {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             asset: [2u8; 20],
-            amount: Amount::new_cash(50 as u128),
+            amount: 50,
             account: [1u8; 20],
         };
 
@@ -289,8 +284,8 @@ mod tests {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             account: [1u8; 20],
-            amount: Amount::new_cash(55 as u128),
-            cash_yield_index: 75 as u128,
+            amount: 55,
+            cash_yield_index: 75u128,
         };
 
         let expected = [
@@ -318,9 +313,9 @@ mod tests {
         let notice = notices::Notice::FutureYieldNotice {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [5u8; 32],
-            next_cash_yield: 700 as u128,
-            next_cash_yield_start_at: 200 as u32,
-            next_cash_yield_index: 400 as u128,
+            next_cash_yield: 700u128,
+            next_cash_yield_start_at: 200u128,
+            next_cash_yield_index: 400u128,
         };
 
         let expected = [
@@ -349,7 +344,7 @@ mod tests {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             asset: [70u8; 20],
-            amount: Amount::new_cash(60 as u128),
+            amount: 60,
         };
 
         let expected = [
