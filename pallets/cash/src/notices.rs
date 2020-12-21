@@ -51,7 +51,7 @@ pub enum Notice<C: Chain> {
     ChangeAuthorityNotice {
         id: NoticeId,
         parent: C::Hash,
-        new_authorities: Vec<C::PublicKey>,
+        new_authorities: Vec<C::Address>,
     },
 }
 
