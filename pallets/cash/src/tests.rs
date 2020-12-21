@@ -40,7 +40,7 @@ fn it_magically_extracts() {
 fn it_works_for_default_value() {
     new_test_ext().execute_with(|| {
         // Dispatch a signed extrinsic.
-        assert_ok!(CashModule::process_ethereum_event(
+        assert_ok!(CashModule::process_eth_event(
             Origin::signed(Default::default()),
             vec![]
         ));

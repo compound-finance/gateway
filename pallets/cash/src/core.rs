@@ -3,7 +3,7 @@ pub use our_std::{fmt, result, result::Result};
 
 use crate::{chains::eth, Reason};
 
-pub fn apply_ethereum_event_internal(event: eth::Event) -> Result<eth::Event, Reason> {
+pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason> {
     Ok(event) // XXX
 }
 
