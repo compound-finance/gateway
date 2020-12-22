@@ -707,6 +707,7 @@ name = "compound-chain"
 version = "1.0.0"
 dependencies = [
  "compound-chain-runtime",
+ "compound-crypto",
  "frame-benchmarking",
  "frame-benchmarking-cli",
  "frame-system",
@@ -800,7 +801,9 @@ name = "compound-crypto"
 version = "1.0.0"
 dependencies = [
  "hex",
+ "lazy_static",
  "libsecp256k1",
+ "parity-scale-codec",
  "sp-core",
  "tiny-keccak 2.0.2",
 ]
@@ -4835,6 +4838,7 @@ dependencies = [
 name = "runtime-interfaces"
 version = "1.0.0"
 dependencies = [
+ "compound-crypto",
  "lazy_static",
  "parity-scale-codec",
  "sp-externalities",
