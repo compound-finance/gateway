@@ -1,10 +1,12 @@
 use crate::std::*;
 use crate::CryptoError;
 use rusoto_core::Region;
-use rusoto_kms::KmsClient;
+use rusoto_kms::{KmsClient, Kms, GetPublicKeyRequest};
+use tokio::runtime::Runtime;
 
 struct KmsKeyring {
     client: KmsClient,
+    runtime: tokio::runtime::Runtime,
 }
 
 impl Keyring for KmsKeyring {
@@ -16,8 +18,8 @@ impl Keyring for KmsKeyring {
         unimplemented!()
     }
 
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
-        unimplemented!()
+    fn get_public_key(self: &mut Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+        self.runtime.block_on(self.get_public_key_async(key_id))
     }
 }
 
@@ -30,6 +32,16 @@ impl KmsKeyring {
         let region = Region::default();
         let client = KmsClient::new(region);
 
-        KmsKeyring { client }
+        // todo: It is unclear to me under what circumstances tokio runtime creation fails, for now.. unwrap..?
+        KmsKeyring {
+            client,
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+        }
+    }
+
+    async fn get_public_key_async(self: &mut Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+        let request : GetPublicKeyRequest = GetPublicKeyRequest{key_id: key_id.clone().into(), ..Default::default()};
+        let result = self.client.get_public_key(request).await.map_err(|_|CryptoError::KeyNotFound)?;
+
     }
 }

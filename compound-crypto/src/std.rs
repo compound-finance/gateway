@@ -33,6 +33,12 @@ impl From<&str> for KeyId {
     }
 }
 
+impl Into<String> for KeyId {
+    fn into(self) -> String {
+        self.data
+    }
+}
+
 impl KeyId {
     pub fn from_utf8(source: Vec<u8>) -> Result<KeyId, CryptoError> {
         let data = String::from_utf8(source).map_err(|_| CryptoError::InvalidKeyId)?;
@@ -57,14 +63,14 @@ pub trait Keyring {
     /// request for each message in order. All of that is wrapped in a result in case we cannot find
     /// the key at all.
     fn sign(
-        self: &Self,
+        self: &mut Self,
         messages: Vec<Vec<u8>>,
         key_id: &KeyId,
     ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError>;
 
     /// Get the public key data for the key id provided.
     /// Fails whenever the key_id is not found in the keyring.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError>;
+    fn get_public_key(self: &mut Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError>;
 }
 
 /// For compatibility this is required.
@@ -189,7 +195,7 @@ impl InMemoryKeyring {
 impl Keyring for InMemoryKeyring {
     /// Sign the messages with the given Key ID
     fn sign(
-        self: &Self,
+        self: &mut Self,
         messages: Vec<Vec<u8>>,
         key_id: &KeyId,
     ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError> {
@@ -204,7 +210,7 @@ impl Keyring for InMemoryKeyring {
     }
 
     /// Get the public key associated with the given key id.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+    fn get_public_key(self: &mut Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
         let private = self.get_private_key(key_id)?;
         // could not call serialize from the keypair so I had to re-derive the public key here
         let public = secp256k1::PublicKey::from_secret_key(&private);
