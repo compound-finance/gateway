@@ -12,6 +12,8 @@ pub enum CryptoError {
     KeyNotFound,
     KeyringLock,
     InvalidKeyId,
+    ParseError,
+    RecoverError,
 }
 
 /// The default key id for the eth authority key (l1)
