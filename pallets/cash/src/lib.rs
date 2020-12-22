@@ -1,6 +1,5 @@
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
-#![feature(trivial_bounds)]
 
 #[macro_use]
 extern crate alloc;
@@ -14,7 +13,8 @@ use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use our_std::{convert::TryInto, vec::Vec, Deserialize, Serialize};
+use hex_literal::hex;
+use our_std::{convert::TryInto, vec::Vec};
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
@@ -25,7 +25,7 @@ use sp_runtime::{
 };
 
 use crate::account::AccountIdent;
-use crate::amount::{Amount, CashAmount};
+use crate::amount::CashAmount;
 use crate::chains::{Chain, Ethereum, EventStatus}; // XXX events mod?
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
@@ -42,7 +42,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
     None,
 }
@@ -51,10 +51,10 @@ pub enum Reason {
 pub type SignedPayload = Vec<u8>; // XXX
 
 /// Type for signature used to verify that a signed payload comes from a validator.
-pub type ValidatorSig = [u8; 32]; // XXX
+pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
 
 /// Type for a public key used to identify a validator.
-pub type ValidatorKey = [u8; 32]; // XXX
+pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1?
 
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
@@ -75,7 +75,10 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
         // XXX
-        CashBalance get(fn cash_balance) config(): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
+        XXXFakeForGenesis get(fn xxx_fake_for_genesis) config(): u32;
+
+        // XXX
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
 
         // Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
@@ -85,9 +88,9 @@ decl_storage! {
 
         // XXX
         // List of validators' public keys
-        Validators get(fn get_validators): Vec<String> = vec![
-            String::from("0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba"),
-            String::from("04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4")
+        Validators get(fn validators): ValidatorSet = vec![
+            hex!("0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba"),
+            hex!("04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4")
         ];
     }
 }
@@ -118,32 +121,31 @@ decl_error! {
         // XXX
         /// Error names should be descriptive.
         NoneValue,
+
+        // XXX
         /// Errors should have helpful documentation associated with them.
         StorageOverflow,
 
-        // Error returned when fetching starport info
+        /// Error returned when fetching starport info
         HttpFetchingError,
 
-        // Error when processing `Lock` event while sending `process_eth_event` extrinsic
+        /// Error when processing `Lock` event while sending `process_eth_event` extrinsic
         ProcessLockEventError,
 
-        // Error sending `process_eth_event` extrinsic
+        /// Error sending `process_eth_event` extrinsic
         OffchainUnsignedLockTxError,
 
-        // Error decoding payload
+        /// Error decoding payload
         SignedPayloadError,
 
-        // Public key doesn't belong to known validator
+        /// Public key doesn't belong to known validator
         UnknownValidator,
 
-        // Validator has already signed and submitted this payload
+        /// Validator has already signed and submitted this payload
         AlreadySigned,
 
-        // Error while decoding ethereum event from payload
-        DecodeEthereumEventError,
-
-        // Fetched event type is not known
-        UnknownEthereumEventType
+        /// Fetched Ethereum event type is not known
+        UnknownEthEventType, // XXX needed per-chain?
 
     }
 }
@@ -194,6 +196,7 @@ decl_module! {
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload); // XXX
 
+            // XXX how do we want to deal with these crypto errors?
             // XXX Toni WIP
             // Recover signature part
             let mut sig_part: [u8; 64] = [0; 64];
@@ -202,20 +205,19 @@ decl_module! {
             // Recover RecoveryId part
             let recovery_id = secp256k1::RecoveryId::parse(sig[64]).map_err(|_| <Error<T>>::SignedPayloadError)?;
             // Recover validator's public key from signature
-            let message = Message::parse(&notices::keccak(payload.clone()));
-            let validator_key = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
-            // Decode to PublicKey to String format
-            let signer = hex::encode(validator_key.serialize());
-            debug::native::info!("Validator public key: {:?} was recovered", signer);
+            let message = secp256k1::Message::parse(&chains::eth::keccak(payload.clone()));
+            let recover = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
+            let signer = recover.serialize();
+
+            // XXX
+            // XXX require(signer == known validator); // XXX
             // Check that signer is a known validator, otherwise throw an error
-            let validators = Self::get_validators();
+            let validators = <Validators>::get();
             if !validators.contains(&signer) {
                 debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
                 return Err(Error::<T>::UnknownValidator)?
             }
-            // XXX
 
-            //require(signer == known validator); // XXX
             let event = chains::eth::decode(payload.as_slice()); // XXX
             let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
@@ -249,7 +251,7 @@ decl_module! {
                             }
                         }
                     } else {
-                        EthEventQueue::insert(event.id, EthEventStatus::<Ethereum>::Pending { signers: signers_new });
+                        EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Pending { signers: signers_new });
                         Ok(())
                     }
                 }
@@ -341,6 +343,7 @@ impl<T: Config> Module<T> {
             // find parent
             // id = notice.gen_id(parent)
 
+            // XXX
             // submit onchain call for aggregating the price
             // let payload = notices::to_payload(notice);
             // let call = Call::publish_eth_signature(payload);
@@ -424,7 +427,8 @@ impl<T: Config> Module<T> {
             debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
             // XXX
-            let payload = events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let payload =
+                events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
             let signature = Self::sign_payload(payload.clone());
             let call = Call::process_eth_event(payload, signature);
 
@@ -438,17 +442,7 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
-    fn get_id_from_ethereum_event(
-        event: &chains::EthereumEvent,
-    ) -> Result<chains::EventId, Error<T>> {
-        match event {
-            chains::EthereumEvent::LockEvent { id, .. } => Ok(*id),
-            chains::EthereumEvent::LockCashEvent { id, .. } => Ok(*id),
-            chains::EthereumEvent::GovEvent { id, .. } => Ok(*id),
-            _ => Err(Error::<T>::UnknownEthereumEventType),
-        }
-    }
-
+    // XXX JF: why are we using secp256k1 to sign these? this is just for offchain <> validator?
     /// XXX this part will be rewritten as soon as keys are done
     fn sign_payload(payload: Vec<u8>) -> ValidatorSig {
         // XXX HORRIBLE, but something to move on, at least I can decode signature

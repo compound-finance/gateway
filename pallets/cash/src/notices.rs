@@ -1,8 +1,6 @@
-use super::chains::{Chain, Ethereum};
+use crate::chains::{Chain, Ethereum};
 use codec::{Decode, Encode};
-use hex::ToHex;
-use num_traits::ToPrimitive;
-use our_std::{vec::Vec, Deserialize, RuntimeDebug, Serialize};
+use our_std::{vec::Vec, RuntimeDebug};
 
 // XXX
 pub type Message = Vec<u8>;
@@ -13,7 +11,7 @@ pub type EraId = u32;
 pub type EraIndex = u32;
 pub type NoticeId = (EraId, EraIndex); // XXX make totally ordered trait
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Notice<C: Chain> {
     ExtractionNotice {
         id: NoticeId,
@@ -53,7 +51,7 @@ pub enum Notice<C: Chain> {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum NoticeStatus<C: Chain> {
     Missing,
     Pending {

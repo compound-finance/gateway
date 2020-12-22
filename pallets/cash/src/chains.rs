@@ -2,9 +2,9 @@
 pub use our_std::vec::Vec;
 
 use codec::{Decode, Encode};
-use our_std::{Debuggable, Deserialize, RuntimeDebug, Serialize};
+use our_std::{Debuggable, RuntimeDebug};
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainId {
     Eth,
     Dot,
@@ -13,18 +13,18 @@ pub enum ChainId {
 }
 
 pub trait Chain {
-    type Address: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = [u8; 20];
-    type Account: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = Self::Address;
-    type Asset: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = Self::Address;
-    type Amount: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = u128;
-    type Index: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = u128;
-    type Rate: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = u128;
-    type Timestamp: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = u128;
-    type Hash: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = [u8; 32];
-    type PublicKey: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = [u8; 32];
-    type Signature: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a> = [u8; 32];
-    type EventId: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a>; // XXX make totally ordered trait
-    type Event: Debuggable + Clone + Eq + Serialize + for<'a> Deserialize<'a>;
+    type Address: Debuggable + Clone + Eq = [u8; 20];
+    type Account: Debuggable + Clone + Eq = Self::Address;
+    type Asset: Debuggable + Clone + Eq = Self::Address;
+    type Amount: Debuggable + Clone + Eq = u128;
+    type Index: Debuggable + Clone + Eq = u128;
+    type Rate: Debuggable + Clone + Eq = u128;
+    type Timestamp: Debuggable + Clone + Eq = u128;
+    type Hash: Debuggable + Clone + Eq = [u8; 32];
+    type PublicKey: Debuggable + Clone + Eq = [u8; 32];
+    type Signature: Debuggable + Clone + Eq = [u8; 65]; // XXX
+    type EventId: Debuggable + Clone + Eq; // XXX make totally ordered trait
+    type Event: Debuggable + Clone + Eq;
 
     fn hash_bytes(data: &[u8]) -> Self::Hash;
 }
@@ -78,7 +78,7 @@ impl Chain for Tezos {
 }
 
 // XXX move?
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventStatus<C: Chain> {
     Pending {
         signers: crate::ValidatorSet,
@@ -94,20 +94,44 @@ pub mod eth {
     // Note: The substrate build requires these be imported
     pub use our_std::vec::Vec;
 
+    use super::{Chain, Ethereum};
     use codec::{Decode, Encode};
-    use our_std::{Deserialize, RuntimeDebug, Serialize};
+    use our_std::RuntimeDebug;
+    use tiny_keccak::Hasher;
 
     pub type BlockNumber = u32;
     pub type LogIndex = u32;
     pub type EventId = (BlockNumber, LogIndex);
 
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {
         pub id: EventId,
+        pub data: EventData,
+    }
+
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub enum EventData {
+        // XXX only event is 'do'?
+        Lock {
+            asset: <Ethereum as Chain>::Address,
+            holder: <Ethereum as Chain>::Address,
+            amount: <Ethereum as Chain>::Amount,
+        },
+
+        LockCash {
+            holder: <Ethereum as Chain>::Address,
+            amount: <Ethereum as Chain>::Amount,
+            yield_index: <Ethereum as Chain>::Amount,
+        },
+
+        Gov {
+            // XXX all these become do?
+        },
     }
 
     // XXX Decode more fields and more event types
     pub fn decode(data: &[u8]) -> Event {
+        // XXX
         let types = vec![
             ethabi::param_type::ParamType::Uint(256),
             ethabi::param_type::ParamType::Uint(256),
@@ -117,8 +141,10 @@ pub mod eth {
         let block_number = ethereum_client::extract_uint(&decoded[0]).unwrap();
         let log_index = ethereum_client::extract_uint(&decoded[1]).unwrap();
         Event {
+            // XXX just 1 event type in future 'do'?
             id: (block_number.as_u32(), log_index.as_u32()),
-        } // XXX
+            data: EventData::Gov {},
+        }
     }
 
     /// XXX Work on sending proper Payload,
@@ -143,7 +169,7 @@ pub mod eth {
     pub fn sign(message: &Vec<u8>) -> <Ethereum as Chain>::Signature {
         // TODO: get this from somewhere else
         let not_so_secret: [u8; 32] =
-        hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
+            hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
         let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
 
         let msg = secp256k1::Message::parse(&keccak(message.clone()));
@@ -152,7 +178,7 @@ pub mod eth {
         let mut r: [u8; 65] = [0; 65];
         r[0..64].copy_from_slice(&x.0.serialize()[..]);
         r[64] = x.1.serialize();
-        sp_core::ecdsa::Signature::from_raw(r).encode()
+        r
     }
 
     // XXX whats this?
@@ -176,30 +202,30 @@ pub mod eth {
 
 pub mod dot {
     use codec::{Decode, Encode};
-    use our_std::{Deserialize, RuntimeDebug, Serialize};
+    use our_std::RuntimeDebug;
 
     pub type EventId = (u64, u64);
 
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
 }
 
 pub mod sol {
     use codec::{Decode, Encode};
-    use our_std::{Deserialize, RuntimeDebug, Serialize};
+    use our_std::RuntimeDebug;
 
     pub type EventId = (u64, u64);
 
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
 }
 
 pub mod tez {
     use codec::{Decode, Encode};
-    use our_std::{Deserialize, RuntimeDebug, Serialize};
+    use our_std::RuntimeDebug;
 
     pub type EventId = (u128, u128);
 
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
 }

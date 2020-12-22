@@ -178,7 +178,7 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
-            cash_balance: vec![], // XXX circular broken substrate -> hacked to gen GenesisConfig, but empty
+            xxx_fake_for_genesis: 0, // XXX circular broken substrate -> hacked to gen GenesisConfig, but empty
         }),
     }
 }
