@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
-use our_std::{vec::Vec, Deserialize, RuntimeDebug, Serialize};
+use our_std::{vec::Vec, RuntimeDebug};
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainIdent {
     Eth,
 }
@@ -9,7 +9,8 @@ pub enum ChainIdent {
 /// The type of the decimal field.
 pub type AccountAddr = Vec<u8>;
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+// Note: serializable b/c key in storage map.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct AccountIdent {
     pub chain: ChainIdent,
     pub address: AccountAddr,

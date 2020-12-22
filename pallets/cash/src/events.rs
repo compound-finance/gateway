@@ -1,11 +1,11 @@
+use crate::chains;
 use codec::alloc::string::String;
 use frame_support::debug;
 use our_std::{vec::Vec, RuntimeDebug};
 
 extern crate ethereum_client;
 
-use crate::chains;
-
+// XXX why starport?
 #[derive(RuntimeDebug)]
 pub struct StarportInfo {
     pub latest_eth_block: String,
@@ -58,14 +58,23 @@ pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
     Ok(next_block_num_hex)
 }
 
-pub fn to_payload(
-    event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
+// XXX JF: why just lock event? also can we just use builtin encoding?
+pub fn to_lock_event_payload(
+    log_event: &ethereum_client::LogEvent<ethereum_client::LockEvent>,
 ) -> anyhow::Result<Vec<u8>> {
-    // XXX does this simplify?
-    let block_number: u32 = hex_to_u32(event.block_number.clone())?;
-    let log_index: u32 = hex_to_u32(event.log_index.clone())?;
+    let block_number: u32 = hex_to_u32(log_event.block_number.clone())?;
+    let log_index: u32 = hex_to_u32(log_event.log_index.clone())?;
+
+    let asset_address: [u8; 20] = *log_event.event.asset.as_fixed_bytes();
+    let holder_address: [u8; 20] = *log_event.event.holder.as_fixed_bytes();
+
     let event = chains::eth::Event {
         id: (block_number, log_index),
+        data: chains::eth::EventData::Lock {
+            asset: asset_address,
+            holder: holder_address,
+            amount: log_event.event.amount.as_u128(),
+        },
     };
     Ok(chains::eth::encode(&event))
 }
