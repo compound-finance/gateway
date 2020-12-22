@@ -1,4 +1,4 @@
-use secp256k1::SecretKey;
+use secp256k1::{recover, PublicKey, SecretKey, Signature};
 use sp_core::ecdsa::Pair as EcdsaPair;
 use sp_core::{keccak_256, Pair};
 use std::collections::hash_map::HashMap;
@@ -30,6 +30,8 @@ pub struct KeyId {
 #[derive(Debug)]
 pub enum CryptoError {
     KeyNotFound,
+    ParseError,
+    RecoverError,
     Unknown,
 }
 
@@ -91,10 +93,47 @@ fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
     sig
 }
 
+/// Recovers the signer's address from the given signature and message. The message is _not_
+/// expected to be a digest and is hashed inside.
+fn eth_recover(message: Vec<u8>, sig: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
+    let recovery_id =
+        secp256k1::RecoveryId::parse_rpc(sig[64]).map_err(|_| CryptoError::ParseError)?;
+    let sig = Signature::parse_slice(&sig[..64]).map_err(|_| CryptoError::ParseError)?;
+    let digested = eth_keccak_for_signature(&message);
+    let message =
+        secp256k1::Message::parse_slice(&digested).map_err(|_| CryptoError::ParseError)?;
+
+    let recovered =
+        secp256k1::recover(&message, &sig, &recovery_id).map_err(|_| CryptoError::RecoverError)?;
+    let address = public_key_to_eth_address(recovered);
+
+    Ok(address)
+}
+
 /// In memory keyring
 pub struct InMemoryKeyring {
     /// for now only support ECDSA with curve secp256k1
     keys: HashMap<String, EcdsaPair>,
+}
+
+fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
+    let public_hash = keccak_256(public_key); // 32 bytes
+    let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
+    Vec::from(public_hash_tail)
+}
+
+fn public_key_to_bytes(public: PublicKey) -> Vec<u8> {
+    // some tag is added here - i think for SCALE encoding but [1..] strips it
+    let serialized: &[u8] = &public.serialize()[1..];
+    let serialized: Vec<u8> = serialized.iter().map(Clone::clone).collect();
+    serialized
+}
+
+fn public_key_to_eth_address(public: PublicKey) -> Vec<u8> {
+    let bytes = public_key_to_bytes(public);
+    let address = public_key_bytes_to_eth_address(&bytes);
+
+    address
 }
 
 /// The in memory keyring is designed for use in development and not encouraged for use in
@@ -132,9 +171,7 @@ impl InMemoryKeyring {
     /// Get the eth address (bytes) associated with the given key id.
     fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
         let public_key = self.get_public_key(key_id)?;
-        let public_hash = keccak_256(&public_key); // 32 bytes
-        let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
-        Ok(Vec::from(public_hash_tail))
+        Ok(public_key_bytes_to_eth_address(&public_key))
     }
 }
 
@@ -162,10 +199,7 @@ impl Keyring for InMemoryKeyring {
         let private = self.get_private_key(key_id)?;
         // could not call serialize from the keypair so I had to re-derive the public key here
         let public = secp256k1::PublicKey::from_secret_key(&private);
-        // some tag is added here - i think for SCALE encoding but [1..] strips it
-        let serialized: &[u8] = &public.serialize()[1..];
-        let serialized: Vec<u8> = serialized.iter().map(Clone::clone).collect();
-        Ok(serialized)
+        Ok(public_key_to_bytes(public))
     }
 }
 
@@ -224,6 +258,22 @@ mod tests {
         // Test cases found in web3js
         // https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/test/eth.accounts.sign.js#L7
         get_test_cases().drain(..).for_each(test_eth_sign_case);
+    }
+
+    /// Test out eth recover function
+    fn test_eth_recover_case(case: TestCase) {
+        let message: Vec<u8> = case.data.into();
+        let sig = eth_decode_hex(case.signature);
+        let actual_address = eth_recover(message, sig).unwrap();
+        let expected_address = eth_decode_hex(case.address);
+        assert_eq!(actual_address, expected_address);
+    }
+
+    #[test]
+    fn test_eth_recover() {
+        // Test cases found in web3js
+        // https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/test/eth.accounts.sign.js#L7
+        get_test_cases().drain(..).for_each(test_eth_recover_case);
     }
 
     fn get_test_keyring(case: &TestCase) -> (KeyId, InMemoryKeyring) {
