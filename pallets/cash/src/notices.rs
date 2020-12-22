@@ -1,6 +1,6 @@
 use super::chains::{Chain, Ethereum};
 use codec::{Decode, Encode};
-use ethabi;
+use hex::ToHex;
 use num_traits::ToPrimitive;
 use our_std::{vec::Vec, Deserialize, RuntimeDebug, Serialize};
 use secp256k1;
@@ -51,7 +51,7 @@ pub enum Notice<C: Chain> {
     ChangeAuthorityNotice {
         id: NoticeId,
         parent: C::Hash,
-        new_authorities: Vec<C::PublicKey>,
+        new_authorities: Vec<C::Address>,
     },
 }
 
@@ -81,17 +81,24 @@ impl<C: Chain> Notice<C> {
 pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
     // XXX
     let chain_ident: Vec<u8> = "ETH".into(); // XX make const?
-    let encode_addr =
-        |raw: [u8; 20]| -> Vec<u8> { ethabi::encode(&[ethabi::Token::FixedBytes(raw.into())]) };
-    // XXX JF: these seem to be relying too much on knowing the struct ab initio, I think we can clean this up a lot
-    // XXX most of these eth abi calls are either doing Nothing or padding some bytes, maybe we don't need to use it
-    // XXX do this better, maybe figure out how to use dyn Into<ethereum_types::U256> ?
-    let encode_int32 = |raw: u32| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
-    let encode_int128 =
-        |raw: u128| -> Vec<u8> { ethabi::encode(&[ethabi::Token::Int(raw.into())]) };
 
-    let encode_public =
-        |raw: [u8; 32]| -> Vec<u8> { ethabi::encode(&[ethabi::Token::FixedBytes(raw.into())]) };
+    let encode_addr = |raw: [u8; 20]| -> Vec<u8> {
+        let mut res: [u8; 32] = [0; 32];
+        res[12..32].clone_from_slice(&raw);
+        res.to_vec()
+    };
+
+    let encode_int32 = |raw: u32| -> Vec<u8> {
+        let mut res: [u8; 32] = [0; 32];
+        res[28..32].clone_from_slice(&raw.to_be_bytes());
+        res.to_vec()
+    };
+
+    let encode_int128 = |raw: u128| -> Vec<u8> {
+        let mut res: [u8; 32] = [0; 32];
+        res[16..32].clone_from_slice(&raw.to_be_bytes());
+        res.to_vec()
+    };
 
     match notice {
         Notice::ExtractionNotice {
@@ -99,12 +106,12 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
             parent,
             asset,
             account,
-            amount,
+            amount: amount,
         } => {
             let era_id: Vec<u8> = encode_int32(id.0);
             let era_index: Vec<u8> = encode_int32(id.1);
             let asset_encoded = encode_addr(asset);
-            let amount_encoded = encode_int128(amount); // XXX cast more safely XXX JF: already converted I think
+            let amount_encoded = encode_int128(amount);
             let account_encoded = encode_addr(account);
 
             [
@@ -181,7 +188,7 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
         } => {
             let authorities_encoded: Vec<Vec<u8>> = new_authorities
                 .iter()
-                .map(|x| encode_public(x.clone()))
+                .map(|x| encode_addr(x.clone()))
                 .collect();
             [
                 chain_ident,
@@ -244,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_encodes_extraction_notice() {
-        let notice = notices::Notice::ExtractionNotice {
+        let notice = notices::Notice::ExtractionNotice::<Ethereum> {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             asset: [2u8; 20],
@@ -260,14 +267,13 @@ mod tests {
             0, 0, 0, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // asset
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+            2, 2, 2, // asset
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 50, // amount
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // account
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, // account
         ];
-
         let encoded = notices::encode_ethereum_notice(notice);
         assert_eq!(encoded, expected);
     }
@@ -290,8 +296,8 @@ mod tests {
             0, 0, 0, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // account
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, // account
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 55, // amount
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -349,8 +355,8 @@ mod tests {
             0, 0, 0, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // asset
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70,
+            70, 70, 70, 70, 70, 70, 70, // asset
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 60, // amount
         ];
@@ -364,7 +370,7 @@ mod tests {
         let notice = notices::Notice::ChangeAuthorityNotice {
             id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
-            new_authorities: vec![[6u8; 32], [7u8; 32], [8u8; 32]],
+            new_authorities: vec![[6u8; 20], [7u8; 20], [8u8; 20]],
         };
 
         let expected = [
@@ -375,11 +381,11 @@ mod tests {
             0, 0, 0, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
             6, 6, 6, // first authority
-            7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
             7, 7, 7, // second
-            8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
             8, 8, 8, // third
         ];
 
