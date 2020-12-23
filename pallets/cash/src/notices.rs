@@ -75,21 +75,19 @@ impl<C: Chain> Notice<C> {
 }
 
 pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
-    // XXX
-    let chain_ident: Vec<u8> = "ETH".into(); // XX make const?
-
+    // XXX JF: this seems to rely too much on the struct definition
+    //  we should be able to simplify this
+    let chain_ident: Vec<u8> = "ETH".into(); // XXX make const?
     let encode_addr = |raw: [u8; 20]| -> Vec<u8> {
         let mut res: [u8; 32] = [0; 32];
         res[12..32].clone_from_slice(&raw);
         res.to_vec()
     };
-
     let encode_int32 = |raw: u32| -> Vec<u8> {
         let mut res: [u8; 32] = [0; 32];
         res[28..32].clone_from_slice(&raw.to_be_bytes());
         res.to_vec()
     };
-
     let encode_int128 = |raw: u128| -> Vec<u8> {
         let mut res: [u8; 32] = [0; 32];
         res[16..32].clone_from_slice(&raw.to_be_bytes());
@@ -102,7 +100,7 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
             parent,
             asset,
             account,
-            amount: amount,
+            amount,
         } => {
             let era_id: Vec<u8> = encode_int32(id.0);
             let era_index: Vec<u8> = encode_int32(id.1);

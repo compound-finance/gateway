@@ -1,9 +1,9 @@
-use crate::{account::*, mock::*, Error};
+use crate::{chains::*, core::*, mock::*, Error};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
 
-fn andrew() -> AccountIdent {
-    AccountIdent {
-        chain: ChainIdent::Eth,
+fn andrew() -> AccountId {
+    AccountId {
+        chain: ChainId::Eth,
         address: [123; 20].to_vec(),
     }
 }
