@@ -147,6 +147,9 @@ decl_error! {
         /// Fetched Ethereum event type is not known
         UnknownEthEventType, // XXX needed per-chain?
 
+        /// Error decoding Ethereum event
+        DecodeEthereumEventError
+
     }
 }
 
@@ -218,7 +221,7 @@ decl_module! {
                 return Err(Error::<T>::UnknownValidator)?
             }
 
-            let event = chains::eth::decode(payload.as_slice()); // XXX
+            let event = chains::eth::Event::decode(&mut payload.as_slice()).map_err(|_| <Error<T>>::DecodeEthereumEventError)?; // XXX
             let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
                 EventStatus::<Ethereum>::Pending { signers } => {
