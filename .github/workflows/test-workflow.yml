@@ -46,6 +46,7 @@ jobs:
         with:
           msg: "🫖 [View Test Results](${{steps.cargo_test.outputs.test_url}})"
           check_for_duplicate_msg: false
+        continue-on-error: true
 
       - name: Upload Unit Test Results
         if: always()
@@ -53,6 +54,7 @@ jobs:
         with:
           name: Unit Test Results
           path: unit-test-results.*
+        continue-on-error: true
 
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1.6
@@ -60,6 +62,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           files: unit-test-results.xml
+        continue-on-error: true
 
   eth-tests:
     name: eth-tests

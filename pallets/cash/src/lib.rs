@@ -1,6 +1,5 @@
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
-#![feature(trivial_bounds)]
 
 #[macro_use]
 extern crate alloc;
@@ -10,12 +9,12 @@ use codec::{alloc::string::String, Decode, Encode};
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
-
 use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use our_std::{convert::TryInto, vec::Vec, Deserialize, Serialize};
+use hex_literal::hex;
+use our_std::{convert::TryInto, vec::Vec};
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
@@ -26,7 +25,7 @@ use sp_runtime::{
 };
 
 use crate::account::AccountIdent;
-use crate::amount::{Amount, CashAmount};
+use crate::amount::CashAmount;
 use crate::chains::{Chain, Ethereum, EventStatus}; // XXX events mod?
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
@@ -43,7 +42,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Serialize, Deserialize, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
     None,
 }
@@ -52,10 +51,10 @@ pub enum Reason {
 pub type SignedPayload = Vec<u8>; // XXX
 
 /// Type for signature used to verify that a signed payload comes from a validator.
-pub type ValidatorSig = [u8; 32]; // XXX
+pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
 
 /// Type for a public key used to identify a validator.
-pub type ValidatorKey = [u8; 32]; // XXX
+pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1?
 
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
@@ -76,13 +75,23 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
         // XXX
-        CashBalance get(fn cash_balance) config(): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
+        XXXFakeForGenesis get(fn xxx_fake_for_genesis) config(): u32;
+
+        // XXX
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
 
         // Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
         // Mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
+
+        // XXX
+        // List of validators' public keys
+        Validators get(fn validators): ValidatorSet = vec![
+            hex!("0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba"),
+            hex!("04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4")
+        ];
     }
 }
 
@@ -112,17 +121,32 @@ decl_error! {
         // XXX
         /// Error names should be descriptive.
         NoneValue,
+
+        // XXX
         /// Errors should have helpful documentation associated with them.
         StorageOverflow,
 
-        // Error returned when fetching starport info
+        /// Error returned when fetching starport info
         HttpFetchingError,
 
-        // Error when processing `Lock` event while sending `process_eth_event` extrinsic
+        /// Error when processing `Lock` event while sending `process_eth_event` extrinsic
         ProcessLockEventError,
 
-        // Error sending `process_eth_event` extrinsic
+        /// Error sending `process_eth_event` extrinsic
         OffchainUnsignedLockTxError,
+
+        /// Error decoding payload
+        SignedPayloadError,
+
+        /// Public key doesn't belong to known validator
+        UnknownValidator,
+
+        /// Validator has already signed and submitted this payload
+        AlreadySigned,
+
+        /// Fetched Ethereum event type is not known
+        UnknownEthEventType, // XXX needed per-chain?
+
     }
 }
 
@@ -168,17 +192,51 @@ decl_module! {
         }
 
         #[weight = 0] // XXX how are we doing weights?
-        pub fn process_eth_event(origin, payload: SignedPayload) -> dispatch::DispatchResult {
+        pub fn process_eth_event(origin, payload: SignedPayload, sig: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload); // XXX
-            //require(signer == known validator); // XXX
+
+            // XXX how do we want to deal with these crypto errors?
+            // XXX Toni WIP
+            // Recover signature part
+            let mut sig_part: [u8; 64] = [0; 64];
+            sig_part[0..64].copy_from_slice(&sig[0..64]);
+            let signature = secp256k1::Signature::parse(&sig_part);
+            // Recover RecoveryId part
+            let recovery_id = secp256k1::RecoveryId::parse(sig[64]).map_err(|_| <Error<T>>::SignedPayloadError)?;
+            // Recover validator's public key from signature
+            let message = secp256k1::Message::parse(&chains::eth::keccak(payload.clone()));
+            let recover = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
+            let signer = recover.serialize();
+
+            // XXX
+            // XXX require(signer == known validator); // XXX
+            // Check that signer is a known validator, otherwise throw an error
+            let validators = <Validators>::get();
+            if !validators.contains(&signer) {
+                debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
+                return Err(Error::<T>::UnknownValidator)?
+            }
+
             let event = chains::eth::decode(payload.as_slice()); // XXX
             let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
                 EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
+                    debug::native::info!("Signers {:?}", signers);
+                    if signers.contains(&signer) {
+                        debug::native::error!("Validator has already signed this payload {:?}", signer);
+                        return Err(Error::<T>::AlreadySigned)?
+                    }
+
+                    // Add new validator to the signers
+                    let mut signers_new = signers.clone();
+                    signers_new.push(signer.clone()); // XXX unique add to set?
+
+                    // XXX
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
+                    if signers_new.len() > validators.len() * 2 / 3 {
                         match core::apply_eth_event_internal(event) {
                             Ok(_) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
@@ -192,10 +250,10 @@ decl_module! {
                                 Ok(())
                             }
                         }
-                    // } else {
-                    //     EthEventQueue::insert(event.id, EthEventStatus::<Ethereum>::Pending { signers: signers_new });
-                    //     Ok(())
-                    // }
+                    } else {
+                        EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Pending { signers: signers_new });
+                        Ok(())
+                    }
                 }
 
                 // XXX potential retry logic to allow retrying Failures
@@ -285,6 +343,7 @@ impl<T: Config> Module<T> {
             // find parent
             // id = notice.gen_id(parent)
 
+            // XXX
             // submit onchain call for aggregating the price
             // let payload = notices::to_payload(notice);
             // let call = Call::publish_eth_signature(payload);
@@ -367,8 +426,11 @@ impl<T: Config> Module<T> {
         for event in events.iter() {
             debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
-            let payload = events::to_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let call = Call::process_eth_event(payload);
+            // XXX
+            let payload =
+                events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let signature = Self::sign_payload(payload.clone());
+            let call = Call::process_eth_event(payload, signature);
 
             // XXX Unsigned tx for now
             let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
@@ -378,6 +440,21 @@ impl<T: Config> Module<T> {
             }
         }
         Ok(())
+    }
+
+    // XXX JF: why are we using secp256k1 to sign these? this is just for offchain <> validator?
+    /// XXX this part will be rewritten as soon as keys are done
+    fn sign_payload(payload: Vec<u8>) -> ValidatorSig {
+        // XXX HORRIBLE, but something to move on, at least I can decode signature
+        let not_so_secret: [u8; 32] =
+            hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
+        let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
+        let message = secp256k1::Message::parse(&chains::eth::keccak(payload.clone()));
+        let sig = secp256k1::sign(&message, &private_key);
+        let mut r: [u8; 65] = [0; 65];
+        r[0..64].copy_from_slice(&sig.0.serialize()[..]);
+        r[64] = sig.1.serialize();
+        return r;
     }
 }
 
@@ -395,7 +472,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             // The transaction is only valid for next 10 blocks. After that it's
             // going to be revalidated by the pool.
             .longevity(10)
-            .and_provides("fix_this_function")
+            // .and_provides("fix_this_function") /// XXX this causes an error, disable for now
             // It's fine to propagate that transaction to other peers, which means it can be
             // created even by nodes that don't produce blocks.
             // Note that sometimes it's better to keep it for yourself (if you are the block

@@ -73,7 +73,7 @@ fn extract_address(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::A
 //     Err(anyhow::anyhow!("candidate is not a string"))
 // }
 
-fn extract_uint(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::Uint> {
+pub fn extract_uint(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::Uint> {
     if let ethabi::token::Token::Uint(u) = candidate {
         return Ok(*u);
     }
