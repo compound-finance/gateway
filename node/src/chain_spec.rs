@@ -178,7 +178,10 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
-            xxx_fake_for_genesis: 0, // XXX circular broken substrate -> hacked to gen GenesisConfig, but empty
+            last_block_timestamp: wasm_timer::SystemTime::now()
+                .duration_since(wasm_timer::UNIX_EPOCH)
+                .expect("cannot get system time for genesis")
+                .as_millis(), // XXX we prob need pallet_timestamp but doesn't cover genesis anyway
         }),
     }
 }
