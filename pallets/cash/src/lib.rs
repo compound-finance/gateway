@@ -21,7 +21,9 @@ use sp_runtime::{
         storage::StorageValueRef,
         storage_lock::{StorageLock, Time},
     },
-    transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction},
+    transaction_validity::{
+        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+    },
     RuntimeDebug, SaturatedConversion,
 };
 
@@ -278,7 +280,6 @@ decl_module! {
             match status {
                 EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
-                    debug::native::info!("Signers {:?}", signers);
                     if signers.contains(&signer) {
                         debug::native::error!("Validator has already signed this payload {:?}", signer);
                         return Err(Error::<T>::AlreadySigned)?
@@ -522,18 +523,22 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// here we make sure that some particular calls (the ones produced by offchain worker)
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-        // TODO: This is not ready for prime-time
-        ValidTransaction::with_tag_prefix("CashPallet")
-            // The transaction is only valid for next 10 blocks. After that it's
-            // going to be revalidated by the pool.
-            .longevity(10)
-            // .and_provides("fix_this_function") /// XXX this causes an error, disable for now
-            // It's fine to propagate that transaction to other peers, which means it can be
-            // created even by nodes that don't produce blocks.
-            // Note that sometimes it's better to keep it for yourself (if you are the block
-            // producer), since for instance in some schemes others may copy your solution and
-            // claim a reward.
-            .propagate(true)
-            .build()
+        match call {
+            Call::process_eth_event(_payload, signature) => {
+                ValidTransaction::with_tag_prefix("CashPallet")
+                    // The transaction is only valid for next 10 blocks. After that it's
+                    // going to be revalidated by the pool.
+                    .longevity(10)
+                    .and_provides(signature)
+                    // It's fine to propagate that transaction to other peers, which means it can be
+                    // created even by nodes that don't produce blocks.
+                    // Note that sometimes it's better to keep it for yourself (if you are the block
+                    // producer), since for instance in some schemes others may copy your solution and
+                    // claim a reward.
+                    .propagate(true)
+                    .build()
+            }
+            _ => InvalidTransaction::Call.into(),
+        }
     }
 }
