@@ -39,7 +39,8 @@ jobs:
       - name: Cargo Test
         run: |
           set -eo pipefail
-          cargo +nightly test -- -Z unstable-options -Z instrument-coverage --format json | tee unit-test-results.json
+          export RUSTFLAGS="-Zinstrument-coverage"
+          cargo +nightly test -- -Z unstable-options --format json | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
