@@ -19,6 +19,12 @@ jobs:
         run: |
           ./scripts/get_substrate.sh --fast
 
+      # TODO: Cache this too?
+      - name: Add grcov
+        run: |
+          cargo install grcov
+          rustup component add llvm-tools-preview
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v1.0.1
 
@@ -33,11 +39,19 @@ jobs:
       - name: Cargo Test
         run: |
           set -eo pipefail
-          cargo +nightly test -- -Z unstable-options --format json | tee unit-test-results.json
+          cargo +nightly test -- -Z unstable-options -Z instrument-coverage --format json | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
+          grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./coverage/
+          echo "showing coverage files"
+          ls -ls ./coverage
         id: cargo_test
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Link to Results
         uses: unsplash/comment-on-pr@master
