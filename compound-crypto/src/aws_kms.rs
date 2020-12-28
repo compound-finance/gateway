@@ -194,6 +194,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_get_public_key() {
         let (keyring, key_id) = get_test_setup();
         let pk = keyring.get_public_key(&key_id).unwrap();
@@ -201,6 +202,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_sign() {
         let (keyring, key_id) = get_test_setup();
         let message: Vec<u8> = "hello".into();
