@@ -12,7 +12,7 @@ pub const SECONDS_PER_YEAR: u64 = 31556952u64;
 /// In that sense it does not change naturally as time progresses as the interest index does.
 ///
 /// The rate is stored as an i16 and is stored as BASIS POINTS as an INTEGER. The extremum are
-/// plus or minus 163.84% per year.
+/// plus or minus 327.67% per year.
 struct Rate {
     basis_points_per_year: i16,
 }
