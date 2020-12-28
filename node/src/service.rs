@@ -26,6 +26,7 @@ native_executor_instance!(
         frame_benchmarking::benchmarking::HostFunctions,
         runtime_interfaces::config_interface::HostFunctions,
         runtime_interfaces::validator_config_interface::HostFunctions,
+        runtime_interfaces::keyring_interface::HostFunctions,
     ),
 );
 

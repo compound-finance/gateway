@@ -14,6 +14,8 @@ const getHypotheticalAddr = (acct, nonce) => {
   return '0x' + web3.utils.sha3(RLP.encode([acct, nonce])).slice(12).substring(14);
 }
 
+let createAddress = () =>  Wallet.createRandom().address;
+
 let createAccounts = (num) => {
   return Array(num).fill(null).map(() => Wallet.createRandom());
 }
@@ -63,9 +65,9 @@ describe('Starport', () => {
   let [root, a1] = saddle.accounts;
 
   // just the header
-  // {chain type = ETH, era ID = 0, era index = 1}
-  const userMsg = "0x" + ethChainType() + encodeUint(0) + encodeUint(3);
-  const adminMsg = "0x" + ethChainType() + encodeUint(1) + encodeUint(3);
+  // {chain type, era ID, era index, parent}
+  const userMsg = "0x" + ethChainType() + encodeUint(0) + encodeUint(3) + encodeAddr(createAddress());
+  const adminMsg = "0x" + ethChainType() + encodeUint(1) + encodeUint(3) + encodeAddr(createAddress());
 
   beforeEach(async () => {
     const nonce = await web3.eth.getTransactionCount(root);
@@ -252,16 +254,35 @@ describe('Starport', () => {
       });
     });
 
-    describe('unlock', () => {
+    describe.only('unlock', () => {
       it('should unlock asset', async () => {
         const [asset, account] = createAccounts(2).map(a => a.address);
         const amount = '1000';
-        const notice = userMsg + encodeAddr(asset) + encodeAddr(account) + encodeUint(amount);
+        const notice = userMsg + encodeAddr(account) + encodeUint(amount) + encodeAddr(asset);
 
         const sigs = authorityAccts.map(acct => sign(notice, acct).sig);
         const tx = await send(starport, 'unlock', [notice, sigs], { from: a1 });
         expect(tx.events.Unlock.returnValues).toMatchObject({asset, account, amount});
       });
+
+      // unsigned notice from compound chain
+      // placeholder for an actual end to end test. 
+      it.skip('should do end to end test', async() => {
+        const e2eMsg = "0x455448" + //chainid
+        "0000000000000000000000000000000000000000000000000000000000000000" +  //era id
+        "0000000000000000000000000000000000000000000000000000000000000000" + // eraIdx
+        "3030303030303030303030303030303030303030303030303030303030303030" + //parent
+        "0000000000000000000000000101010101010101010101010101010101010101" + //acct
+        "0000000000000000000000000000000000000000000000000000000000000032" + // amt
+        "0000000000000000000000002020202020202020202020202020202020202020" // asset
+
+
+        const sigs = authorityAccts.map(acct => sign(e2eMsg, acct).sig);
+        const tx = await send(starport, 'unlock', [e2eMsg, sigs], { from: a1 });
+        console.log(tx.events.Unlock.returnValues);
+        // expect(tx.events.Unlock.returnValues).toMatchObject({asset, account, amount});
+      })
+
     });
   });
 });

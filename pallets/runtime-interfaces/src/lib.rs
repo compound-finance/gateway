@@ -2,6 +2,7 @@ use sp_runtime_interface::pass_by::PassByCodec;
 
 #[macro_use]
 extern crate lazy_static;
+use compound_crypto::CryptoError;
 use std::sync::Mutex;
 
 #[derive(Clone, PassByCodec, codec::Encode, codec::Decode)]
@@ -60,7 +61,7 @@ pub trait ConfigInterface {
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
-const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = "my_eth_key_id";
+const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = compound_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str =
     "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27";
@@ -88,6 +89,24 @@ pub trait ValidatorConfigInterface {
     /// Get the Ethereum node RPC URL
     fn get_eth_rpc_url() -> Option<Vec<u8>> {
         std::env::var(ETH_RPC_URL_ENV_VAR).ok().map(Into::into)
+    }
+}
+
+#[sp_runtime_interface::runtime_interface]
+pub trait KeyringInterface {
+    /// Get the Key ID for the Ethereum key.
+    ///
+    /// Downstream this is used to feed the keyring for signing and obtaining the corresponding
+    /// public key.
+    fn sign(
+        messages: Vec<Vec<u8>>,
+        key_id: Vec<u8>,
+    ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError> {
+        let keyring = compound_crypto::KEYRING
+            .lock()
+            .map_err(|_| CryptoError::KeyringLock)?;
+        let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
+        keyring.sign(messages, &key_id)
     }
 }
 
