@@ -1,10 +1,10 @@
 {
-  "ChainIdent": {
+  "ChainId": {
     "_enum": ["Eth"]
   },
   "AccountAddr": "Vec<u8>",
-  "AccountIdent": {
-    "chain": "ChainIdent",
+  "AccountId": {
+    "chain": "ChainId",
     "account": "AccountAddr"
   },
   "CashAmount": "u128",
@@ -18,11 +18,11 @@
     }
   },
   "ExtractionNotice": {
-    "chain": "ChainIdent",
+    "chain": "ChainId",
     "id": "NoticeId",
     "parent": "EthHash",
     "asset": "Asset",
-    "account": "AccountIdent",
+    "account": "AccountAddr",
     "amount": "Amount"
   },
   "Message": "Vec<u8>",
@@ -47,7 +47,7 @@
   "NoticePayload": {
     "msg": "Message",
     "sig": "Signature",
-    "signer": "AccountIdent"
+    "signer": "AccountId"
   },
   "Payload": "Vec<u8>",
   "Reason": {

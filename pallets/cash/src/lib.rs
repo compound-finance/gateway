@@ -1,3 +1,4 @@
+#![allow(incomplete_features)]
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
 
@@ -24,17 +25,17 @@ use sp_runtime::{
     RuntimeDebug, SaturatedConversion,
 };
 
-use crate::account::AccountIdent;
 use crate::amount::CashAmount;
 use crate::chains::{Chain, Ethereum, EventStatus}; // XXX events mod?
+use crate::core::AccountId;
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
-mod account;
 mod amount;
 mod chains;
 mod core;
 mod events;
 mod notices; // XXX
+mod params; // XXX
 
 #[cfg(test)]
 mod mock;
@@ -42,10 +43,23 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+/// Type for a nonce.
+pub type Nonce = u32;
+
+/// Type for reporting failures for reasons outside of our control.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
     None,
 }
+
+/// Type for representing an annualized rate on Compound Chain.
+pub type APR = u128; // XXX custom rate type?
+
+/// Type for representing a balance index on Compound Chain.
+pub type Index = u128; // XXX biguint? initial value 1?
+
+/// Type for representing time on Compound Chain.
+pub type Timestamp = u128; // XXX u64?
 
 /// Type for an encoded payload within an extrinsic.
 pub type SignedPayload = Vec<u8>; // XXX
@@ -74,24 +88,62 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
-        // XXX
-        XXXFakeForGenesis get(fn xxx_fake_for_genesis) config(): u32;
+        /// The timestamp of the previous block (or defaults to timestamp of the genesis block).
+        LastBlockTimestamp get(fn last_block_timestamp) config(): Timestamp;
 
-        // XXX
-        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountIdent => Option<CashAmount>;
-
-        // Mapping of (status of) events witnessed on Ethereum, by event id.
-        EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
-
-        // Mapping of (status of) notices to be signed for Ethereum, by notice id.
-        EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
-
-        // XXX
-        // List of validators' public keys
+        // XXX we also need mapping of public (identity, babe) key to other keys
+        /// The current set of allowed validators, and their associated keys.
         Validators get(fn validators): ValidatorSet = vec![
             hex!("0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba"),
             hex!("04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4")
-        ];
+        ]; // XXX
+
+        /// The upcoming set of allowed validators, and their associated keys (or none).
+        NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
+
+        /// An index to track interest owed by CASH borrowers.
+        CashCostIndex get(fn cash_cost_index): Index;
+
+        /// An index to track interest earned by CASH holders.
+        CashYieldIndex get(fn cash_yield_index): Index;
+
+        /// The upcoming base rate change for CASH and when, if any.
+        CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
+
+        /// The current APR on CASH held, and the base rate paid by borrowers.
+        CashYield get(fn cash_yield): APR;
+
+        /// The current APR surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
+        CashSpread get(fn cash_spread): APR;
+
+        // XXX
+        // ChainCashHoldPrincipal;
+        // TotalCashHoldPrincipal;
+        // TotalCashBorrowPrincipal;
+        // TotalSupplyPrincipal;
+        // CashHoldPrincipal[account];
+        // CashBorrowPrincipal[account];
+        // SupplyPrincipal[account];
+
+        /// The last used nonce for each account, initialized at zero.
+        Nonces get(fn nonces): map hasher(blake2_128_concat) AccountId => Nonce;
+
+        // XXX delete me (part of magic extract)
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountId => Option<CashAmount>;
+
+        /// Mapping of (status of) events witnessed on Ethereum, by event id.
+        EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
+
+        /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
+        EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
+
+        // XXX
+        // AssetInfo[asset];
+        // LiquidationIncentive;
+        // Price[asset];
+        // PriceTime[asset];
+        // PriceReporter;
+        // PriceKeyMapping;
     }
 }
 
@@ -103,7 +155,7 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX
-        MagicExtract(CashAmount, AccountIdent, Notice<Ethereum>),
+        MagicExtract(CashAmount, AccountId, Notice<Ethereum>),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -147,6 +199,9 @@ decl_error! {
         /// Fetched Ethereum event type is not known
         UnknownEthEventType, // XXX needed per-chain?
 
+        /// Error decoding Ethereum event
+        DecodeEthereumEventError
+
     }
 }
 
@@ -165,7 +220,7 @@ decl_module! {
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn magic_extract(origin, account: AccountIdent, amount: CashAmount) -> dispatch::DispatchResult {
+        pub fn magic_extract(origin, account: AccountId, amount: CashAmount) -> dispatch::DispatchResult {
             let () = ensure_none(origin)?;
 
             // Update storage -- TODO: increment this-- sure why not?
@@ -218,7 +273,7 @@ decl_module! {
                 return Err(Error::<T>::UnknownValidator)?
             }
 
-            let event = chains::eth::decode(payload.as_slice()); // XXX
+            let event = chains::eth::Event::decode(&mut payload.as_slice()).map_err(|_| <Error<T>>::DecodeEthereumEventError)?; // XXX
             let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
                 EventStatus::<Ethereum>::Pending { signers } => {

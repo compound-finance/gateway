@@ -1,5 +1,6 @@
 use crate::chains;
 use codec::alloc::string::String;
+use codec::{Decode, Encode};
 use frame_support::debug;
 use our_std::{vec::Vec, RuntimeDebug};
 
@@ -76,7 +77,8 @@ pub fn to_lock_event_payload(
             amount: log_event.event.amount.as_u128(),
         },
     };
-    Ok(chains::eth::encode(&event))
+    let payload: Vec<u8> = event.encode();
+    Ok(payload)
 }
 
 fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
