@@ -33,6 +33,18 @@ impl From<&str> for KeyId {
     }
 }
 
+impl Into<String> for KeyId {
+    fn into(self) -> String {
+        self.data
+    }
+}
+
+impl Into<String> for &KeyId {
+    fn into(self) -> String {
+        self.data.clone()
+    }
+}
+
 impl KeyId {
     pub fn from_utf8(source: Vec<u8>) -> Result<KeyId, CryptoError> {
         let data = String::from_utf8(source).map_err(|_| CryptoError::InvalidKeyId)?;
@@ -70,10 +82,10 @@ pub trait Keyring {
 /// For compatibility this is required.
 const ETH_MESSAGE_PREAMBLE: &[u8] = "\x19Ethereum Signed Message:\n".as_bytes();
 /// For compatibility this is required.
-const ETH_ADD_TO_V: u8 = 27u8;
+pub const ETH_ADD_TO_V: u8 = 27u8;
 
 /// Helper function to quickly run keccak in the Ethereum-style
-fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
+pub(crate) fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
     hasher.update(ETH_MESSAGE_PREAMBLE);
@@ -100,7 +112,7 @@ fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
 
 /// Recovers the signer's address from the given signature and message. The message is _not_
 /// expected to be a digest and is hashed inside.
-fn eth_recover(message: Vec<u8>, sig: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
+pub fn eth_recover(message: Vec<u8>, sig: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
     let recovery_id =
         secp256k1::RecoveryId::parse_rpc(sig[64]).map_err(|_| CryptoError::ParseError)?;
     let sig = Signature::parse_slice(&sig[..64]).map_err(|_| CryptoError::ParseError)?;
@@ -121,7 +133,7 @@ pub struct InMemoryKeyring {
     keys: HashMap<String, EcdsaPair>,
 }
 
-fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
+pub(crate) fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
     let public_hash = keccak_256(public_key); // 32 bytes
     let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
     Vec::from(public_hash_tail)
