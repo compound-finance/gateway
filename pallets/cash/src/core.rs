@@ -83,6 +83,10 @@ pub fn value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, MathError>
 
 // Internal helpers //
 
+pub fn passes_validation_threshold(signers_len: u8, validators_len: u8) -> bool {
+    signers_len > validators_len * 2 / 3
+}
+
 fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
     Ok(a.checked_add(b.value()).ok_or(MathError::Overflow)?)
 }

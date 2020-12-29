@@ -129,6 +129,7 @@ function aliasBy(ctx, iterator, key) {
 async function buildCtx(scenInfo={}) {
   scenInfo = merge(baseScenInfo, scenInfo);
   debug(() => `Builing ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
+  debug(() => `test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   let ctx = new Ctx(scenInfo);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
   ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx);

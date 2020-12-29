@@ -44,6 +44,9 @@
   "CashPrincipal": ["Int"],
   "CashIndex": ["Uint"],
   "AssetIndex": ["Uint"],
+  "SessionIndex": "u32",
+  "AccountId32": "[u8;32]",
+  "AccountId": "AccountId32",
 
   "Source1": "SymbolRS",
   "Symbol": "([u8; 12], u8)",
@@ -105,6 +108,9 @@
 
   "Source3": "NoticesRS",
   "EncodedNotice": "Vec<u8>",
+  "ChainKeys": {
+    "eth_addr": "ValidatorKey"
+  },
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",

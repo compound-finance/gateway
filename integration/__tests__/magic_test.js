@@ -9,7 +9,9 @@ const {
   waitForEvent
 } = require('../util/substrate');
 const { log, error } = require('../util/log');
+
 const { getEventValues } = require('../util/ethereum');
+const { u8aToHex } = require('@polkadot/util');
 
 /* This is probably going to be permanently skipped.
    We might want to keep it since it shows the non-scenario
@@ -25,7 +27,10 @@ describe('magic extract and goldie unlocks', () => {
     keyring,
     provider,
     web3;
-
+    
+  let alice_init_id = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+  let alice_init_eth_key = "0x6a72a2f14577d9cd0167801efdd54a07b40d2b61";
+  
   beforeEach(async () => {
     ({
       accounts,
@@ -139,6 +144,26 @@ describe('magic extract and goldie unlocks', () => {
     });
 
     // Everything's good.
+  }, 600000 /* 10m */);
+
+
+  const toSS58 = (arr) => keyring.encodeAddress(new Uint8Array(arr.buffer));
+
+  test('authorities', async () => {
+    const [[val_id_0, chainKeys_0]] = await api.query.cash.validators.entries();
+    
+    const val_0 = toSS58(val_id_0.args[0]);
+    expect(val_0).toEqual(alice_init_id);
+    
+    const eth_addr = u8aToHex(chainKeys_0.unwrap().eth_addr);
+    expect(eth_addr).toEqual(alice_init_eth_key);
+
+    const [auths] = await api.query.babe.authorities();
+    const babe_id_0 = toSS58(auths[0]);
+    expect(babe_id_0).toEqual(alice_init_id);
+
+    // todo: query and assert grandpa state via the GRANDPA_AUTHORITIES_KEY https://www.shawntabrizi.com/substrate/querying-substrate-storage-via-rpc/
+
   }, 600000 /* 10m */);
 
   // TODO: Submit trx to Starport and check event logs

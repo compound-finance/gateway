@@ -49,6 +49,7 @@ pallet-sudo = { version = '2.0.0', default-features = false, git = 'https://gith
 pallet-timestamp = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 pallet-transaction-payment = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 pallet-transaction-payment-rpc-runtime-api = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+pallet-session = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 
 # Local dependencies
 pallet-cash = { path = '../pallets/cash', default-features = false, version = '1.0.0' }
@@ -80,6 +81,7 @@ std = [
     'pallet-timestamp/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'pallet-transaction-payment/std',
+    'pallet-session/std',
     'serde',
     'sp-api/std',
     'sp-block-builder/std',

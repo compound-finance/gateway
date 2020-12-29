@@ -82,6 +82,10 @@ pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
 /// Type for an address used to identify a validator.
 pub type ValidatorKey = [u8; 20]; // XXX secp256k1 public key, but why secp256k1?
 
+pub type EthAddress = ValidatorKey;
+
+pub type SessionIndex = u32;
+
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
 
@@ -149,7 +153,13 @@ pub struct Quantity(pub Symbol, pub AssetAmount);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
 pub struct CashPrincipal(pub Int);
 
-/// Type for representing the multiplicative CASH index.
+/// Type for representing the keys to sign notices
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct ChainKeys {
+    pub eth_addr: ValidatorKey,
+}
+
+/// Type for representing a multiplicative index on Compound Chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct CashIndex(pub Uint);
 

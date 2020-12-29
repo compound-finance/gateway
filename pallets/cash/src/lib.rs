@@ -10,6 +10,19 @@ extern crate alloc;
 extern crate ethereum_client;
 extern crate trx_request;
 
+use crate::chains::{
+    Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
+};
+use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId, NoticeStatus};
+use crate::rates::{InterestRateModel, APR};
+use crate::reason::Reason;
+use crate::symbol::Symbol;
+use crate::types::{
+    AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
+    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, MaxableAssetAmount,
+    Nonce, Quantity, ReporterSet, SessionIndex, SignedPayload, Timestamp, ValidatorSet,
+    ValidatorSig,
+};
 use codec::{alloc::string::String, Decode};
 use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{
@@ -19,32 +32,23 @@ use frame_system::{
 use our_std::{
     convert::{TryFrom, TryInto},
     str,
+    str::FromStr,
     vec::Vec,
 };
+use sp_core::crypto::AccountId32;
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
         storage_lock::{StorageLock, Time},
     },
+    traits::IdentifyAccount,
     transaction_validity::{
         InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
     },
     SaturatedConversion,
 };
 
-use crate::chains::{
-    Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
-};
-use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId, NoticeStatus};
-use crate::rates::{InterestRateModel, APR};
-use crate::reason::Reason;
-use crate::symbol::Symbol;
-use crate::types::{
-    AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ConfigAsset,
-    ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, Nonce, Quantity, ReporterSet,
-    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
-};
-
+use pallet_session;
 use sp_runtime::print;
 
 pub mod chains;
@@ -89,12 +93,13 @@ decl_storage! {
         /// The timestamp of the previous block (or defaults to timestamp of the genesis block).
         LastBlockTimestamp get(fn last_block_timestamp) config(): Timestamp;
 
-        // XXX we also need mapping of public (identity, babe) key to other keys
-        /// The current set of allowed validators, and their associated keys.
-        Validators get(fn validators): ValidatorSet; // XXX
+        NextSessionIndex get(fn get_next_session_index): SessionIndex;
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
-        NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
+        NextValidators get(fn next_validators) : map hasher(blake2_128_concat) AccountId32 => Option<ChainKeys>;
+
+        /// The current set of allowed validators, and their associated keys.
+        Validators get(fn validators) : map hasher(blake2_128_concat) AccountId32 => Option<ChainKeys>;
 
         /// An index to track interest earned by CASH holders and owed by CASH borrowers.
         GlobalCashIndex get(fn cash_index): CashIndex;
@@ -171,13 +176,14 @@ decl_storage! {
         pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
-        config(validators): ConfigSetString;
+        config(validator_ids): Vec<[u8;32]>;
+        config(validator_keys): Vec<(String,)>;
         config(reporters): ConfigSetString;
         config(assets): Vec<ConfigAsset>;
         build(|config| {
-            Module::<T>::initialize_assets(config.assets.clone());
+            Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_assets(config.assets.clone());
         })
     }
 }
@@ -309,6 +315,41 @@ macro_rules! r#cash_err {
     };
 }
 
+impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
+    // return validator set to use in the next session (babe and grandpa also stage new auths associated w these accountIds)
+    fn new_session(session_index: SessionIndex) -> Option<Vec<AccountId32>> {
+        if NextValidators::iter().count() != 0 {
+            NextSessionIndex::put(session_index);
+            Some(NextValidators::iter().map(|x| x.0).collect::<Vec<_>>())
+        } else {
+            Some(Validators::iter().map(|x| x.0).collect::<Vec<_>>())
+        }
+    }
+
+    fn start_session(index: SessionIndex) {
+        // if changes have been queued
+        // if starting the queued session
+        if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
+            // delete existing validators
+            for kv in <Validators>::iter() {
+                <Validators>::take(&kv.0);
+            }
+            // push next validators into current validators
+            for kv in <NextValidators>::iter() {
+                let id: AccountId32 = kv.0;
+                let chain_keys: ChainKeys = kv.1;
+                <Validators>::insert(&id, chain_keys);
+                <NextValidators>::take(&id); //query and return
+            }
+        } else {
+            ()
+        }
+    }
+    fn end_session(_: SessionIndex) {
+        ()
+    }
+}
+
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -380,12 +421,10 @@ decl_module! {
                 compound_crypto::eth_recover(&payload[..], &signature, false),  // XXX why is this using eth for validator sig though?
                 Error::<T>::InvalidSignature)?;
 
-            print(format!("signer: {}", hex::encode(&signer[..])).as_str());
-            // XXX
-            // XXX require(signer == known validator); // XXX
-            // Check that signer is a known validator, otherwise throw an error
-            let validators = <Validators>::get();
+            let validators: Vec<EthAddress> = <Validators>::iter().map(|v| v.1.eth_addr).collect();
+
             if !validators.contains(&signer) {
+                print(format!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators).as_str());
                 debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
                 return Err(Error::<T>::UnknownValidator)?
             }
@@ -404,10 +443,7 @@ decl_module! {
                     let mut signers_new = signers.clone();
                     signers_new.push(signer.clone()); // XXX unique add to set?
 
-                    // XXX
-                    // let signers_new = {signer | signers};
-                    // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                    if signers_new.len() > validators.len() * 2 / 3 { // XXX note this needs to be & Validators, so we need a set
+                    if core::passes_validation_threshold(signers_new.len() as u8, validators.len() as u8) {
                         match core::apply_eth_event_internal::<T>(event) {
                             Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
@@ -456,6 +492,19 @@ decl_module! {
         pub fn publish_signature(origin, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             cash_err!(core::publish_signature_internal(notice_id, signature), Error::<T>::PublishSignatureFailure)?;
+
+            Ok(())
+        }
+
+        #[weight = 0] // XXX
+        pub fn change_authorities(origin, keys: Vec<(AccountId32, ChainKeys)>) -> dispatch::DispatchResult {
+            // TODO: assert root only
+            for k in &keys {
+                let id: &AccountId32 = &k.0;
+                let chain_keys: &ChainKeys = &k.1;
+                <NextValidators>::take(id); // XXX: actually delete previous nextValidators?
+                <NextValidators>::insert(&id, chain_keys);
+            }
 
             Ok(())
         }
@@ -643,6 +692,34 @@ impl<T: Config> Module<T> {
         }
     }
 
+    /// Set the initial set of validators from the genesis config
+    /// Set next validators, bc they will become "current validators" upon session 0 start
+    fn initialize_validators(ids: Vec<[u8; 32]>, keys: Vec<(String,)>) {
+        assert!(
+            !ids.is_empty(),
+            "Validators must be set in the genesis config"
+        );
+
+        assert!(
+            <NextValidators>::iter().count() == 0 || <Validators>::iter().count() == 0,
+            "Validators are already set but they should only be set in the genesis config."
+        );
+        for (acc_id_bytes, key_tuple) in ids.iter().zip(keys.iter()) {
+            print(format!("Error {:#?}", acc_id_bytes).as_str());
+            let acc_id: AccountId32 = AccountId32::new(*acc_id_bytes);
+
+            let eth_addr: [u8; 20] = hex::decode(&key_tuple.0)
+                .unwrap_or_else(|_| panic!("Ecsda key could not be decoded"))
+                .try_into()
+                .expect("Ecsda public key not 20 bytes");
+            assert!(
+                <Validators>::get(&acc_id) == None,
+                "Duplicate validator keys in genesis config"
+            );
+            <Validators>::insert(acc_id, ChainKeys { eth_addr });
+        }
+    }
+
     /// Set the initial set of open price feed price reporters from the genesis config
     fn initialize_reporters(reporters: ConfigSetString) {
         assert!(
@@ -656,21 +733,6 @@ impl<T: Config> Module<T> {
         let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
             .expect("Could not deserialize validators from genesis config");
         PriceReporters::put(converted);
-    }
-
-    /// Set the initial set of validators from the genesis config
-    fn initialize_validators(validators: ConfigSetString) {
-        assert!(
-            !validators.is_empty(),
-            "Validators must be set in the genesis config"
-        );
-        assert!(
-            Validators::get().is_empty(),
-            "Validators are already set but they should only be set in the genesis config."
-        );
-        let converted: ValidatorSet = Self::hex_string_vec_to_binary_vec(validators)
-            .expect("Could not deserialize validators from genesis config");
-        Validators::put(converted);
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed

@@ -1,6 +1,7 @@
 use crate::{chains::*, core::*, mock::*, rates::*, reason::Reason, symbol::*, *};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
+use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
 
 const ETH: Symbol = Symbol::new("ETH", 18);
@@ -62,10 +63,22 @@ fn initialize_storage() {
             asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
         },
     ]);
-    CashModule::initialize_validators(vec![
-        "6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
-        "8ad1b2918c34ee5d3e881a57c68574ea9dbecb81".into(), // pk: 6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d
-    ]);
+    CashModule::initialize_validators(
+        //accountId32s
+        vec![
+            AccountId32::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY")
+                .unwrap()
+                .into(),
+            AccountId32::from_str("5FfBQ3kwXrbdyoqLPvcXRp7ikWydXawpNs2Ceu3WwFdhZ8W4")
+                .unwrap()
+                .into(),
+        ],
+        // eth keys
+        vec![
+            ("6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(),), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
+            ("8ad1b2918c34ee5d3e881a57c68574ea9dbecb81".into(),),
+        ],
+    );
     CashModule::initialize_reporters(vec![
         "85615b076615317c80f14cbad6501eec031cd51c".into(),
         "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
@@ -73,6 +86,7 @@ fn initialize_storage() {
 }
 
 #[test]
+// TODO: move into integraion test area, validators are not present in unit tests as not all pallets are loaded
 fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();

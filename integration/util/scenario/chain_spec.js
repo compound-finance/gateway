@@ -27,20 +27,15 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
 
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
 
-  let babe = validatorsInfo.map(([_, validator]) =>
-    [
-      validator.babe_key,
-      1
-    ]
+  // babekey == validator id, account id
+  let session_args = validatorsInfo.map(([_, el]) => [el.babe_key, el.babe_key, {babe: el.babe_key, grandpa: el.grandpa_key}]);
+
+  let validatorIds = validatorsInfo.map(([_, el]) =>
+    Array.from(ctx.actors.keyring.decodeAddress(el.babe_key))// from ss58 str => byte array
   );
-  let grandpa = validatorsInfo.map(([_, validator]) =>
-    [
-      validator.grandpa_key,
-      1
-    ]
-  );
-  let validators = validatorsInfo.map(([_, validator]) =>
-    stripHexPrefix(validator.eth_account)
+
+  let chain_keys = validatorsInfo.map(([_, validator]) =>
+    [stripHexPrefix(validator.eth_account)]
   );
   let assets = tokens.all().map((token) => ({
     symbol: `${token.symbol.toUpperCase()}/${token.decimals}`,
@@ -55,15 +50,13 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     },
     genesis: {
       runtime: {
-        palletBabe: {
-          authorities: babe,
-        },
-        palletGrandpa: {
-          authorities: grandpa
-        },
         palletCash: {
-          validators,
+          validatorIds,
+          validatorKeys: chain_keys,
           assets
+        },
+        palletSession: {
+          keys: session_args
         }
       }
     }
