@@ -205,6 +205,18 @@ decl_error! {
     }
 }
 
+macro_rules! r#cash_err {
+    ($expr:expr, $new_err:expr) => {
+        match $expr {
+            core::result::Result::Ok(val) => Ok(val),
+            core::result::Result::Err(err) => {
+                debug::native::error!("Error {:#?}", err);
+                Err($new_err)
+            }
+        }
+    };
+}
+
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -258,7 +270,7 @@ decl_module! {
             sig_part[0..64].copy_from_slice(&sig[0..64]);
             let signature = secp256k1::Signature::parse(&sig_part);
             // Recover RecoveryId part
-            let recovery_id = secp256k1::RecoveryId::parse(sig[64]).map_err(|_| <Error<T>>::SignedPayloadError)?;
+            let recovery_id = cash_err!(secp256k1::RecoveryId::parse(sig[64]), <Error<T>>::SignedPayloadError)?;
             // Recover validator's public key from signature
             let message = secp256k1::Message::parse(&chains::eth::keccak(payload.clone()));
             let recover = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
