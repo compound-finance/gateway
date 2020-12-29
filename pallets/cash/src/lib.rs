@@ -1,7 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
-#![feature(trivial_bounds)]
 
 #[macro_use]
 extern crate alloc;
