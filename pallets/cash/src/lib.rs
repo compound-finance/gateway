@@ -27,9 +27,9 @@ use sp_runtime::{
     RuntimeDebug, SaturatedConversion,
 };
 
-use crate::amount::CashAmount;
+use crate::amount::{Amount, CashAmount};
 use crate::chains::{Chain, Ethereum, EventStatus}; // XXX events mod?
-use crate::core::AccountId;
+use crate::core::{AccountId, AssetId};
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
 mod amount;
@@ -42,6 +42,7 @@ mod params; // XXX
 #[cfg(test)]
 mod mock;
 
+mod oracle;
 #[cfg(test)]
 mod tests;
 
@@ -139,11 +140,22 @@ decl_storage! {
         /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
+        /// Mapping of assets to their price.
+        Price get(fn price): map hasher(blake2_128_concat) AssetId => Amount;
+
+        /// Mapping of assets to the last time their price was updated.
+        PriceTime get(fn price_time): map hasher(blake2_128_concat) AssetId => Timestamp;
+
+        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => AssetId;
+
+        Reporters get(fn reporters): Vec<[u8; 20]> = vec![
+            hex!("fCEAdAFab14d46e20144F48824d0C09B1a03F2BC") // coinbase pro
+        ];
+
         // XXX
         // AssetInfo[asset];
         // LiquidationIncentive;
-        // Price[asset];
-        // PriceTime[asset];
         // PriceReporter;
         // PriceKeyMapping;
     }
@@ -217,6 +229,13 @@ decl_module! {
 
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
+
+        /// Set the price using the open price feed. Note, ext suffix is required here because
+        /// price is already defined in storage
+        #[weight = 0]
+        pub fn price_ext(origin, payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
+            Ok(())
+        }
 
         // XXX this function is temporary and will be deleted after we reach a certain point
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
