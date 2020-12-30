@@ -230,10 +230,9 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
-        /// Set the price using the open price feed. Note, ext suffix is required here because
-        /// price is already defined in storage
+        /// Set the price using the open price feed.
         #[weight = 0]
-        pub fn price_ext(origin, payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
+        pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
             Ok(())
         }
 
