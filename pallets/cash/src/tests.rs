@@ -1,5 +1,7 @@
 use crate::{chains::*, core::*, mock::*, Error};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
+use our_std::ops::Deref;
+use sp_core::offchain::testing;
 
 fn andrew() -> AccountId {
     AccountId {
@@ -94,5 +96,27 @@ fn correct_error_for_none_value() {
             CashModule::cause_error(Origin::signed(Default::default())),
             Error::<Test>::NoneValue
         );
+    });
+}
+
+#[test]
+fn test_open_price_feed_request_okex() {
+    let calls: Vec<testing::PendingRequest> = vec![testing::PendingRequest {
+        method: "GET".into(),
+        uri: crate::oracle::OKEX_OPEN_PRICE_FEED_URL.into(),
+        body: vec![],
+        response: Some(
+            crate::oracle::tests::API_RESPONSE_TEST_DATA
+                .to_owned()
+                .into_bytes(),
+        ),
+        headers: vec![],
+        sent: true,
+        ..Default::default()
+    }];
+
+    new_test_ext_with_http_calls(calls).execute_with(|| {
+        let opf = crate::oracle::open_price_feed_request_okex().unwrap();
+        // note - open_price_feed_request_okex also runs a sanity check so this test is somewhat comprehensive
     });
 }

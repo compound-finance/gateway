@@ -1,6 +1,10 @@
 use crate::{Call, Config, Module};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
-use sp_core::{sr25519::Signature, H256};
+use sp_core::{
+    offchain::{testing, OffchainExt, TransactionPoolExt},
+    sr25519::Signature,
+    H256,
+};
 use sp_runtime::{
     testing::{Header, TestXt},
     traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
@@ -89,8 +93,27 @@ pub type CashModule = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    frame_system::GenesisConfig::default()
-        .build_storage::<Test>()
-        .unwrap()
-        .into()
+    new_test_ext_with_http_calls(vec![])
+}
+
+pub fn new_test_ext_with_http_calls(
+    mut calls: Vec<testing::PendingRequest>,
+) -> sp_io::TestExternalities {
+    let (offchain, state) = testing::TestOffchainExt::new();
+    let (pool, pool_state) = testing::TestTransactionPoolExt::new();
+
+    // let mut test_externalities: sp_io::TestExternalities = system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
+
+    let mut test_externalities = sp_io::TestExternalities::default();
+    test_externalities.register_extension(OffchainExt::new(offchain));
+    test_externalities.register_extension(TransactionPoolExt::new(pool));
+
+    {
+        let mut state = state.write();
+        for call in calls.drain(0..calls.len()) {
+            state.expect_request(call);
+        }
+    }
+
+    test_externalities
 }
