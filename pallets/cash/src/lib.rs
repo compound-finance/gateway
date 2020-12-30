@@ -75,6 +75,9 @@ pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
 
+/// Type for validator set included in the genesis config
+pub type ValidatorGenesisConfig = Vec<String>;
+
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
 pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
@@ -95,10 +98,7 @@ decl_storage! {
 
         // XXX we also need mapping of public (identity, babe) key to other keys
         /// The current set of allowed validators, and their associated keys.
-        Validators get(fn validators): ValidatorSet = vec![
-            hex!("0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba"),
-            hex!("04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4")
-        ]; // XXX
+        Validators get(fn validators): ValidatorSet; // XXX
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
         NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
@@ -146,6 +146,10 @@ decl_storage! {
         // PriceTime[asset];
         // PriceReporter;
         // PriceKeyMapping;
+    }
+    add_extra_genesis {
+        config(validators): ValidatorGenesisConfig;
+        build(|config| Module::<T>::initialize_validators(config.validators.clone()))
     }
 }
 
@@ -394,6 +398,28 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
+    fn initialize_validators(validators: ValidatorGenesisConfig) {
+        assert!(
+            !validators.is_empty(),
+            "Validators must be set in the genesis config"
+        );
+        assert!(
+            Validators::get().is_empty(),
+            "Validators are already set but they should only be set in the genesis config."
+        );
+        let mut converted_validators: ValidatorSet = Vec::new();
+        for validator_address in validators {
+            let validator_address = hex::decode(&validator_address)
+                .expect("Bad genisis config, validator address not stored as hex");
+            let converted_validator: [u8; 65] = validator_address
+                .try_into()
+                .expect("Bad genesis config, validator address incorrect number of bytes.");
+            converted_validators.push(converted_validator);
+        }
+        // build the
+        Validators::put(converted_validators);
+    }
+
     pub fn process_eth_notices(block_number: T::BlockNumber) {
         for notice in EthNoticeQueue::iter_values() {
             // find parent
