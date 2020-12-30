@@ -14,7 +14,7 @@ For more information on the design, see the [Architecture Doc](./ARCHITECTURE.md
 From the `ops` directory, you should first set-up an AWS account and create a bucket to store your terraform state. Then run:
 
 ```sh
-TF_DATA_DIR=.terraform1 AWS_PROFILE=compound-dev-1 terraform init -upgrade \
+terraform init -upgrade \
   -backend-config="bucket=compound-chain" \
   -backend-config="key=tfstate" \
   -backend-config="region=us-east-1"
@@ -27,21 +27,21 @@ Also, you will need to create a public & private key pair to access your instanc
 Next, plan the terraform changes:
 
 ```sh
-TF_DATA_DIR=.terraform1 AWS_PROFILE=compound-dev-1 terraform plan \
+terraform plan \
   -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)"
 ```
 
 Then, if that looks good, apply the terraform changes:
 
 ```sh
-TF_DATA_DIR=.terraform1 AWS_PROFILE=compound-dev-1 terraform apply \
+terraform apply \
   -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)"
 ```
 
 Once you have everything up, you'll need to construct your Ansible inventory and `ssh_config`. This can be done by running:
 
 ```sh
-TF_DATA_DIR=.terraform1 AWS_PROFILE=compound-dev-1 terraform output -json | ./ansible/generate_inv.py
+terraform output -json | ./ansible/generate_inv.py
 ```
 
 Note: you'll need python3 installed. You may need to run this command differently in Powershell.
@@ -55,48 +55,19 @@ Setting up each node is a matter of simply running the Ansible playbooks. Make s
 To run the playbook and configure the servers, run:
 
 ```sh
-ansible-playbook chain.yml
+ansible-playbook -i hosts --ssh-extra-args "-F ./ssh_config" ansible/chain.yml
 ```
 
 Note: while Compound Chain is private, you will need to add a deploy key to the repo and give that deploy key to the servers, like so:
 
 ```sh
-env deploy_key="$HOME/.ssh/id_rsa_compound_chain_deploy" ansible-playbook chain.yml
+env deploy_key="$HOME/.ssh/id_rsa_compound_chain_deploy" ansible-playbook -i hosts --ssh-extra-args "-F ./ssh_config" ansible/chain.yml
 ```
 
+## Best Practices
 
+If you need to run multiple isolated deployments, the best practice is to create a directory `deployment` and then sub-folders for each isolated deployment with a `main.tf` that references `./tf/main.tf`'s module. This is the official terraform way to handle fully hermetic deployments (i.e. more isolated than terraform workspaces). Note: the `deployment` folder is git ignored.
 
+## Contributing
 
-
-
-DSFDSFDSFDSF
-
-### Running a second node
-
-TODO: Decide if `TF_DATA_DIR` hack is a good idea or if there's a better alternative.
-
-```sh
-TF_DATA_DIR=.terraform2 AWS_PROFILE=compound-dev-2 terraform init -upgrade \
-  -backend-config="bucket=compound-chain-2" \
-  -backend-config="key=tfstate" \
-  -backend-config="region=us-east-1"
-```
-
-Apply the changes:
-
-```sh
-TF_DATA_DIR=.terraform2 AWS_PROFILE=compound-dev-2 terraform apply \
-  -var admin_public_key="$(cat ~/.ssh/id_rsa_compound_chain.pub)"
-```
-
-TODO: How to make this command work simultaneously with 1 and 2?
-
-```sh
-TF_DATA_DIR=.terraform2 AWS_PROFILE=compound-dev-2 terraform output -json | ./ansible/generate_inv.py
-```
-
-Then Ansible:
-
-```sh
-env deploy_key="$HOME/.ssh/id_rsa_compound_chain_deploy" ansible-playbook chain.yml -e authority=bob
-```
+Please create an issue or pull request. Note: the goal here is to build a golden path fully-secured deployment. Thus, we may not add frivilous features. If you need more features, consider using the isolated deployments pattern above and adding to the `main.tf` you create.

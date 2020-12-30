@@ -18,4 +18,5 @@
 **/*.tfstate*
 ops/**/hosts
 ops/**/ssh_config
+ops/deployment*
 **/*.log

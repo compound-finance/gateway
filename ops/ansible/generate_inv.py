@@ -1,6 +1,7 @@
 #!env python3
 import json
 import sys
+import pathlib
 
 
 def build_hosts_tmpl(authority_node_ip_address, bastion_ip_address, full_node_ip_addresses):
@@ -21,15 +22,15 @@ def build_inventory_file(inv):
     hosts_file = build_hosts_tmpl(authority_node_ip_address,
                                   bastion_ip_address, full_node_ip_addresses)
 
-    with open('ansible/hosts', 'w') as f:
+    with open('hosts', 'w') as f:
         f.write(hosts_file)
 
 
 def build_ssh_config(inv):
-    with open('ansible/ssh_config.template', 'r') as f:
+    with open('{}/ssh_config.template'.format(pathlib.Path(__file__).parent.absolute()), 'r') as f:
         tmpl = f.read()
     res = tmpl.replace('{bastion}', inv['bastion_ip_address']['value'])
-    with open('ansible/ssh_config', 'w') as f:
+    with open('ssh_config', 'w') as f:
         f.write(res)
 
 

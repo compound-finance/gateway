@@ -13,6 +13,6 @@ Host {bastion}
 
 Host 10.0.*
   User ubuntu
-  ProxyCommand ssh -F ./ssh_config -W %h:%p {bastion}
+  ProxyJump {bastion}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
