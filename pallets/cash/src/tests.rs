@@ -36,13 +36,38 @@ fn it_magically_extracts() {
     });
 }
 
+fn initialize_validators() {
+    CashModule::initialize_validators(vec![
+        "0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba".into(),
+        "04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4".into()
+    ]);
+}
+
 #[test]
-fn it_works_for_default_value() {
+fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
+        initialize_validators();
         // Dispatch a signed extrinsic.
         // XXX
-        // assert_ok!(
-        //     CashModule::process_eth_event(Origin::signed(Default::default()), vec![], [0; 65]));
+        let payload = vec![
+            47u8, 223, 58, 0, 0, 0, 0, 0, 0, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
+            238, 238, 238, 238, 238, 238, 238, 238, 238, 81, 60, 31, 244, 53, 236, 206, 221, 15,
+            218, 94, 221, 42, 213, 229, 70, 31, 14, 135, 38, 0, 128, 224, 55, 121, 195, 17, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+
+        let sig = [
+            228, 180, 56, 220, 198, 16, 107, 231, 10, 157, 165, 109, 245, 75, 46, 66, 164, 47, 161,
+            71, 119, 142, 174, 183, 246, 102, 9, 121, 89, 21, 104, 174, 21, 202, 66, 26, 78, 204,
+            163, 35, 125, 113, 170, 242, 7, 213, 238, 201, 16, 22, 61, 174, 1, 22, 128, 224, 221,
+            97, 133, 205, 126, 99, 4, 105, 1,
+        ];
+
+        assert_ok!(CashModule::process_eth_event(
+            Origin::signed(Default::default()),
+            payload,
+            sig
+        ));
         // Read pallet storage and assert an expected result.
         // XXX assert_eq!(CashModule::something(), Some(42));
     });
