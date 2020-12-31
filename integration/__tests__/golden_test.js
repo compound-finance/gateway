@@ -5,42 +5,8 @@ const { deployContracts } = require('../util/ethereum');
 const { log, error } = require('../util/log');
 const { canConnectTo } = require('../util/net');
 const { loadTypes } = require('../util/types');
+const { genPort, sleep, until } = require('../util/util');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
-
-const eth_lock_event_topic = "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3";
-
-function genPort() {
-  // TODO: Actually check port is free?
-  return Math.floor(Math.random() * (65535 - 1024)) + 1024;
-}
-
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function until(cond, opts = {}) {
-  let options = {
-    delay: 5000,
-    retries: null,
-    message: null,
-    ...opts
-  };
-
-  let start = +new Date();
-
-  if (await cond()) {
-    return;
-  } else {
-    if (options.message) {
-      log(options.message);
-    }
-    await sleep(options.delay + start - new Date());
-    return await until(cond, {
-      ...options,
-      retries: options.retries === null ? null : options.retries - 1
-    });
-  }
-}
 
 describe('golden path', () => {
   let api, contracts, ganacheServer, provider, ps, web3;
