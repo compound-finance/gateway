@@ -112,9 +112,8 @@ jobs:
 
       - name: Run Integration Test
         run: |
-          set -eo pipefail
           cd integration
-          npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
+          npx jest --ci --reporters=default --reporters=jest-junit
           test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
         id: int_test
@@ -133,7 +132,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
-          path: junit.xml
+          path: integration/junit.xml
         continue-on-error: true
 
       - name: Publish Unit Test Results
@@ -141,7 +140,7 @@ jobs:
         if: always()
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          files: junit.xml
+          files: integration/junit.xml
         continue-on-error: true
 
   eth-tests:
