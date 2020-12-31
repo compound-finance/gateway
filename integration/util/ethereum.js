@@ -7,10 +7,11 @@ const { log, error } = require('./log');
 let contractsFile = path.join(__dirname, '..', '..', 'ethereum', '.build', 'contracts.json');
 
 async function deployContract(web3, from, contracts, contractName, args) {
-  let contract = Object.entries(contracts).find(([name, contract]) => name.split(':')[1] === contractName)?.[1];
-  if (!contract) {
+  let contractObj = Object.entries(contracts).find(([name, contract]) => name.split(':')[1] === contractName);
+  if (!contractObj) {
     throw new Error(`Could not find contract: ${contractName}`);
   }
+  let [_, contract] = contractObj;
   let abi = JSON.parse(contract.abi);
   let constructor = abi.find((m) => m.type === 'constructor' && m.inputs.length === args.length);
   if (!constructor) {
