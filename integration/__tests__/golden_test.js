@@ -18,7 +18,7 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function until(cond, opts={}) {
+async function until(cond, opts = {}) {
   let options = {
     delay: 5000,
     retries: null,
@@ -27,7 +27,7 @@ async function until(cond, opts={}) {
   };
 
   let start = +new Date();
-  
+
   if (await cond()) {
     return;
   } else {
@@ -43,24 +43,45 @@ async function until(cond, opts={}) {
 }
 
 describe('golden path', () => {
-  let api, contracts, ps, web3;
+  let api, contracts, ganacheServer, provider, ps, web3;
 
   beforeEach(async () => {
-    web3 = new Web3(ganache.provider(), null, { transactionConfirmationBlocks: 1 });
+    ganacheServer = ganache.server();
+    provider = ganacheServer.provider;
+
+    let web3Port = genPort();
+
+    // Start web3 server
+    log(`Starting Ethereum server on ${web3Port}...`);
+    ganacheServer.listen(web3Port);
+
+    web3 = new Web3(provider, null, { transactionConfirmationBlocks: 1 });
+
     contracts = await deployContracts(web3);
     let chainSpecFile = await buildChainSpec({
       name: 'Integration Test Network',
       properties: {
-        eth_lock_event_topic,
         eth_starport_address: contracts.starport._address
+      },
+      genesis: {
+        runtime: {
+          palletBabe: {
+            authorities: [
+              // Use single well-known authority: Alice
+              [
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+                1
+              ]
+            ]
+          }
+        }
       }
     }, false);
 
+    let rpcPort = genPort();
     let p2pPort = genPort();
     let wsPort = genPort();
-    let rpcPort = genPort();
 
-    // TODO: Point off-chain worker at our ganache provider
     ps = spawnValidator([
       '--chain',
       chainSpecFile,
@@ -71,8 +92,14 @@ describe('golden path', () => {
       '--ws-port',
       wsPort,
       '--port',
-      p2pPort
-    ]);
+      p2pPort,
+      '--tmp',
+      '--alice'
+    ], {
+      env: { ETH_RPC_URL: `http://localhost:${web3Port}` }
+    });
+
+    // TODO: Fail on process error
 
     await until(() => canConnectTo('localhost', wsPort), {
       retries: 50,
@@ -93,6 +120,10 @@ describe('golden path', () => {
 
     if (ps) {
       ps.kill('SIGTERM'); // Kill compound-chain node
+    }
+
+    if (ganacheServer) {
+      ganacheServer.close(); // Close Web3 server
     }
   });
 
