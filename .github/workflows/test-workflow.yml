@@ -110,6 +110,10 @@ jobs:
           cd ethereum
           yarn compile
 
+      - name: Build Compound Chain
+        run: |
+          cargo +nightly build --release
+
       - name: Run Integration Test
         run: |
           cd integration
