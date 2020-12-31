@@ -52,5 +52,7 @@
   "Payload": "Vec<u8>",
   "Reason": {
     "_enum": ["None"]
-  }
+  },
+  "SignedPayload": "Vec<u8>",
+  "Signatures": "Vec<Signature>"
 }
