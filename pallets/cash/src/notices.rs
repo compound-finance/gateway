@@ -9,7 +9,9 @@ pub type Signatures = Vec<Signature>;
 
 pub type EraId = u32;
 pub type EraIndex = u32;
-pub type NoticeId = (EraId, EraIndex); // XXX make totally ordered trait
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct NoticeId(pub EraId, pub EraIndex);
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Notice<C: Chain> {
@@ -163,7 +165,6 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
             amount, //: Amount,
         } => {
             let amount_encoded = encode_int128(amount); // XXX cast more safely XXX JF: already converted I think
-
             [
                 chain_ident,
                 encode_int32(id.0),
@@ -203,7 +204,7 @@ mod tests {
     #[test]
     fn test_encodes_extraction_notice() {
         let notice = notices::Notice::ExtractionNotice::<Ethereum> {
-            id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             asset: [2u8; 20],
             amount: 50,
@@ -232,7 +233,7 @@ mod tests {
     #[test]
     fn test_encodes_cash_extraction_notice() {
         let notice = notices::Notice::CashExtractionNotice {
-            id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             account: [1u8; 20],
             amount: 55,
@@ -262,7 +263,7 @@ mod tests {
     #[test]
     fn test_encodes_future_yield_notice() {
         let notice = notices::Notice::FutureYieldNotice {
-            id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [5u8; 32],
             next_cash_yield: 700u128,
             next_cash_yield_start_at: 200u128,
@@ -292,7 +293,7 @@ mod tests {
     #[test]
     fn test_encodes_set_supply_cap_notice() {
         let notice = notices::Notice::SetSupplyCapNotice {
-            id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             asset: [70u8; 20],
             amount: 60,
@@ -319,7 +320,7 @@ mod tests {
     #[test]
     fn test_encodes_new_authorities_notice() {
         let notice = notices::Notice::ChangeAuthorityNotice {
-            id: (80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
             new_authorities: vec![[6u8; 20], [7u8; 20], [8u8; 20]],
         };

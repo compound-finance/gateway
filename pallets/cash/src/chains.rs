@@ -23,7 +23,7 @@ pub trait Chain {
     type Hash: Debuggable + Clone + Eq = [u8; 32];
     type PublicKey: Debuggable + Clone + Eq = [u8; 32];
     type Signature: Debuggable + Clone + Eq = [u8; 65]; // XXX
-    type EventId: Debuggable + Clone + Eq; // XXX make totally ordered trait
+    type EventId: Debuggable + Clone + Eq + Ord;
     type Event: Debuggable + Clone + Eq;
 
     fn hash_bytes(data: &[u8]) -> Self::Hash;
@@ -101,6 +101,7 @@ pub mod eth {
 
     pub type BlockNumber = u32;
     pub type LogIndex = u32;
+
     pub type EventId = (BlockNumber, LogIndex);
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
