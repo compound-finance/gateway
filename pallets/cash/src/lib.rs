@@ -249,7 +249,7 @@ decl_module! {
             let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
             let notice = Notice::ExtractionNotice {
-                id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
+                id: NoticeId(now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
                 asset: [0u8; 20],
                 amount: amount,
