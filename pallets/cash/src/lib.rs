@@ -15,6 +15,7 @@ use frame_system::{
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
 use hex_literal::hex;
+use num_bigint::BigUint;
 use our_std::{convert::TryInto, vec::Vec};
 use sp_runtime::{
     offchain::{
@@ -27,9 +28,9 @@ use sp_runtime::{
     RuntimeDebug, SaturatedConversion,
 };
 
-use crate::amount::CashAmount;
+use crate::amount::{Amount, CashAmount};
 use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
-use crate::core::AccountId;
+use crate::core::{AccountId, AssetId};
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
 mod amount;
@@ -122,10 +123,14 @@ decl_storage! {
         // ChainCashHoldPrincipal;
         // TotalCashHoldPrincipal;
         // TotalCashBorrowPrincipal;
-        // TotalSupplyPrincipal;
+        // TODO: Use Amounts, at cost of mainting decimals field correctly / throwing it away every time, 
+        //       or write newtype wrapper for BigUint, or store principals as Ints and use Amounts for indexes/math?
+        //       I think likely store BigUint's here -CB
+        TotalSupplyPrincipal get(fn total_supply_principal): map hasher(blake2_128_concat) AssetId => Option<Amount>;
+        SupplyPrincipal get(fn supply_principal):
+            double_map hasher(blake2_128_concat) AssetId, hasher(blake2_128_concat) AccountId => Option<Amount>;
         // CashHoldPrincipal[account];
         // CashBorrowPrincipal[account];
-        // SupplyPrincipal[account];
 
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) AccountId => Nonce;
@@ -292,7 +297,7 @@ decl_module! {
             }
 
             let event = chains::eth::Event::decode(&mut payload.as_slice()).map_err(|_| <Error<T>>::DecodeEthereumEventError)?; // XXX
-            let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
+            let status = EthEventQueue::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
             match status {
                 EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
@@ -550,6 +555,50 @@ impl<T: Config> Module<T> {
         r[64] = sig.1.serialize();
         return r;
     }
+
+
+// XXX : can this be in another file and imported? Dependency on storage insert is the challenge
+pub fn lock_internal(asset: AssetId, holder: AccountId, amount: Amount) {
+    // XXX tequire price  Require Amount * PriceAsset >= ParamsMinTxValue
+    let account_principal = match SupplyPrincipal::get(&asset, &holder) {
+        Some(a) => {
+            a
+        }
+        None => {
+            Amount::new(0 as u8, amount.decimals)
+        }
+    }; 
+
+    let new_account_principal = account_principal.add(&amount);
+    match new_account_principal {
+        Ok(n) => {
+            SupplyPrincipal::insert(&asset, &holder, n);
+        }
+        Err(e) =>{
+            // XXX error handling
+        }
+    }
+    
+
+    let total_supply_principal = match TotalSupplyPrincipal::get(&asset) {
+        Some(a) => {
+            a
+        }
+        None => {
+            Amount::new(0u8, amount.decimals)
+        }
+    }; 
+
+    let new_total_supply_principal = total_supply_principal.add(&amount);
+    match new_total_supply_principal {
+        Ok(n) => {
+            TotalSupplyPrincipal::insert(&asset, n);
+        }
+        Err(e) =>{
+            // XXX error handling
+        }
+    }
+}
 }
 
 impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {

@@ -2,6 +2,8 @@ use anyhow::{bail, Result}; // XXX
 use codec::{Decode, Encode, Input};
 use num_bigint::BigUint;
 use our_std::{vec::Vec, RuntimeDebug};
+use codec::{EncodeLike};
+
 
 /// The type of the decimal field.
 pub type DecimalType = u8;
@@ -34,6 +36,8 @@ impl Encode for Amount {
     }
 }
 
+impl EncodeLike for Amount {}
+
 impl Decode for Amount {
     fn decode<I: Input>(value: &mut I) -> Result<Self, codec::Error> {
         let mut value_bytes: Vec<u8> = Decode::decode(value)?;
@@ -54,6 +58,7 @@ impl Decode for Amount {
 pub enum MathError {
     PrecisionMismatch,
 }
+
 
 impl Amount {
     /// Create a new FixedPrecision number from parts. The mantissa is used "raw" and not scaled

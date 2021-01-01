@@ -4,7 +4,7 @@ pub use our_std::{fmt, result, result::Result};
 use our_std::{vec::Vec, RuntimeDebug};
 
 use crate::{
-    amount::CashAmount,
+    amount::{Amount, CashAmount},
     chains::{eth, ChainId},
     params, // XXX
     Config,
@@ -25,6 +25,7 @@ pub struct AccountId {
     pub address: Address,
 }
 
+#[derive(Clone, Encode, Decode)]
 pub struct AssetId {
     pub chain: ChainId,
     pub address: Address,
