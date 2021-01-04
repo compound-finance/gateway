@@ -6,10 +6,21 @@ const { log, error } = require('../util/log');
 const { canConnectTo } = require('../util/net');
 const { loadTypes } = require('../util/types');
 const { genPort, sleep, until } = require('../util/util');
+const { waitForEvents } = require('../util/substrate');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
+const { Keyring } = require('@polkadot/api');
 
 describe('golden path', () => {
-  let api, contracts, ganacheServer, provider, ps, web3;
+  let
+    alice,
+    api,
+    bob,
+    contracts,
+    ganacheServer,
+    keyring,
+    provider,
+    ps,
+    web3;
 
   beforeEach(async () => {
     ganacheServer = ganache.server();
@@ -77,6 +88,10 @@ describe('golden path', () => {
       provider: wsProvider,
       types: await loadTypes()
     });
+
+    keyring = new Keyring();
+    alice = keyring.addFromUri('//Alice');
+    bob = keyring.addFromUri('//Bob');
   }, 600000 /* 10m */);
 
   afterEach(async () => {
@@ -94,8 +109,14 @@ describe('golden path', () => {
   });
 
   test('has the correct genesis hash', async () => {
-    expect(api.genesisHash.toHex()).toBe('0x71ef780cdc604f5f974b25ccd02b9658712531c7e02217d0da260d24eabdbf7d');
+    let call = api.tx.cash.magicExtract({
+      chain: "Eth",
+      account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
+    }, "1000");
+    let events = await waitForEvents(call, alice);
 
+    log({ events });
+    await sleep(100000);
     // TODO: Submit trx to Starport and check event logs
 
     // TODO: Submit extrinsic to Compound Chain and collect notices

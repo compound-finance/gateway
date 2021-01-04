@@ -3,7 +3,7 @@
     "_enum": ["Eth"]
   },
   "AccountAddr": "Vec<u8>",
-  "AccountId": {
+  "ChainAccount": {
     "chain": "ChainId",
     "account": "AccountAddr"
   },
@@ -27,6 +27,9 @@
   },
   "Message": "Vec<u8>",
   "Signature": "Vec<u8>",
+  "Signatures": "Vec<Signature>",
+  "EraId": "u32",
+  "EraIndex": "u32",
   "Asset": "Vec<u8>",
   "EthHash": "[u8; 32]",
   "EthEventStatus": {
@@ -41,9 +44,7 @@
       "Done": null
     }
   },
-  "NoticeId": "(GenerationId, WithinGenerationId)",
-  "GenerationId": "u32",
-  "WithinGenerationId": "u32",
+  "NoticeId": "(EraId, EraIndex)",
   "NoticePayload": {
     "msg": "Message",
     "sig": "Signature",
@@ -53,6 +54,12 @@
   "Reason": {
     "_enum": ["None"]
   },
+  "APR": "u128",
+  "Index": "u128",
+  "Timestamp": "u128",
   "SignedPayload": "Vec<u8>",
-  "Signatures": "Vec<Signature>"
+  "ValidatorSig": "[u8; 65]",
+  "ValidatorKey": "[u8; 65]",
+  "ValidatorSet": "Vec<ValidatorKey>",
+  "ValidatorGenesisConfig": "Vec<String>"
 }

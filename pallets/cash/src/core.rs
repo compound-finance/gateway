@@ -20,19 +20,19 @@ pub type Address = Vec<u8>;
 
 /// Type for a generic account identifier, tied to one of the possible chains.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct AccountId {
+pub struct ChainAccount {
     pub chain: ChainId,
     pub address: Address,
 }
 
-pub struct AssetId {
+pub struct ChainAsset {
     pub chain: ChainId,
     pub address: Address,
 }
 
 pub enum AssetOrCash {
     Cash,
-    Asset(AssetId),
+    Asset(ChainAsset),
 }
 
 pub type Price = u128; // XXX
@@ -59,8 +59,8 @@ pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason>
 // XXX should we expect amounts are already converted to our bigint type here?
 //  probably not, probably inputs should always be fixed width?
 pub fn extract_cash_principal_internal<T: Config>(
-    holder: AccountId,
-    recipient: AccountId,
+    holder: ChainAccount,
+    recipient: ChainAccount,
     amount_principal: CashAmount,
     nonce: Nonce,
 ) -> Result<(), Reason> {
