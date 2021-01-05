@@ -28,7 +28,7 @@ use sp_runtime::{
 };
 
 use crate::amount::{Amount, CashAmount};
-use crate::chains::{Chain, Ethereum, EventStatus}; // XXX events mod?
+use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
 use crate::core::{AccountId, AssetId};
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
@@ -182,7 +182,7 @@ decl_event!(
         FailedProcessingEthEvent(SignedPayload, Reason),
 
         /// Signed Ethereum notice. [message, signatures]
-        SignedNotice(notices::Message, notices::Signatures), // XXX emit Payload? NoticePayload? should be common to all notices
+        SignedNotice(ChainId, NoticeId, notices::Message, notices::Signatures),
     }
 );
 
@@ -271,7 +271,7 @@ decl_module! {
             let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
             let notice = Notice::ExtractionNotice {
-                id: (now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
+                id: NoticeId(now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
                 asset: [0u8; 20],
                 amount: amount,
@@ -281,7 +281,7 @@ decl_module! {
             EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
             // Emit an event.
-            // Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
+            Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice.id(), notices::encode_ethereum_notice(notice), vec![])); // XXX signatures
             // Return a successful DispatchResult
             Ok(())
         }
@@ -392,7 +392,7 @@ decl_module! {
                     // let signatures_new = {signature | signatures };
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
                            EthNoticeQueue::insert(notice_id, NoticeStatus::<Ethereum>::Done);
-                           Self::deposit_event(RawEvent::SignedNotice(notices::encode_ethereum_notice(notice), signatures)); // XXX generic
+                           Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice_id, notices::encode_ethereum_notice(notice), signatures)); // XXX generic
                            Ok(())
                     // } else {
                     //     EthNoticeQueue::insert(event.id, NoticeStatus::<Ethereum>::Pending { signers: signers_new, signatures, notice});
