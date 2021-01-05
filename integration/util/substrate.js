@@ -1,9 +1,9 @@
 const { log, error } = require('./log');
 
-function waitForEvents(call, signer, onFinalize = true) {
+function sendAndWaitForEvents(call, onFinalize = true) {
   return new Promise((resolve, reject) => {
     let unsub;
-    call.signAndSend(signer, ({ events = [], status }) => {
+    call.send(({ events = [], status }) => {
       log(`Current status is ${status}`);
 
       if (status.isInBlock) {
@@ -25,5 +25,5 @@ function waitForEvents(call, signer, onFinalize = true) {
 }
 
 module.exports = {
-  waitForEvents
+  sendAndWaitForEvents
 }

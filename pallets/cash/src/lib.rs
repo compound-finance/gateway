@@ -562,12 +562,12 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::process_eth_event(_payload, signature) => {
+            _ => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     // The transaction is only valid for next 10 blocks. After that it's
                     // going to be revalidated by the pool.
                     .longevity(10)
-                    .and_provides(signature)
+                    .and_provides("hello nurse")
                     // It's fine to propagate that transaction to other peers, which means it can be
                     // created even by nodes that don't produce blocks.
                     // Note that sometimes it's better to keep it for yourself (if you are the block
@@ -576,7 +576,6 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
-            _ => InvalidTransaction::Call.into(),
         }
     }
 }

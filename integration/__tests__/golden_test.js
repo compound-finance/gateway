@@ -6,7 +6,7 @@ const { log, error } = require('../util/log');
 const { canConnectTo } = require('../util/net');
 const { loadTypes } = require('../util/types');
 const { genPort, sleep, until } = require('../util/util');
-const { waitForEvents } = require('../util/substrate');
+const { sendAndWaitForEvents } = require('../util/substrate');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { Keyring } = require('@polkadot/api');
 
@@ -112,8 +112,8 @@ describe('golden path', () => {
     let call = api.tx.cash.magicExtract({
       chain: "Eth",
       account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
-    }, "1000");
-    let events = await waitForEvents(call, alice);
+    }, "1000", false);
+    let events = await sendAndWaitForEvents(call, alice);
 
     log({ events });
     await sleep(100000);
