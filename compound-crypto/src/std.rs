@@ -1,11 +1,10 @@
 use crate::no_std::*;
-use secp256k1::{PublicKey, SecretKey, Signature};
+use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
-use sp_core::{keccak_256, Pair};
+use sp_core::Pair;
 use std::collections::hash_map::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
-use tiny_keccak::Hasher;
 
 /// The crypto module for compound chain.
 ///
@@ -79,22 +78,6 @@ pub trait Keyring {
     fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError>;
 }
 
-/// For compatibility this is required.
-const ETH_MESSAGE_PREAMBLE: &[u8] = "\x19Ethereum Signed Message:\n".as_bytes();
-/// For compatibility this is required.
-pub const ETH_ADD_TO_V: u8 = 27u8;
-
-/// Helper function to quickly run keccak in the Ethereum-style
-pub(crate) fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
-    let mut output = [0u8; 32];
-    let mut hasher = tiny_keccak::Keccak::v256();
-    hasher.update(ETH_MESSAGE_PREAMBLE);
-    hasher.update(format!("{}", input.len()).as_bytes());
-    hasher.update(input);
-    hasher.finalize(&mut output);
-    output
-}
-
 /// A helper function to sign a message in the style of ethereum
 ///
 /// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
@@ -110,47 +93,10 @@ fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
     sig
 }
 
-/// Recovers the signer's address from the given signature and message. The message is _not_
-/// expected to be a digest and is hashed inside.
-pub fn eth_recover(message: Vec<u8>, sig: Vec<u8>) -> Result<Vec<u8>, CryptoError> {
-    let recovery_id =
-        secp256k1::RecoveryId::parse_rpc(sig[64]).map_err(|_| CryptoError::ParseError)?;
-    let sig = Signature::parse_slice(&sig[..64]).map_err(|_| CryptoError::ParseError)?;
-    let digested = eth_keccak_for_signature(&message);
-    let message =
-        secp256k1::Message::parse_slice(&digested).map_err(|_| CryptoError::ParseError)?;
-
-    let recovered =
-        secp256k1::recover(&message, &sig, &recovery_id).map_err(|_| CryptoError::RecoverError)?;
-    let address = public_key_to_eth_address(recovered);
-
-    Ok(address)
-}
-
 /// In memory keyring
 pub struct InMemoryKeyring {
     /// for now only support ECDSA with curve secp256k1
     keys: HashMap<String, EcdsaPair>,
-}
-
-pub(crate) fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
-    let public_hash = keccak_256(public_key); // 32 bytes
-    let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
-    Vec::from(public_hash_tail)
-}
-
-fn public_key_to_bytes(public: PublicKey) -> Vec<u8> {
-    // some tag is added here - i think for SCALE encoding but [1..] strips it
-    let serialized: &[u8] = &public.serialize()[1..];
-    let serialized: Vec<u8> = serialized.iter().map(Clone::clone).collect();
-    serialized
-}
-
-fn public_key_to_eth_address(public: PublicKey) -> Vec<u8> {
-    let bytes = public_key_to_bytes(public);
-    let address = public_key_bytes_to_eth_address(&bytes);
-
-    address
 }
 
 /// The in memory keyring is designed for use in development and not encouraged for use in
@@ -302,7 +248,7 @@ mod tests {
     fn test_eth_recover_case(case: TestCase) {
         let message: Vec<u8> = case.data.into();
         let sig = eth_decode_hex(case.signature);
-        let actual_address = eth_recover(message, sig).unwrap();
+        let actual_address = eth_recover(&message, &sig).unwrap();
         let expected_address = eth_decode_hex(case.address);
         assert_eq!(actual_address, expected_address);
     }

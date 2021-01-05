@@ -12,6 +12,7 @@ pub enum OracleError {
     JsonParseError,
     HttpError,
     InvalidOpenOracleApiResponse,
+    InvalidSignature,
 }
 
 #[derive(PartialEq, Eq, Debuggable)]
@@ -20,6 +21,13 @@ pub struct Message {
     pub timestamp: Timestamp,
     pub key: String, // note key is the same thing as ticker but called key throughout
     pub value: u64,
+}
+
+fn eth_hex_decode_helper(message: &[u8]) -> Result<Vec<u8>, OracleError> {
+    if !message.starts_with(b"0x") {
+        return Err(OracleError::HexParseError);
+    }
+    hex::decode(&message[2..]).map_err(|_| OracleError::HexParseError)
 }
 
 const MAXIMUM_TICKER_LENGTH: usize = 5;
@@ -36,20 +44,15 @@ const MAXIMUM_TICKER_LENGTH: usize = 5;
 ///
 /// Reference implementation is here
 /// https://github.com/compound-finance/open-oracle/blob/aff3634c9f23dc40b3803f44863244d22f623e7e/contracts/OpenOraclePriceData.sol#L58
-fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
+pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
     let types = [
         ethabi::param_type::ParamType::String,
         ethabi::param_type::ParamType::Uint(64),
         ethabi::param_type::ParamType::String,
         ethabi::param_type::ParamType::Uint(64),
     ];
-    if !message.starts_with(b"0x") {
-        return Err(OracleError::HexParseError);
-    }
-    // strip 0x
-    let hex_decoded = hex::decode(&message[2..]).map_err(|_| OracleError::HexParseError)?;
     let mut abi_decoded =
-        ethabi::decode(&types, &hex_decoded).map_err(|_| OracleError::HexParseError)?;
+        ethabi::decode(&types, &message).map_err(|_| OracleError::HexParseError)?;
     if !abi_decoded.len() == 4 {
         return Err(OracleError::EthAbiParseError);
     }
@@ -162,7 +165,8 @@ fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), 
 
     // decode messages and check content
     for message in &api_response.messages {
-        let decoded_message = parse_message(message.as_bytes())?;
+        let message = eth_hex_decode_helper(message.as_bytes())?;
+        let decoded_message = parse_message(&message)?;
 
         if decoded_message.timestamp != timestamp {
             return Err(OracleError::InvalidOpenOracleApiResponse);
@@ -190,7 +194,39 @@ fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), 
     Ok(())
 }
 
-fn to_message_signature_pairs(response: OpenPriceFeedApiResponse) {}
+const OKEX_SIGNING_ADDRESS: [u8; 20] =
+    hex_literal::hex!("85615b076615317c80f14cbad6501eec031cd51c");
+
+const COINBASE_SIGNING_ADDRESS: [u8; 20] =
+    hex_literal::hex!("fCEAdAFab14d46e20144F48824d0C09B1a03F2BC");
+
+/// Ensure that the oracle message signature belongs to an approved reporter.
+pub(crate) fn check_signature(payload: &[u8], signature: &[u8]) -> Result<(), OracleError> {
+    let hashed = compound_crypto::keccak(payload);
+    let recovered = compound_crypto::eth_recover(&hashed, &signature)
+        .map_err(|_| OracleError::InvalidSignature)?;
+    if recovered != OKEX_SIGNING_ADDRESS && recovered != COINBASE_SIGNING_ADDRESS {
+        return Err(OracleError::InvalidSignature);
+    }
+
+    Ok(())
+}
+
+impl OpenPriceFeedApiResponse {
+    /// This is provided for convenience making the processing of API messages as extrinsics
+    /// more straightforward.
+    pub fn to_message_signature_pairs(mut self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, OracleError> {
+        let mut res = Vec::new();
+        // didn't use map here so that we can bail out early using `?` operator
+        for (msg, sig) in self.messages.iter().zip(self.signatures) {
+            let msg = eth_hex_decode_helper(msg.as_bytes())?;
+            let sig = eth_hex_decode_helper(sig.as_bytes())?;
+            res.push((msg, sig));
+        }
+
+        Ok(res)
+    }
+}
 
 #[cfg(test)]
 pub mod tests {
@@ -236,7 +272,7 @@ pub mod tests {
     fn test_parse_message_happy_path() -> Result<(), OracleError> {
         // note test case taken from https://docs.pro.coinbase.com/#oracle but naturally it may change
         // by the time someone else visits that link
-        let test_data = "0x0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005e5da58000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000020f3570580000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000";
+        let test_data = eth_hex_decode_helper("0x0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005e5da58000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000020f3570580000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000".as_bytes())?;
         let expected = Message {
             kind: "prices".into(),
             timestamp: 1583195520,
@@ -244,7 +280,7 @@ pub mod tests {
             value: 8845095000,
         };
 
-        let actual = parse_message(test_data.as_bytes())?;
+        let actual = parse_message(&test_data)?;
 
         assert_eq!(actual, expected);
 
@@ -272,5 +308,17 @@ pub mod tests {
     fn test_sanity_check_messages_happy_path() {
         let actual = get_parsed_test_case();
         sanity_check_messages(&actual).unwrap();
+    }
+
+    #[test]
+    fn test_recover() {
+        let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
+        let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
+        let hashed = compound_crypto::keccak(&msg);
+        let recovered = compound_crypto::eth_recover(&hashed, &sig).unwrap();
+        assert_eq!(
+            hex::encode(recovered),
+            "85615b076615317c80f14cbad6501eec031cd51c"
+        )
     }
 }

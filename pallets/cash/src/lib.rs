@@ -218,8 +218,10 @@ decl_error! {
         UnknownEthEventType, // XXX needed per-chain?
 
         /// Error decoding Ethereum event
-        DecodeEthereumEventError
+        DecodeEthereumEventError,
 
+        /// An error related to the oracle
+        OpenOracleError,
     }
 }
 
@@ -248,7 +250,9 @@ decl_module! {
 
         /// Set the price using the open price feed.
         #[weight = 0]
-        pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
+        pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> dispatch::DispatchResult {
+            ensure_none(origin)?;
+            Self::post_price_internal(payload, signature)?;
             Ok(())
         }
 
@@ -257,7 +261,7 @@ decl_module! {
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn magic_extract(origin, account: AccountId, amount: CashAmount) -> dispatch::DispatchResult {
-            let () = ensure_none(origin)?;
+            ensure_none(origin)?;
 
             // Update storage -- TODO: increment this-- sure why not?
             let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
@@ -419,15 +423,47 @@ decl_module! {
 
             let result = Self::fetch_events_with_lock();
             if let Err(e) = result {
-                debug::native::error!("offchain_worker error: {:?}", e);
+                debug::native::error!("offchain_worker error during fetch events: {:?}", e);
             }
             Self::process_eth_notices(block_number);
+            // todo: do this less often perhaps once a minute?
+            // a really simple idea to do it once a minute on average is to just use probability
+            // and only update the feed every now and then. It is a function of how many validators
+            // are running.
+            let result = Self::process_open_price_feed();
+            if let Err(e) = result {
+                debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
+            }
         }
     }
 }
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
+    /// Body of the post_price extrinsic
+    /// * checks signature of message
+    /// * parses message
+    /// * updates storage
+    ///
+    /// Gets us out of the decl_module! macro and helps with static code analysis to have the
+    /// body of this function here.
+    fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
+        cash_err!(
+            oracle::check_signature(&payload, &signature),
+            <Error<T>>::OpenOracleError
+        )?;
+        let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
+
+        debug::native::info!(
+            "Parsed price from open price feed: {:?} is worth {:?}",
+            parsed.key,
+            (parsed.value as f64) / 1000000.0
+        );
+        // todo: more sanity checking on the value
+        // todo: update storage
+        Ok(())
+    }
+
     fn initialize_validators(validators: ValidatorGenesisConfig) {
         assert!(
             !validators.is_empty(),
@@ -448,6 +484,27 @@ impl<T: Config> Module<T> {
         }
         // build the
         Validators::put(converted_validators);
+    }
+
+    /// Procedure for offchain worker to processes messages coming out of the open price feed
+    pub fn process_open_price_feed() -> Result<(), Error<T>> {
+        let api_response = cash_err!(
+            crate::oracle::open_price_feed_request_okex(),
+            <Error<T>>::HttpFetchingError
+        )?;
+        let messages_and_signatures = cash_err!(
+            api_response.to_message_signature_pairs(),
+            <Error<T>>::OpenOracleError
+        )?;
+        for (msg, sig) in messages_and_signatures {
+            // adding some debug info in here, this will become very chatty
+            let call = <Call<T>>::post_price(msg, sig);
+            cash_err!(
+                SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()),
+                <Error<T>>::OpenOracleError
+            )?;
+        }
+        Ok(())
     }
 
     pub fn process_eth_notices(block_number: T::BlockNumber) {
@@ -594,6 +651,10 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
+            Call::post_price(_, _) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .propagate(true)
+                .build(),
             _ => InvalidTransaction::Call.into(),
         }
     }

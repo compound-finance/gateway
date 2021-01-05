@@ -3949,6 +3949,7 @@ name = "pallet-cash"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "compound-crypto",
  "ethabi",
  "ethereum-client",
  "frame-support",

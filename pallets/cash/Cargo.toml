@@ -34,6 +34,7 @@ anyhow = { version = "1.0", default-features = false }
 our-std = { path = "../../std", default-features = false }
 ethereum-client = { path = "../../ethereum_client", default-features = false }
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
+compound-crypto = { path = '../../compound-crypto', default-features = false }
 
 [features]
 default = ['std']
@@ -42,6 +43,7 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'runtime-interfaces/std',
+    'compound-crypto/std',
     'sp-io/std',
     'sp-core/std',
     'sp-runtime/std',
