@@ -6,7 +6,7 @@ const { log, error } = require('../util/log');
 const { canConnectTo } = require('../util/net');
 const { loadTypes } = require('../util/types');
 const { genPort, sleep, until } = require('../util/util');
-const { sendAndWaitForEvents } = require('../util/substrate');
+const { getEventData, findEvent, sendAndWaitForEvents } = require('../util/substrate');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { Keyring } = require('@polkadot/api');
 
@@ -106,27 +106,42 @@ describe('golden path', () => {
     if (ganacheServer) {
       ganacheServer.close(); // Close Web3 server
     }
+
+    await sleep(1000); // Give things a second to close
   });
 
-  test('has the correct genesis hash', async () => {
+  test('magic extraction', async () => {
     let call = api.tx.cash.magicExtract({
       chain: "Eth",
       account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
     }, "1000");
+
     let events = await sendAndWaitForEvents(call, false);
+    let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
 
-    for (const event of events) {
-      log({ event });
-      log(event.event);
-      log(event.topics);
-    }
-    await sleep(100000);
-    // TODO: Submit trx to Starport and check event logs
+    expect(magicExtractEvent).toBeDefined();
+    expect(getEventData(magicExtractEvent)).toEqual({
+      CashAmount: 1000,
+      ChainAccount: {
+        chain: "Eth",
+        account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
+      },
+      Notice: {
+        ExtractionNotice: {
+          id: [expect.any(Number), 0],
+          parent: "0x0000000000000000000000000000000000000000000000000000000000000000", "asset": "0x0000000000000000000000000000000000000000",
+          account: "0xc00e94cb662c3520282e6f5717214004a7f26888",
+          amount: 1000
+        }
+      }
+    });
 
-    // TODO: Submit extrinsic to Compound Chain and collect notices
-
-    // TODO: Submit notices to Starport
-
-    // TODO: Turn off validator
+    // Everything's good.
   }, 600000 /* 10m */);
+
+  // TODO: Submit trx to Starport and check event logs
+
+  // TODO: Submit extrinsic to Compound Chain and collect notices
+
+  // TODO: Submit notices to Starport
 });

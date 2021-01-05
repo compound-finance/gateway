@@ -1,17 +1,18 @@
 {
   "ChainId": {
-    "_enum": ["Eth"]
+    "_enum": [
+      "Eth",
+      "Dot",
+      "Sol",
+      "Tez"
+    ]
   },
-  "AccountAddr": "Vec<u8>",
+  "Address": "Vec<u8>",
   "ChainAccount": {
     "chain": "ChainId",
-    "account": "AccountAddr"
+    "account": "Address"
   },
   "CashAmount": "u128",
-  "Amount": {
-    "mantissa": "Vec<u8>",
-    "decimals": "u8"
-  },
   "Notice": {
     "_enum": {
       "ExtractionNotice": "ExtractionNotice"
@@ -19,37 +20,17 @@
   },
   "ExtractionNotice": {
     "id": "NoticeId",
-    "parent": "EthHash",
-    "asset": "Asset",
-    "account": "AccountAddr",
-    "amount": "Amount"
+    "parent": "[u8; 32]",
+    "asset": "[u8; 20]",
+    "account": "[u8; 20]",
+    "amount": "u128"
   },
   "Message": "Vec<u8>",
   "Signature": "Vec<u8>",
   "Signatures": "Vec<Signature>",
   "EraId": "u32",
   "EraIndex": "u32",
-  "Asset": "Vec<u8>",
-  "EthHash": "[u8; 32]",
-  "EthEventStatus": {
-    "_enum": {
-      "Pending": {
-        "signers": "Vec<u8>"
-      },
-      "Failed": {
-        "hash": "Hash",
-        "reason": "Reason"
-      },
-      "Done": null
-    }
-  },
   "NoticeId": "(EraId, EraIndex)",
-  "NoticePayload": {
-    "msg": "Message",
-    "sig": "Signature",
-    "signer": "AccountId"
-  },
-  "Payload": "Vec<u8>",
   "Reason": {
     "_enum": ["None"]
   },
