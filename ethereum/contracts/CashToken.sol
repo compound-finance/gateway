@@ -14,10 +14,10 @@ contract CashToken {
     uint8 public constant decimals = 18;
 
     /// @notice Allowance amounts on behalf of others
-    mapping (address => mapping (address => uint96)) internal allowances;
+    mapping (address => mapping (address => uint256)) internal allowances;
 
     /// @notice Official record of token balances for each account
-    mapping (address => uint96) internal balances;
+    mapping (address => uint256) internal balances;
 
     /// @notice The standard EIP-20 transfer event
     event Transfer(address indexed from, address indexed to, uint256 amount);
