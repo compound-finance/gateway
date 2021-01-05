@@ -25,9 +25,10 @@ pub const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = "my_eth_key_id";
 /// For compatibility this is required.
 pub(crate) const ETH_MESSAGE_PREAMBLE: &[u8] = "\x19Ethereum Signed Message:\n".as_bytes();
 /// For compatibility this is required.
-pub const ETH_ADD_TO_V: u8 = 27u8;
+pub(crate) const ETH_ADD_TO_V: u8 = 27u8;
 
 /// Helper function to quickly run keccak in the Ethereum-style
+/// This includes the preamble and length ouf output
 pub(crate) fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
@@ -38,6 +39,8 @@ pub(crate) fn eth_keccak_for_signature(input: &[u8]) -> [u8; 32] {
     output
 }
 
+/// Run keccak256 on the input.
+/// This does not include the preamble and length of output.
 pub fn keccak(input: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
@@ -46,12 +49,14 @@ pub fn keccak(input: &[u8]) -> [u8; 32] {
     output
 }
 
+/// Convert the public key bytes to an ETH address
 pub(crate) fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
     let public_hash = keccak(public_key); // 32 bytes
     let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
     Vec::from(public_hash_tail)
 }
 
+/// Convert a secp256k1 public key to a "RAW" public key format.
 pub(crate) fn public_key_to_bytes(public: PublicKey) -> Vec<u8> {
     // some tag is added here - i think for SCALE encoding but [1..] strips it
     let serialized: &[u8] = &public.serialize()[1..];
@@ -59,6 +64,7 @@ pub(crate) fn public_key_to_bytes(public: PublicKey) -> Vec<u8> {
     serialized
 }
 
+/// Convert a secp256k1 public key into an eth address
 pub(crate) fn public_key_to_eth_address(public: PublicKey) -> Vec<u8> {
     let bytes = public_key_to_bytes(public);
     let address = public_key_bytes_to_eth_address(&bytes);

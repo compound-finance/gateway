@@ -1,3 +1,16 @@
+"""
+Patch substrate with a local verison of substrate. Useful for fixing bugs in substrate while working on compound-chain.
+
+PRECONDITIONS
+* git folders are checked out in the same directory as in
+* run this script from the compound-chain directory
+
+USAGE
+1. run
+python3 ./scripts/generate_patch_for_all_of_substrate.py | pbcopy
+
+2. Now you have the patch on your clipboard, paste in into the top level Cargo.toml file.
+"""
 import os
 import toml
 

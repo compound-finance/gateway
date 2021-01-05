@@ -3,6 +3,7 @@ use our_std::{collections::btree_map::BTreeMap, vec::Vec, Debuggable};
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
 
+/// Errors coming from the price oracle
 #[derive(Debuggable)]
 pub enum OracleError {
     HexParseError,
@@ -15,6 +16,7 @@ pub enum OracleError {
     InvalidSignature,
 }
 
+/// A single decoded message from the price oracle
 #[derive(PartialEq, Eq, Debuggable)]
 pub struct Message {
     pub kind: String,
@@ -23,6 +25,7 @@ pub struct Message {
     pub value: u64,
 }
 
+/// Convert a message such as the ascii string "0x123456" into the corresponding bytes
 fn eth_hex_decode_helper(message: &[u8]) -> Result<Vec<u8>, OracleError> {
     if !message.starts_with(b"0x") {
         return Err(OracleError::HexParseError);
@@ -99,6 +102,8 @@ pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
     })
 }
 
+/// The deserialized API response from a given price feed provider.
+/// Note that the messages are obviously NOT decoded in this struct.
 #[derive(Deserialize)]
 pub struct OpenPriceFeedApiResponse {
     pub messages: Vec<String>,
