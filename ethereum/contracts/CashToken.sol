@@ -75,7 +75,7 @@ contract CashToken {
      * @return Whether or not the transfer succeeded
      */
     function transfer(address dst, uint amount) external returns (bool) {
-        _transferTokens(msg.sender, dst, amount);
+        transferFrom(msg.sender, dst, amount);
         return true;
     }
 
