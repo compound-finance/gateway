@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
+#![feature(array_methods)]
 
 #[macro_use]
 extern crate alloc;
@@ -31,6 +32,7 @@ use crate::amount::{Amount, CashAmount};
 use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
 use crate::core::{AccountId, AssetId};
 use crate::notices::{Notice, NoticeId, NoticeStatus};
+use our_std::convert::TryFrom;
 
 mod amount;
 mod chains;
@@ -78,6 +80,9 @@ pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Ve
 
 /// Type for validator set included in the genesis config
 pub type ValidatorGenesisConfig = Vec<String>;
+
+/// Type for open price feed reporter set included in the genesis config
+pub type ReporterGenesisConfig = Vec<String>;
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
@@ -149,9 +154,8 @@ decl_storage! {
         /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
         PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => AssetId;
 
-        Reporters get(fn reporters): Vec<[u8; 20]> = vec![
-            hex!("fCEAdAFab14d46e20144F48824d0C09B1a03F2BC") // coinbase pro
-        ];
+        /// Eth addresses of price reporters for open oracle
+        Reporters get(fn reporters): Vec<[u8; 20]>;
 
         // XXX
         // AssetInfo[asset];
@@ -161,7 +165,11 @@ decl_storage! {
     }
     add_extra_genesis {
         config(validators): ValidatorGenesisConfig;
-        build(|config| Module::<T>::initialize_validators(config.validators.clone()))
+        config(reporters): ReporterGenesisConfig;
+        build(|config| {
+            Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_reporters(config.reporters.clone());
+        })
     }
 }
 
@@ -222,6 +230,9 @@ decl_error! {
 
         /// An error related to the oracle
         OpenOracleError,
+
+        /// An error related to the chain_spec file contents
+        GenesisConfigError,
     }
 }
 
@@ -448,10 +459,20 @@ impl<T: Config> Module<T> {
     /// Gets us out of the decl_module! macro and helps with static code analysis to have the
     /// body of this function here.
     fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
-        cash_err!(
-            oracle::check_signature(&payload, &signature),
+        // check signature
+        let hashed = compound_crypto::keccak(&payload);
+        let recovered = cash_err!(
+            compound_crypto::eth_recover(&hashed, &signature),
             <Error<T>>::OpenOracleError
         )?;
+        let reporters = Reporters::get();
+        if !reporters
+            .iter()
+            .any(|e| e.as_slice() == recovered.as_slice())
+        {
+            return Err(<Error<T>>::OpenOracleError);
+        }
+
         let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
 
         debug::native::info!(
@@ -464,6 +485,22 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
+    /// Convert from the chain spec file format hex encoded strings into the local storage format, binary blob
+    fn hex_string_vec_to_binary_vec<U: TryFrom<Vec<u8>>>(
+        data: Vec<String>,
+    ) -> Result<Vec<U>, Error<T>> {
+        let mut converted: Vec<U> = Vec::new();
+        for record in data {
+            let decoded = hex::decode(&record).map_err(|_| <Error<T>>::GenesisConfigError)?;
+            let converted_validator: U = decoded
+                .try_into()
+                .map_err(|_| <Error<T>>::GenesisConfigError)?;
+            converted.push(converted_validator);
+        }
+        Ok(converted)
+    }
+
+    /// Set the initial set of validators from the genesis config
     fn initialize_validators(validators: ValidatorGenesisConfig) {
         assert!(
             !validators.is_empty(),
@@ -473,17 +510,24 @@ impl<T: Config> Module<T> {
             Validators::get().is_empty(),
             "Validators are already set but they should only be set in the genesis config."
         );
-        let mut converted_validators: ValidatorSet = Vec::new();
-        for validator_address in validators {
-            let validator_address = hex::decode(&validator_address)
-                .expect("Bad genisis config, validator address not stored as hex");
-            let converted_validator: [u8; 65] = validator_address
-                .try_into()
-                .expect("Bad genesis config, validator address incorrect number of bytes.");
-            converted_validators.push(converted_validator);
-        }
-        // build the
-        Validators::put(converted_validators);
+        let converted: ValidatorSet = Self::hex_string_vec_to_binary_vec(validators)
+            .expect("Could not deserialize validators from genesis config");
+        Validators::put(converted);
+    }
+
+    /// Set the initial set of open price feed price reporters from the genesis config
+    fn initialize_reporters(reporters: ReporterGenesisConfig) {
+        assert!(
+            !reporters.is_empty(),
+            "Open price feed price reporters must be set in the genesis config"
+        );
+        assert!(
+            Reporters::get().is_empty(),
+            "Reporters are already set but they should only be set in the genesis config."
+        );
+        let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
+            .expect("Could not deserialize validators from genesis config");
+        Reporters::put(converted);
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed

@@ -186,6 +186,10 @@ fn testnet_genesis(
                 "0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba".into(),
                 "04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4".into()
             ],
+            reporters: vec![
+                "85615b076615317c80f14cbad6501eec031cd51c".into(),
+                "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into()
+            ],
         }),
     }
 }

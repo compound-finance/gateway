@@ -199,24 +199,6 @@ fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), 
     Ok(())
 }
 
-const OKEX_SIGNING_ADDRESS: [u8; 20] =
-    hex_literal::hex!("85615b076615317c80f14cbad6501eec031cd51c");
-
-const COINBASE_SIGNING_ADDRESS: [u8; 20] =
-    hex_literal::hex!("fCEAdAFab14d46e20144F48824d0C09B1a03F2BC");
-
-/// Ensure that the oracle message signature belongs to an approved reporter.
-pub(crate) fn check_signature(payload: &[u8], signature: &[u8]) -> Result<(), OracleError> {
-    let hashed = compound_crypto::keccak(payload);
-    let recovered = compound_crypto::eth_recover(&hashed, &signature)
-        .map_err(|_| OracleError::InvalidSignature)?;
-    if recovered != OKEX_SIGNING_ADDRESS && recovered != COINBASE_SIGNING_ADDRESS {
-        return Err(OracleError::InvalidSignature);
-    }
-
-    Ok(())
-}
-
 impl OpenPriceFeedApiResponse {
     /// This is provided for convenience making the processing of API messages as extrinsics
     /// more straightforward.
