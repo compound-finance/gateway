@@ -1,3 +1,5 @@
+use crate::core::{Quantity, Symbol};
+
 // XXX do these belong in runtime interfaces config?
 
 /// The number of blocks before an Ethereum transaction is considered final.
@@ -10,7 +12,7 @@ pub const MIN_NEXT_SYNC_TIME: u32 = 24 * 60 * 60 * 1000; // XXX
 pub const MIN_VALIDATOR_COUNT: u32 = 4; // XXX needed? in the way of dev?
 
 /// Minimum value (USD) required across all protocol interactions.
-pub const MIN_TX_VALUE: u128 = 1; // XXX how to represent $1?
+pub const MIN_TX_VALUE: Quantity<{ Symbol::USD }> = Quantity(1); // XXX Quantity::from_nominal(1)? can be const?
 
 /// Flat transfer fee (CASH).
-pub const TRANSFER_FEE: f64 = 0.01; // XXX a CashAmount?
+pub const TRANSFER_FEE: Quantity<{ Symbol::CASH }> = Quantity(10000); // XXX 0.01 from nominal

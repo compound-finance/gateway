@@ -1,11 +1,13 @@
 // Note: The substrate build requires these be imported
 pub use our_std::vec::Vec;
 
+use crate::{GenericQty, MultiplicativeIndex, Timestamp, APR};
 use codec::{Decode, Encode};
 use our_std::{Debuggable, RuntimeDebug};
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainId {
+    Comp,
     Eth,
     Dot,
     Sol,
@@ -19,13 +21,13 @@ impl Default for ChainId {
 }
 
 pub trait Chain {
-    type Address: Debuggable + Clone + Eq = [u8; 20];
-    type Account: Debuggable + Clone + Eq = Self::Address;
-    type Asset: Debuggable + Clone + Eq = Self::Address;
-    type Amount: Debuggable + Clone + Eq = u128;
-    type Index: Debuggable + Clone + Eq = u128;
-    type Rate: Debuggable + Clone + Eq = u128;
-    type Timestamp: Debuggable + Clone + Eq = u128;
+    const ID: ChainId;
+
+    type Address: Debuggable + Clone + Eq + Into<Vec<u8>> = [u8; 20];
+    type Amount: Debuggable + Clone + Eq + Into<GenericQty> = u128;
+    type Index: Debuggable + Clone + Eq + Into<MultiplicativeIndex> = u128;
+    type Rate: Debuggable + Clone + Eq + Into<APR> = u128;
+    type Timestamp: Debuggable + Clone + Eq + Into<Timestamp> = u128;
     type Hash: Debuggable + Clone + Eq = [u8; 32];
     type PublicKey: Debuggable + Clone + Eq = [u8; 32];
     type Signature: Debuggable + Clone + Eq = [u8; 65]; // XXX
@@ -34,6 +36,9 @@ pub trait Chain {
 
     fn hash_bytes(data: &[u8]) -> Self::Hash;
 }
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct Compound {}
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Ethereum {}
@@ -47,7 +52,20 @@ pub struct Solana {}
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Tezos {}
 
+impl Chain for Compound {
+    const ID: ChainId = ChainId::Comp;
+
+    type EventId = comp::EventId;
+    type Event = comp::Event;
+
+    fn hash_bytes(data: &[u8]) -> Self::Hash {
+        [0u8; 32] // XXX
+    }
+}
+
 impl Chain for Ethereum {
+    const ID: ChainId = ChainId::Eth;
+
     type EventId = eth::EventId;
     type Event = eth::Event;
 
@@ -57,6 +75,8 @@ impl Chain for Ethereum {
 }
 
 impl Chain for Polkadot {
+    const ID: ChainId = ChainId::Dot;
+
     type EventId = dot::EventId;
     type Event = dot::Event;
 
@@ -66,6 +86,8 @@ impl Chain for Polkadot {
 }
 
 impl Chain for Solana {
+    const ID: ChainId = ChainId::Sol;
+
     type EventId = sol::EventId;
     type Event = sol::Event;
 
@@ -75,6 +97,8 @@ impl Chain for Solana {
 }
 
 impl Chain for Tezos {
+    const ID: ChainId = ChainId::Tez;
+
     type EventId = tez::EventId;
     type Event = tez::Event;
 
@@ -83,17 +107,14 @@ impl Chain for Tezos {
     }
 }
 
-// XXX move?
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum EventStatus<C: Chain> {
-    Pending {
-        signers: crate::ValidatorSet,
-    },
-    Failed {
-        hash: C::Hash,
-        reason: crate::Reason,
-    },
-    Done,
+pub mod comp {
+    use codec::{Decode, Encode};
+    use our_std::RuntimeDebug;
+
+    pub type EventId = (u64, u64); // XXX
+
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub struct Event {}
 }
 
 pub mod eth {
@@ -128,7 +149,7 @@ pub mod eth {
         LockCash {
             holder: <Ethereum as Chain>::Address,
             amount: <Ethereum as Chain>::Amount,
-            yield_index: <Ethereum as Chain>::Amount,
+            yield_index: <Ethereum as Chain>::Index,
         },
 
         Gov {
@@ -160,24 +181,6 @@ pub mod eth {
         r[64] = x.1.serialize();
         r
     }
-
-    // XXX whats this?
-    // pub fn to_eth_payload(notice: Notice) -> NoticePayload {
-    //     let message = encode_ethereum_notice(notice);
-    //     // TODO: do signer by chain
-    //     let signer = "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61"
-    //         .as_bytes()
-    //         .to_vec();
-    //     NoticePayload {
-    //         // id: move id,
-    //         sig: sign(&message),
-    //         msg: message.to_vec(), // perhaps hex::encode(message)
-    //         signer: AccountIdent {
-    //             chain: ChainIdent::Eth,
-    //             account: signer,
-    //         },
-    //     }
-    // }
 }
 
 pub mod dot {

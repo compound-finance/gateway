@@ -15,7 +15,6 @@ use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use hex_literal::hex;
 use our_std::{convert::TryInto, vec::Vec};
 use sp_runtime::{
     offchain::{
@@ -28,18 +27,15 @@ use sp_runtime::{
     RuntimeDebug, SaturatedConversion,
 };
 
-use crate::amount::{Amount, CashAmount};
-use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
-use crate::core::{ChainAccount, ChainAsset};
-use crate::notices::{Notice, NoticeId, NoticeStatus};
-use our_std::convert::TryFrom;
+use crate::chains::{Chain, ChainId, Ethereum};
+use crate::core::{Account, Asset, Symbol};
+use crate::notices::{Notice, NoticeId};
 
-mod amount;
 mod chains;
 mod core;
 mod events;
-mod notices; // XXX
-mod params; // XXX
+mod notices;
+mod params;
 
 #[cfg(test)]
 mod mock;
@@ -48,6 +44,36 @@ mod oracle;
 #[cfg(test)]
 mod tests;
 
+/// Type for a generic address, potentially on any chain.
+pub type GenericAddr = Vec<u8>;
+
+/// Type for a generic account, tied to one of the possible chains.
+pub type GenericAccount = (ChainId, GenericAddr);
+
+/// Type for a generic asset, tied to one of the possible chains.
+pub type GenericAsset = (ChainId, GenericAddr);
+
+/// Type for a generic encoded message, potentially for any chain.
+pub type GenericMsg = Vec<u8>;
+
+/// Type for a generic signature, potentially for any chain.
+pub type GenericSig = Vec<u8>;
+
+/// Type for a bunch of generic signatures.
+pub type GenericSigs = Vec<GenericSig>;
+
+/// Type for representing a price, potentially for any symbol.
+pub type GenericPrice = u128;
+
+/// Type for representing a quantity, potentially of any symbol.
+pub type GenericQty = u128;
+
+/// Type for representing an annualized rate on Compound Chain.
+pub type APR = u128; // XXX custom rate type?
+
+/// Type for representing a balance index on Compound Chain.
+pub type MultiplicativeIndex = u128; // XXX initial value 1? wrap for safe mul/div?
+
 /// Type for a nonce.
 pub type Nonce = u32;
 
@@ -55,13 +81,8 @@ pub type Nonce = u32;
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
     None,
+    MinTxValueNotMet,
 }
-
-/// Type for representing an annualized rate on Compound Chain.
-pub type APR = u128; // XXX custom rate type?
-
-/// Type for representing a balance index on Compound Chain.
-pub type Index = u128; // XXX biguint? initial value 1?
 
 /// Type for representing time on Compound Chain.
 pub type Timestamp = u128; // XXX u64?
@@ -78,11 +99,36 @@ pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
 
-/// Type for validator set included in the genesis config
+/// Type for validator set included in the genesis config.
 pub type ValidatorGenesisConfig = Vec<String>;
 
 /// Type for open price feed reporter set included in the genesis config
 pub type ReporterGenesisConfig = Vec<String>;
+
+/// Type for the status of an event on the queue.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum EventStatus<C: Chain> {
+    Pending {
+        signers: crate::ValidatorSet,
+    },
+    Failed {
+        hash: C::Hash,
+        reason: crate::Reason,
+    },
+    Done,
+}
+
+/// Type for the status of a notice on the queue.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum NoticeStatus<C: Chain> {
+    Missing,
+    Pending {
+        signers: crate::ValidatorSet,
+        signatures: GenericSigs,
+        notice: Notice<C>,
+    },
+    Done,
+}
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
@@ -110,10 +156,10 @@ decl_storage! {
         NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
 
         /// An index to track interest owed by CASH borrowers.
-        CashCostIndex get(fn cash_cost_index): Index;
+        CashCostIndex get(fn cash_cost_index): MultiplicativeIndex;
 
         /// An index to track interest earned by CASH holders.
-        CashYieldIndex get(fn cash_yield_index): Index;
+        CashYieldIndex get(fn cash_yield_index): MultiplicativeIndex;
 
         /// The upcoming base rate change for CASH and when, if any.
         CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
@@ -124,20 +170,28 @@ decl_storage! {
         /// The current APR surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
         CashSpread get(fn cash_spread): APR;
 
+        /// An index to track interest owed by asset borrowers.
+        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => MultiplicativeIndex;
+
+        /// An index to track interest earned by asset suppliers.
+        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => MultiplicativeIndex;
+
         // XXX
-        // ChainCashHoldPrincipal;
+        ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => GenericQty;
         // TotalCashHoldPrincipal;
         // TotalCashBorrowPrincipal;
-        // TotalSupplyPrincipal;
+        // TotalSupplyPrincipal[asset];
+        // TotalBorrowPrincipal[asset];
         // CashHoldPrincipal[account];
         // CashBorrowPrincipal[account];
-        // SupplyPrincipal[account];
+        // SupplyPrincipal[asset][account];
+        // BorrowPrincipal[asset][account];
 
         /// The last used nonce for each account, initialized at zero.
-        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
+        Nonces get(fn nonces): map hasher(blake2_128_concat) GenericAccount => Nonce;
 
         // XXX delete me (part of magic extract)
-        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<CashAmount>;
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) GenericAccount => Option<GenericQty>;
 
         /// Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
@@ -160,6 +214,11 @@ decl_storage! {
         // XXX
         // AssetInfo[asset];
         // LiquidationIncentive;
+
+        /// Mapping of latest prices for each asset symbol.
+        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => GenericPrice;
+
+        // PriceTime[asset];
         // PriceReporter;
         // PriceKeyMapping;
     }
@@ -181,7 +240,7 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX
-        MagicExtract(CashAmount, ChainAccount, Notice<Ethereum>),
+        MagicExtract(GenericQty, GenericAccount, Notice<Ethereum>),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -190,20 +249,13 @@ decl_event!(
         FailedProcessingEthEvent(SignedPayload, Reason),
 
         /// Signed Ethereum notice. [message, signatures]
-        SignedNotice(ChainId, NoticeId, notices::Message, notices::Signatures),
+        SignedNotice(ChainId, NoticeId, GenericMsg, GenericSigs),
     }
 );
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        // XXX
-        /// Error names should be descriptive.
-        NoneValue,
-
-        // XXX
-        /// Errors should have helpful documentation associated with them.
-        StorageOverflow,
-
+        // XXX delete with magic extract
         /// Error returned when fetching starport info
         HttpFetchingError,
 
@@ -271,23 +323,25 @@ decl_module! {
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn magic_extract(origin, account: ChainAccount, amount: CashAmount) -> dispatch::DispatchResult {
-            ensure_none(origin)?;
+        pub fn magic_extract(origin, account: GenericAccount, amount: GenericQty) -> dispatch::DispatchResult {
+            let () = ensure_none(origin)?;
+            let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
 
             // Update storage -- TODO: increment this-- sure why not?
-            let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
-            let next_cash_balance: CashAmount = curr_cash_balance.checked_add(amount).ok_or(Error::<T>::StorageOverflow)?;
-            CashBalance::insert(&account, next_cash_balance);
+            let curr_cash_balance: GenericQty = <CashBalance>::get(&account).unwrap_or_default();
+            let next_cash_balance: GenericQty = curr_cash_balance + amount;
+            <CashBalance>::insert(&account, next_cash_balance);
 
             let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
             // Add to Notice Queue
             let notice = Notice::ExtractionNotice {
                 id: NoticeId(now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
                 parent: [0u8; 32], // XXX,
-                asset: [0u8; 20],
-                amount: amount,
-                account: account.address.clone().try_into() // XXX avoid clone?
-                    .unwrap_or_else(|_| panic!("Address has wrong number of bytes"))
+                asset: Asset([0u8; 20]),
+                amount: amount.try_into()
+                    .unwrap_or_else(|_| panic!("Amount does not fit on chain")),
+                account: Account(account.1.clone().try_into() // XXX avoid clone?
+                    .unwrap_or_else(|_| panic!("Address has wrong number of bytes")))
             };
             EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
@@ -419,16 +473,6 @@ decl_module! {
                 }
             }
         }
-
-        // XXX
-        /// An example dispatchable that may throw a custom error.
-        #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-        pub fn cause_error(origin) -> dispatch::DispatchResult {
-            let _who = ensure_signed(origin)?;
-            let _ = runtime_interfaces::config_interface::get();
-            Err(Error::<T>::NoneValue)?
-        }
-
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {

@@ -77,7 +77,7 @@ if [[ "$1" == "--fast" ]]; then
 	echo "Skipped cargo install of 'substrate' and 'subkey'"
 	echo "You can install manually by cloning the https://github.com/paritytech/substrate repo,"
 	echo "and using cargo to install 'substrate' and 'subkey' from the repo path."
-else 
+else
 	g=$(mktemp -d)
 	git clone https://github.com/paritytech/substrate "$g"
 	pushd "$g"
