@@ -76,8 +76,7 @@ contract CashToken {
      * @return Whether or not the transfer succeeded
      */
     function transfer(address dst, uint amount) external returns (bool) {
-        transferFrom(msg.sender, dst, amount);
-        return true;
+        return transferFrom(msg.sender, dst, amount);
     }
 
     // TODO: actually implement CASH principal balances etc
