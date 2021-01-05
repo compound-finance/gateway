@@ -13,6 +13,9 @@ contract CashToken {
     /// @notice EIP-20 token decimals for this token
     uint8 public constant decimals = 18;
 
+    /// @notice EIP-20 token total supply for this token
+    uint256 public totalSupply;
+
     mapping (address => mapping (address => uint256)) internal allowances;
 
     mapping (address => uint256) internal balances;
