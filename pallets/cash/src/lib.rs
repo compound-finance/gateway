@@ -258,8 +258,10 @@ decl_module! {
             };
             EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
-            // Emit an event.
+            // Emit an event or two.
             Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice.id(), notices::encode_ethereum_notice(notice), vec![])); // XXX signatures
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
+
             // Return a successful DispatchResult
             Ok(())
         }

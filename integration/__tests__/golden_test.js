@@ -112,10 +112,14 @@ describe('golden path', () => {
     let call = api.tx.cash.magicExtract({
       chain: "Eth",
       account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
-    }, "1000", false);
-    let events = await sendAndWaitForEvents(call, alice);
+    }, "1000");
+    let events = await sendAndWaitForEvents(call, false);
 
-    log({ events });
+    for (const event of events) {
+      log({ event });
+      log(event.event);
+      log(event.topics);
+    }
     await sleep(100000);
     // TODO: Submit trx to Starport and check event logs
 

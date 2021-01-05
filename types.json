@@ -18,7 +18,6 @@
     }
   },
   "ExtractionNotice": {
-    "chain": "ChainId",
     "id": "NoticeId",
     "parent": "EthHash",
     "asset": "Asset",
