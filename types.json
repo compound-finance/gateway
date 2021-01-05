@@ -60,5 +60,17 @@
   "ValidatorSig": "[u8; 65]",
   "ValidatorKey": "[u8; 65]",
   "ValidatorSet": "Vec<ValidatorKey>",
-  "ValidatorGenesisConfig": "Vec<String>"
+  "ValidatorGenesisConfig": "Vec<String>",
+  "EventStatus": {
+    "_enum": {
+      "Pending": {
+        "signers": "ValidatorSet"
+      },
+      "Failed": {
+        "hash": "[u8; 32]",
+        "reason": "Reason"
+      },
+      "Done": {}
+    }
+  }
 }

@@ -11,8 +11,8 @@ version = "0.0.1"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
-sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git', branch = 'hayesgm/updated' }
+sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'hayesgm/updated' }
 
 our-std-proc-macro = { path = "./proc-macro" }
 

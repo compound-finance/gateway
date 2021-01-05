@@ -12,9 +12,9 @@ dependencies = [
 
 [[package]]
 name = "addr2line"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c0929d69e78dd9bf5408269919fcbcaeb2e35e5d43e5815517cdc6a8e11a423"
+checksum = "a55f82cfe485775d02112886f4169bde0c5894d75e79ead7eafe7e40a25e45f7"
 dependencies = [
  "gimli 0.23.0",
 ]
@@ -55,7 +55,7 @@ dependencies = [
  "aes",
  "block-cipher",
  "ghash",
- "subtle 2.3.0",
+ "subtle 2.4.0",
 ]
 
 [[package]]
@@ -87,9 +87,9 @@ checksum = "e8fd72866655d1904d6b0997d0b07ba561047d070fbe29de039031c641b61217"
 
 [[package]]
 name = "ahash"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6789e291be47ace86a60303502173d84af8327e3627ecf334356ee0f87a164c"
+checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "aho-corasick"
@@ -120,9 +120,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.34"
+version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf8dcb5b4bbaa28653b647d8c77bd4ed40183b48882e130c1f1ffb73de069fd7"
+checksum = "ee67c11feeac938fae061b232e38e0b6d94f97a9df10e6271319325ac4c56a86"
 
 [[package]]
 name = "approx"
@@ -135,9 +135,9 @@ dependencies = [
 
 [[package]]
 name = "arc-swap"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d25d88fd6b8041580a654f9d0c581a047baee2b3efee13275f2fc392fc75034"
+checksum = "dabe5a181f83789739c194cbe5a897dde195078fac08568d09221fd6137a7ba8"
 
 [[package]]
 name = "arrayref"
@@ -247,14 +247,32 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-std"
-version = "1.7.0"
+name = "async-process"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7e82538bc65a25dbdff70e4c5439d52f068048ab97cdea0acd73f131594caa1"
+checksum = "4c8cea09c1fb10a317d1b5af8024eeba256d6554763e85ecd90ff8df31c7bbda"
 dependencies = [
+ "async-io",
+ "blocking",
+ "cfg-if 0.1.10",
+ "event-listener",
+ "futures-lite",
+ "once_cell",
+ "signal-hook",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "async-std"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f9f84f1280a2b436a2c77c2582602732b6c2f4321d5494d6e799e6c367859a8"
+dependencies = [
+ "async-channel",
  "async-global-executor",
  "async-io",
  "async-mutex",
+ "async-process",
  "blocking",
  "crossbeam-utils 0.8.1",
  "futures-channel",
@@ -267,7 +285,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.2.0",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -281,15 +299,15 @@ checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 
 [[package]]
 name = "async-tls"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d85a97c4a0ecce878efd3f945f119c78a646d8975340bca0398f9bb05c30cc52"
+checksum = "2f23d769dbf1838d5df5156e7b1ad404f4c463d1ac2c6aeb6cd943630f8a8400"
 dependencies = [
  "futures-core",
  "futures-io",
- "rustls",
+ "rustls 0.19.0",
  "webpki",
- "webpki-roots 0.20.0",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -612,9 +630,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.65"
+version = "1.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95752358c8f7552394baf48cd82695b345628ad3f170d607de3ca03b8dacca15"
+checksum = "4c0496836a84f8d0495758516b8621a622beb77c0fed418570e50764093ced48"
 dependencies = [
  "jobserver",
 ]
@@ -678,6 +696,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cipher"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12f8e7987cbd042a63249497f41aed09f8e65add917ea6566effbc56578d6801"
+dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "clang-sys"
 version = "0.29.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -708,15 +735,6 @@ name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
-dependencies = [
- "bitflags",
-]
-
-[[package]]
-name = "cloudabi"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4344512281c643ae7638bbabc3af17a11307803ec8f0fcad9fae512a8bf36467"
 dependencies = [
  "bitflags",
 ]
@@ -830,7 +848,7 @@ dependencies = [
  "rusoto_kms",
  "sp-core",
  "tiny-keccak 2.0.2",
- "tokio 0.2.23",
+ "tokio 0.2.24",
 ]
 
 [[package]]
@@ -844,9 +862,9 @@ dependencies = [
 
 [[package]]
 name = "const_fn"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c478836e029dcef17fb47c89023448c64f781a046e0300e257ad8225ae59afab"
+checksum = "cd51eab21ab4fd6a3bf889e2d0958c0a6e3a61ad04260325e919e652a2a62826"
 
 [[package]]
 name = "constant_time_eq"
@@ -893,6 +911,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
 
 [[package]]
+name = "cpuid-bool"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
+
+[[package]]
 name = "cranelift-bforest"
 version = "0.66.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -916,7 +940,7 @@ dependencies = [
  "log",
  "regalloc",
  "serde",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "target-lexicon",
  "thiserror",
 ]
@@ -954,7 +978,7 @@ checksum = "2ef419efb4f94ecc02e5d9fbcc910d2bb7f0040e2de570e63a454f883bc891d6"
 dependencies = [
  "cranelift-codegen",
  "log",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "target-lexicon",
 ]
 
@@ -1110,7 +1134,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
 dependencies = [
  "generic-array 0.14.4",
- "subtle 2.3.0",
+ "subtle 2.4.0",
 ]
 
 [[package]]
@@ -1142,7 +1166,7 @@ dependencies = [
  "byteorder",
  "digest 0.8.1",
  "rand_core 0.5.1",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "zeroize",
 ]
 
@@ -1155,7 +1179,7 @@ dependencies = [
  "byteorder",
  "digest 0.9.0",
  "rand_core 0.5.1",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "zeroize",
 ]
 
@@ -1298,9 +1322,9 @@ dependencies = [
 
 [[package]]
 name = "dyn-clone"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d55796afa1b20c2945ca8eabfc421839f2b766619209f1ede813cf2484f31804"
+checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 
 [[package]]
 name = "ed25519"
@@ -1352,9 +1376,9 @@ checksum = "6576a1755ddffd988788025e75bce9e74b018f7cc226198fe931d077911c6d7e"
 
 [[package]]
 name = "erased-serde"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ca8b296792113e1500fd935ae487be6e00ce318952a6880555554824d6ebf38"
+checksum = "0465971a8cc1fa2455c8465aaa377131e1f1cf4983280f474a13e68793aa770c"
 dependencies = [
  "serde",
 ]
@@ -1583,7 +1607,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "fork-tree"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
 ]
@@ -1601,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -1619,8 +1643,9 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking-cli"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
+ "Inflector",
  "chrono",
  "frame-benchmarking",
  "handlebars",
@@ -1641,7 +1666,7 @@ dependencies = [
 [[package]]
 name = "frame-executive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -1657,7 +1682,7 @@ dependencies = [
 [[package]]
 name = "frame-metadata"
 version = "12.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "serde",
@@ -1668,7 +1693,7 @@ dependencies = [
 [[package]]
 name = "frame-support"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "bitflags",
  "frame-metadata",
@@ -1679,7 +1704,7 @@ dependencies = [
  "parity-scale-codec",
  "paste",
  "serde",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "sp-arithmetic",
  "sp-core",
  "sp-inherents",
@@ -1693,7 +1718,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support-procedural-tools",
  "proc-macro2",
@@ -1704,7 +1729,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural-tools"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support-procedural-tools-derive",
  "proc-macro-crate",
@@ -1716,7 +1741,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural-tools-derive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1726,7 +1751,7 @@ dependencies = [
 [[package]]
 name = "frame-system"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "impl-trait-for-tuples",
@@ -1742,7 +1767,7 @@ dependencies = [
 [[package]]
 name = "frame-system-benchmarking"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -1756,7 +1781,7 @@ dependencies = [
 [[package]]
 name = "frame-system-rpc-runtime-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -1798,9 +1823,9 @@ checksum = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 
 [[package]]
 name = "funty"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ba62103ce691c2fd80fbae2213dfdda9ce60804973ac6b6e97de818ea7f52c8"
+checksum = "fed34cd105917e91daa4da6b3728c47b068749d6a62c59811f06ed2ac71d9da7"
 
 [[package]]
 name = "futures"
@@ -1885,16 +1910,16 @@ checksum = "611834ce18aaa1bd13c4b374f5d653e1027cf99b6b502584ff8c9a64413b30bb"
 
 [[package]]
 name = "futures-lite"
-version = "1.11.2"
+version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e6c079abfac3ab269e2927ec048dabc89d009ebfdda6b8ee86624f30c689658"
+checksum = "b4481d0cd0de1d204a4fa55e7d45f07b1d958abcb06714b3446438e2eff695fb"
 dependencies = [
  "fastrand",
  "futures-core",
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.2.0",
  "waker-fn",
 ]
 
@@ -1977,19 +2002,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
-name = "generator"
-version = "0.6.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cdc09201b2e8ca1b19290cf7e65de2246b8e91fb6874279722189c4de7b94dc"
-dependencies = [
- "cc",
- "libc",
- "log",
- "rustc_version",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2019,21 +2031,22 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.1.15"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc587bc0ec293155d5bfa6b9891ec18a1e330c234f896ea47fbada4cadbe47e6"
+checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "libc",
  "wasi 0.9.0+wasi-snapshot-preview1",
 ]
 
 [[package]]
 name = "ghash"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6e27f0689a6e15944bdce7e45425efb87eaa8ab0c6e87f11d0987a9133e2531"
+checksum = "97304e4cd182c3846f7575ced3890c53012ce534ad9114046b0a9e00bb30a375"
 dependencies = [
+ "opaque-debug 0.3.0",
  "polyval",
 ]
 
@@ -2115,10 +2128,10 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "futures-util",
- "http 0.2.1",
+ "http 0.2.2",
  "indexmap",
  "slab",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "tokio-util",
  "tracing",
  "tracing-futures",
@@ -2126,9 +2139,9 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
-version = "3.5.1"
+version = "3.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2764f9796c0ddca4b82c07f25dd2cb3db30b9a8f47940e78e1c883d9e95c3db9"
+checksum = "964d0e99a61fe9b1b347389b77ebf8b7e1587b70293676aaca7d27e59b9073b2"
 dependencies = [
  "log",
  "pest",
@@ -2169,14 +2182,14 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 dependencies = [
- "ahash 0.4.6",
+ "ahash 0.4.7",
 ]
 
 [[package]]
 name = "heck"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
+checksum = "87cbf45460356b7deeb5e3415b5563308c0a9b057c85e12b06ad551f98d0a6ac"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -2252,9 +2265,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d569972648b2c512421b5f2a405ad6ac9666547189d0c5477a3f200f3e02f9"
+checksum = "84129d298a6d57d246960ff8eb831ca4af3f96d29e2e28848dae275408658e26"
 dependencies = [
  "bytes 0.5.6",
  "fnv",
@@ -2280,7 +2293,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13d5ff830006f7646652e057693569bfe0d51760c0085a071769d142a205111b"
 dependencies = [
  "bytes 0.5.6",
- "http 0.2.1",
+ "http 0.2.2",
 ]
 
 [[package]]
@@ -2345,14 +2358,14 @@ dependencies = [
  "futures-core",
  "futures-util",
  "h2 0.2.7",
- "http 0.2.1",
+ "http 0.2.2",
  "http-body 0.3.1",
  "httparse",
  "httpdate",
  "itoa",
  "pin-project 1.0.2",
  "socket2",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "tower-service",
  "tracing",
  "want 0.3.0",
@@ -2369,9 +2382,9 @@ dependencies = [
  "futures-util",
  "hyper 0.13.9",
  "log",
- "rustls",
+ "rustls 0.18.1",
  "rustls-native-certs",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "tokio-rustls",
  "webpki",
 ]
@@ -2385,7 +2398,7 @@ dependencies = [
  "bytes 0.5.6",
  "hyper 0.13.9",
  "native-tls",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "tokio-tls",
 ]
 
@@ -2433,6 +2446,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-watch"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16d7c5e361e6b05c882b4847dd98992534cebc6fcde7f4bc98225bcf10fd6d0d"
+dependencies = [
+ "async-io",
+ "futures 0.3.8",
+ "futures-lite",
+ "if-addrs",
+ "ipnet",
+ "libc",
+ "log",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "impl-codec"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2472,9 +2501,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55e2e4c765aa53a0424761bf9f41aa7a6ac1efa87238f59560640e27fca028f2"
+checksum = "4fb1fa934250de4de8aef298d81c729a7d33d8c239daa3a7575e6b92bfc7313b"
 dependencies = [
  "autocfg",
  "hashbrown 0.9.1",
@@ -2550,9 +2579,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
+checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
 
 [[package]]
 name = "jobserver"
@@ -2726,7 +2755,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0315ef2f688e33844400b31f11c263f2b3dc21d8b9355c6891c5f185fae43f9a"
 dependencies = [
  "parity-util-mem",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
 ]
 
 [[package]]
@@ -2755,7 +2784,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "regex",
  "rocksdb",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
 ]
 
 [[package]]
@@ -2791,9 +2820,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.80"
+version = "0.2.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d58d1b70b004888f764dfbf6a26a3b0342a1632d33968e4a179d8011c760614"
+checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
 
 [[package]]
 name = "libloading"
@@ -2813,9 +2842,9 @@ checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 
 [[package]]
 name = "libp2p"
-version = "0.31.2"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "724846a3194368fefcac7ebdab12e01b8ac382e3efe399ddbd28851ab34f396f"
+checksum = "2e17c636b5fe5ff900ccc2840b643074bfac321551d821243a781d0d46f06588"
 dependencies = [
  "atomic",
  "bytes 0.5.6",
@@ -2845,19 +2874,18 @@ dependencies = [
  "parity-multiaddr",
  "parking_lot 0.11.1",
  "pin-project 1.0.2",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-core"
-version = "0.25.2"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc9c96d3a606a696a3a6c0ad3c3352c57bda2082ec9090930f1bd9daf787039f"
+checksum = "e1cb706da14c064dce54d8864ade6836b3486b51689300da74eeb7053aa4551e"
 dependencies = [
  "asn1_der",
  "bs58",
- "bytes 0.5.6",
  "ed25519-dalek",
  "either",
  "fnv",
@@ -2877,7 +2905,7 @@ dependencies = [
  "ring",
  "rw-stream-sink",
  "sha2 0.9.2",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "thiserror",
  "unsigned-varint",
  "void",
@@ -2896,9 +2924,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-deflate"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a579d7dd506d0620ba88ccc1754436b7de35ed6c884234f9a226bbfce382640"
+checksum = "e3257a41f376aa23f237231971fee7e350e4d8353cfcf233aef34d6d6b638f0c"
 dependencies = [
  "flate2",
  "futures 0.3.8",
@@ -2907,9 +2935,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-dns"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15dea5933f570844d7b5222b12b58f7bd52e9ca38cd65a1bd4f35341f053f012"
+checksum = "2e09bab25af01326b4ed9486d31325911437448edda30bc57681502542d49f20"
 dependencies = [
  "futures 0.3.8",
  "libp2p-core",
@@ -2918,9 +2946,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-floodsub"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23070a0838bd9a8adb27e6eba477eeb650c498f9d139383dd0135d20a8170253"
+checksum = "6fd8cdd5ef1dd0b7346975477216d752de976b92e43051bc8bd808c372ea6cec"
 dependencies = [
  "cuckoofilter",
  "fnv",
@@ -2931,14 +2959,14 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.7.3",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
 ]
 
 [[package]]
 name = "libp2p-gossipsub"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65e8f3aa0906fbad435dac23c177eef3cdfaaf62609791bd7f54f8553edcfdf9"
+checksum = "d489531aa9d4ba8726a08b3b74e21c2e10a518ad266ebca98d79040123ab0036"
 dependencies = [
  "base64 0.13.0",
  "byteorder",
@@ -2955,16 +2983,16 @@ dependencies = [
  "prost-build",
  "rand 0.7.3",
  "sha2 0.9.2",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "unsigned-varint",
  "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-identify"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "802fb973a7e0dde3fb9a2113a62bad90338ebe01983b706e1d576d0c2af93cda"
+checksum = "c43bc51a9bc3780288c526615ba0f5f8216820ea6dcc02b89e8daee526c5fccb"
 dependencies = [
  "futures 0.3.8",
  "libp2p-core",
@@ -2972,15 +3000,15 @@ dependencies = [
  "log",
  "prost",
  "prost-build",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-kad"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6506b7b7982f7626fc96a91bc61be4b1fe7ae9ac23824f0ecefcce21cb39238c"
+checksum = "a226956b49438a10f3206480b8faf5e61fc445c349ea9d9cc37766a83745fa9a"
 dependencies = [
  "arrayvec 0.5.2",
  "bytes 0.5.6",
@@ -2995,7 +3023,7 @@ dependencies = [
  "prost-build",
  "rand 0.7.3",
  "sha2 0.9.2",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "uint",
  "unsigned-varint",
  "void",
@@ -3004,31 +3032,30 @@ dependencies = [
 
 [[package]]
 name = "libp2p-mdns"
-version = "0.25.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4458ec36b5ab2662fb4d5c8bb9b6e1591da0ab6efe8881c7a7670ef033bc8937"
+checksum = "8a9e12688e8f14008c950c1efde587cb44dbf316fa805f419cd4e524991236f5"
 dependencies = [
- "async-std",
+ "async-io",
  "data-encoding",
  "dns-parser",
- "either",
  "futures 0.3.8",
+ "if-watch",
  "lazy_static",
  "libp2p-core",
  "libp2p-swarm",
  "log",
- "net2",
  "rand 0.7.3",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
+ "socket2",
  "void",
- "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-mplex"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae2132b14045009b0f8e577a06e1459592ef0a89dedc58f3d4baf4eac956837b"
+checksum = "ce3200fbe6608e623bd9efa459cc8bafa0e4efbb0a2dfcdd0e1387ff4181264b"
 dependencies = [
  "bytes 0.5.6",
  "futures 0.3.8",
@@ -3038,15 +3065,15 @@ dependencies = [
  "nohash-hasher",
  "parking_lot 0.11.1",
  "rand 0.7.3",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "unsigned-varint",
 ]
 
 [[package]]
 name = "libp2p-noise"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9610a524bef4db383cd96b4ec3ec4722eafa72c7242fa89990b74166760583d"
+checksum = "0580e0d18019d254c9c349c03ff7b22e564b6f2ada70c045fc39738e144f2139"
 dependencies = [
  "bytes 0.5.6",
  "curve25519-dalek 3.0.0",
@@ -3066,9 +3093,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-ping"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "659adf89356e04f65398bb74ee791b269e63da9e41b37f8dc19eaacd12487bfe"
+checksum = "50b2ec86a18cbf09d7df440e7786a2409640c774e476e9a3b4d031382c3d7588"
 dependencies = [
  "futures 0.3.8",
  "libp2p-core",
@@ -3081,9 +3108,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-plaintext"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96dfe26270c91d4ff095030d1fcadd602f3fd84968ebd592829916d0715798a6"
+checksum = "6a7b1bdcbe46a3a2159c231601ed29645282653c0a96ce3a2ad8352c9fbe6800"
 dependencies = [
  "bytes 0.5.6",
  "futures 0.3.8",
@@ -3098,13 +3125,13 @@ dependencies = [
 
 [[package]]
 name = "libp2p-pnet"
-version = "0.19.2"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96b3c2d5d26a9500e959a0e19743897239a6c4be78dadf99b70414301a70c006"
+checksum = "6ce3374f3b28162db9d3442c9347c4f14cb01e8290052615c7d341d40eae0599"
 dependencies = [
  "futures 0.3.8",
  "log",
- "pin-project 0.4.27",
+ "pin-project 1.0.2",
  "rand 0.7.3",
  "salsa20",
  "sha3",
@@ -3112,9 +3139,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-request-response"
-version = "0.6.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e952dcc9d2d7e7e45ae8bfcff255723091bd43e3e9a7741a0af8a17fe55b3ed"
+checksum = "620e2950decbf77554b5aed3824f7d0e2c04923f28c70f9bff1a402c47ef6b1e"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
@@ -3125,32 +3152,32 @@ dependencies = [
  "lru",
  "minicbor",
  "rand 0.7.3",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "unsigned-varint",
  "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-swarm"
-version = "0.25.1"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6ecee54e85513a7301eb4681b3a6aac5b6d11f60d43097cf7624fd4450d7dfe"
+checksum = "fdf5894ee1ee63a38aa58d58a16e3dcf7ede6b59ea7b22302c00c1a41d7aec41"
 dependencies = [
  "either",
  "futures 0.3.8",
  "libp2p-core",
  "log",
  "rand 0.7.3",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "void",
  "wasm-timer",
 ]
 
 [[package]]
 name = "libp2p-tcp"
-version = "0.25.1"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc28c9ad6dc43f4c3950411cf808639d90307a076330e7996e5e94e70279bde0"
+checksum = "1d2113a7dab2b502c55fe290910cd7399a2aa04fe70a2f5a415a87a1db600c0e"
 dependencies = [
  "async-std",
  "futures 0.3.8",
@@ -3164,9 +3191,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-uds"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d821208d4b9af4b293a56dde470edd9f9fac8bb94a51f4f5327cc29a471b3f3"
+checksum = "af05fe92c2a3aa320bc82a308ddb7b33bef3b060154c5a4b9fb0b01f15385fc0"
 dependencies = [
  "async-std",
  "futures 0.3.8",
@@ -3176,9 +3203,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-wasm-ext"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e6ef400b231ba78e866b860445480ca21ee447e03034138c6d57cf2969d6bf4"
+checksum = "37cd44ea05a4523f40183f60ab6e6a80e400a5ddfc98b0df1c55edeb85576cd9"
 dependencies = [
  "futures 0.3.8",
  "js-sys",
@@ -3190,9 +3217,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-websocket"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5736e2fccdcea6e728bbaf903bddc113be223313ce2c756ad9fe43b5a2b0f06"
+checksum = "270c80528e21089ea25b41dd1ab8fd834bdf093ebee422fed3b68699a857a083"
 dependencies = [
  "async-tls",
  "either",
@@ -3200,19 +3227,19 @@ dependencies = [
  "libp2p-core",
  "log",
  "quicksink",
- "rustls",
+ "rustls 0.19.0",
  "rw-stream-sink",
  "soketto",
  "url 2.2.0",
  "webpki",
- "webpki-roots 0.21.0",
+ "webpki-roots",
 ]
 
 [[package]]
 name = "libp2p-yamux"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3be7ac000fa3e42ac09a6e658e48de34ac8ef9fff64a4e6e6b08dcc8f4b0e5f6"
+checksum = "36799de9092c35782f080032eddbc8de870f94a0def87cf9f8883efccd5cacf0"
 dependencies = [
  "futures 0.3.8",
  "libp2p-core",
@@ -3245,7 +3272,7 @@ dependencies = [
  "hmac-drbg",
  "rand 0.7.3",
  "sha2 0.8.2",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "typenum",
 ]
 
@@ -3313,23 +3340,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "loom"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0e8460f2f2121162705187214720353c517b97bdfb3494c0b1e33d83ebe4bed"
-dependencies = [
- "cfg-if 0.1.10",
- "generator",
- "scoped-tls",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "lru"
-version = "0.6.1"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be716eb6878ca2263eb5d00a781aa13264a794f519fe6af4fbb2668b2d5441c0"
+checksum = "3aae342b73d57ad0b8b364bd12584819f2c1fe9114285dfcf8b0722607671635"
 dependencies = [
  "hashbrown 0.9.1",
 ]
@@ -3372,9 +3386,9 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "matrixmultiply"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4f7ec66360130972f34830bfad9ef05c6610a43938a467bcc9ab9369ab3478f"
+checksum = "916806ba0031cd542105d916a97c8572e1fa6dd79c9c51e7eb43a09ec2dd84c1"
 dependencies = [
  "rawpointer",
 ]
@@ -3609,7 +3623,7 @@ dependencies = [
  "futures 0.3.8",
  "log",
  "pin-project 1.0.2",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "unsigned-varint",
 ]
 
@@ -3642,9 +3656,9 @@ dependencies = [
 
 [[package]]
 name = "native-tls"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fcc7939b5edc4e4f86b1b4a04bb1498afaaf871b1a6691838ed06fcb48d3a3f"
+checksum = "b8d96b2e1c8da3957d58100b09f102c6d9cfdfced01b7ec5a8974044bb09dbd4"
 dependencies = [
  "lazy_static",
  "libc",
@@ -3670,9 +3684,9 @@ dependencies = [
 
 [[package]]
 name = "net2"
-version = "0.2.36"
+version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7cf75f38f16cb05ea017784dc6dbfd354f76c223dba37701734c4f5a9337d02"
+checksum = "391630d12b68002ae1e25e8f974306474966550ad82dac6886fb8910c19568ae"
 dependencies = [
  "cfg-if 0.1.10",
  "libc",
@@ -3833,9 +3847,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.31"
+version = "0.10.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d008f51b1acffa0d3450a68606e6a51c123012edaacb0f4e1426bd978869187"
+checksum = "038d43985d1ddca7a9900630d8cd031b56e4794eecc2e9ea39dd17aa04399a70"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -3853,9 +3867,9 @@ checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.59"
+version = "0.9.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de52d8eabd217311538a39bba130d7dea1f1e118010fee7a033d966845e7d5fe"
+checksum = "921fc71883267538946025deffb622905ecad223c28efbfdef9bb59a0175f3e6"
 dependencies = [
  "autocfg",
  "cc",
@@ -3893,7 +3907,7 @@ dependencies = [
 [[package]]
 name = "pallet-authorship"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -3908,7 +3922,7 @@ dependencies = [
 [[package]]
 name = "pallet-babe"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -3933,7 +3947,7 @@ dependencies = [
 [[package]]
 name = "pallet-balances"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -3971,7 +3985,7 @@ dependencies = [
 [[package]]
 name = "pallet-grandpa"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -3992,7 +4006,7 @@ dependencies = [
 [[package]]
 name = "pallet-randomness-collective-flip"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4005,7 +4019,7 @@ dependencies = [
 [[package]]
 name = "pallet-session"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4025,7 +4039,7 @@ dependencies = [
 [[package]]
 name = "pallet-sudo"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4039,7 +4053,7 @@ dependencies = [
 [[package]]
 name = "pallet-timestamp"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -4057,14 +4071,14 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "frame-system",
  "pallet-transaction-payment-rpc-runtime-api",
  "parity-scale-codec",
  "serde",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -4074,7 +4088,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment-rpc"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
@@ -4092,7 +4106,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment-rpc-runtime-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -4196,7 +4210,7 @@ dependencies = [
  "parity-util-mem-derive",
  "parking_lot 0.10.2",
  "primitive-types",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "winapi 0.3.9",
 ]
 
@@ -4279,7 +4293,7 @@ checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
 dependencies = [
  "instant",
  "lock_api 0.4.2",
- "parking_lot_core 0.8.0",
+ "parking_lot_core 0.8.2",
 ]
 
 [[package]]
@@ -4289,7 +4303,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b876b1b9e7ac6e1a74a6da34d25c42e17e8862aa409cbbbdcfc8d86c6f3bc62b"
 dependencies = [
  "cfg-if 0.1.10",
- "cloudabi 0.0.3",
+ "cloudabi",
  "libc",
  "redox_syscall",
  "rustc_version",
@@ -4304,25 +4318,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d58c7c768d4ba344e3e8d72518ac13e259d7c7ade24167003b8488e10b6740a3"
 dependencies = [
  "cfg-if 0.1.10",
- "cloudabi 0.0.3",
+ "cloudabi",
  "libc",
  "redox_syscall",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "winapi 0.3.9",
 ]
 
 [[package]]
 name = "parking_lot_core"
-version = "0.8.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c361aa727dd08437f2f1447be8b59a33b0edd15e0fcee698f935613d9efbca9b"
+checksum = "9ccb628cad4f84851442432c60ad8e1f607e29752d0bf072cbd0baf28aa34272"
 dependencies = [
- "cfg-if 0.1.10",
- "cloudabi 0.1.0",
+ "cfg-if 1.0.0",
  "instant",
  "libc",
  "redox_syscall",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "winapi 0.3.9",
 ]
 
@@ -4526,20 +4539,22 @@ dependencies = [
 
 [[package]]
 name = "poly1305"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22ce46de8e53ee414ca4d02bfefac75d8c12fba948b76622a40b4be34dfce980"
+checksum = "4b7456bc1ad2d4cf82b3a016be4c2ac48daf11bf990c1603ebd447fe6f30fca8"
 dependencies = [
+ "cpuid-bool 0.2.0",
  "universal-hash",
 ]
 
 [[package]]
 name = "polyval"
-version = "0.4.2"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3fd900a291ceb8b99799cc8cd3d1d3403a51721e015bc533528b2ceafcc443c"
+checksum = "eebcc4aa140b9abd2bc40d9c3f7ccec842679cd79045ac3a7ac698c1a064b7cd"
 dependencies = [
- "cfg-if 1.0.0",
+ "cpuid-bool 0.2.0",
+ "opaque-debug 0.3.0",
  "universal-hash",
 ]
 
@@ -4717,9 +4732,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
+checksum = "991431c3519a3f36861882da93630ce66b52918dcf1b8e2fd66b397fc96f28df"
 dependencies = [
  "proc-macro2",
 ]
@@ -4836,9 +4851,9 @@ dependencies = [
 
 [[package]]
 name = "raw-cpuid"
-version = "7.0.3"
+version = "7.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4a349ca83373cfa5d6dbb66fd76e58b2cca08da71a5f6400de0a0a6a9bceeaf"
+checksum = "beb71f708fe39b2c5e98076204c3cc094ee5a4c12c4cdb119a2b72dc34164f41"
 dependencies = [
  "bitflags",
  "cc",
@@ -4904,18 +4919,18 @@ dependencies = [
 
 [[package]]
 name = "ref-cast"
-version = "1.0.3"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e17626b2f4bcf35b84bf379072a66e28cfe5c3c6ae58b38e4914bb8891dabece"
+checksum = "300f2a835d808734ee295d45007adacb9ebb29dd3ae2424acfa17930cae541da"
 dependencies = [
  "ref-cast-impl",
 ]
 
 [[package]]
 name = "ref-cast-impl"
-version = "1.0.3"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c523ccaed8ac4b0288948849a350b37d3035827413c458b6a40ddb614bb4f72"
+checksum = "4c38e3aecd2b21cb3959637b883bb3714bc7e43f0268b9a29d3743ee3e55cdd2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4930,7 +4945,7 @@ checksum = "b9ba8aaf5fe7cf307c6dbdaeed85478961d29e25e3bee5169e11b92fa9f027a8"
 dependencies = [
  "log",
  "rustc-hash",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
 ]
 
 [[package]]
@@ -4984,9 +4999,9 @@ dependencies = [
 
 [[package]]
 name = "retain_mut"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e005d658ad26eacc2b6c506dfde519f4e277e328d0eb3379ca61647d70a8f531"
+checksum = "53552c6c49e1e13f1a203ef0080ab3bbef0beb570a528993e83df057a9d9bba1"
 
 [[package]]
 name = "ring"
@@ -5055,7 +5070,7 @@ dependencies = [
  "bytes 0.5.6",
  "crc32fast",
  "futures 0.3.8",
- "http 0.2.1",
+ "http 0.2.2",
  "hyper 0.13.9",
  "hyper-tls",
  "lazy_static",
@@ -5068,7 +5083,7 @@ dependencies = [
  "rustc_version",
  "serde",
  "serde_json",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "xml-rs",
 ]
 
@@ -5088,7 +5103,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shlex",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "zeroize",
 ]
 
@@ -5117,7 +5132,7 @@ dependencies = [
  "futures 0.3.8",
  "hex",
  "hmac 0.8.1",
- "http 0.2.1",
+ "http 0.2.2",
  "hyper 0.13.9",
  "log",
  "md5",
@@ -5128,7 +5143,7 @@ dependencies = [
  "serde",
  "sha2 0.9.2",
  "time 0.2.23",
- "tokio 0.2.23",
+ "tokio 0.2.24",
 ]
 
 [[package]]
@@ -5193,13 +5208,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "064fd21ff87c6e87ed4506e68beb42459caa4a0e2eb144932e6776768556980b"
+dependencies = [
+ "base64 0.13.0",
+ "log",
+ "ring",
+ "sct",
+ "webpki",
+]
+
+[[package]]
 name = "rustls-native-certs"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "629d439a7672da82dd955498445e496ee2096fe2117b9f796558a43fdb9e59b8"
 dependencies = [
  "openssl-probe",
- "rustls",
+ "rustls 0.18.1",
  "schannel",
  "security-framework 1.0.0",
 ]
@@ -5232,11 +5260,11 @@ dependencies = [
 
 [[package]]
 name = "salsa20"
-version = "0.6.0"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f47b10fa80f6969bbbd9c8e7cc998f082979d402a9e10579e2303a87955395"
+checksum = "399f290ffc409596022fce5ea5d4138184be4784f2b28c62c59f0d8389059a15"
 dependencies = [
- "stream-cipher",
+ "cipher",
 ]
 
 [[package]]
@@ -5251,7 +5279,7 @@ dependencies = [
 [[package]]
 name = "sc-basic-authorship"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -5274,7 +5302,7 @@ dependencies = [
 [[package]]
 name = "sc-block-builder"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sc-client-api",
@@ -5291,7 +5319,7 @@ dependencies = [
 [[package]]
 name = "sc-chain-spec"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -5312,7 +5340,7 @@ dependencies = [
 [[package]]
 name = "sc-chain-spec-derive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -5323,15 +5351,13 @@ dependencies = [
 [[package]]
 name = "sc-cli"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
- "ansi_term 0.12.1",
  "atty",
  "chrono",
  "fdlimit",
  "futures 0.3.8",
  "hex",
- "lazy_static",
  "libp2p",
  "log",
  "names",
@@ -5359,7 +5385,7 @@ dependencies = [
  "structopt",
  "thiserror",
  "tiny-bip39",
- "tokio 0.2.23",
+ "tokio 0.2.24",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
@@ -5368,7 +5394,7 @@ dependencies = [
 [[package]]
 name = "sc-cli-proc-macro"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -5379,7 +5405,7 @@ dependencies = [
 [[package]]
 name = "sc-client-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "fnv",
@@ -5413,7 +5439,7 @@ dependencies = [
 [[package]]
 name = "sc-client-db"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "blake2-rfc",
  "hash-db",
@@ -5443,7 +5469,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "sc-client-api",
  "sp-blockchain",
@@ -5454,7 +5480,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-babe"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "fork-tree",
@@ -5499,7 +5525,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-babe-rpc"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -5523,7 +5549,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-epochs"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "fork-tree",
  "parity-scale-codec",
@@ -5536,7 +5562,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-slots"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -5562,7 +5588,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-uncles"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "sc-client-api",
@@ -5576,7 +5602,7 @@ dependencies = [
 [[package]]
 name = "sc-executor"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "lazy_static",
@@ -5605,7 +5631,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-common"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "parity-scale-codec",
@@ -5621,7 +5647,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-wasmi"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -5636,7 +5662,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-wasmtime"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -5654,7 +5680,7 @@ dependencies = [
 [[package]]
 name = "sc-finality-grandpa"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "finality-grandpa",
@@ -5691,7 +5717,7 @@ dependencies = [
 [[package]]
 name = "sc-finality-grandpa-rpc"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "finality-grandpa",
@@ -5715,7 +5741,7 @@ dependencies = [
 [[package]]
 name = "sc-informant"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "ansi_term 0.12.1",
  "futures 0.3.8",
@@ -5733,7 +5759,7 @@ dependencies = [
 [[package]]
 name = "sc-keystore"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5747,13 +5773,13 @@ dependencies = [
  "sp-application-crypto",
  "sp-core",
  "sp-keystore",
- "subtle 2.3.0",
+ "subtle 2.4.0",
 ]
 
 [[package]]
 name = "sc-light"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "hash-db",
  "lazy_static",
@@ -5772,7 +5798,7 @@ dependencies = [
 [[package]]
 name = "sc-network"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "async-std",
  "async-trait",
@@ -5793,7 +5819,6 @@ dependencies = [
  "linked-hash-map",
  "linked_hash_set",
  "log",
- "lru",
  "nohash-hasher",
  "parity-scale-codec",
  "parking_lot 0.11.1",
@@ -5808,7 +5833,7 @@ dependencies = [
  "serde_json",
  "slog",
  "slog_derive",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "sp-arithmetic",
  "sp-blockchain",
  "sp-consensus",
@@ -5826,7 +5851,7 @@ dependencies = [
 [[package]]
 name = "sc-network-gossip"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -5841,7 +5866,7 @@ dependencies = [
 [[package]]
 name = "sc-offchain"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "bytes 0.5.6",
  "fnv",
@@ -5868,7 +5893,7 @@ dependencies = [
 [[package]]
 name = "sc-peerset"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "libp2p",
@@ -5881,7 +5906,7 @@ dependencies = [
 [[package]]
 name = "sc-proposer-metrics"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "substrate-prometheus-endpoint",
@@ -5890,7 +5915,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "hash-db",
@@ -5904,6 +5929,7 @@ dependencies = [
  "sc-executor",
  "sc-keystore",
  "sc-rpc-api",
+ "sc-tracing",
  "serde_json",
  "sp-api",
  "sp-blockchain",
@@ -5923,7 +5949,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-api"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -5947,7 +5973,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-server"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.1.30",
  "jsonrpc-core",
@@ -5965,7 +5991,7 @@ dependencies = [
 [[package]]
 name = "sc-service"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "directories 3.0.1",
  "exit-future",
@@ -6029,7 +6055,7 @@ dependencies = [
 [[package]]
 name = "sc-service-test"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "fdlimit",
  "futures 0.1.30",
@@ -6066,7 +6092,7 @@ dependencies = [
 [[package]]
 name = "sc-state-db"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -6081,7 +6107,7 @@ dependencies = [
 [[package]]
 name = "sc-sync-state-rpc"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
@@ -6101,7 +6127,7 @@ dependencies = [
 [[package]]
 name = "sc-telemetry"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -6122,11 +6148,15 @@ dependencies = [
 [[package]]
 name = "sc-tracing"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
+ "ansi_term 0.12.1",
  "erased-serde",
+ "lazy_static",
  "log",
+ "once_cell",
  "parking_lot 0.10.2",
+ "regex",
  "rustc-hash",
  "sc-telemetry",
  "serde",
@@ -6135,13 +6165,14 @@ dependencies = [
  "sp-tracing",
  "tracing",
  "tracing-core",
+ "tracing-log",
  "tracing-subscriber",
 ]
 
 [[package]]
 name = "sc-transaction-graph"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -6163,7 +6194,7 @@ dependencies = [
 [[package]]
 name = "sc-transaction-pool"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-diagnose",
@@ -6209,8 +6240,9 @@ dependencies = [
  "merlin",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "serde",
  "sha2 0.8.2",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "zeroize",
 ]
 
@@ -6357,18 +6389,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.117"
+version = "1.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b88fa983de7720629c9387e9f517353ed404164b1e482c970a90c1a4aaf7dc1a"
+checksum = "06c64263859d87aa2eb554587e2d23183398d617427327cf2b3d0ed8c69e4800"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.117"
+version = "1.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd1ae72adb44aab48f325a02444a5fc079349a8d804c1fc922aed3f7454c74e"
+checksum = "c84d3526699cd55261af4b941e4e725444df67aa4f9e6a3564f18030d12672df"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6377,9 +6409,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.60"
+version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1500e84d27fe482ed1dc791a56eddc2f230046a040fa908c08bda1d9fb615779"
+checksum = "4fceb2595057b6891a4ee808f70054bd2d12f0e97f1cbb78689b59f676df325a"
 dependencies = [
  "itoa",
  "ryu",
@@ -6406,7 +6438,7 @@ checksum = "ce3cdf1b5e620a498ee6f2a171885ac7e22f0e12089ec4b3d22b84921792507c"
 dependencies = [
  "block-buffer 0.9.0",
  "cfg-if 1.0.0",
- "cpuid-bool",
+ "cpuid-bool 0.1.2",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
 ]
@@ -6437,7 +6469,7 @@ checksum = "6e7aab86fe2149bad8c507606bdb3f4ef5e7b2380eb92350f56122cca72a42a8"
 dependencies = [
  "block-buffer 0.9.0",
  "cfg-if 1.0.0",
- "cpuid-bool",
+ "cpuid-bool 0.1.2",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
 ]
@@ -6456,12 +6488,11 @@ dependencies = [
 
 [[package]]
 name = "sharded-slab"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4921be914e16899a80adefb821f8ddb7974e3f1250223575a44ed994882127"
+checksum = "79c719719ee05df97490f80a45acfc99e5a30ce98a1e4fb67aee422745ae14e3"
 dependencies = [
  "lazy_static",
- "loom",
 ]
 
 [[package]]
@@ -6471,10 +6502,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
 
 [[package]]
-name = "signal-hook-registry"
-version = "1.2.2"
+name = "signal-hook"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce32ea0c6c56d5eacaeb814fbed9960547021d3edd010ded1425f180536b20ab"
+checksum = "7e31d442c16f047a671b5a71e2161d6e68814012b7f5379d269ebd915fac2729"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
+name = "signal-hook-registry"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16f1d0fef1604ba8f7a073c7e701f213e056707210e9020af4528e0101ce11a6"
 dependencies = [
  "libc",
 ]
@@ -6558,9 +6599,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7acad6f34eb9e8a259d3283d1e8c1d34d7415943d4895f65cc73813c7396fc85"
+checksum = "1a55ca5f3b68e41c979bf8c46a6f1da892ca4db8f94023ce0bd32407573b1ac0"
 
 [[package]]
 name = "snow"
@@ -6576,19 +6617,18 @@ dependencies = [
  "ring",
  "rustc_version",
  "sha2 0.9.2",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "x25519-dalek",
 ]
 
 [[package]]
 name = "socket2"
-version = "0.3.17"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c29947abdee2a218277abeca306f25789c938e500ea5a9d4b12a5a504466902"
+checksum = "122e570113d28d773067fab24266b66753f6ea915758651696b6e35e49f88d6e"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "redox_syscall",
  "winapi 0.3.9",
 ]
 
@@ -6611,7 +6651,7 @@ dependencies = [
 [[package]]
 name = "sp-allocator"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "sp-core",
@@ -6623,7 +6663,7 @@ dependencies = [
 [[package]]
 name = "sp-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "hash-db",
  "parity-scale-codec",
@@ -6639,7 +6679,7 @@ dependencies = [
 [[package]]
 name = "sp-api-proc-macro"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "blake2-rfc",
  "proc-macro-crate",
@@ -6651,7 +6691,7 @@ dependencies = [
 [[package]]
 name = "sp-application-crypto"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "serde",
@@ -6663,7 +6703,7 @@ dependencies = [
 [[package]]
 name = "sp-arithmetic"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "integer-sqrt",
  "num-traits",
@@ -6676,7 +6716,7 @@ dependencies = [
 [[package]]
 name = "sp-authorship"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-inherents",
@@ -6687,7 +6727,7 @@ dependencies = [
 [[package]]
 name = "sp-block-builder"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -6699,7 +6739,7 @@ dependencies = [
 [[package]]
 name = "sp-blockchain"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "log",
@@ -6717,7 +6757,7 @@ dependencies = [
 [[package]]
 name = "sp-chain-spec"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "serde",
  "serde_json",
@@ -6726,7 +6766,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -6752,7 +6792,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-aura"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -6766,7 +6806,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-babe"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "merlin",
  "parity-scale-codec",
@@ -6786,7 +6826,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-slots"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-runtime",
@@ -6795,7 +6835,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-vrf"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "schnorrkel",
@@ -6807,7 +6847,7 @@ dependencies = [
 [[package]]
 name = "sp-core"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "base58",
  "blake2-rfc",
@@ -6851,7 +6891,7 @@ dependencies = [
 [[package]]
 name = "sp-database"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "kvdb",
  "parking_lot 0.10.2",
@@ -6860,7 +6900,7 @@ dependencies = [
 [[package]]
 name = "sp-debug-derive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6870,7 +6910,7 @@ dependencies = [
 [[package]]
 name = "sp-externalities"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "environmental",
  "parity-scale-codec",
@@ -6881,7 +6921,7 @@ dependencies = [
 [[package]]
 name = "sp-finality-grandpa"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "finality-grandpa",
  "log",
@@ -6898,7 +6938,7 @@ dependencies = [
 [[package]]
 name = "sp-inherents"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "parking_lot 0.10.2",
@@ -6910,7 +6950,7 @@ dependencies = [
 [[package]]
 name = "sp-io"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "hash-db",
@@ -6934,7 +6974,7 @@ dependencies = [
 [[package]]
 name = "sp-keyring"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "lazy_static",
  "sp-core",
@@ -6945,7 +6985,7 @@ dependencies = [
 [[package]]
 name = "sp-keystore"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -6954,6 +6994,7 @@ dependencies = [
  "parity-scale-codec",
  "parking_lot 0.10.2",
  "schnorrkel",
+ "serde",
  "sp-core",
  "sp-externalities",
 ]
@@ -6961,7 +7002,7 @@ dependencies = [
 [[package]]
 name = "sp-offchain"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "sp-api",
  "sp-core",
@@ -6971,7 +7012,7 @@ dependencies = [
 [[package]]
 name = "sp-panic-handler"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "backtrace",
 ]
@@ -6979,7 +7020,7 @@ dependencies = [
 [[package]]
 name = "sp-rpc"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "serde",
  "sp-core",
@@ -6988,7 +7029,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "either",
  "hash256-std-hasher",
@@ -7009,8 +7050,9 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
+ "impl-trait-for-tuples",
  "parity-scale-codec",
  "primitive-types",
  "sp-externalities",
@@ -7025,7 +7067,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface-proc-macro"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "Inflector",
  "proc-macro-crate",
@@ -7037,7 +7079,7 @@ dependencies = [
 [[package]]
 name = "sp-serializer"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "serde",
  "serde_json",
@@ -7046,7 +7088,7 @@ dependencies = [
 [[package]]
 name = "sp-session"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -7059,7 +7101,7 @@ dependencies = [
 [[package]]
 name = "sp-staking"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "parity-scale-codec",
  "sp-runtime",
@@ -7069,7 +7111,7 @@ dependencies = [
 [[package]]
 name = "sp-state-machine"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "hash-db",
  "log",
@@ -7077,7 +7119,7 @@ dependencies = [
  "parity-scale-codec",
  "parking_lot 0.10.2",
  "rand 0.7.3",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "sp-core",
  "sp-externalities",
  "sp-panic-handler",
@@ -7091,12 +7133,12 @@ dependencies = [
 [[package]]
 name = "sp-std"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 
 [[package]]
 name = "sp-storage"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "impl-serde",
  "parity-scale-codec",
@@ -7109,7 +7151,7 @@ dependencies = [
 [[package]]
 name = "sp-tasks"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "sp-core",
@@ -7122,7 +7164,7 @@ dependencies = [
 [[package]]
 name = "sp-timestamp"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -7136,7 +7178,7 @@ dependencies = [
 [[package]]
 name = "sp-tracing"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -7149,7 +7191,7 @@ dependencies = [
 [[package]]
 name = "sp-transaction-pool"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -7165,7 +7207,7 @@ dependencies = [
 [[package]]
 name = "sp-trie"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "hash-db",
  "memory-db",
@@ -7179,7 +7221,7 @@ dependencies = [
 [[package]]
 name = "sp-utils"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "futures-core",
@@ -7191,7 +7233,7 @@ dependencies = [
 [[package]]
 name = "sp-version"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "impl-serde",
  "parity-scale-codec",
@@ -7203,7 +7245,7 @@ dependencies = [
 [[package]]
 name = "sp-wasm-interface"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -7225,9 +7267,9 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "standback"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf906c8b8fc3f6ecd1046e01da1d8ddec83e48c8b08b84dcc02b585a6bedf5a8"
+checksum = "c66a8cff4fa24853fdf6b51f75c6d7f8206d7c75cab4e467bcd7f25c2b1febe0"
 dependencies = [
  "version_check",
 ]
@@ -7382,7 +7424,7 @@ dependencies = [
 [[package]]
 name = "substrate-build-script-utils"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "platforms",
 ]
@@ -7390,7 +7432,7 @@ dependencies = [
 [[package]]
 name = "substrate-frame-rpc-system"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "frame-system-rpc-runtime-api",
  "futures 0.3.8",
@@ -7413,7 +7455,7 @@ dependencies = [
 [[package]]
 name = "substrate-prometheus-endpoint"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "async-std",
  "derive_more",
@@ -7421,13 +7463,13 @@ dependencies = [
  "hyper 0.13.9",
  "log",
  "prometheus",
- "tokio 0.2.23",
+ "tokio 0.2.24",
 ]
 
 [[package]]
 name = "substrate-test-client"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.1.30",
  "futures 0.3.8",
@@ -7454,7 +7496,7 @@ dependencies = [
 [[package]]
 name = "substrate-test-runtime"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "cfg-if 0.1.10",
  "frame-executive",
@@ -7496,7 +7538,7 @@ dependencies = [
 [[package]]
 name = "substrate-test-runtime-client"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "futures 0.3.8",
  "parity-scale-codec",
@@ -7517,7 +7559,7 @@ dependencies = [
 [[package]]
 name = "substrate-wasm-builder"
 version = "3.0.0"
-source = "git+https://github.com/compound-finance/substrate.git#dcf6a3ae9587bdf27a58eeff4bad8628c4763b38"
+source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
@@ -7537,15 +7579,15 @@ checksum = "2d67a5a62ba6e01cb2192ff309324cb4875d0c451d55fe2319433abe7a05a8ee"
 
 [[package]]
 name = "subtle"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "343f3f510c2915908f155e94f17220b19ccfacf2a64a2a5d8004f2c3e311e7fd"
+checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.53"
+version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8833e20724c24de12bbaba5ad230ea61c3eafb05b881c7c9d3cfe8638b187e68"
+checksum = "4211ce9909eb971f111059df92c45640aad50a619cf55cd76476be803c4c68e6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7616,18 +7658,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.22"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e9ae34b84616eedaaf1e9dd6026dbe00dcafa92aa0c8077cb69df1fcfe5e53e"
+checksum = "76cc616c6abf8c8928e2fdcc0dbfab37175edd8fb49a4641066ad1364fdab146"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.22"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ba20f23e85b10754cd195504aebf6a27e2e6cbe28c17778a0c930724628dd56"
+checksum = "9be73a2caec27583d0046ef3796c3794f868a5bc813db689eed00c7631275cd1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7778,9 +7820,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.23"
+version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6d7ad61edd59bfcc7e80dababf0f4aed2e6d5e0ba1659356ae889752dfc12ff"
+checksum = "099837d3464c16a808060bb3f02263b412f6fafcb5d01c533d309985fbeebe48"
 dependencies = [
  "bytes 0.5.6",
  "fnv",
@@ -7914,8 +7956,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e12831b255bcfa39dc0436b01e19fea231a37db570686c06ee72c423479f889a"
 dependencies = [
  "futures-core",
- "rustls",
- "tokio 0.2.23",
+ "rustls 0.18.1",
+ "tokio 0.2.24",
  "webpki",
 ]
 
@@ -7988,7 +8030,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a70f4fcd7b3b24fb194f837560168208f669ca8cb70d0c4b862944452396343"
 dependencies = [
  "native-tls",
- "tokio 0.2.23",
+ "tokio 0.2.24",
 ]
 
 [[package]]
@@ -8035,14 +8077,14 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.1.11",
- "tokio 0.2.23",
+ "tokio 0.2.24",
 ]
 
 [[package]]
 name = "toml"
-version = "0.5.7"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75cf45bb0bef80604d001caaec0d09da99611b3c0fd39d3080468875cdb65645"
+checksum = "a31142970826733df8241ef35dc040ef98c679ab14d7c3e54d827099b3acecaa"
 dependencies = [
  "serde",
 ]
@@ -8131,7 +8173,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sharded-slab",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "thread_local",
  "tracing",
  "tracing-core",
@@ -8149,7 +8191,7 @@ dependencies = [
  "hashbrown 0.8.2",
  "log",
  "rustc-hex",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
 ]
 
 [[package]]
@@ -8254,7 +8296,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8326b2c654932e3e4f9196e69d08fdf7cfd718e1dc6f66b347e6024a0c961402"
 dependencies = [
  "generic-array 0.14.4",
- "subtle 2.3.0",
+ "subtle 2.4.0",
 ]
 
 [[package]]
@@ -8300,9 +8342,9 @@ dependencies = [
 
 [[package]]
 name = "vcpkg"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6454029bf181f092ad1b853286f23e2c507d8e8194d01d92da4a55c274a5508c"
+checksum = "b00bca6106a5e23f3eee943593759b7fcddb00554332e856d990c893966879fb"
 
 [[package]]
 name = "vec-arena"
@@ -8519,7 +8561,7 @@ dependencies = [
  "log",
  "region",
  "rustc-demangle",
- "smallvec 1.5.0",
+ "smallvec 1.6.0",
  "target-lexicon",
  "wasmparser 0.59.0",
  "wasmtime-environ",
@@ -8662,18 +8704,18 @@ dependencies = [
 
 [[package]]
 name = "wast"
-version = "28.0.0"
+version = "30.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c0586061bfacc035034672c8d760802b428ab4c80a92e2a392425c516df9be1"
+checksum = "9b79907b22f740634810e882d8d1d9d0f9563095a8ab94e786e370242bff5cd2"
 dependencies = [
  "leb128",
 ]
 
 [[package]]
 name = "wat"
-version = "1.0.29"
+version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c06d55b5ec4f9d9396fa99abaafa0688597395e57827dffd89731412ae90c9bf"
+checksum = "a8279a02835bf12e61ed2b3c3cbc6ecf9918762fd97e036917c11a09ec20ca44"
 dependencies = [
  "wast",
 ]
@@ -8696,15 +8738,6 @@ checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring",
  "untrusted",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f20dea7535251981a9670857150d571846545088359b28e4951d350bdaf179f"
-dependencies = [
- "webpki",
 ]
 
 [[package]]
@@ -8826,9 +8859,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05f33972566adbd2d3588b0491eb94b98b43695c4ef897903470ede4f3f5a28a"
+checksum = "81a974bcdd357f0dca4d41677db03436324d45a4c9ed2d0b873a5a360ce41c36"
 dependencies = [
  "zeroize_derive",
 ]
@@ -8847,18 +8880,18 @@ dependencies = [
 
 [[package]]
 name = "zstd"
-version = "0.5.3+zstd.1.4.5"
+version = "0.5.4+zstd.1.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01b32eaf771efa709e8308605bbf9319bf485dc1503179ec0469b611937c0cd8"
+checksum = "69996ebdb1ba8b1517f61387a883857818a66c8a295f487b1ffd8fd9d2c82910"
 dependencies = [
  "zstd-safe",
 ]
 
 [[package]]
 name = "zstd-safe"
-version = "2.0.5+zstd.1.4.5"
+version = "2.0.6+zstd.1.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cfb642e0d27f64729a639c52db457e0ae906e7bc6f5fe8f5c453230400f1055"
+checksum = "98aa931fb69ecee256d44589d19754e61851ae4769bf963b385119b1cc37a49e"
 dependencies = [
  "libc",
  "zstd-sys",
@@ -8866,9 +8899,9 @@ dependencies = [
 
 [[package]]
 name = "zstd-sys"
-version = "1.4.17+zstd.1.4.5"
+version = "1.4.18+zstd.1.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b89249644df056b522696b1bb9e7c18c87e8ffa3e2f0dc3b0155875d6498f01b"
+checksum = "a1e6e8778706838f43f771d80d37787cb2fe06dafe89dd3aebaf6721b9eaec81"
 dependencies = [
  "cc",
  "glob",
