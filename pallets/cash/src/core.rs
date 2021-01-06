@@ -16,6 +16,14 @@ use crate::{
     Module,
 };
 
+macro_rules! require {
+    ($expr:expr, $reason:expr) => {
+        if !$expr {
+            return core::result::Result::Err($reason);
+        }
+    };
+}
+
 // Type aliases //
 
 /// Type for representing an annualized rate on Compound Chain.
@@ -37,7 +45,6 @@ pub type GenericAddr = Vec<u8>;
 pub type GenericAccount = (ChainId, GenericAddr);
 
 /// Type for a generic asset, tied to one of the possible chains.
-// #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Default)]
 pub type GenericAsset = (ChainId, GenericAddr);
 
 /// Type for a generic encoded message, potentially for any chain.
@@ -284,10 +291,10 @@ pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason>
 //     // Add ExtractionNotice(Asset, Recipient, Amount) to NoticeQueueRecipient.Chain
 //     Ok(()) // XXX
 // }
-
-// XXX should we expect amounts are already converted to our bigint type here?
-//  probably not, probably inputs should always be fixed width?
-//   actually now I think we can always guarantee to parse ascii numbers in lisp requests into bigints
+//
+// // XXX should we expect amounts are already converted to our bigint type here?
+// //  probably not, probably inputs should always be fixed width?
+// //   actually now I think we can always guarantee to parse ascii numbers in lisp requests into bigints
 // pub fn extract_cash_principal_internal<T: Config, C: Chain>(
 //     holder: Account<Compound>,
 //     recipient: Account<C>,
@@ -309,7 +316,7 @@ pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason>
 //     //     Add CashExtractionNotice(Recipient, Amount, YieldIndex) to NoticeQueueRecipient.Chain;
 //     Ok(()) // XXX
 // }
-//
+
 #[cfg(test)]
 mod tests {
     // XXX
