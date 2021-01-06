@@ -1,5 +1,5 @@
 use anyhow::{bail, Result}; // XXX
-use codec::{Decode, Encode, Input};
+use codec::{Decode, Encode, EncodeLike, Input};
 use num_bigint::BigUint;
 use our_std::{vec::Vec, RuntimeDebug};
 
@@ -20,11 +20,13 @@ const CASH_DECIMALS: DecimalType = 18;
 /// For example, if the mantissa is 123456789 and decimals is 4 the number that is represented is
 /// 12345.6789. The decimals are stored separately.
 
-#[derive(Clone, Eq, PartialEq, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, RuntimeDebug, Default)]
 pub struct Amount {
     pub mantissa: MantissaType,
     pub decimals: DecimalType,
 }
+
+impl EncodeLike for Amount {}
 
 impl Encode for Amount {
     fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {

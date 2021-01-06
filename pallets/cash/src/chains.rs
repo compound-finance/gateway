@@ -12,6 +12,12 @@ pub enum ChainId {
     Tez,
 }
 
+impl Default for ChainId {
+    fn default() -> Self {
+        ChainId::Eth
+    }
+}
+
 pub trait Chain {
     type Address: Debuggable + Clone + Eq = [u8; 20];
     type Account: Debuggable + Clone + Eq = Self::Address;

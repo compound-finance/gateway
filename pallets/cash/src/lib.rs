@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
 #![feature(associated_type_defaults)]
 #![feature(const_generics)]
+#![feature(array_methods)]
 
 #[macro_use]
 extern crate alloc;
@@ -27,10 +28,11 @@ use sp_runtime::{
     RuntimeDebug, SaturatedConversion,
 };
 
-use crate::amount::CashAmount;
+use crate::amount::{Amount, CashAmount};
 use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
-use crate::core::ChainAccount;
+use crate::core::{ChainAccount, ChainAsset};
 use crate::notices::{Notice, NoticeId, NoticeStatus};
+use our_std::convert::TryFrom;
 
 mod amount;
 mod chains;
@@ -42,6 +44,7 @@ mod params; // XXX
 #[cfg(test)]
 mod mock;
 
+mod oracle;
 #[cfg(test)]
 mod tests;
 
@@ -77,6 +80,9 @@ pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Ve
 
 /// Type for validator set included in the genesis config
 pub type ValidatorGenesisConfig = Vec<String>;
+
+/// Type for open price feed reporter set included in the genesis config
+pub type ReporterGenesisConfig = Vec<String>;
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
@@ -139,17 +145,31 @@ decl_storage! {
         /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
+        /// Mapping of assets to their price.
+        Price get(fn price): map hasher(blake2_128_concat) ChainAsset => Amount;
+
+        /// Mapping of assets to the last time their price was updated.
+        PriceTime get(fn price_time): map hasher(blake2_128_concat) ChainAsset => Timestamp;
+
+        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => ChainAsset;
+
+        /// Eth addresses of price reporters for open oracle
+        Reporters get(fn reporters): Vec<[u8; 20]>;
+
         // XXX
         // AssetInfo[asset];
         // LiquidationIncentive;
-        // Price[asset];
-        // PriceTime[asset];
         // PriceReporter;
         // PriceKeyMapping;
     }
     add_extra_genesis {
         config(validators): ValidatorGenesisConfig;
-        build(|config| Module::<T>::initialize_validators(config.validators.clone()))
+        config(reporters): ReporterGenesisConfig;
+        build(|config| {
+            Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_reporters(config.reporters.clone());
+        })
     }
 }
 
@@ -206,8 +226,13 @@ decl_error! {
         UnknownEthEventType, // XXX needed per-chain?
 
         /// Error decoding Ethereum event
-        DecodeEthereumEventError
+        DecodeEthereumEventError,
 
+        /// An error related to the oracle
+        OpenOracleError,
+
+        /// An error related to the chain_spec file contents
+        GenesisConfigError,
     }
 }
 
@@ -234,12 +259,20 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
+        /// Set the price using the open price feed.
+        #[weight = 0]
+        pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> dispatch::DispatchResult {
+            ensure_none(origin)?;
+            Self::post_price_internal(payload, signature)?;
+            Ok(())
+        }
+
         // XXX this function is temporary and will be deleted after we reach a certain point
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn magic_extract(origin, account: ChainAccount, amount: CashAmount) -> dispatch::DispatchResult {
-            let () = ensure_none(origin)?;
+            ensure_none(origin)?;
 
             // Update storage -- TODO: increment this-- sure why not?
             let curr_cash_balance: CashAmount = CashBalance::get(&account).unwrap_or_default();
@@ -403,15 +436,73 @@ decl_module! {
 
             let result = Self::fetch_events_with_lock();
             if let Err(e) = result {
-                debug::native::error!("offchain_worker error: {:?}", e);
+                debug::native::error!("offchain_worker error during fetch events: {:?}", e);
             }
             Self::process_eth_notices(block_number);
+            // todo: do this less often perhaps once a minute?
+            // a really simple idea to do it once a minute on average is to just use probability
+            // and only update the feed every now and then. It is a function of how many validators
+            // are running.
+            let result = Self::process_open_price_feed();
+            if let Err(e) = result {
+                debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
+            }
         }
     }
 }
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
+    /// Body of the post_price extrinsic
+    /// * checks signature of message
+    /// * parses message
+    /// * updates storage
+    ///
+    /// Gets us out of the decl_module! macro and helps with static code analysis to have the
+    /// body of this function here.
+    fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
+        // check signature
+        let hashed = compound_crypto::keccak(&payload);
+        let recovered = cash_err!(
+            compound_crypto::eth_recover(&hashed, &signature),
+            <Error<T>>::OpenOracleError
+        )?;
+        let reporters = Reporters::get();
+        if !reporters
+            .iter()
+            .any(|e| e.as_slice() == recovered.as_slice())
+        {
+            return Err(<Error<T>>::OpenOracleError);
+        }
+
+        let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
+
+        debug::native::info!(
+            "Parsed price from open price feed: {:?} is worth {:?}",
+            parsed.key,
+            (parsed.value as f64) / 1000000.0
+        );
+        // todo: more sanity checking on the value
+        // todo: update storage
+        Ok(())
+    }
+
+    /// Convert from the chain spec file format hex encoded strings into the local storage format, binary blob
+    fn hex_string_vec_to_binary_vec<U: TryFrom<Vec<u8>>>(
+        data: Vec<String>,
+    ) -> Result<Vec<U>, Error<T>> {
+        let mut converted: Vec<U> = Vec::new();
+        for record in data {
+            let decoded = hex::decode(&record).map_err(|_| <Error<T>>::GenesisConfigError)?;
+            let converted_validator: U = decoded
+                .try_into()
+                .map_err(|_| <Error<T>>::GenesisConfigError)?;
+            converted.push(converted_validator);
+        }
+        Ok(converted)
+    }
+
+    /// Set the initial set of validators from the genesis config
     fn initialize_validators(validators: ValidatorGenesisConfig) {
         assert!(
             !validators.is_empty(),
@@ -421,17 +512,45 @@ impl<T: Config> Module<T> {
             Validators::get().is_empty(),
             "Validators are already set but they should only be set in the genesis config."
         );
-        let mut converted_validators: ValidatorSet = Vec::new();
-        for validator_address in validators {
-            let validator_address = hex::decode(&validator_address)
-                .expect("Bad genisis config, validator address not stored as hex");
-            let converted_validator: [u8; 65] = validator_address
-                .try_into()
-                .expect("Bad genesis config, validator address incorrect number of bytes.");
-            converted_validators.push(converted_validator);
+        let converted: ValidatorSet = Self::hex_string_vec_to_binary_vec(validators)
+            .expect("Could not deserialize validators from genesis config");
+        Validators::put(converted);
+    }
+
+    /// Set the initial set of open price feed price reporters from the genesis config
+    fn initialize_reporters(reporters: ReporterGenesisConfig) {
+        assert!(
+            !reporters.is_empty(),
+            "Open price feed price reporters must be set in the genesis config"
+        );
+        assert!(
+            Reporters::get().is_empty(),
+            "Reporters are already set but they should only be set in the genesis config."
+        );
+        let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
+            .expect("Could not deserialize validators from genesis config");
+        Reporters::put(converted);
+    }
+
+    /// Procedure for offchain worker to processes messages coming out of the open price feed
+    pub fn process_open_price_feed() -> Result<(), Error<T>> {
+        let api_response = cash_err!(
+            crate::oracle::open_price_feed_request_okex(),
+            <Error<T>>::HttpFetchingError
+        )?;
+        let messages_and_signatures = cash_err!(
+            api_response.to_message_signature_pairs(),
+            <Error<T>>::OpenOracleError
+        )?;
+        for (msg, sig) in messages_and_signatures {
+            // adding some debug info in here, this will become very chatty
+            let call = <Call<T>>::post_price(msg, sig);
+            cash_err!(
+                SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()),
+                <Error<T>>::OpenOracleError
+            )?;
         }
-        // build the
-        Validators::put(converted_validators);
+        Ok(())
     }
 
     pub fn process_eth_notices(block_number: T::BlockNumber) {
@@ -585,6 +704,10 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
+            Call::post_price(_, _) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .propagate(true)
+                .build(),
             _ => InvalidTransaction::Call.into(),
         }
     }

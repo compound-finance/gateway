@@ -25,6 +25,7 @@ pub struct ChainAccount {
     pub address: Address,
 }
 
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Default)]
 pub struct ChainAsset {
     pub chain: ChainId,
     pub address: Address,
