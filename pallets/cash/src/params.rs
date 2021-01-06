@@ -12,7 +12,7 @@ pub const MIN_NEXT_SYNC_TIME: u32 = 24 * 60 * 60 * 1000; // XXX
 pub const MIN_VALIDATOR_COUNT: u32 = 4; // XXX needed? in the way of dev?
 
 /// Minimum value (USD) required across all protocol interactions.
-pub const MIN_TX_VALUE: Quantity<{ Symbol::USD }> = Quantity(1); // XXX Quantity::from_nominal(1)? can be const?
+pub const MIN_TX_VALUE: Quantity<{ Symbol::USD }> = Quantity::from_nominal(1.0);
 
 /// Flat transfer fee (CASH).
-pub const TRANSFER_FEE: Quantity<{ Symbol::CASH }> = Quantity(10000); // XXX 0.01 from nominal
+pub const TRANSFER_FEE: Quantity<{ Symbol::CASH }> = Quantity::from_nominal(0.01);
