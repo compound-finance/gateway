@@ -7,7 +7,7 @@
 extern crate alloc;
 extern crate ethereum_client;
 
-use codec::{alloc::string::String, Decode, Encode};
+use codec::{alloc::string::String, Decode};
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
@@ -24,12 +24,16 @@ use sp_runtime::{
     transaction_validity::{
         InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
     },
-    RuntimeDebug, SaturatedConversion,
+    SaturatedConversion,
 };
 
 use crate::chains::{Chain, ChainId, Ethereum};
-use crate::core::{Account, Asset, Symbol};
-use crate::notices::{Notice, NoticeId};
+use crate::core::{
+    Account, Asset, EventStatus, GenericAccount, GenericAsset, GenericMsg, GenericPrice,
+    GenericQty, GenericSigs, Index, Nonce, NoticeStatus, Reason, SignedPayload, Symbol, Timestamp,
+    ValidatorGenesisConfig, ValidatorSet, ValidatorSig, APR,
+};
+use crate::notices::{Notice, NoticeId}; // XXX move to core?
 
 mod chains;
 mod core;
@@ -43,92 +47,6 @@ mod mock;
 mod oracle;
 #[cfg(test)]
 mod tests;
-
-/// Type for a generic address, potentially on any chain.
-pub type GenericAddr = Vec<u8>;
-
-/// Type for a generic account, tied to one of the possible chains.
-pub type GenericAccount = (ChainId, GenericAddr);
-
-/// Type for a generic asset, tied to one of the possible chains.
-pub type GenericAsset = (ChainId, GenericAddr);
-
-/// Type for a generic encoded message, potentially for any chain.
-pub type GenericMsg = Vec<u8>;
-
-/// Type for a generic signature, potentially for any chain.
-pub type GenericSig = Vec<u8>;
-
-/// Type for a bunch of generic signatures.
-pub type GenericSigs = Vec<GenericSig>;
-
-/// Type for representing a price, potentially for any symbol.
-pub type GenericPrice = u128;
-
-/// Type for representing a quantity, potentially of any symbol.
-pub type GenericQty = u128;
-
-/// Type for representing an annualized rate on Compound Chain.
-pub type APR = u128; // XXX custom rate type?
-
-/// Type for representing a balance index on Compound Chain.
-pub type MultiplicativeIndex = u128; // XXX initial value 1? wrap for safe mul/div?
-
-/// Type for a nonce.
-pub type Nonce = u32;
-
-/// Type for reporting failures for reasons outside of our control.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum Reason {
-    None,
-    MinTxValueNotMet,
-}
-
-/// Type for representing time on Compound Chain.
-pub type Timestamp = u128; // XXX u64?
-
-/// Type for an encoded payload within an extrinsic.
-pub type SignedPayload = Vec<u8>; // XXX
-
-/// Type for signature used to verify that a signed payload comes from a validator.
-pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
-
-/// Type for a public key used to identify a validator.
-pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1?
-
-/// Type for a set of validator identities.
-pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
-
-/// Type for validator set included in the genesis config.
-pub type ValidatorGenesisConfig = Vec<String>;
-
-/// Type for open price feed reporter set included in the genesis config
-pub type ReporterGenesisConfig = Vec<String>;
-
-/// Type for the status of an event on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum EventStatus<C: Chain> {
-    Pending {
-        signers: crate::ValidatorSet,
-    },
-    Failed {
-        hash: C::Hash,
-        reason: crate::Reason,
-    },
-    Done,
-}
-
-/// Type for the status of a notice on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum NoticeStatus<C: Chain> {
-    Missing,
-    Pending {
-        signers: crate::ValidatorSet,
-        signatures: GenericSigs,
-        notice: Notice<C>,
-    },
-    Done,
-}
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
@@ -156,10 +74,10 @@ decl_storage! {
         NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
 
         /// An index to track interest owed by CASH borrowers.
-        CashCostIndex get(fn cash_cost_index): MultiplicativeIndex;
+        CashCostIndex get(fn cash_cost_index): Index;
 
         /// An index to track interest earned by CASH holders.
-        CashYieldIndex get(fn cash_yield_index): MultiplicativeIndex;
+        CashYieldIndex get(fn cash_yield_index): Index;
 
         /// The upcoming base rate change for CASH and when, if any.
         CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
@@ -171,12 +89,12 @@ decl_storage! {
         CashSpread get(fn cash_spread): APR;
 
         /// An index to track interest owed by asset borrowers.
-        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => MultiplicativeIndex;
+        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => Index;
 
         /// An index to track interest earned by asset suppliers.
-        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => MultiplicativeIndex;
+        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => Index;
 
-        // XXX
+        // XXX doc
         ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => GenericQty;
         // TotalCashHoldPrincipal;
         // TotalCashBorrowPrincipal;
