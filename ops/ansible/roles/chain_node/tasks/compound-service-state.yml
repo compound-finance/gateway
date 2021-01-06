@@ -1,4 +1,0 @@
-
-- name: restart Compound Chain
-  systemd: 'state={{ compound_service_state }} name=compound-chain daemon_reload=yes'
-  become: true

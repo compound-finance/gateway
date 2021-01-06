@@ -1,6 +1,0 @@
-
-- hosts:
-    - full_node
-    - authority_node
-  roles:
-    - chain_node

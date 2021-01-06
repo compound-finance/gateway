@@ -11,20 +11,3 @@
 
 # The cache for chain data in container
 .local
-
-# Terraform ignores
-**/.terraform*
-**/*.hcl
-**/*.tfstate*
-ops/**/hosts
-ops/**/ssh_config
-ops/deployment*
-**/*.log
-
-# Just for integration test
-node_modules
-integration/chainSpec.json
-integration/*.xml
-
-# Builds Ethereum contracts
-ethereum/.build/contracts.json

@@ -27,13 +27,6 @@ pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
     let eth_lock_event_topic = String::from_utf8(config.get_eth_lock_event_topic())
         .map_err(|e| anyhow::anyhow!("Error reading `eth_lock_event_topic` from config {:?}", e))?;
 
-    debug::native::print!(
-        "eth_rpc_url={}, starport_address={}, lock_event_topic={}",
-        eth_rpc_url,
-        eth_starport_address,
-        eth_lock_event_topic
-    );
-
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
         debug::native::error!("fetch_events error: {:?}", e);
