@@ -285,7 +285,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.0",
+ "pin-project-lite 0.2.1",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -862,9 +862,9 @@ dependencies = [
 
 [[package]]
 name = "const_fn"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd51eab21ab4fd6a3bf889e2d0958c0a6e3a61ad04260325e919e652a2a62826"
+checksum = "28b9d6de7f49e22cf97ad17fc4036ece69300032f45f78f30b4a4482cdc3f4a6"
 
 [[package]]
 name = "constant_time_eq"
@@ -1607,7 +1607,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "fork-tree"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
 ]
@@ -1625,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -1643,7 +1643,7 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking-cli"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "Inflector",
  "chrono",
@@ -1666,7 +1666,7 @@ dependencies = [
 [[package]]
 name = "frame-executive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -1682,7 +1682,7 @@ dependencies = [
 [[package]]
 name = "frame-metadata"
 version = "12.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "serde",
@@ -1693,7 +1693,7 @@ dependencies = [
 [[package]]
 name = "frame-support"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "bitflags",
  "frame-metadata",
@@ -1718,7 +1718,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support-procedural-tools",
  "proc-macro2",
@@ -1729,7 +1729,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural-tools"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support-procedural-tools-derive",
  "proc-macro-crate",
@@ -1741,7 +1741,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural-tools-derive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1751,7 +1751,7 @@ dependencies = [
 [[package]]
 name = "frame-system"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "impl-trait-for-tuples",
@@ -1767,7 +1767,7 @@ dependencies = [
 [[package]]
 name = "frame-system-benchmarking"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -1781,7 +1781,7 @@ dependencies = [
 [[package]]
 name = "frame-system-rpc-runtime-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -1919,7 +1919,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.2.0",
+ "pin-project-lite 0.2.1",
  "waker-fn",
 ]
 
@@ -1976,7 +1976,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -2363,7 +2363,7 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "socket2",
  "tokio 0.2.24",
  "tower-service",
@@ -2873,7 +2873,7 @@ dependencies = [
  "libp2p-yamux",
  "parity-multiaddr",
  "parking_lot 0.11.1",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "smallvec 1.6.0",
  "wasm-timer",
 ]
@@ -2898,7 +2898,7 @@ dependencies = [
  "multistream-select",
  "parity-multiaddr",
  "parking_lot 0.11.1",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "prost",
  "prost-build",
  "rand 0.7.3",
@@ -3131,7 +3131,7 @@ checksum = "6ce3374f3b28162db9d3442c9347c4f14cb01e8290052615c7d341d40eae0599"
 dependencies = [
  "futures 0.3.8",
  "log",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "rand 0.7.3",
  "salsa20",
  "sha3",
@@ -3622,7 +3622,7 @@ dependencies = [
  "bytes 0.5.6",
  "futures 0.3.8",
  "log",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "smallvec 1.6.0",
  "unsigned-varint",
 ]
@@ -3907,7 +3907,7 @@ dependencies = [
 [[package]]
 name = "pallet-authorship"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -3922,7 +3922,7 @@ dependencies = [
 [[package]]
 name = "pallet-babe"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -3947,7 +3947,7 @@ dependencies = [
 [[package]]
 name = "pallet-balances"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -3985,7 +3985,7 @@ dependencies = [
 [[package]]
 name = "pallet-grandpa"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -4006,7 +4006,7 @@ dependencies = [
 [[package]]
 name = "pallet-randomness-collective-flip"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4019,7 +4019,7 @@ dependencies = [
 [[package]]
 name = "pallet-session"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4039,7 +4039,7 @@ dependencies = [
 [[package]]
 name = "pallet-sudo"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4053,7 +4053,7 @@ dependencies = [
 [[package]]
 name = "pallet-timestamp"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -4071,7 +4071,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -4088,7 +4088,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment-rpc"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
@@ -4106,7 +4106,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment-rpc-runtime-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -4465,11 +4465,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ccc2237c2c489783abd8c4c80e5450fc0e98644555b1364da68cc29aa151ca7"
+checksum = "5a83804639aad6ba65345661744708855f9fbcb71176ea8d28d05aeb11d975e7"
 dependencies = [
- "pin-project-internal 1.0.2",
+ "pin-project-internal 1.0.3",
 ]
 
 [[package]]
@@ -4485,9 +4485,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8e8d2bf0b23038a4424865103a4df472855692821aab4e4f5c3312d461d9e5f"
+checksum = "b7bcc46b8f73443d15bc1c5fecbb315718491fa9187fa483f0e359323cde8b3a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4502,9 +4502,9 @@ checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b063f57ec186e6140e2b8b6921e5f1bd89c7356dda5b33acc5401203ca6131c"
+checksum = "e36743d754ccdf9954c2e352ce2d4b106e024c814f6499c2dadff80da9a442d8"
 
 [[package]]
 name = "pin-utils"
@@ -5279,7 +5279,7 @@ dependencies = [
 [[package]]
 name = "sc-basic-authorship"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -5302,7 +5302,7 @@ dependencies = [
 [[package]]
 name = "sc-block-builder"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sc-client-api",
@@ -5319,7 +5319,7 @@ dependencies = [
 [[package]]
 name = "sc-chain-spec"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -5340,7 +5340,7 @@ dependencies = [
 [[package]]
 name = "sc-chain-spec-derive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -5351,7 +5351,7 @@ dependencies = [
 [[package]]
 name = "sc-cli"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "atty",
  "chrono",
@@ -5394,7 +5394,7 @@ dependencies = [
 [[package]]
 name = "sc-cli-proc-macro"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -5405,7 +5405,7 @@ dependencies = [
 [[package]]
 name = "sc-client-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "fnv",
@@ -5439,7 +5439,7 @@ dependencies = [
 [[package]]
 name = "sc-client-db"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "blake2-rfc",
  "hash-db",
@@ -5469,7 +5469,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "sc-client-api",
  "sp-blockchain",
@@ -5480,7 +5480,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-babe"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "fork-tree",
@@ -5525,7 +5525,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-babe-rpc"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -5549,7 +5549,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-epochs"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "fork-tree",
  "parity-scale-codec",
@@ -5562,7 +5562,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-slots"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -5588,7 +5588,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-uncles"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "sc-client-api",
@@ -5602,7 +5602,7 @@ dependencies = [
 [[package]]
 name = "sc-executor"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "lazy_static",
@@ -5631,7 +5631,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-common"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "parity-scale-codec",
@@ -5647,7 +5647,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-wasmi"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -5662,7 +5662,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-wasmtime"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -5680,7 +5680,7 @@ dependencies = [
 [[package]]
 name = "sc-finality-grandpa"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "finality-grandpa",
@@ -5717,7 +5717,7 @@ dependencies = [
 [[package]]
 name = "sc-finality-grandpa-rpc"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "finality-grandpa",
@@ -5741,7 +5741,7 @@ dependencies = [
 [[package]]
 name = "sc-informant"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "ansi_term 0.12.1",
  "futures 0.3.8",
@@ -5759,7 +5759,7 @@ dependencies = [
 [[package]]
 name = "sc-keystore"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5779,7 +5779,7 @@ dependencies = [
 [[package]]
 name = "sc-light"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "hash-db",
  "lazy_static",
@@ -5798,7 +5798,7 @@ dependencies = [
 [[package]]
 name = "sc-network"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "async-std",
  "async-trait",
@@ -5851,7 +5851,7 @@ dependencies = [
 [[package]]
 name = "sc-network-gossip"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -5866,7 +5866,7 @@ dependencies = [
 [[package]]
 name = "sc-offchain"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "bytes 0.5.6",
  "fnv",
@@ -5893,7 +5893,7 @@ dependencies = [
 [[package]]
 name = "sc-peerset"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "libp2p",
@@ -5906,7 +5906,7 @@ dependencies = [
 [[package]]
 name = "sc-proposer-metrics"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "substrate-prometheus-endpoint",
@@ -5915,7 +5915,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "hash-db",
@@ -5949,7 +5949,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-api"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -5973,7 +5973,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-server"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.1.30",
  "jsonrpc-core",
@@ -5991,7 +5991,7 @@ dependencies = [
 [[package]]
 name = "sc-service"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "directories 3.0.1",
  "exit-future",
@@ -6055,7 +6055,7 @@ dependencies = [
 [[package]]
 name = "sc-service-test"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "fdlimit",
  "futures 0.1.30",
@@ -6092,7 +6092,7 @@ dependencies = [
 [[package]]
 name = "sc-state-db"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -6107,7 +6107,7 @@ dependencies = [
 [[package]]
 name = "sc-sync-state-rpc"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
@@ -6127,7 +6127,7 @@ dependencies = [
 [[package]]
 name = "sc-telemetry"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -6148,7 +6148,7 @@ dependencies = [
 [[package]]
 name = "sc-tracing"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "ansi_term 0.12.1",
  "erased-serde",
@@ -6172,7 +6172,7 @@ dependencies = [
 [[package]]
 name = "sc-transaction-graph"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -6194,7 +6194,7 @@ dependencies = [
 [[package]]
 name = "sc-transaction-pool"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-diagnose",
@@ -6651,7 +6651,7 @@ dependencies = [
 [[package]]
 name = "sp-allocator"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "sp-core",
@@ -6663,7 +6663,7 @@ dependencies = [
 [[package]]
 name = "sp-api"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "hash-db",
  "parity-scale-codec",
@@ -6679,7 +6679,7 @@ dependencies = [
 [[package]]
 name = "sp-api-proc-macro"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "blake2-rfc",
  "proc-macro-crate",
@@ -6691,7 +6691,7 @@ dependencies = [
 [[package]]
 name = "sp-application-crypto"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "serde",
@@ -6703,7 +6703,7 @@ dependencies = [
 [[package]]
 name = "sp-arithmetic"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "integer-sqrt",
  "num-traits",
@@ -6716,7 +6716,7 @@ dependencies = [
 [[package]]
 name = "sp-authorship"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-inherents",
@@ -6727,7 +6727,7 @@ dependencies = [
 [[package]]
 name = "sp-block-builder"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -6739,7 +6739,7 @@ dependencies = [
 [[package]]
 name = "sp-blockchain"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "log",
@@ -6757,7 +6757,7 @@ dependencies = [
 [[package]]
 name = "sp-chain-spec"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "serde",
  "serde_json",
@@ -6766,7 +6766,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-timer 3.0.2",
@@ -6792,7 +6792,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-aura"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -6806,7 +6806,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-babe"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "merlin",
  "parity-scale-codec",
@@ -6826,7 +6826,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-slots"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-runtime",
@@ -6835,7 +6835,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-vrf"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "schnorrkel",
@@ -6847,7 +6847,7 @@ dependencies = [
 [[package]]
 name = "sp-core"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "base58",
  "blake2-rfc",
@@ -6891,7 +6891,7 @@ dependencies = [
 [[package]]
 name = "sp-database"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "kvdb",
  "parking_lot 0.10.2",
@@ -6900,7 +6900,7 @@ dependencies = [
 [[package]]
 name = "sp-debug-derive"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6910,7 +6910,7 @@ dependencies = [
 [[package]]
 name = "sp-externalities"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "environmental",
  "parity-scale-codec",
@@ -6921,7 +6921,7 @@ dependencies = [
 [[package]]
 name = "sp-finality-grandpa"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "finality-grandpa",
  "log",
@@ -6938,7 +6938,7 @@ dependencies = [
 [[package]]
 name = "sp-inherents"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "parking_lot 0.10.2",
@@ -6950,7 +6950,7 @@ dependencies = [
 [[package]]
 name = "sp-io"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "hash-db",
@@ -6974,7 +6974,7 @@ dependencies = [
 [[package]]
 name = "sp-keyring"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "lazy_static",
  "sp-core",
@@ -6985,7 +6985,7 @@ dependencies = [
 [[package]]
 name = "sp-keystore"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -7002,7 +7002,7 @@ dependencies = [
 [[package]]
 name = "sp-offchain"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "sp-api",
  "sp-core",
@@ -7012,7 +7012,7 @@ dependencies = [
 [[package]]
 name = "sp-panic-handler"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "backtrace",
 ]
@@ -7020,7 +7020,7 @@ dependencies = [
 [[package]]
 name = "sp-rpc"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "serde",
  "sp-core",
@@ -7029,7 +7029,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "either",
  "hash256-std-hasher",
@@ -7050,7 +7050,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -7067,7 +7067,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface-proc-macro"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "Inflector",
  "proc-macro-crate",
@@ -7079,7 +7079,7 @@ dependencies = [
 [[package]]
 name = "sp-serializer"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "serde",
  "serde_json",
@@ -7088,7 +7088,7 @@ dependencies = [
 [[package]]
 name = "sp-session"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -7101,7 +7101,7 @@ dependencies = [
 [[package]]
 name = "sp-staking"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "parity-scale-codec",
  "sp-runtime",
@@ -7111,7 +7111,7 @@ dependencies = [
 [[package]]
 name = "sp-state-machine"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "hash-db",
  "log",
@@ -7133,12 +7133,12 @@ dependencies = [
 [[package]]
 name = "sp-std"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 
 [[package]]
 name = "sp-storage"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "impl-serde",
  "parity-scale-codec",
@@ -7151,7 +7151,7 @@ dependencies = [
 [[package]]
 name = "sp-tasks"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "sp-core",
@@ -7164,7 +7164,7 @@ dependencies = [
 [[package]]
 name = "sp-timestamp"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -7178,7 +7178,7 @@ dependencies = [
 [[package]]
 name = "sp-tracing"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -7191,7 +7191,7 @@ dependencies = [
 [[package]]
 name = "sp-transaction-pool"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "derive_more",
  "futures 0.3.8",
@@ -7207,7 +7207,7 @@ dependencies = [
 [[package]]
 name = "sp-trie"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "hash-db",
  "memory-db",
@@ -7221,7 +7221,7 @@ dependencies = [
 [[package]]
 name = "sp-utils"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "futures-core",
@@ -7233,7 +7233,7 @@ dependencies = [
 [[package]]
 name = "sp-version"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "impl-serde",
  "parity-scale-codec",
@@ -7245,7 +7245,7 @@ dependencies = [
 [[package]]
 name = "sp-wasm-interface"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -7424,7 +7424,7 @@ dependencies = [
 [[package]]
 name = "substrate-build-script-utils"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "platforms",
 ]
@@ -7432,7 +7432,7 @@ dependencies = [
 [[package]]
 name = "substrate-frame-rpc-system"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "frame-system-rpc-runtime-api",
  "futures 0.3.8",
@@ -7455,7 +7455,7 @@ dependencies = [
 [[package]]
 name = "substrate-prometheus-endpoint"
 version = "0.8.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "async-std",
  "derive_more",
@@ -7469,7 +7469,7 @@ dependencies = [
 [[package]]
 name = "substrate-test-client"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.1.30",
  "futures 0.3.8",
@@ -7496,7 +7496,7 @@ dependencies = [
 [[package]]
 name = "substrate-test-runtime"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "cfg-if 0.1.10",
  "frame-executive",
@@ -7538,7 +7538,7 @@ dependencies = [
 [[package]]
 name = "substrate-test-runtime-client"
 version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "futures 0.3.8",
  "parity-scale-codec",
@@ -7559,7 +7559,7 @@ dependencies = [
 [[package]]
 name = "substrate-wasm-builder"
 version = "3.0.0"
-source = "git+https://github.com/compound-finance/substrate.git?branch=hayesgm/updated#30009d9c995c3509be745b42ed8b968ca98395d7"
+source = "git+https://github.com/compound-finance/substrate.git#a2ee0b414f29ce558155dac5cbf78b40723bcc73"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
@@ -7585,9 +7585,9 @@ checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.57"
+version = "1.0.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4211ce9909eb971f111059df92c45640aad50a619cf55cd76476be803c4c68e6"
+checksum = "cc60a3d73ea6594cd712d830cc1f0390fd71542d8c8cd24e70cc54cdfd5e05d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8103,7 +8103,7 @@ checksum = "9f47026cdc4080c07e49b37087de021820269d996f581aac150ef9e5583eefe3"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
- "pin-project-lite 0.2.0",
+ "pin-project-lite 0.2.1",
  "tracing-attributes",
  "tracing-core",
 ]
@@ -8183,12 +8183,12 @@ dependencies = [
 
 [[package]]
 name = "trie-db"
-version = "0.22.1"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e55f7ace33d6237e14137e386f4e1672e2a5c6bbc97fef9f438581a143971f0"
+checksum = "5cc176c377eb24d652c9c69c832c832019011b6106182bf84276c66b66d5c9a6"
 dependencies = [
  "hash-db",
- "hashbrown 0.8.2",
+ "hashbrown 0.9.1",
  "log",
  "rustc-hex",
  "smallvec 1.6.0",
