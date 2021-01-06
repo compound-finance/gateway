@@ -64,33 +64,120 @@ jobs:
           files: unit-test-results.xml
         continue-on-error: true
 
+  integration-tests:
+    name: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Note for ${{ github.ref }}
+        run: |
+          echo Integration testing ${GITHUB_REF}...
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      # TODO: cache this step somehow if necessary?
+      #  could use parity/substrate image maybe but requires entrypoint on every step
+      - name: Substrate setup
+        run: |
+          ./scripts/get_substrate.sh --fast
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v1.0.1
+    
+      - name: Install yarn ethereum dependencies
+        run: cd ethereum && yarn install
+      
+      - name: Install integration test ethereum dependencies
+        run: cd integration && yarn install
+
+      - name: Install solc
+        run: |
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
+          sudo chmod +x /usr/local/bin/solc
+
+      - name: Compile Ethereum contracts
+        run: |
+          cd ethereum
+          yarn compile
+
+      - name: Build Compound Chain
+        run: |
+          cargo +nightly build --release
+
+      - name: Run Integration Test
+        run: |
+          cd integration
+          npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
+          test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
+          echo "::set-output name=test_url::$test_url"
+        id: int_test
+
+      - name: Link to Integration Results
+        uses: unsplash/comment-on-pr@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          msg: "🫖 [View Integration Test Results](${{steps.int_test.outputs.test_url}})"
+          check_for_duplicate_msg: false
+        continue-on-error: true
+
+      - name: Upload Integration Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Integration Test Results
+          path: integration/junit.xml
+        continue-on-error: true
+
+      - name: Publish Integration Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1.6
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: integration/junit.xml
+        continue-on-error: true
+
   eth-tests:
     name: eth-tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ethereum
+
     strategy:
       matrix:
         node-version: [12.x]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Use Node.js
-      uses: actions/setup-node@v1
-      with:
-        node-version: '12.x'
-    - uses: actions/cache@v2
-      with:
-        path: '**/node_modules'
-        key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+      - uses: actions/checkout@v2
 
-    - name: Install dependencies
-      run: yarn install
-    - name: Install solc
-      run:
-        |
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Install solc
+        run: |
           sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
           sudo chmod +x /usr/local/bin/solc
-    - name: Run tests
-      run: yarn test
+
+      - name: Run tests
+        run: yarn test

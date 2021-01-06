@@ -29,7 +29,7 @@ use sp_runtime::{
 
 use crate::amount::CashAmount;
 use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
-use crate::core::AccountId;
+use crate::core::ChainAccount;
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 
 mod amount;
@@ -128,10 +128,10 @@ decl_storage! {
         // SupplyPrincipal[account];
 
         /// The last used nonce for each account, initialized at zero.
-        Nonces get(fn nonces): map hasher(blake2_128_concat) AccountId => Nonce;
+        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
         // XXX delete me (part of magic extract)
-        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountId => Option<CashAmount>;
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<CashAmount>;
 
         /// Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
@@ -161,7 +161,7 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX
-        MagicExtract(CashAmount, AccountId, Notice<Ethereum>),
+        MagicExtract(CashAmount, ChainAccount, Notice<Ethereum>),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -238,7 +238,7 @@ decl_module! {
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn magic_extract(origin, account: AccountId, amount: CashAmount) -> dispatch::DispatchResult {
+        pub fn magic_extract(origin, account: ChainAccount, amount: CashAmount) -> dispatch::DispatchResult {
             let () = ensure_none(origin)?;
 
             // Update storage -- TODO: increment this-- sure why not?
@@ -258,8 +258,10 @@ decl_module! {
             };
             EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
-            // Emit an event.
+            // Emit an event or two.
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
             Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice.id(), notices::encode_ethereum_notice(notice), vec![])); // XXX signatures
+
             // Return a successful DispatchResult
             Ok(())
         }
@@ -573,6 +575,13 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     // Note that sometimes it's better to keep it for yourself (if you are the block
                     // producer), since for instance in some schemes others may copy your solution and
                     // claim a reward.
+                    .propagate(true)
+                    .build()
+            }
+            Call::magic_extract(_account, _amount) => {
+                ValidTransaction::with_tag_prefix("CashPallet")
+                    .longevity(10)
+                    .and_provides("magic")
                     .propagate(true)
                     .build()
             }
