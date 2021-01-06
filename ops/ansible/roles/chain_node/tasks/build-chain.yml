@@ -1,0 +1,59 @@
+
+- name: use deploy key if set
+  when: lookup('env', 'deploy_key') != ""
+  block:
+    - name: check for deploy key
+      debug:
+        msg: "'{{ lookup('env', 'deploy_key') }}' is the deploy key environment variable."
+
+    - name: add deploy key
+      copy:
+        src:  "{{ lookup('env', 'deploy_key') }}"
+        dest: '{{ git_deploy_key }}'
+        mode: '0400'
+  tags:
+    - build-chain
+
+# TODO: how to handle missing deploy key?
+- name: checkout compound chain
+  git:
+    repo: '{{ git_repo }}'
+    dest: '{{ compound_chain_home }}'
+    version: '{{ git_branch }}'
+    key_file: '{{ git_deploy_key }}'
+    accept_hostkey: yes
+  tags:
+    - build-chain
+    - rebuild-chain
+
+- name: compile compound chain
+  command:
+    cmd: '{{ cargo_bin }} +nightly build --release'
+    chdir: '{{ compound_chain_home }}'
+  async: 3600
+  poll: 0
+  register: compound_chain
+  tags:
+    - build-chain
+    - rebuild-chain
+
+- name: compile compound chain - check async status
+  async_status: jid={{ compound_chain.ansible_job_id }}
+  register: job_result
+  until: job_result.finished
+  retries: 1000
+  delay: 10
+  tags:
+    - build-chain
+    - rebuild-chain
+
+- name: change compound-chain bin owner to compound
+  file:
+    path: '{{ compound_chain_bin }}'
+    owner: compound
+    group: compound
+    mode: '0744'
+    state: file
+  become: true
+  tags:
+    - build-chain

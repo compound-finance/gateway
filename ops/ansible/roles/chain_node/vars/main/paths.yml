@@ -1,0 +1,9 @@
+
+rustup_init_url: https://sh.rustup.rs
+cargo_home: "{{ ansible_env.HOME }}/.cargo"
+cargo_bin_dir: "{{ cargo_home }}/bin"
+cargo_bin: "{{ cargo_bin_dir }}/cargo"
+subkey_bin: "{{ cargo_bin_dir }}/subkey"
+rustup_home: "{{ cargo_home }}/bin/rustup"
+compound_chain_home: "{{ ansible_env.HOME }}/compound_chain"
+compound_chain_bin: "{{ ansible_env.HOME }}/compound_chain/target/release/compound-chain"

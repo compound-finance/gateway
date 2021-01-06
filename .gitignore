@@ -11,3 +11,12 @@
 
 # The cache for chain data in container
 .local
+
+# Terraform ignores
+**/.terraform*
+**/*.hcl
+**/*.tfstate*
+ops/**/hosts
+ops/**/ssh_config
+ops/deployment*
+**/*.log
