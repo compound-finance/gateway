@@ -577,14 +577,14 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     // claim a reward.
                     .propagate(true)
                     .build()
-            },
+            }
             Call::magic_extract(_account, _amount) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
                     .and_provides("magic")
                     .propagate(true)
                     .build()
-            },
+            }
             _ => InvalidTransaction::Call.into(),
         }
     }
