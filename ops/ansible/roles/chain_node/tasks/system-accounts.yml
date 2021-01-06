@@ -1,0 +1,17 @@
+
+- name: add compound group
+  group:
+    name: compound
+  become: true
+  tags:
+    system-accounts
+
+- name: add compound user
+  user:
+    name: compound
+    comment: Compound User
+    group: compound
+  become: true
+  tags:
+    system-accounts
+

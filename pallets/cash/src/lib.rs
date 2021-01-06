@@ -30,7 +30,7 @@ use sp_runtime::{
 
 use crate::amount::{Amount, CashAmount};
 use crate::chains::{Chain, ChainId, Ethereum, EventStatus}; // XXX events mod?
-use crate::core::{AccountId, AssetId};
+use crate::core::{ChainAccount, ChainAsset};
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 use our_std::convert::TryFrom;
 
@@ -134,10 +134,10 @@ decl_storage! {
         // SupplyPrincipal[account];
 
         /// The last used nonce for each account, initialized at zero.
-        Nonces get(fn nonces): map hasher(blake2_128_concat) AccountId => Nonce;
+        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
         // XXX delete me (part of magic extract)
-        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) AccountId => Option<CashAmount>;
+        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<CashAmount>;
 
         /// Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
@@ -146,13 +146,13 @@ decl_storage! {
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
         /// Mapping of assets to their price.
-        Price get(fn price): map hasher(blake2_128_concat) AssetId => Amount;
+        Price get(fn price): map hasher(blake2_128_concat) ChainAsset => Amount;
 
         /// Mapping of assets to the last time their price was updated.
-        PriceTime get(fn price_time): map hasher(blake2_128_concat) AssetId => Timestamp;
+        PriceTime get(fn price_time): map hasher(blake2_128_concat) ChainAsset => Timestamp;
 
         /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => AssetId;
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => ChainAsset;
 
         /// Eth addresses of price reporters for open oracle
         Reporters get(fn reporters): Vec<[u8; 20]>;
@@ -181,7 +181,7 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX
-        MagicExtract(CashAmount, AccountId, Notice<Ethereum>),
+        MagicExtract(CashAmount, ChainAccount, Notice<Ethereum>),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -271,7 +271,7 @@ decl_module! {
         /// An example dispatchable that takes a singles value as a parameter, writes the value to
         /// storage and emits an event. This function must be dispatched by a signed extrinsic.
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn magic_extract(origin, account: AccountId, amount: CashAmount) -> dispatch::DispatchResult {
+        pub fn magic_extract(origin, account: ChainAccount, amount: CashAmount) -> dispatch::DispatchResult {
             ensure_none(origin)?;
 
             // Update storage -- TODO: increment this-- sure why not?
@@ -291,8 +291,10 @@ decl_module! {
             };
             EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
-            // Emit an event.
+            // Emit an event or two.
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
             Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice.id(), notices::encode_ethereum_notice(notice), vec![])); // XXX signatures
+
             // Return a successful DispatchResult
             Ok(())
         }
@@ -692,6 +694,13 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     // Note that sometimes it's better to keep it for yourself (if you are the block
                     // producer), since for instance in some schemes others may copy your solution and
                     // claim a reward.
+                    .propagate(true)
+                    .build()
+            }
+            Call::magic_extract(_account, _amount) => {
+                ValidTransaction::with_tag_prefix("CashPallet")
+                    .longevity(10)
+                    .and_provides("magic")
                     .propagate(true)
                     .build()
             }

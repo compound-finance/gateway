@@ -347,8 +347,6 @@ pub fn new_full_base(
             "grandpa-voter",
             sc_finality_grandpa::run_grandpa_voter(grandpa_params)?,
         );
-    } else {
-        sc_finality_grandpa::setup_disabled_grandpa(network.clone())?;
     }
 
     // Signal to the "network-worker" to let it make progress

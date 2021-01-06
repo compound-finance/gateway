@@ -1,0 +1,9 @@
+
+compound_user_home: /home/compound
+chain_data_dir: "{{ compound_user_home }}/chain-data"
+node_key_dir: "{{ compound_user_home }}/.keys"
+node_key_priv_file: "{{ node_key_dir }}/node_key"
+node_key_pub_file: "{{ node_key_dir }}/node_key.pub"
+fact_dir: "/etc/ansible/facts.d"
+fact_file: "{{ fact_dir }}/substrate.fact"
+authority: alice

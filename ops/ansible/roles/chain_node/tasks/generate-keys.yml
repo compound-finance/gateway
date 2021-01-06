@@ -1,0 +1,86 @@
+
+- name: check if node key exists
+  stat:
+    path: '{{ node_key_pub_file }}z'
+  register: node_key_exists
+  become: true
+  tags:
+    - node-key
+
+- name: build new node key
+  when: not node_key_exists.stat.exists
+  tags:
+    - node-key
+  block:
+    - name: check if subkey exists
+      stat:
+        path: '{{ subkey_bin }}'
+      register: subkey_exists
+
+    - name: install subkey
+      command: '{{ cargo_bin }} install --force subkey --git https://github.com/paritytech/substrate --version 2.0.0'
+      async: 3600
+      poll: 0
+      register: install_subkey
+      when: not subkey_exists.stat.exists
+
+    - name: install subkey - check async status
+      async_status: jid={{ install_subkey.ansible_job_id }}
+      register: job_result
+      until: job_result.finished
+      retries: 1000
+      delay: 10
+      when: not subkey_exists.stat.exists
+
+    - name: node key directory
+      file:
+        path: '{{ node_key_dir }}'
+        owner: compound
+        group: compound
+        mode: '0755'
+        state: directory
+      become: true
+
+    - name: chown priv node file # compound user needs to read it to boot node
+      file:
+        path: '{{ node_key_priv_file }}'
+        owner: compound
+        group: compound
+        mode: '0400'
+        state: touch
+      become: true
+
+    - name: chown pub node file # less secure perms for pub file
+      file:
+        path: '{{ node_key_pub_file }}'
+        owner: compound
+        group: compound
+        mode: '0644'
+        state: touch
+      become: true
+
+    - name: build node key
+      command: '{{ subkey_bin }} generate-node-key --file {{ node_key_priv_file }}'
+      register: public_key
+      become: true
+
+    - name: store public key file
+      copy: content="{{ public_key.stderr_lines[0] }}" dest={{ node_key_pub_file }}
+      become: true
+
+    - name: facts directory
+      file:
+        path: '{{ fact_dir }}'
+        state: directory
+      become: true
+
+    # TODO: is this the right way to store a public key as a fact?
+    - name: store public key fact
+      copy: content="[compound_chain]\npublic_key={{ public_key.stderr_lines[0] }}" dest={{ fact_file }}
+      become: true
+
+    - name: re-read facts after adding public key fact
+      ansible.builtin.setup:
+        filter: ansible_local
+
+    # TODO: Generate passwords, too.

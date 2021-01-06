@@ -1,0 +1,18 @@
+
+Host *
+  ForwardAgent yes
+
+Host {bastion}
+  User ubuntu
+  ForwardAgent yes
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ControlPath ~/.ssh/cm-%r@%h:%p
+  ControlMaster auto
+  ControlPersist 10m
+
+Host 10.0.*
+  User ubuntu
+  ProxyJump {bastion}
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null

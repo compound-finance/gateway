@@ -1,0 +1,57 @@
+{
+  "ChainId": {
+    "_enum": [
+      "Eth",
+      "Dot",
+      "Sol",
+      "Tez"
+    ]
+  },
+  "Address": "Vec<u8>",
+  "ChainAccount": {
+    "chain": "ChainId",
+    "account": "Address"
+  },
+  "CashAmount": "u128",
+  "Notice": {
+    "_enum": {
+      "ExtractionNotice": "ExtractionNotice"
+    }
+  },
+  "ExtractionNotice": {
+    "id": "NoticeId",
+    "parent": "[u8; 32]",
+    "asset": "[u8; 20]",
+    "account": "[u8; 20]",
+    "amount": "u128"
+  },
+  "Message": "Vec<u8>",
+  "Signature": "Vec<u8>",
+  "Signatures": "Vec<Signature>",
+  "EraId": "u32",
+  "EraIndex": "u32",
+  "NoticeId": "(EraId, EraIndex)",
+  "Reason": {
+    "_enum": ["None"]
+  },
+  "APR": "u128",
+  "Index": "u128",
+  "Timestamp": "u128",
+  "SignedPayload": "Vec<u8>",
+  "ValidatorSig": "[u8; 65]",
+  "ValidatorKey": "[u8; 65]",
+  "ValidatorSet": "Vec<ValidatorKey>",
+  "ValidatorGenesisConfig": "Vec<String>",
+  "EventStatus": {
+    "_enum": {
+      "Pending": {
+        "signers": "ValidatorSet"
+      },
+      "Failed": {
+        "hash": "[u8; 32]",
+        "reason": "Reason"
+      },
+      "Done": {}
+    }
+  }
+}
