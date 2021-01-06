@@ -65,6 +65,8 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     type Call: From<Call<Self>>;
 }
 
+type EthereumAddress = <crate::chains::Ethereum as Chain>::Address;
+
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
         /// The timestamp of the previous block (or defaults to timestamp of the genesis block).
@@ -131,7 +133,7 @@ decl_storage! {
         PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => GenericAsset;
 
         /// Eth addresses of price reporters for open oracle
-        Reporters get(fn reporters): Vec<[u8; 20]>;
+        Reporters get(fn reporters): Vec<EthereumAddress>;
 
         // XXX
         // AssetInfo[asset];
