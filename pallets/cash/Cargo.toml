@@ -33,6 +33,7 @@ anyhow = { version = "1.0", default-features = false }
 our-std = { path = "../../std", default-features = false }
 ethereum-client = { path = "../../ethereum_client", default-features = false }
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
+syn = "=1.0.57" # force syn version
 
 [features]
 default = ['std']
