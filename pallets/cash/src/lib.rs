@@ -259,8 +259,8 @@ decl_module! {
             EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
 
             // Emit an event or two.
+            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
             Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice.id(), notices::encode_ethereum_notice(notice), vec![])); // XXX signatures
-            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice));
 
             // Return a successful DispatchResult
             Ok(())
@@ -564,12 +564,12 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            _ => {
+            Call::process_eth_event(_payload, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     // The transaction is only valid for next 10 blocks. After that it's
                     // going to be revalidated by the pool.
                     .longevity(10)
-                    .and_provides("hello nurse")
+                    .and_provides(signature)
                     // It's fine to propagate that transaction to other peers, which means it can be
                     // created even by nodes that don't produce blocks.
                     // Note that sometimes it's better to keep it for yourself (if you are the block
@@ -577,7 +577,15 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     // claim a reward.
                     .propagate(true)
                     .build()
-            }
+            },
+            Call::magic_extract(_account, _amount) => {
+                ValidTransaction::with_tag_prefix("CashPallet")
+                    .longevity(10)
+                    .and_provides("magic")
+                    .propagate(true)
+                    .build()
+            },
+            _ => InvalidTransaction::Call.into(),
         }
     }
 }
