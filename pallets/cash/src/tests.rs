@@ -136,9 +136,8 @@ fn test_post_price_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         CashModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
-        let eth_chain_addr = CashModule::price_key_mapping("ETH");
-        let eth_price = CashModule::price(&eth_chain_addr);
-        let eth_price_time = CashModule::price_time(&eth_chain_addr);
+        let eth_price = CashModule::price("ETH");
+        let eth_price_time = CashModule::price_time("ETH");
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
     });

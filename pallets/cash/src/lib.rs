@@ -151,13 +151,13 @@ decl_storage! {
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
         /// Mapping of assets to their price.
-        Price get(fn price): map hasher(blake2_128_concat) ChainAsset => u128;
+        Price get(fn price): map hasher(blake2_128_concat) String => u128;
 
         /// Mapping of assets to the last time their price was updated.
-        PriceTime get(fn price_time): map hasher(blake2_128_concat) ChainAsset => Timestamp;
+        PriceTime get(fn price_time): map hasher(blake2_128_concat) String => Timestamp;
 
         /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => ChainAsset;
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) ChainAsset => String;
 
         /// Eth addresses of price reporters for open oracle
         Reporters get(fn reporters): Vec<[u8; 20]>;
@@ -493,14 +493,10 @@ impl<T: Config> Module<T> {
         // note - the API for GET does not return an Option but if the value is not present it
         // returns Default::default(). Thus, we explicitly check if the key for the ticker is supported
         // or not.
-        if !PriceKeyMapping::contains_key(&parsed.key) {
-            return Err(<Error<T>>::OpenOracleError);
-        }
-        let addr = PriceKeyMapping::get(&parsed.key);
 
-        if PriceTime::contains_key(&addr) {
+        if PriceTime::contains_key(&parsed.key) {
             // it has been updated at some point, make sure we are updating to a more recent price
-            let last_updated = PriceTime::get(&addr);
+            let last_updated = PriceTime::get(&parsed.key);
             if parsed.timestamp <= last_updated {
                 return Err(<Error<T>>::OpenOracleError);
             }
@@ -508,8 +504,8 @@ impl<T: Config> Module<T> {
 
         // WARNING begin storage - all checks must happen above
 
-        Price::insert(&addr, parsed.value as u128);
-        PriceTime::insert(&addr, parsed.timestamp as u128);
+        Price::insert(&parsed.key, parsed.value as u128);
+        PriceTime::insert(&parsed.key, parsed.timestamp as u128);
 
         // todo: update storage
         Ok(())
@@ -584,7 +580,7 @@ impl<T: Config> Module<T> {
                 chain: ChainId::Eth,
                 address: decoded,
             };
-            PriceKeyMapping::insert(chain, chain_asset);
+            PriceKeyMapping::insert(chain_asset, ticker);
         }
     }
 
