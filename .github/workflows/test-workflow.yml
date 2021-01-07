@@ -43,8 +43,9 @@ jobs:
           export SKIP_WASM_BUILD=true
           cargo +nightly test -- -Z unstable-options --format json | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
-          test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
-          echo "::set-output name=test_url::$test_url"
+          cat unit-test-results.xml
+          # test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
+          # echo "::set-output name=test_url::$test_url"
           grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./coverage/
           echo "showing coverage files"
           ls -ls ./coverage
