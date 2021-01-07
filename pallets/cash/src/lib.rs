@@ -15,7 +15,10 @@ use frame_system::{
     ensure_none, ensure_signed,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use our_std::{convert::TryInto, vec::Vec};
+use our_std::{
+    convert::{TryFrom, TryInto},
+    vec::Vec,
+};
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
@@ -30,8 +33,8 @@ use sp_runtime::{
 use crate::chains::{Chain, ChainId, Ethereum};
 use crate::core::{
     Account, Asset, EventStatus, GenericAccount, GenericAsset, GenericMsg, GenericPrice,
-    GenericQty, GenericSigs, Index, Nonce, NoticeStatus, Reason, SignedPayload, Symbol, Timestamp,
-    ValidatorGenesisConfig, ValidatorSet, ValidatorSig, APR,
+    GenericQty, GenericSet, GenericSigs, Index, Nonce, NoticeStatus, Reason, ReporterSet,
+    SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
 
@@ -117,17 +120,8 @@ decl_storage! {
         /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
-        /// Mapping of assets to their price.
-        Price get(fn price): map hasher(blake2_128_concat) ChainAsset => Amount;
-
-        /// Mapping of assets to the last time their price was updated.
-        PriceTime get(fn price_time): map hasher(blake2_128_concat) ChainAsset => Timestamp;
-
-        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) String => ChainAsset;
-
         /// Eth addresses of price reporters for open oracle
-        Reporters get(fn reporters): Vec<[u8; 20]>;
+        Reporters get(fn reporters): ReporterSet;
 
         // XXX
         // AssetInfo[asset];
@@ -136,13 +130,19 @@ decl_storage! {
         /// Mapping of latest prices for each asset symbol.
         Prices get(fn prices): map hasher(blake2_128_concat) Symbol => GenericPrice;
 
-        // PriceTime[asset];
+        /// Mapping of assets to the last time their price was updated.
+        PriceTime get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
+
+        // XXX I think the logic for this mapping needs to be inverted so we have prices stored by symbol
+        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) Symbol => GenericAsset;
+
         // PriceReporter;
         // PriceKeyMapping;
     }
     add_extra_genesis {
-        config(validators): ValidatorGenesisConfig;
-        config(reporters): ReporterGenesisConfig;
+        config(validators): GenericSet;
+        config(reporters): GenericSet;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
@@ -465,7 +465,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of validators from the genesis config
-    fn initialize_validators(validators: ValidatorGenesisConfig) {
+    fn initialize_validators(validators: GenericSet) {
         assert!(
             !validators.is_empty(),
             "Validators must be set in the genesis config"
@@ -480,7 +480,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_reporters(reporters: ReporterGenesisConfig) {
+    fn initialize_reporters(reporters: GenericSet) {
         assert!(
             !reporters.is_empty(),
             "Open price feed price reporters must be set in the genesis config"

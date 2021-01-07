@@ -9,7 +9,7 @@ use our_std::{
 };
 
 use crate::{
-    chains::{eth, Chain, ChainId, Compound},
+    chains::{eth, Chain, ChainId, Ethereum},
     notices::Notice, // XXX move here, encoding to chains
     params::MIN_TX_VALUE,
     Config,
@@ -21,6 +21,12 @@ macro_rules! require {
         if !$expr {
             return core::result::Result::Err($reason);
         }
+    };
+}
+
+macro_rules! require_min_tx_value {
+    ($value:expr) => {
+        require!($value >= MIN_TX_VALUE, Reason::MinTxValueNotMet);
     };
 }
 
@@ -62,6 +68,12 @@ pub type GenericPrice = Uint;
 /// Type for representing a quantity, potentially of any symbol.
 pub type GenericQty = Uint;
 
+/// Type for a generic set, for validators/reporters in the genesis config.
+pub type GenericSet = Vec<String>;
+
+/// Type for a set of open price feed reporters.
+pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
+
 /// Type for an encoded payload within an extrinsic.
 pub type SignedPayload = Vec<u8>; // XXX
 
@@ -73,9 +85,6 @@ pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1
 
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
-
-/// Type for validator set included in the genesis config.
-pub type ValidatorGenesisConfig = Vec<String>; // XXX not the right type? can we get rid altogether?
 
 // Type definitions //
 
@@ -165,13 +174,13 @@ pub struct Index(pub Uint);
 
 impl<const S: Symbol> Price<S> {
     pub const fn from_nominal(nominal: f64) -> Self {
-        Price::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint))
+        Price::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint)) // XXX fixme
     }
 }
 
 impl<const S: Symbol> Quantity<S> {
     pub const fn from_nominal(nominal: f64) -> Self {
-        Quantity::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint))
+        Quantity::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint)) // XXX fixme
     }
 }
 
@@ -213,7 +222,7 @@ impl<const S: Symbol> Mul<Quantity<S>> for Price<S> {
     type Output = Quantity<{ Symbol::USD }>;
 
     fn mul(self, rhs: Quantity<S>) -> Self::Output {
-        Quantity(self.0 * rhs.0)
+        Quantity(self.0 * rhs.0) // XXX fixme (S.decimals())
     }
 }
 
@@ -222,7 +231,7 @@ impl<const S: Symbol> Mul<Price<S>> for Quantity<S> {
     type Output = Quantity<{ Symbol::USD }>;
 
     fn mul(self, rhs: Price<S>) -> Self::Output {
-        Quantity(self.0 * rhs.0)
+        Quantity(self.0 * rhs.0) // XXX fixme (S.decimals())
     }
 }
 
@@ -231,7 +240,7 @@ impl<const S: Symbol> Div<Price<S>> for Quantity<{ Symbol::USD }> {
     type Output = Quantity<{ S }>;
 
     fn div(self, rhs: Price<S>) -> Self::Output {
-        Quantity(self.0 / rhs.0)
+        Quantity(self.0 / rhs.0) // XXX fixme (S.decimals())
     }
 }
 
@@ -240,7 +249,7 @@ impl<const S: Symbol> Div<Quantity<S>> for Quantity<{ Symbol::USD }> {
     type Output = Price<S>;
 
     fn div(self, rhs: Quantity<S>) -> Self::Output {
-        Price(self.0 / rhs.0)
+        Price(self.0 / rhs.0) // XXX fixme (S.decimals())
     }
 }
 
@@ -265,20 +274,61 @@ pub fn price<T: Config, const S: Symbol>() -> Price<S> {
 // Protocol interface //
 
 pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason> {
+    // XXX
+    // Pattern match Event:
+    //  When Gov(title:string, extrinsics:bytes[]):
+    //   Decode a SCALE-encoded set of extrinsics from the event
+    //   For each extrinsic, dispatch the given extrinsic as Root
+    //  When Lock(Asset:address, Holder:address, Amount:uint256):
+    //   Build AccountIdent=("eth", account)
+    //   Build AssetIdent=("eth", asset)
+    //   Call lockInternal(AssetIdent, AccountIdent, Amount)
+    //  When LockCash(Account:address, Amount: uint256, CashYieldIndex: uint256):
+    //   Build AccountIdent=("eth", account)
+    //   Call lockCashInternal(AccountIdent, Amount)
     Ok(event) // XXX
 }
 
-pub fn extract_internal<T: Config, C: Chain, const S: Symbol>(
+pub fn lock_internal<T: Config, C: Chain, const S: Symbol>(
     asset: Asset<C>,
-    holder: Account<Compound>,
+    holder: Account<C>,
+    amount: Quantity<S>,
+) -> Result<(), Reason> {
+    // XXX
+    // Read Require AmountPriceAssetParamsMinTxValue
+    // Read Principal =AmountSupplyIndexAsset
+    // Read TotalSupplyNew=TotalSupplyPrincipalAsset+Principal
+    // Read HolderSupplyNew=SupplyPrincipalAsset, Holder+Principal
+    // Set TotalSupplyPrincipalAsset=TotalSupplyNew
+    // Set SupplyPrincipalAsset, Holder=HolderSupplyNew
+    Ok(())
+}
+
+pub fn lock_cash_internal<T: Config, C: Chain>(
+    holder: Account<C>,
+    amount: Quantity<{ Symbol::CASH }>,
+) -> Result<(), Reason> {
+    // XXX
+    // Read Require AmountPriceCASHParamsMinTxValue
+    // Read Principal =AmountCashYieldIndex
+    // Read ChainCashHoldPrincipalNew=TotalCashHoldPrincipalHolder.Chain-Principal
+    // Underflow: ${Sender.Chain} does not have enough total CASH to extract ${Amount}
+    // Read HolderCashHoldPrincipalNew=CashHoldPrincipalHolder+Principal
+    // Set TotalCashHoldPrincipalHolder.Chain=ChainCashHoldPrincipalNew
+    // Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew
+    Ok(())
+}
+
+pub fn extract_principal_internal<T: Config, C: Chain, const S: Symbol>(
+    asset: Asset<C>,
+    holder: Account<C>,
     recipient: Account<C>,
     principal: Quantity<S>,
 ) -> Result<(), Reason> {
     // Require Recipient.Chain=Asset.Chain XXX proven by compiler
     let supply_index = <Module<T>>::supply_index(Into::<GenericAsset>::into(asset));
     let amount = principal * supply_index;
-    let value = amount * price::<T, S>();
-    require!(value >= MIN_TX_VALUE, Reason::MinTxValueNotMet);
+    require_min_tx_value!(amount * price::<T, S>());
 
     // Read Require HasLiquidityToReduceCollateralAsset(Holder, Asset, Amount)
     // ReadsCashBorrowPrincipalBorrower, CashCostIndexPair, CashYield, CashSpread, Price*, SupplyPrincipal*, Borrower, StabilityFactor*
@@ -296,14 +346,13 @@ pub fn extract_internal<T: Config, C: Chain, const S: Symbol>(
 //  probably not, probably inputs should always be fixed width?
 //   actually now I think we can always guarantee to parse ascii numbers in lisp requests into bigints
 pub fn extract_cash_principal_internal<T: Config, C: Chain>(
-    holder: Account<Compound>,
+    holder: Account<C>,
     recipient: Account<C>,
     principal: Quantity<{ Symbol::CASH }>,
 ) -> Result<(), Reason> {
     let yield_index = <Module<T>>::cash_yield_index();
     let amount = principal * yield_index;
-    let value = amount * price::<T, { Symbol::CASH }>();
-    require!(value >= MIN_TX_VALUE, Reason::MinTxValueNotMet);
+    require_min_tx_value!(amount * price::<T, { Symbol::CASH }>());
 
     // Note: we do not check health here, since CASH cannot be borrowed against yet.
     // let chain_cash_hold_principal_new = <Module<T>>::chain_cash_hold_principal(recipient.chain) + amount_principal;

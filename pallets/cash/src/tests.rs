@@ -1,6 +1,5 @@
 use crate::{chains::*, core::*, mock::*, *};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
-use our_std::ops::Deref;
 use sp_core::offchain::testing;
 
 fn andrew() -> GenericAccount {
