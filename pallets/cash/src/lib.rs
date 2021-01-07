@@ -87,8 +87,11 @@ pub type ReporterGenesisConfig = Vec<String>;
 pub type PriceKeyMappingGenesisConfig = Vec<String>;
 
 // OCW storage constants
-pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
-pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
+pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
+pub const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
+pub const OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER: &[u8; 41] =
+    b"cash::latest_price_feed_poll_block_number";
+pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
@@ -447,7 +450,7 @@ decl_module! {
             // a really simple idea to do it once a minute on average is to just use probability
             // and only update the feed every now and then. It is a function of how many validators
             // are running.
-            let result = Self::process_open_price_feed();
+            let result = Self::process_open_price_feed(block_number);
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
             }
@@ -479,9 +482,8 @@ impl<T: Config> Module<T> {
             return Err(<Error<T>>::OpenOracleError);
         }
 
-        // parse message
+        // parse message and check it
         let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
-
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
             parsed.key,
@@ -494,10 +496,18 @@ impl<T: Config> Module<T> {
         if !PriceKeyMapping::contains_key(&parsed.key) {
             return Err(<Error<T>>::OpenOracleError);
         }
+        let addr = PriceKeyMapping::get(&parsed.key);
+
+        if PriceTime::contains_key(&addr) {
+            // it has been updated at some point, make sure we are updating to a more recent price
+            let last_updated = PriceTime::get(&addr);
+            if parsed.timestamp <= last_updated {
+                return Err(<Error<T>>::OpenOracleError);
+            }
+        }
 
         // WARNING begin storage - all checks must happen above
 
-        let addr = PriceKeyMapping::get(&parsed.key);
         Price::insert(&addr, parsed.value as u128);
         PriceTime::insert(&addr, parsed.timestamp as u128);
 
@@ -579,7 +589,26 @@ impl<T: Config> Module<T> {
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed
-    pub fn process_open_price_feed() -> Result<(), Error<T>> {
+    pub fn process_open_price_feed(block_number: T::BlockNumber) -> Result<(), Error<T>> {
+        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_OPEN_PRICE_FEED);
+        if lock.try_lock().is_err() {
+            // working in another thread, no big deal
+            return Ok(());
+        }
+        // check to see if it is time to poll or not
+        let latest_price_feed_poll_block_number_storage =
+            StorageValueRef::persistent(OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER);
+        if let Some(Some(latest_poll_block_number)) =
+            latest_price_feed_poll_block_number_storage.get::<T::BlockNumber>()
+        {
+            let poll_interval_blocks = <T as frame_system::Config>::BlockNumber::from(
+                params::OCW_OPEN_ORACLE_POLL_INTERVAL_BLOCKS,
+            );
+            if block_number - latest_poll_block_number < poll_interval_blocks {
+                return Ok(());
+            }
+        }
+        // poll
         let api_response = cash_err!(
             crate::oracle::open_price_feed_request_okex(),
             <Error<T>>::HttpFetchingError
@@ -596,6 +625,7 @@ impl<T: Config> Module<T> {
                 <Error<T>>::OpenOracleError
             )?;
         }
+        latest_price_feed_poll_block_number_storage.set(&block_number);
         Ok(())
     }
 
@@ -619,7 +649,7 @@ impl<T: Config> Module<T> {
         // Create a reference to Local Storage value.
         // Since the local storage is common for all offchain workers, it's a good practice
         // to prepend our entry with the pallet name.
-        let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_BLOCK);
+        let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_ETHEREUM_BLOCK);
 
         // Local storage is persisted and shared between runs of the offchain workers,
         // offchain workers may run concurrently. We can use the `mutate` function to
@@ -656,7 +686,7 @@ impl<T: Config> Module<T> {
         //   3) `with_block_deadline` - lock with default time but custom block expiration
         //   4) `with_block_and_time_deadline` - lock with custom time and block expiration
         // Here we choose the default one for now.
-        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_KEY);
+        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_ETHEREUM_EVENTS);
 
         // We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
         //   executed by previous run of ocw, so the function just returns.

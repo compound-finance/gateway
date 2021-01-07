@@ -14,3 +14,6 @@ pub const MIN_TX_VALUE: u128 = 1; // XXX how to represent $1?
 
 /// Flat transfer fee (CASH).
 pub const TRANSFER_FEE: f64 = 0.01; // XXX a CashAmount?
+
+/// Number of blocks between HTTP requests via offchain workers to open oracle price reporters
+pub const OCW_OPEN_ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
