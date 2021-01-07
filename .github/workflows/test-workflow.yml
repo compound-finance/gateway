@@ -26,30 +26,30 @@ jobs:
         run: |
           cargo fmt -- --check
 
-      - name: Cargo Test
-        run: |
-          set -eo pipefail
-          cargo +nightly install grcov
-          cargo +nightly install cargo2junit
-          rustup component add llvm-tools-preview
-          export RUSTFLAGS="-Zinstrument-coverage"
-          export SKIP_WASM_BUILD=true
-          cargo +nightly test -- -Z unstable-options --format json | tee unit-test-results.json
-          cat unit-test-results.json | cargo2junit > unit-test-results.xml
-          echo "a"
-          cat unit-test-results.xml
-          echo "b"
-          test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
-          echo "::set-output name=test_url::$test_url"
-          echo "c"
-          grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o lcov.info
-          echo "d"
-          echo "showing coverage files"
-          head lcov.info
-        id: cargo_test
+      # - name: Cargo Test
+      #   run: |
+      #     set -eo pipefail
+      #     cargo +nightly install grcov
+      #     cargo +nightly install cargo2junit
+      #     rustup component add llvm-tools-preview
+      #     export RUSTFLAGS="-Zinstrument-coverage"
+      #     export SKIP_WASM_BUILD=true
+      #     cargo +nightly test -- -Z unstable-options --format json | tee unit-test-results.json
+      #     cat unit-test-results.json | cargo2junit > unit-test-results.xml
+      #     echo "a"
+      #     cat unit-test-results.xml
+      #     echo "b"
+      #     test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
+      #     echo "::set-output name=test_url::$test_url"
+      #     echo "c"
+      #     grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o lcov.info
+      #     echo "d"
+      #     echo "showing coverage files"
+      #     head lcov.info
+      #   id: cargo_test
 
       - name: Coveralls
-        uses: coverallsapp/github-action@master
+        uses: compound-finance/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: lcov.info
