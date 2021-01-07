@@ -780,8 +780,9 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
-            Call::post_price(_, _) => ValidTransaction::with_tag_prefix("CashPallet")
+            Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
+                .and_provides(sig)
                 .propagate(true)
                 .build(),
             _ => InvalidTransaction::Call.into(),
