@@ -84,6 +84,8 @@ pub type ValidatorGenesisConfig = Vec<String>;
 /// Type for open price feed reporter set included in the genesis config
 pub type ReporterGenesisConfig = Vec<String>;
 
+pub type PriceKeyMappingGenesisConfig = Vec<String>;
+
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
 pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
@@ -146,7 +148,7 @@ decl_storage! {
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
         /// Mapping of assets to their price.
-        Price get(fn price): map hasher(blake2_128_concat) ChainAsset => Amount;
+        Price get(fn price): map hasher(blake2_128_concat) ChainAsset => u128;
 
         /// Mapping of assets to the last time their price was updated.
         PriceTime get(fn price_time): map hasher(blake2_128_concat) ChainAsset => Timestamp;
@@ -166,9 +168,11 @@ decl_storage! {
     add_extra_genesis {
         config(validators): ValidatorGenesisConfig;
         config(reporters): ReporterGenesisConfig;
+        config(price_key_mapping): PriceKeyMappingGenesisConfig;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
+            Module::<T>::initialize_price_key_mapping(config.price_key_mapping.clone());
         })
     }
 }
@@ -475,6 +479,7 @@ impl<T: Config> Module<T> {
             return Err(<Error<T>>::OpenOracleError);
         }
 
+        // parse message
         let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
 
         debug::native::info!(
@@ -483,6 +488,19 @@ impl<T: Config> Module<T> {
             (parsed.value as f64) / 1000000.0
         );
         // todo: more sanity checking on the value
+        // note - the API for GET does not return an Option but if the value is not present it
+        // returns Default::default(). Thus, we explicitly check if the key for the ticker is supported
+        // or not.
+        if !PriceKeyMapping::contains_key(&parsed.key) {
+            return Err(<Error<T>>::OpenOracleError);
+        }
+
+        // WARNING begin storage - all checks must happen above
+
+        let addr = PriceKeyMapping::get(&parsed.key);
+        Price::insert(&addr, parsed.value as u128);
+        PriceTime::insert(&addr, parsed.timestamp as u128);
+
         // todo: update storage
         Ok(())
     }
@@ -530,6 +548,34 @@ impl<T: Config> Module<T> {
         let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
             .expect("Could not deserialize validators from genesis config");
         Reporters::put(converted);
+    }
+
+    /// Set the initial set of open price feed price reporters from the genesis config
+    fn initialize_price_key_mapping(price_key_mapping: PriceKeyMappingGenesisConfig) {
+        assert!(
+            !price_key_mapping.is_empty(),
+            "price_key_mapping must be set in the genesis config"
+        );
+
+        for record in price_key_mapping {
+            let mut tokens = record.split(":");
+            let ticker = tokens.next().expect("No ticker present");
+            let chain = tokens.next().expect("No blockchain present");
+            let address = tokens.next().expect("No address present");
+            assert!(
+                tokens.next().is_none(),
+                "Too many colons in price key mapping element"
+            );
+            assert!(chain == "ETH", "Invalid blockchain");
+
+            let decoded = hex::decode(&address).expect("Address is not in hex format");
+
+            let chain_asset = ChainAsset {
+                chain: ChainId::Eth,
+                address: decoded,
+            };
+            PriceKeyMapping::insert(chain, chain_asset);
+        }
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed
