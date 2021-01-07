@@ -38,17 +38,22 @@ fn it_magically_extracts() {
     });
 }
 
-fn initialize_validators() {
+fn initialize_storage() {
     CashModule::initialize_validators(vec![
         "0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba".into(),
         "04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4".into()
     ]);
+    CashModule::initialize_reporters(vec![
+        "85615b076615317c80f14cbad6501eec031cd51c".into(),
+        "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
+    ]);
+    CashModule::initialize_price_key_mapping(vec!["USDC:ETH:deadbeef".into()]);
 }
 
 #[test]
 fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
-        initialize_validators();
+        initialize_storage();
         // Dispatch a signed extrinsic.
         // XXX
         let payload = vec![
@@ -100,7 +105,7 @@ fn correct_error_for_none_value() {
 }
 
 #[test]
-fn test_open_price_feed_request_okex() {
+fn test_process_open_price_feed_happy_path_makes_required_http_call() {
     let calls: Vec<testing::PendingRequest> = vec![testing::PendingRequest {
         method: "GET".into(),
         uri: crate::oracle::OKEX_OPEN_PRICE_FEED_URL.into(),
@@ -116,7 +121,25 @@ fn test_open_price_feed_request_okex() {
     }];
 
     new_test_ext_with_http_calls(calls).execute_with(|| {
-        let opf = crate::oracle::open_price_feed_request_okex().unwrap();
-        // note - open_price_feed_request_okex also runs a sanity check so this test is somewhat comprehensive
+        initialize_storage();
+        CashModule::process_open_price_feed(1u64).unwrap();
+        // sadly, it seems we can not check storage here, but we should at least be able to check that
+        // the OCW attempted to call the post_price extrinsic.. that is a todo
+    });
+}
+
+#[test]
+fn test_post_price_happy_path() {
+    // an eth price message
+    let test_payload = hex::decode("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000002baa48a00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000").unwrap();
+    let test_signature = hex::decode("41a3f89a526dee766049f3699e9e975bfbabda4db677c9f5c41fbcc0730fccb84d08b2208c4ffae0b87bb162e2791cc305ee4e9a1d936f9e6154356154e9a8e9000000000000000000000000000000000000000000000000000000000000001c").unwrap();
+    new_test_ext().execute_with(|| {
+        initialize_storage(); // sets up ETH
+        CashModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
+        let eth_chain_addr = CashModule::price_key_mapping("ETH");
+        let eth_price = CashModule::price(&eth_chain_addr);
+        let eth_price_time = CashModule::price_time(&eth_chain_addr);
+        assert_eq!(eth_price, 732580000);
+        assert_eq!(eth_price_time, 1609340760);
     });
 }
