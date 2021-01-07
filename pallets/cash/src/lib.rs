@@ -238,6 +238,12 @@ decl_error! {
         /// An error related to the oracle
         OpenOracleError,
 
+        /// Open oracle can not parse the signature
+        OpenOracleErrorInvalidSignature,
+
+        /// Open oracle can not parse the signature
+        OpenOracleErrorInvalidReporter,
+
         /// An error related to the chain_spec file contents
         GenesisConfigError,
     }
@@ -472,14 +478,14 @@ impl<T: Config> Module<T> {
         let hashed = compound_crypto::keccak(&payload);
         let recovered = cash_err!(
             compound_crypto::eth_recover(&hashed, &signature),
-            <Error<T>>::OpenOracleError
+            <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
         let reporters = Reporters::get();
         if !reporters
             .iter()
             .any(|e| e.as_slice() == recovered.as_slice())
         {
-            return Err(<Error<T>>::OpenOracleError);
+            return Err(<Error<T>>::OpenOracleErrorInvalidReporter);
         }
 
         // parse message and check it
