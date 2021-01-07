@@ -46,15 +46,16 @@ jobs:
           cat unit-test-results.xml
           # test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
           # echo "::set-output name=test_url::$test_url"
-          grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./coverage/
+          grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o lcov.info
           echo "showing coverage files"
-          ls -ls ./coverage
+          head lcov.info
         id: cargo_test
 
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: lcov.info
 
       - name: Link to Results
         uses: unsplash/comment-on-pr@master
