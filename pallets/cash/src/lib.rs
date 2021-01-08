@@ -244,6 +244,9 @@ decl_error! {
         /// Open oracle can not parse the signature
         OpenOracleErrorInvalidReporter,
 
+        /// Open oracle cannot parse the message
+        OpenOracleErrorInvalidMessage,
+
         /// An error related to the chain_spec file contents
         GenesisConfigError,
     }
@@ -489,7 +492,10 @@ impl<T: Config> Module<T> {
         }
 
         // parse message and check it
-        let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
+        let parsed = cash_err!(
+            oracle::parse_message(&payload),
+            <Error<T>>::OpenOracleErrorInvalidMessage
+        )?;
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
             parsed.key,
