@@ -1,11 +1,10 @@
-use crate::chains::{Chain, Ethereum};
+use crate::{
+    chains::{Chain, Ethereum},
+    core::{Account, Asset},
+    GenericMsg,
+};
 use codec::{Decode, Encode};
 use our_std::{vec::Vec, RuntimeDebug};
-
-// XXX
-pub type Message = Vec<u8>;
-pub type Signature = Vec<u8>; // XXX bunch of Signature types now, rename to avoid confusion?
-pub type Signatures = Vec<Signature>;
 
 pub type EraId = u32;
 pub type EraIndex = u32;
@@ -18,15 +17,15 @@ pub enum Notice<C: Chain> {
     ExtractionNotice {
         id: NoticeId,
         parent: C::Hash,
-        asset: C::Asset,
-        account: C::Account,
+        asset: Asset<C>,
+        account: Account<C>,
         amount: C::Amount,
     },
 
     CashExtractionNotice {
         id: NoticeId,
         parent: C::Hash,
-        account: C::Account,
+        account: Account<C>,
         amount: C::Amount,
         cash_yield_index: C::Index,
     },
@@ -42,7 +41,7 @@ pub enum Notice<C: Chain> {
     SetSupplyCapNotice {
         id: NoticeId,
         parent: C::Hash,
-        asset: C::Asset,
+        asset: Asset<C>,
         amount: C::Amount,
     },
 
@@ -51,17 +50,6 @@ pub enum Notice<C: Chain> {
         parent: C::Hash,
         new_authorities: Vec<C::Address>,
     },
-}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum NoticeStatus<C: Chain> {
-    Missing,
-    Pending {
-        signers: crate::ValidatorSet,
-        signatures: Signatures,
-        notice: Notice<C>,
-    },
-    Done,
 }
 
 impl<C: Chain> Notice<C> {
@@ -76,7 +64,7 @@ impl<C: Chain> Notice<C> {
     }
 }
 
-pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
+pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> GenericMsg {
     // XXX JF: this seems to rely too much on the struct definition
     //  we should be able to simplify this
     let chain_ident: Vec<u8> = "ETH".into(); // XXX make const?
@@ -106,9 +94,9 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
         } => {
             let era_id: Vec<u8> = encode_int32(id.0);
             let era_index: Vec<u8> = encode_int32(id.1);
-            let asset_encoded = encode_addr(asset);
+            let asset_encoded = encode_addr(asset.0);
             let amount_encoded = encode_int128(amount);
-            let account_encoded = encode_addr(account);
+            let account_encoded = encode_addr(account.0);
 
             [
                 chain_ident,
@@ -134,7 +122,7 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
                 encode_int32(id.0),
                 encode_int32(id.1),
                 parent.into(),
-                encode_addr(account),
+                encode_addr(account.0),
                 amount_encoded,
                 encode_int128(cash_yield_index),
             ]
@@ -161,7 +149,7 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
         Notice::SetSupplyCapNotice {
             id,     //: NoticeId,
             parent, //: C::Hash,
-            asset,  //: C::Asset,
+            asset,  //: Asset<C>,
             amount, //: Amount,
         } => {
             let amount_encoded = encode_int128(amount); // XXX cast more safely XXX JF: already converted I think
@@ -170,7 +158,7 @@ pub fn encode_ethereum_notice(notice: Notice<Ethereum>) -> Message {
                 encode_int32(id.0),
                 encode_int32(id.1),
                 parent.into(),
-                encode_addr(asset),
+                encode_addr(asset.0),
                 amount_encoded,
             ]
             .concat()
@@ -206,9 +194,9 @@ mod tests {
         let notice = notices::Notice::ExtractionNotice::<Ethereum> {
             id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
-            asset: [2u8; 20],
+            asset: Asset([2u8; 20]),
             amount: 50,
-            account: [1u8; 20],
+            account: Account([1u8; 20]),
         };
 
         let expected = [
@@ -235,7 +223,7 @@ mod tests {
         let notice = notices::Notice::CashExtractionNotice {
             id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
-            account: [1u8; 20],
+            account: Account([1u8; 20]),
             amount: 55,
             cash_yield_index: 75u128,
         };
@@ -295,7 +283,7 @@ mod tests {
         let notice = notices::Notice::SetSupplyCapNotice {
             id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
             parent: [3u8; 32],
-            asset: [70u8; 20],
+            asset: Asset([70u8; 20]),
             amount: 60,
         };
 
