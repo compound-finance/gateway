@@ -19,9 +19,6 @@ jobs:
         run: |
           ./scripts/get_substrate.sh --fast
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v1.0.1
-
       - name: Cargo fmt
         run: |
           cargo fmt -- --check
@@ -91,8 +88,6 @@ jobs:
         run: |
           ./scripts/get_substrate.sh --fast
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v1.0.1
     
       - name: Install yarn ethereum dependencies
         run: cd ethereum && yarn install
