@@ -250,6 +250,15 @@ decl_error! {
         /// Open oracle cannot update price due to stale price
         OpenOracleErrorStalePrice,
 
+        /// Open oracle cannot fetch price due to an http error
+        OpenOracleHttpFetchError,
+
+        /// Open oracle cannot deserialize the messages and/or signatures from eth encoded hex to binary
+        OpenOracleApiResponseHexError,
+
+        /// Open oracle offchain worker made an attempt to update the price but failed in the extrinsic
+        OpenOraclePostPriceExtrinsicError,
+
         /// An error related to the chain_spec file contents
         GenesisConfigError,
     }
@@ -622,18 +631,18 @@ impl<T: Config> Module<T> {
         // poll
         let api_response = cash_err!(
             crate::oracle::open_price_feed_request_okex(),
-            <Error<T>>::HttpFetchingError
+            <Error<T>>::OpenOracleHttpFetchError
         )?;
         let messages_and_signatures = cash_err!(
             api_response.to_message_signature_pairs(),
-            <Error<T>>::OpenOracleError
+            <Error<T>>::OpenOracleApiResponseHexError
         )?;
         for (msg, sig) in messages_and_signatures {
             // adding some debug info in here, this will become very chatty
             let call = <Call<T>>::post_price(msg, sig);
             cash_err!(
                 SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()),
-                <Error<T>>::OpenOracleError
+                <Error<T>>::OpenOraclePostPriceExtrinsicError
             )?;
         }
         latest_price_feed_poll_block_number_storage.set(&block_number);
