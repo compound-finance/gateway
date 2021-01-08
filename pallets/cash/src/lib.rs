@@ -238,14 +238,17 @@ decl_error! {
         /// An error related to the oracle
         OpenOracleError,
 
-        /// Open oracle can not parse the signature
+        /// Open oracle cannot parse the signature
         OpenOracleErrorInvalidSignature,
 
-        /// Open oracle can not parse the signature
+        /// Open oracle cannot parse the signature
         OpenOracleErrorInvalidReporter,
 
         /// Open oracle cannot parse the message
         OpenOracleErrorInvalidMessage,
+
+        /// Open oracle cannot update price due to stale price
+        OpenOracleErrorStalePrice,
 
         /// An error related to the chain_spec file contents
         GenesisConfigError,
@@ -510,7 +513,7 @@ impl<T: Config> Module<T> {
             // it has been updated at some point, make sure we are updating to a more recent price
             let last_updated = PriceTime::get(&parsed.key);
             if parsed.timestamp <= last_updated {
-                return Err(<Error<T>>::OpenOracleError);
+                return Err(<Error<T>>::OpenOracleErrorStalePrice);
             }
         }
 

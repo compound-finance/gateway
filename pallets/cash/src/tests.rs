@@ -168,3 +168,23 @@ fn test_post_price_invalid_reporter() {
         assert_err!(result, Error::<Test>::OpenOracleErrorInvalidSignature);
     });
 }
+
+#[test]
+fn test_post_price_stale_price() {
+    // an eth price message
+    let test_payload = hex::decode("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000002baa48a00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000").unwrap();
+    let test_signature = hex::decode("41a3f89a526dee766049f3699e9e975bfbabda4db677c9f5c41fbcc0730fccb84d08b2208c4ffae0b87bb162e2791cc305ee4e9a1d936f9e6154356154e9a8e9000000000000000000000000000000000000000000000000000000000000001c").unwrap();
+    new_test_ext().execute_with(|| {
+        initialize_storage(); // sets up ETH
+                              // post once
+        CashModule::post_price(Origin::none(), test_payload.clone(), test_signature.clone())
+            .unwrap();
+        let eth_price = CashModule::price("ETH");
+        let eth_price_time = CashModule::price_time("ETH");
+        assert_eq!(eth_price, 732580000);
+        assert_eq!(eth_price_time, 1609340760);
+        // try to post the same thing again
+        let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
+        assert_err!(result, Error::<Test>::OpenOracleErrorStalePrice);
+    });
+}
