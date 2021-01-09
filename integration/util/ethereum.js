@@ -1,7 +1,6 @@
 const path = require('path');
 const fs = require('fs').promises;
 const ABI = require('web3-eth-abi');
-var Contract = require('web3-eth-contract');
 const { log, error } = require('./log');
 
 let contractsFile = path.join(__dirname, '..', '..', 'ethereum', '.build', 'contracts.json');
@@ -29,7 +28,7 @@ async function deployContract(web3, from, contracts, contractName, args) {
     data: constructorCall
   });
 
-  return new Contract(abi, res.contractAddress);
+  return new web3.eth.Contract(abi, res.contractAddress);
 }
 
 async function deployContracts(web3) {

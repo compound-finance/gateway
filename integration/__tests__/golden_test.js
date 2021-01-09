@@ -12,6 +12,7 @@ const { Keyring } = require('@polkadot/api');
 
 describe('golden path', () => {
   let
+    accounts,
     alice,
     api,
     bob,
@@ -20,78 +21,113 @@ describe('golden path', () => {
     keyring,
     provider,
     ps,
+    starportTopics,
     web3;
 
   beforeEach(async () => {
-    ganacheServer = ganache.server();
-    provider = ganacheServer.provider;
+    try {
+      ganacheServer = ganache.server();
+      provider = ganacheServer.provider;
 
-    let web3Port = genPort();
+      let web3Port = genPort();
 
-    // Start web3 server
-    log(`Starting Ethereum server on ${web3Port}...`);
-    ganacheServer.listen(web3Port);
+      // Start web3 server
+      log(`Starting Ethereum server on ${web3Port}...`);
+      ganacheServer.listen(web3Port);
 
-    web3 = new Web3(provider, null, { transactionConfirmationBlocks: 1 });
+      web3 = new Web3(provider, null, { transactionConfirmationBlocks: 1 });
+      accounts = await web3.eth.personal.getAccounts();
 
-    contracts = await deployContracts(web3);
-    let chainSpecFile = await buildChainSpec({
-      name: 'Integration Test Network',
-      properties: {
-        eth_starport_address: contracts.starport._address
-      },
-      genesis: {
-        runtime: {
-          palletBabe: {
-            authorities: [
-              // Use single well-known authority: Alice
-              [
-                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-                1
-              ]
-            ]
+      contracts = await deployContracts(web3);
+
+      starportTopics = Object.fromEntries(contracts
+        .starport
+        ._jsonInterface
+        .filter(e => e.type === 'event')
+        .map(e => [e.name, e.signature]));
+
+      let chainSpecFile;
+      try {
+        chainSpecFile = await buildChainSpec({
+          name: 'Integration Test Network',
+          properties: {
+            eth_starport_address: contracts.starport._address,
+            eth_lock_event_topic: starportTopics['Lock']
+          },
+          genesis: {
+            runtime: {
+              palletBabe: {
+                authorities: [
+                  // Use single well-known authority: Alice
+                  [
+                    "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+                    1
+                  ]
+                ]
+              }
+            }
           }
-        }
+        }, false);
+      } catch (e) {
+        error("Failed to spawn validator node. Try running `cargo build --release`");
+        throw e;
       }
-    }, false);
 
-    let rpcPort = genPort();
-    let p2pPort = genPort();
-    let wsPort = genPort();
+      let rpcPort = genPort();
+      let p2pPort = genPort();
+      let wsPort = genPort();
 
-    ps = spawnValidator([
-      '--chain',
-      chainSpecFile,
-      '--rpc-methods',
-      'Unsafe',
-      '--rpc-port',
-      rpcPort,
-      '--ws-port',
-      wsPort,
-      '--port',
-      p2pPort,
-      '--tmp',
-      '--alice'
-    ], {
-      env: { ETH_RPC_URL: `http://localhost:${web3Port}` }
-    });
+      ps = spawnValidator([
+        '--chain',
+        chainSpecFile,
+        '--rpc-methods',
+        'Unsafe',
+        '--rpc-port',
+        rpcPort,
+        '--ws-port',
+        wsPort,
+        '--port',
+        p2pPort,
+        '--tmp',
+        '--alice'
+      ], {
+        env: { ETH_RPC_URL: `http://localhost:${web3Port}` }
+      });
 
-    // TODO: Fail on process error
+      ps.on('error', (err) => {
+        error(`Failed to spawn validator: ${err}`);
+        process.exit(1);
+      });
 
-    await until(() => canConnectTo('localhost', wsPort), {
-      retries: 50,
-      message: `awaiting websocket on port ${wsPort}...`
-    });
+      ps.on('close', (code) => {
+        log(`Validator terminated, code=${code}`);
+        if (code !== 0) {
+          error(`Validator failed unexpectedly with code ${code}`);
+          process.exit(1);
+        }
+      });
 
-    const wsProvider = new WsProvider(`ws://localhost:${wsPort}`);
-    api = await ApiPromise.create({
-      provider: wsProvider,
-      types: await loadTypes()
-    });
+      // TODO: Fail on process error
 
-    keyring = new Keyring();
-    alice = keyring.addFromUri('//Alice');
-    bob = keyring.addFromUri('//Bob');
+      await until(() => canConnectTo('localhost', wsPort), {
+        retries: 50,
+        message: `awaiting websocket on port ${wsPort}...`
+      });
+
+      const wsProvider = new WsProvider(`ws://localhost:${wsPort}`);
+      api = await ApiPromise.create({
+        provider: wsProvider,
+        types: await loadTypes()
+      });
+
+      keyring = new Keyring();
+      alice = keyring.addFromUri('//Alice');
+      bob = keyring.addFromUri('//Bob');
+    } catch (e) {
+      error(`Test setup failed with error ${e}...`);
+      error(e);
+      process.exit(1);
+    }
   }, 600000 /* 10m */);
 
   afterEach(async () => {
@@ -135,6 +171,36 @@ describe('golden path', () => {
         }
       }
     });
+
+    // Everything's good.
+  }, 600000 /* 10m */);
+
+  test.only('lock asset', async () => {
+    let tx = await contracts.starport.methods.lockETH().send({ value: 1e18, from: accounts[0] });
+    log({ tx });
+
+    await sleep(50000);
+
+    // Check for events not via trx
+    // let events = await sendAndWaitForEvents(call, false);
+    // let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
+
+    // expect(magicExtractEvent).toBeDefined();
+    // expect(getEventData(magicExtractEvent)).toEqual({
+    //   CashAmount: 1000,
+    //   ChainAccount: {
+    //     chain: "Eth",
+    //     account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
+    //   },
+    //   Notice: {
+    //     ExtractionNotice: {
+    //       id: [expect.any(Number), 0],
+    //       parent: "0x0000000000000000000000000000000000000000000000000000000000000000", "asset": "0x0000000000000000000000000000000000000000",
+    //       account: "0xc00e94cb662c3520282e6f5717214004a7f26888",
+    //       amount: 1000
+    //     }
+    //   }
+    // });
 
     // Everything's good.
   }, 600000 /* 10m */);
