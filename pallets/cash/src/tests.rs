@@ -141,8 +141,8 @@ fn test_post_price_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         CashModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
-        let eth_price = CashModule::price("ETH");
-        let eth_price_time = CashModule::price_time("ETH");
+        let eth_price = CashModule::price(Symbol::ETH);
+        let eth_price_time = CashModule::price_time(Symbol::ETH);
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
     });
@@ -184,8 +184,8 @@ fn test_post_price_stale_price() {
                               // post once
         CashModule::post_price(Origin::none(), test_payload.clone(), test_signature.clone())
             .unwrap();
-        let eth_price = CashModule::price("ETH");
-        let eth_price_time = CashModule::price_time("ETH");
+        let eth_price = CashModule::price(Symbol::ETH);
+        let eth_price_time = CashModule::price_time(Symbol::ETH);
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
         // try to post the same thing again

@@ -51,15 +51,6 @@ mod oracle;
 #[cfg(test)]
 mod tests;
 
-
-/// Type for validator set included in the genesis config
-pub type ValidatorGenesisConfig = Vec<String>;
-
-/// Type for open price feed reporter set included in the genesis config
-pub type ReporterGenesisConfig = Vec<String>;
-
-pub type PriceKeyMappingGenesisConfig = Vec<String>;
-
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
 pub const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
@@ -132,15 +123,6 @@ decl_storage! {
         /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
-        /// Mapping of assets to their price.
-        Price get(fn price): map hasher(blake2_128_concat) String => u128;
-
-        /// Mapping of assets to the last time their price was updated.
-        PriceTime get(fn price_time): map hasher(blake2_128_concat) String => Timestamp;
-
-        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) ChainAsset => String;
-
         /// Eth addresses of price reporters for open oracle
         Reporters get(fn reporters): ReporterSet;
 
@@ -149,14 +131,14 @@ decl_storage! {
         // LiquidationIncentive;
 
         /// Mapping of latest prices for each asset symbol.
-        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => GenericPrice;
+        Price get(fn price): map hasher(blake2_128_concat) Symbol => GenericPrice;
 
         /// Mapping of assets to the last time their price was updated.
         PriceTime get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
 
         // XXX I think the logic for this mapping needs to be inverted so we have prices stored by symbol
         /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) Symbol => GenericAsset;
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Symbol;
 
         // PriceReporter;
         // PriceKeyMapping;
@@ -164,7 +146,7 @@ decl_storage! {
     add_extra_genesis {
         config(validators): GenericSet;
         config(reporters): GenericSet;
-        config(price_key_mapping): PriceKeyMappingGenesisConfig;
+        config(price_key_mapping): GenericSet;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
@@ -244,6 +226,9 @@ decl_error! {
 
         /// Open oracle offchain worker made an attempt to update the price but failed in the extrinsic
         OpenOraclePostPriceExtrinsicError,
+
+        /// An unsupported symbol was provided to the oracle.
+        OpenOracleErrorInvalidSymbol,
 
         /// An error related to the chain_spec file contents
         GenesisConfigError,
@@ -486,6 +471,12 @@ impl<T: Config> Module<T> {
             oracle::parse_message(&payload),
             <Error<T>>::OpenOracleErrorInvalidMessage
         )?;
+
+        let symbol = cash_err!(
+            crate::core::Symbol::from_str(&parsed.key),
+            <Error<T>>::OpenOracleErrorInvalidSymbol
+        )?;
+
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
             parsed.key,
@@ -496,9 +487,9 @@ impl<T: Config> Module<T> {
         // returns Default::default(). Thus, we explicitly check if the key for the ticker is supported
         // or not.
 
-        if PriceTime::contains_key(&parsed.key) {
+        if PriceTime::contains_key(&symbol) {
             // it has been updated at some point, make sure we are updating to a more recent price
-            let last_updated = PriceTime::get(&parsed.key);
+            let last_updated = PriceTime::get(&symbol);
             if parsed.timestamp <= last_updated {
                 return Err(<Error<T>>::OpenOracleErrorStalePrice);
             }
@@ -506,8 +497,8 @@ impl<T: Config> Module<T> {
 
         // WARNING begin storage - all checks must happen above
 
-        Price::insert(&parsed.key, parsed.value as u128);
-        PriceTime::insert(&parsed.key, parsed.timestamp as u128);
+        Price::insert(&symbol, parsed.value as u128);
+        PriceTime::insert(&symbol, parsed.timestamp as u128);
 
         // todo: update storage
         Ok(())
@@ -559,7 +550,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_price_key_mapping(price_key_mapping: PriceKeyMappingGenesisConfig) {
+    fn initialize_price_key_mapping(price_key_mapping: GenericSet) {
         assert!(
             !price_key_mapping.is_empty(),
             "price_key_mapping must be set in the genesis config"
@@ -568,6 +559,7 @@ impl<T: Config> Module<T> {
         for record in price_key_mapping {
             let mut tokens = record.split(":");
             let ticker = tokens.next().expect("No ticker present");
+            let symbol = Symbol::from_str(ticker).expect("Ticker was not a valid symbol");
             let chain = tokens.next().expect("No blockchain present");
             let address = tokens.next().expect("No address present");
             assert!(
@@ -578,11 +570,8 @@ impl<T: Config> Module<T> {
 
             let decoded = hex::decode(&address).expect("Address is not in hex format");
 
-            let chain_asset = ChainAsset {
-                chain: ChainId::Eth,
-                address: decoded,
-            };
-            PriceKeyMapping::insert(chain_asset, ticker);
+            let chain_asset: GenericAsset = (ChainId::Eth, decoded);
+            PriceKeyMapping::insert(chain_asset, symbol);
         }
     }
 
@@ -618,10 +607,13 @@ impl<T: Config> Module<T> {
         for (msg, sig) in messages_and_signatures {
             // adding some debug info in here, this will become very chatty
             let call = <Call<T>>::post_price(msg, sig);
-            cash_err!(
+            let _ = cash_err!(
                 SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()),
                 <Error<T>>::OpenOraclePostPriceExtrinsicError
-            )?;
+            );
+            // note - there is a log message in cash_err if this extrinsic fails but we should
+            // still try to update the other prices even if one extrinsic fails, thus the result
+            // is ignored and we continue in this loop
         }
         latest_price_feed_poll_block_number_storage.set(&block_number);
         Ok(())
