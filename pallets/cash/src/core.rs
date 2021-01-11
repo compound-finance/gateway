@@ -1,89 +1,368 @@
 // Note: The substrate build requires these be re-exported.
-use codec::{Decode, Encode};
 pub use our_std::{fmt, result, result::Result};
-use our_std::{vec::Vec, RuntimeDebug};
 
-use crate::{
-    amount::CashAmount,
-    chains::{eth, ChainId},
-    params, // XXX
-    Config,
-    Module,
-    Nonce,
-    Reason,
+/// Setup
+use codec::{Decode, Encode};
+use our_std::{
+    ops::{Div, Mul},
+    RuntimeDebug,
 };
 
-// XXX these types can still use another pass
-//  further clarification around when to use this vs chain-specific type
+use crate::{
+    chains::{eth, Chain, ChainId, Ethereum},
+    notices::Notice, // XXX move here, encoding to chains
+    params::MIN_TX_VALUE,
+    Config,
+    Module,
+};
+
+macro_rules! require {
+    ($expr:expr, $reason:expr) => {
+        if !$expr {
+            return core::result::Result::Err($reason);
+        }
+    };
+}
+
+macro_rules! require_min_tx_value {
+    ($value:expr) => {
+        require!($value >= MIN_TX_VALUE, Reason::MinTxValueNotMet);
+    };
+}
+
+// Type aliases //
+
+/// Type for representing an annualized rate on Compound Chain.
+pub type APR = u128; // XXX custom rate type?
+
+/// Type for a nonce.
+pub type Nonce = u32;
+
+/// Type for representing time on Compound Chain.
+pub type Timestamp = u128; // XXX u64?
+
+/// Type of the largest possible unsigned integer on Compound Chain.
+pub type Uint = u128;
+
 /// Type for a generic address, potentially on any chain.
-pub type Address = Vec<u8>;
+pub type GenericAddr = Vec<u8>;
 
-/// Type for a generic account identifier, tied to one of the possible chains.
+/// Type for a generic account, tied to one of the possible chains.
+pub type GenericAccount = (ChainId, GenericAddr);
+
+/// Type for a generic asset, tied to one of the possible chains.
+pub type GenericAsset = (ChainId, GenericAddr);
+
+/// Type for a generic encoded message, potentially for any chain.
+pub type GenericMsg = Vec<u8>;
+
+/// Type for a generic signature, potentially for any chain.
+pub type GenericSig = Vec<u8>;
+
+/// Type for a bunch of generic signatures.
+pub type GenericSigs = Vec<GenericSig>;
+
+/// Type for representing a price, potentially for any symbol.
+pub type GenericPrice = Uint;
+
+/// Type for representing a quantity, potentially of any symbol.
+pub type GenericQty = Uint;
+
+/// Type for a generic set, for validators/reporters in the genesis config.
+pub type GenericSet = Vec<String>;
+
+/// Type for a set of open price feed reporters.
+pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
+
+/// Type for an encoded payload within an extrinsic.
+pub type SignedPayload = Vec<u8>; // XXX
+
+/// Type for signature used to verify that a signed payload comes from a validator.
+pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
+
+/// Type for a public key used to identify a validator.
+pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1?
+
+/// Type for a set of validator identities.
+pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
+
+// Type definitions //
+
+/// Type for reporting failures for reasons outside of our control.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum Reason {
+    None,
+    MinTxValueNotMet,
+}
+
+/// Type for the abstract symbol of an asset, not tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum Symbol {
+    CASH,
+    DOT,
+    ETH,
+    SOL,
+    TEZ,
+    USD,
+    USDC,
+}
+
+impl Symbol {
+    pub const fn decimals(self) -> u8 {
+        match self {
+            Symbol::CASH => 6,
+            Symbol::DOT => 10,
+            Symbol::ETH => 18,
+            Symbol::SOL => 18, // XXX ?
+            Symbol::TEZ => 6,
+            Symbol::USD => 6,
+            Symbol::USDC => 6,
+        }
+    }
+}
+
+/// Type for the status of an event on the queue.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct ChainAccount {
-    pub chain: ChainId,
-    pub address: Address,
+pub enum EventStatus<C: Chain> {
+    Pending {
+        signers: crate::ValidatorSet,
+    },
+    Failed {
+        hash: C::Hash,
+        reason: crate::Reason,
+    },
+    Done,
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Default)]
-pub struct ChainAsset {
-    pub chain: ChainId,
-    pub address: Address,
+/// Type for the status of a notice on the queue.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum NoticeStatus<C: Chain> {
+    Missing,
+    Pending {
+        signers: crate::ValidatorSet,
+        signatures: GenericSigs,
+        notice: Notice<C>,
+    },
+    Done,
 }
 
-pub enum AssetOrCash {
-    Cash,
-    Asset(ChainAsset),
-}
+/// XXX doc
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct Account<C: Chain>(pub C::Address);
 
-pub type Price = u128; // XXX
+/// XXX doc
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct Asset<C: Chain>(pub C::Address);
 
-// XXX
-pub fn require(predicate: bool, reason: &'static str) {
-    if !predicate {
-        panic!(reason); // XXX
+impl<C: Chain> From<Asset<C>> for GenericAsset {
+    fn from(asset: Asset<C>) -> Self {
+        (C::ID, asset.0.into())
     }
 }
 
-// XXX
-pub fn price(asset: AssetOrCash) -> Price {
-    match asset {
-        AssetOrCash::Cash => 1, // XXX $1
-        AssetOrCash::Asset(asset_id) => panic!("xxx no prices yet"),
+/// XXX doc
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Price<const S: Symbol>(pub GenericPrice);
+
+/// XXX doc
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Quantity<const S: Symbol>(pub GenericQty);
+
+/// Type for representing a balance index on Compound Chain.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, RuntimeDebug)]
+pub struct Index(pub Uint);
+
+impl<const S: Symbol> Price<S> {
+    pub const fn from_nominal(nominal: f64) -> Self {
+        Price::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint)) // XXX fixme
     }
 }
+
+impl<const S: Symbol> Quantity<S> {
+    pub const fn from_nominal(nominal: f64) -> Self {
+        Quantity::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint)) // XXX fixme
+    }
+}
+
+impl Default for Index {
+    fn default() -> Self {
+        Index(1) // XXX do we need more 'precision' for ONE?
+    }
+}
+
+impl<const S: Symbol, T> From<T> for Price<S>
+where
+    T: Into<GenericPrice>,
+{
+    fn from(raw: T) -> Self {
+        Price(raw.into())
+    }
+}
+
+impl<const S: Symbol, T> From<T> for Quantity<S>
+where
+    T: Into<GenericQty>,
+{
+    fn from(raw: T) -> Self {
+        Quantity(raw.into())
+    }
+}
+
+impl<T> From<T> for Index
+where
+    T: Into<Uint>,
+{
+    fn from(raw: T) -> Self {
+        Index(raw.into())
+    }
+}
+
+// Price<S> * Quantity<S> -> Quantity<{ USD }>
+impl<const S: Symbol> Mul<Quantity<S>> for Price<S> {
+    type Output = Quantity<{ Symbol::USD }>;
+
+    fn mul(self, rhs: Quantity<S>) -> Self::Output {
+        Quantity(self.0 * rhs.0) // XXX fixme (S.decimals())
+    }
+}
+
+// Quantity<S> * Price<S> -> Quantity<S>
+impl<const S: Symbol> Mul<Price<S>> for Quantity<S> {
+    type Output = Quantity<{ Symbol::USD }>;
+
+    fn mul(self, rhs: Price<S>) -> Self::Output {
+        Quantity(self.0 * rhs.0) // XXX fixme (S.decimals())
+    }
+}
+
+// Quantity<{ USD }> / Price<S> -> Quantity<S>
+impl<const S: Symbol> Div<Price<S>> for Quantity<{ Symbol::USD }> {
+    type Output = Quantity<{ S }>;
+
+    fn div(self, rhs: Price<S>) -> Self::Output {
+        Quantity(self.0 / rhs.0) // XXX fixme (S.decimals())
+    }
+}
+
+// Quantity<{ USD }> / Quantity<S> -> Price<S>
+impl<const S: Symbol> Div<Quantity<S>> for Quantity<{ Symbol::USD }> {
+    type Output = Price<S>;
+
+    fn div(self, rhs: Quantity<S>) -> Self::Output {
+        Price(self.0 / rhs.0) // XXX fixme (S.decimals())
+    }
+}
+
+// Quantity<S> * Index -> Quantity<S>
+impl<const S: Symbol> Mul<Index> for Quantity<S> {
+    type Output = Quantity<S>;
+
+    fn mul(self, rhs: Index) -> Self::Output {
+        Quantity(self.0 * rhs.0)
+    }
+}
+
+// Helper functions //
+
+pub fn price<T: Config, const S: Symbol>() -> Price<S> {
+    match S {
+        Symbol::CASH => Price::from_nominal(1.0),
+        _ => Price(<Module<T>>::prices(S)),
+    }
+}
+
+// Protocol interface //
 
 pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason> {
+    // XXX
+    // Pattern match Event:
+    //  When Gov(title:string, extrinsics:bytes[]):
+    //   Decode a SCALE-encoded set of extrinsics from the event
+    //   For each extrinsic, dispatch the given extrinsic as Root
+    //  When Lock(Asset:address, Holder:address, Amount:uint256):
+    //   Build AccountIdent=("eth", account)
+    //   Build AssetIdent=("eth", asset)
+    //   Call lockInternal(AssetIdent, AccountIdent, Amount)
+    //  When LockCash(Account:address, Amount: uint256, CashYieldIndex: uint256):
+    //   Build AccountIdent=("eth", account)
+    //   Call lockCashInternal(AccountIdent, Amount)
     Ok(event) // XXX
+}
+
+pub fn lock_internal<T: Config, C: Chain, const S: Symbol>(
+    asset: Asset<C>,
+    holder: Account<C>,
+    amount: Quantity<S>,
+) -> Result<(), Reason> {
+    // XXX
+    // Read Require AmountPriceAssetParamsMinTxValue
+    // Read Principal =AmountSupplyIndexAsset
+    // Read TotalSupplyNew=TotalSupplyPrincipalAsset+Principal
+    // Read HolderSupplyNew=SupplyPrincipalAsset, Holder+Principal
+    // Set TotalSupplyPrincipalAsset=TotalSupplyNew
+    // Set SupplyPrincipalAsset, Holder=HolderSupplyNew
+    Ok(())
+}
+
+pub fn lock_cash_internal<T: Config, C: Chain>(
+    holder: Account<C>,
+    amount: Quantity<{ Symbol::CASH }>,
+) -> Result<(), Reason> {
+    // XXX
+    // Read Require AmountPriceCASHParamsMinTxValue
+    // Read Principal =AmountCashYieldIndex
+    // Read ChainCashHoldPrincipalNew=TotalCashHoldPrincipalHolder.Chain-Principal
+    // Underflow: ${Sender.Chain} does not have enough total CASH to extract ${Amount}
+    // Read HolderCashHoldPrincipalNew=CashHoldPrincipalHolder+Principal
+    // Set TotalCashHoldPrincipalHolder.Chain=ChainCashHoldPrincipalNew
+    // Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew
+    Ok(())
+}
+
+pub fn extract_principal_internal<T: Config, C: Chain, const S: Symbol>(
+    asset: Asset<C>,
+    holder: Account<C>,
+    recipient: Account<C>,
+    principal: Quantity<S>,
+) -> Result<(), Reason> {
+    // Require Recipient.Chain=Asset.Chain XXX proven by compiler
+    let supply_index = <Module<T>>::supply_index(Into::<GenericAsset>::into(asset));
+    let amount = principal * supply_index;
+    require_min_tx_value!(amount * price::<T, S>());
+
+    // Read Require HasLiquidityToReduceCollateralAsset(Holder, Asset, Amount)
+    // ReadsCashBorrowPrincipalBorrower, CashCostIndexPair, CashYield, CashSpread, Price*, SupplyPrincipal*, Borrower, StabilityFactor*
+    // Read TotalSupplyNew=TotalSupplyPrincipalAsset-Principal
+    // Underflow: Not enough total funds to extract ${Amount}
+    // Read HolderSupplyNew=SupplyPrincipalAsset, Holder-Principal
+    // Underflow: ${Holder} does not have enough funds to extract ${Amount}
+    // Set TotalSupplyPrincipalAsset=TotalSupplyNew
+    // Set SupplyPrincipalAsset, Holder=HolderSupplyNew
+    // Add ExtractionNotice(Asset, Recipient, Amount) to NoticeQueueRecipient.Chain
+    Ok(()) // XXX
 }
 
 // XXX should we expect amounts are already converted to our bigint type here?
 //  probably not, probably inputs should always be fixed width?
-pub fn extract_cash_principal_internal<T: Config>(
-    holder: ChainAccount,
-    recipient: ChainAccount,
-    amount_principal: CashAmount,
-    nonce: Nonce,
+//   actually now I think we can always guarantee to parse ascii numbers in lisp requests into bigints
+pub fn extract_cash_principal_internal<T: Config, C: Chain>(
+    holder: Account<C>,
+    recipient: Account<C>,
+    principal: Quantity<{ Symbol::CASH }>,
 ) -> Result<(), Reason> {
-    // XXX
-    require(
-        amount_principal * price(AssetOrCash::Cash) >= params::MIN_TX_VALUE,
-        "min tx value not met",
-    ); // XXX
-    require(
-        nonce == <Module<T>>::nonces(holder) + 1,
-        "supplied nonce does not match",
-    ); // XXX
-       // Note: we do not check health here, since CASH cannot be borrowed against yet.
-       //     Read YieldIndex=CashYieldIndex;
-       //     Read AmountPrincipal =AmountYieldIndex;
-       //     Read ChainCashHoldPrincipalNew=TotalCashHoldPrincipalRecipient.Chain+AmountPrincipal;
-       //     Read HolderCashHoldPrincipalNew=CashHoldPrincipalHolder-AmountPrincipal;
-       //       Underflow: ${Account} does not have enough CASH to extract ${Amount};
-       //     Set NoncesHolder=Nonce;
-       //     Set TotalCashHoldPrincipalRecipient.Chain=ChainCashHoldPrincipalNew;
-       //     Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew;
-       //     Add CashExtractionNotice(Recipient, Amount, YieldIndex) to NoticeQueueRecipient.Chain;
+    let yield_index = <Module<T>>::cash_yield_index();
+    let amount = principal * yield_index;
+    require_min_tx_value!(amount * price::<T, { Symbol::CASH }>());
+
+    // Note: we do not check health here, since CASH cannot be borrowed against yet.
+    // let chain_cash_hold_principal_new = <Module<T>>::chain_cash_hold_principal(recipient.chain) + amount_principal;
+    // let holder_cash_hold_principal_new = <Module<T>>::cash_hold_principal(holder) - amount_principal;
+    // XXX Underflow: ${Account} does not have enough CASH to extract ${Amount};
+    // <Module<T>>::ChainCashHoldPrincipal::insert(recipient, chain_cash_hold_principal_new);
+    // <Module<T>>::C
+    //     Set TotalCashHoldPrincipalRecipient.Chain=ChainCashHoldPrincipalNew;
+    //     Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew;
+    //     Add CashExtractionNotice(Recipient, Amount, YieldIndex) to NoticeQueueRecipient.Chain;
     Ok(()) // XXX
 }
 

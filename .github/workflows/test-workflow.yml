@@ -19,9 +19,6 @@ jobs:
         run: |
           ./scripts/get_substrate.sh --fast
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v1.0.1
-
       - name: Cargo fmt
         run: |
           cargo fmt -- --check

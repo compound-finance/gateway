@@ -50,7 +50,7 @@ pub fn keccak(input: &[u8]) -> [u8; 32] {
 }
 
 /// Convert the public key bytes to an ETH address
-pub(crate) fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
+pub fn public_key_bytes_to_eth_address(public_key: &[u8]) -> Vec<u8> {
     let public_hash = keccak(public_key); // 32 bytes
     let public_hash_tail: &[u8] = &public_hash[12..]; // bytes 12 to 32 - last 20 bytes
     Vec::from(public_hash_tail)
@@ -88,4 +88,8 @@ pub fn eth_recover(message: &[u8], sig: &[u8]) -> Result<Vec<u8>, CryptoError> {
     let address = public_key_to_eth_address(recovered);
 
     Ok(address)
+}
+
+pub fn bytes_to_eth_hex_string(message: &[u8]) -> String {
+    format!("0x{}", hex::encode(message))
 }

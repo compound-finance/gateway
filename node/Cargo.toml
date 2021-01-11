@@ -7,6 +7,7 @@ homepage = 'https://compound.cash'
 name = 'compound-chain'
 repository = 'https://github.com/compound-finance/compound-chain/'
 version = '1.0.0'
+default-run = "compound-chain"
 
 [[bin]]
 name = 'compound-chain'

@@ -87,9 +87,10 @@ fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
     // todo: there is something in this function that says "it is ok for the message to overflow.." that seems bad.
     let message = secp256k1::Message::parse(&hashed);
     let (sig, recovery) = secp256k1::sign(&message, &private_key);
-    let why_is_this_here = recovery.serialize() + ETH_ADD_TO_V;
+    let recovery_term = recovery.serialize() + ETH_ADD_TO_V;
     let mut sig: Vec<u8> = sig.serialize().into();
-    sig.push(why_is_this_here);
+    sig.extend_from_slice(&[0; 31]); // need to pad out for eth_abi
+    sig.push(recovery_term);
     sig
 }
 
@@ -178,7 +179,7 @@ lazy_static::lazy_static! {
 
 /// Sets up the development keyring, an in memory keyring loaded with the `//ALICE` key
 /// for signing messages headed to ethereum.
-fn dev_keyring() -> InMemoryKeyring {
+pub fn dev_keyring() -> InMemoryKeyring {
     let mut keyring = InMemoryKeyring::new();
     let eth_key_id = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
     let (pair, _) = EcdsaPair::from_string_with_seed("//ALICE", None).unwrap();
@@ -206,12 +207,12 @@ mod tests {
                 address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
                 private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
                 data: "Some data".into(),
-                signature: "0xa8037a6116c176a25e6fc224947fde9e79a2deaa0dd8b67b366fbdfdbffc01f953e41351267b20d4a89ebfe9c8f03c04de9b345add4a52f15bd026b63c8fb1501b".into(),
+                signature: "0xa8037a6116c176a25e6fc224947fde9e79a2deaa0dd8b67b366fbdfdbffc01f953e41351267b20d4a89ebfe9c8f03c04de9b345add4a52f15bd026b63c8fb150000000000000000000000000000000000000000000000000000000000000001b".into(),
             }, TestCase {
                 address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
                 private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
                 data: "Some data!%$$%&@*".into(),
-                signature: "0x05252412b097c5d080c994d1ea12abcee6f1cae23feb225517a0b691a66e12866b3f54292f9cfef98f390670b4d010fc4af7fcd46e41d72870602c117b14921c1c".into(),
+                signature: "0x05252412b097c5d080c994d1ea12abcee6f1cae23feb225517a0b691a66e12866b3f54292f9cfef98f390670b4d010fc4af7fcd46e41d72870602c117b14921c000000000000000000000000000000000000000000000000000000000000001c".into(),
             }, /* TestCase { // for now this test case is excluded because the data are encoded as binary
                 address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
                 private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),

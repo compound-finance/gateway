@@ -9,4 +9,5 @@ members = [
     'runtime',
     'std',
     'compound-crypto',
+    'open-oracle-mock-reporter'
 ]
