@@ -77,6 +77,10 @@ describe('golden path', () => {
       let p2pPort = genPort();
       let wsPort = genPort();
 
+      let logLevel = process.env['LOG'];
+      let spawnOpts = logLevel ? { RUST_LOG: logLevel } : {};
+      let extraArgs = logLevel ? [`-lruntime=${logLevel}`] : [];
+
       ps = spawnValidator([
         '--chain',
         chainSpecFile,
@@ -89,9 +93,10 @@ describe('golden path', () => {
         '--port',
         p2pPort,
         '--tmp',
-        '--alice'
+        '--alice',
+        ...extraArgs
       ], {
-        env: { ETH_RPC_URL: `http://localhost:${web3Port}` }
+        env: { ...spawnOpts, ETH_RPC_URL: `http://localhost:${web3Port}` }
       });
 
       ps.on('error', (err) => {

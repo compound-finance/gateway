@@ -37,6 +37,7 @@ use crate::core::{
     SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
+use sp_runtime::print;
 
 mod chains;
 mod core;
@@ -271,9 +272,9 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = 1] // XXX how are we doing weights?
+        #[weight = 10] // XXX how are we doing weights?
         pub fn process_eth_event(origin, payload: SignedPayload, sig: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            debug::native::error!("processing eth event payload={:?}, sig={:?}", payload, sig);
+            print("process_eth_event(origin,payload,sig)");
             ensure_none(origin)?;
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload); // XXX
