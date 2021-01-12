@@ -117,8 +117,6 @@ describe('golden path', () => {
         }
       });
 
-      // TODO: Fail on process error
-
       await until(() => canConnectTo('localhost', wsPort), {
         retries: 50,
         message: `awaiting websocket on port ${wsPort}...`

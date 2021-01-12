@@ -8,7 +8,7 @@ function waitForEvent(api, pallet, method, onFinalize = true) {
 
       // Loop through the Vec<EventRecord>
       events.forEach(({ event }) => {
-        log(`Found event: ${event.section}:${event.method}`);
+        debug(`Found event: ${event.section}:${event.method}`);
         if (event.section === pallet && event.method === method) {
           return resolve(event);
         }
