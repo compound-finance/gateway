@@ -2,6 +2,11 @@ use crate::{chains::*, core::*, mock::*, *};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
 use sp_core::offchain::testing;
 
+const ETH: Symbol = Symbol(
+    ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+    18,
+); // XXX macro?
+
 fn andrew() -> GenericAccount {
     (ChainId::Eth, [123; 20].to_vec())
 }
@@ -51,6 +56,7 @@ fn initialize_storage() {
         "85615b076615317c80f14cbad6501eec031cd51c".into(),
         "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
     ]);
+    CashModule::initialize_symbols(vec!["ETH".into()]); // XXX fixme + needs decimals
     CashModule::initialize_price_key_mapping(vec!["USDC:ETH:deadbeef".into()]);
 }
 
@@ -141,8 +147,8 @@ fn test_post_price_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         CashModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
-        let eth_price = CashModule::price(Symbol::ETH);
-        let eth_price_time = CashModule::price_time(Symbol::ETH);
+        let eth_price = CashModule::prices(ETH);
+        let eth_price_time = CashModule::price_times(ETH);
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
     });
@@ -184,8 +190,8 @@ fn test_post_price_stale_price() {
                               // post once
         CashModule::post_price(Origin::none(), test_payload.clone(), test_signature.clone())
             .unwrap();
-        let eth_price = CashModule::price(Symbol::ETH);
-        let eth_price_time = CashModule::price_time(Symbol::ETH);
+        let eth_price = CashModule::prices(ETH);
+        let eth_price_time = CashModule::price_times(ETH);
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
         // try to post the same thing again

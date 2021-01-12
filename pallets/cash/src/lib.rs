@@ -1,7 +1,7 @@
 #![allow(incomplete_features)]
-#![feature(associated_type_defaults)]
-#![feature(const_generics)]
 #![feature(array_methods)]
+#![feature(associated_type_defaults)]
+#![feature(const_fn_floating_point_arithmetic)]
 
 #[macro_use]
 extern crate alloc;
@@ -18,7 +18,7 @@ use frame_system::{
 };
 use our_std::{
     convert::{TryFrom, TryInto},
-    fmt, str,
+    str,
     vec::Vec,
 };
 use sp_runtime::{
@@ -35,11 +35,10 @@ use sp_runtime::{
 use crate::chains::{Chain, ChainId, Ethereum};
 use crate::core::{
     Account, Asset, EventStatus, GenericAccount, GenericAsset, GenericMsg, GenericPrice,
-    GenericQty, GenericSet, GenericSigs, Index, Nonce, NoticeStatus, Reason, ReporterSet,
+    GenericQty, GenericSet, GenericSigs, MulIndex, Nonce, NoticeStatus, Reason, ReporterSet,
     SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
-use crate::trx_req::*;
 use sp_runtime::print;
 
 mod chains;
@@ -85,10 +84,10 @@ decl_storage! {
         NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
 
         /// An index to track interest owed by CASH borrowers.
-        CashCostIndex get(fn cash_cost_index): Index;
+        CashCostIndex get(fn cash_cost_index): MulIndex;
 
         /// An index to track interest earned by CASH holders.
-        CashYieldIndex get(fn cash_yield_index): Index;
+        CashYieldIndex get(fn cash_yield_index): MulIndex;
 
         /// The upcoming base rate change for CASH and when, if any.
         CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
@@ -100,10 +99,10 @@ decl_storage! {
         CashSpread get(fn cash_spread): APR;
 
         /// An index to track interest owed by asset borrowers.
-        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => Index;
+        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => MulIndex; // XXX will change to add
 
         /// An index to track interest earned by asset suppliers.
-        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => Index;
+        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => MulIndex; // XXX will change to add
 
         // XXX doc
         ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => GenericQty;
@@ -135,15 +134,17 @@ decl_storage! {
         // AssetInfo[asset];
         // LiquidationIncentive;
 
+        /// Mapping of strings to symbols.
+        Symbols get(fn symbols): map hasher(blake2_128_concat) String => Option<Symbol>;
+
         /// Mapping of latest prices for each asset symbol.
-        Price get(fn price): map hasher(blake2_128_concat) Symbol => GenericPrice;
+        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => GenericPrice;
 
         /// Mapping of assets to the last time their price was updated.
-        PriceTime get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
+        PriceTimes get(fn price_times): map hasher(blake2_128_concat) Symbol => Timestamp;
 
-        // XXX I think the logic for this mapping needs to be inverted so we have prices stored by symbol
-        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Symbol;
+        /// Mapping of assets to symbols.
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Option<Symbol>;
 
         // PriceReporter;
         // PriceKeyMapping;
@@ -151,10 +152,12 @@ decl_storage! {
     add_extra_genesis {
         config(validators): GenericSet;
         config(reporters): GenericSet;
+        config(symbols): GenericSet; // XXX initialize symbol from string: (ticker, decimals)
         config(price_key_mapping): GenericSet;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
+            Module::<T>::initialize_symbols(config.symbols.clone());
             Module::<T>::initialize_price_key_mapping(config.price_key_mapping.clone());
         })
     }
@@ -179,7 +182,7 @@ decl_event!(
         /// An Ethereum event failed during processing. [payload, reason]
         FailedProcessingEthEvent(SignedPayload, Reason),
 
-        /// Signed Ethereum notice. [message, signatures]
+        /// Signed notice. [chain_id, notice_id, message, signatures]
         SignedNotice(ChainId, NoticeId, GenericMsg, GenericSigs),
     }
 );
@@ -506,10 +509,8 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidMessage
         )?;
 
-        let symbol = cash_err!(
-            crate::core::Symbol::from_str(&parsed.key),
-            <Error<T>>::OpenOracleErrorInvalidSymbol
-        )?;
+        let symbol = Symbols::get(parsed.key.clone()).expect("xxx our pattern for expect or err?");
+        // XXX <Error<T>>::OpenOracleErrorInvalidSymbol
 
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
@@ -521,9 +522,9 @@ impl<T: Config> Module<T> {
         // returns Default::default(). Thus, we explicitly check if the key for the ticker is supported
         // or not.
 
-        if PriceTime::contains_key(&symbol) {
+        if PriceTimes::contains_key(&symbol) {
             // it has been updated at some point, make sure we are updating to a more recent price
-            let last_updated = PriceTime::get(&symbol);
+            let last_updated = PriceTimes::get(&symbol);
             if parsed.timestamp <= last_updated {
                 return Err(<Error<T>>::OpenOracleErrorStalePrice);
             }
@@ -531,8 +532,8 @@ impl<T: Config> Module<T> {
 
         // WARNING begin storage - all checks must happen above
 
-        Price::insert(&symbol, parsed.value as u128);
-        PriceTime::insert(&symbol, parsed.timestamp as u128);
+        Prices::insert(&symbol, parsed.value as u128);
+        PriceTimes::insert(&symbol, parsed.timestamp as u128);
 
         // todo: update storage
         Ok(())
@@ -568,6 +569,23 @@ impl<T: Config> Module<T> {
         Validators::put(converted);
     }
 
+    // XXX actually symbols is a map with decimals
+    /// Set the initial set of supported symbols from the genesis config
+    fn initialize_symbols(symbols: GenericSet) {
+        assert!(
+            !symbols.is_empty(),
+            "Symbols must be set in the genesis config"
+        );
+
+        for (ticker, decimals) in vec![("ETH", 18), ("USDC", 6)] {
+            // XXX
+            let mut chars: Vec<char> = ticker.chars().collect();
+            chars.resize(12, 0 as char);
+            let raw: [char; 12] = chars.try_into().expect("bad ticker");
+            Symbols::insert(ticker, Symbol(raw, decimals));
+        }
+    }
+
     /// Set the initial set of open price feed price reporters from the genesis config
     fn initialize_reporters(reporters: GenericSet) {
         assert!(
@@ -593,7 +611,7 @@ impl<T: Config> Module<T> {
         for record in price_key_mapping {
             let mut tokens = record.split(":");
             let ticker = tokens.next().expect("No ticker present");
-            let symbol = Symbol::from_str(ticker).expect("Ticker was not a valid symbol");
+            let symbol = Symbols::get(ticker).expect("Ticker not a valid symbol");
             let chain = tokens.next().expect("No blockchain present");
             let address = tokens.next().expect("No address present");
             assert!(
