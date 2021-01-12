@@ -1,21 +1,13 @@
 {
+  "Compound": {},
   "ChainId": {
     "_enum": [
+      "Comp",
       "Eth",
       "Dot",
       "Sol",
       "Tez"
     ]
-  },
-  "Address": "Vec<u8>",
-  "ChainAccount": {
-    "chain": "ChainId",
-    "account": "Address"
-  },
-  "CashAmount": "u128",
-  "ChainAsset": {
-    "chain": "ChainId",
-    "address": "Address"
   },
   "Notice": {
     "_enum": {
@@ -29,23 +21,34 @@
     "account": "[u8; 20]",
     "amount": "u128"
   },
-  "Message": "Vec<u8>",
   "Signature": "Vec<u8>",
-  "Signatures": "Vec<Signature>",
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",
   "Reason": {
-    "_enum": ["None"]
+    "_enum": [
+      "None",
+      "NotImplemented",
+      "MinTxValueNotMet"
+    ]
   },
   "APR": "u128",
-  "Index": "u128",
+  "Nonce": "u32",
   "Timestamp": "u128",
+  "Uint": "u128",
+  "GenericAddr": "Vec<u8>",
+  "GenericAccount": "(ChainId, GenericAddr)",
+  "GenericAsset": "(ChainId, GenericAddr)",
+  "GenericMsg": "Vec<u8>",
+  "GenericSig": "Vec<u8>",
+  "GenericSigs": "Vec<GenericSig>",
+  "GenericPrice": "Uint",
+  "GenericQty": "Uint",
+  "GenericSet": "Vec<String>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
   "ValidatorKey": "[u8; 65]",
   "ValidatorSet": "Vec<ValidatorKey>",
-  "ValidatorGenesisConfig": "Vec<String>",
   "EventStatus": {
     "_enum": {
       "Pending": {
@@ -57,5 +60,16 @@
       },
       "Done": {}
     }
+  },
+  "Symbol": {
+    "_enum": [
+      "CASH",
+      "DOT",
+      "ETH",
+      "SOL",
+      "TEZ",
+      "USD",
+      "USDC"
+    ]
   }
 }
