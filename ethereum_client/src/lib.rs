@@ -2,6 +2,22 @@ use frame_support::debug;
 /// for now this will just focus on serialization and deserialization of payloads
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
+use std::convert::TryInto;
+
+#[derive(Debug)]
+pub enum EthereumClientError {
+    InvalidResponseErrorFormatIsNotValidJson,
+    InvalidResponseErrorJsonMapExpected,
+    InvalidResponseErrorMissingResultField,
+    InvalidResponseErrorResultFieldExpectedToBeString,
+    InvalidResponseErrorResultFieldExpectedToBeEthEncodedHex,
+    InvalidResponseErrorResultFieldEthAbiDecodeFailed,
+    InvalidResponseErrorResultFieldEthAbiDecodeFailedMissingField,
+    InvalidResponseErrorResultFieldEthAbiDecodeFailedInvalidTokenType,
+    InvalidResponseErrorResultFieldEthAbiDecodeFailedOverflowedValue,
+    InvalidResponseErrorResultFieldEthAbiDecodeFailedTooManyValues,
+    HttpError,
+}
 
 #[derive(Deserialize, Debug)]
 pub struct ResponseError {
@@ -21,6 +37,18 @@ pub struct BlockResponse {
     pub id: Option<u64>,
     pub result: Option<String>,
     pub error: Option<ResponseError>,
+}
+
+/// Chainlink data directly provided by the `latestRoundData` smart contract function. Importantly
+/// this does NOT include the symbol that the data are being provided for, that symbol is implicit
+/// given the contract that the `latestRoundData` function was called on.
+#[derive(Deserialize, Debug)]
+pub struct ChainLinkLatestRoundDataResponse {
+    pub round_id: u128,
+    pub answer: i128,
+    pub started_at: u128,
+    pub updated_at: u128,
+    pub answered_in_round: u128,
 }
 
 #[derive(Deserialize, Debug)]
@@ -242,6 +270,129 @@ pub fn fetch_latest_block(server: &str) -> Result<String, http::Error> {
     return Ok(block_number);
 }
 
+fn eth_decode_hex(data: &str) -> Result<Vec<u8>, hex::FromHexError> {
+    if !data.starts_with("0x") {
+        return Err(hex::FromHexError::InvalidHexCharacter { c: 'x', index: 0 });
+    }
+
+    hex::decode(&data[2..])
+}
+
+fn get_chainlink_latest_round_data(
+    server: &str,
+    addr: &str,
+) -> Result<ChainLinkLatestRoundDataResponse, EthereumClientError> {
+    // note - the data field is the hash of the signature of the latestRoundData function, it does not
+    // change across contracts or networks and thus can be hard coded here
+    let params = format!(r#""to": "{}"", "data": "0xfeaf968c""#, addr);
+    let body =
+        send_rpc(server, "eth_call", vec![&params]).map_err(|_| EthereumClientError::HttpError)?;
+    deserialize_chainlink_latest_round_data_call_response(&body)
+}
+
+/// Safely extract a u128 primitive from an ethabi::Token drain
+///
+/// Possible errors
+/// * token drain is empty
+/// * next token is not a Uint token
+/// * next token is a Uint token and is too large to fit inside a u128
+///
+fn safe_extract_u128(
+    inp: &mut std::vec::Drain<ethabi::Token>,
+) -> Result<u128, EthereumClientError> {
+    let candidate = inp
+        .next()
+        .ok_or(EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedMissingField)?
+        .to_uint()
+        .ok_or(
+            EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedInvalidTokenType,
+        )?;
+    let result: u128 = candidate.try_into().map_err(|_| {
+        EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedOverflowedValue
+    })?;
+
+    Ok(result)
+}
+
+/// Safely extract an i128 primitive from an ethabi::Token drain
+///
+/// Possible errors
+/// * token drain is empty
+/// * next token is not an Int token
+/// * next token is an Int token and is too large to fit inside an i128
+///
+fn safe_extract_i128(
+    inp: &mut std::vec::Drain<ethabi::Token>,
+) -> Result<i128, EthereumClientError> {
+    let candidate = inp
+        .next()
+        .ok_or(EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedMissingField)?
+        .to_int()
+        .ok_or(
+            EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedInvalidTokenType,
+        )?;
+    let result: i128 = candidate.try_into().map_err(|_| {
+        EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedOverflowedValue
+    })?;
+
+    Ok(result)
+}
+
+/// Parse chainlink data obtained by calling the `latestRoundData` function on some chainlink
+/// contract. The response should be straight out of the eth rpc endpoint `eth_call`.
+fn deserialize_chainlink_latest_round_data_call_response(
+    response: &str,
+) -> Result<ChainLinkLatestRoundDataResponse, EthereumClientError> {
+    let deserialized: serde_json::Value = serde_json::from_str(response)
+        .map_err(|_| EthereumClientError::InvalidResponseErrorFormatIsNotValidJson)?;
+    let map = deserialized
+        .as_object()
+        .ok_or(EthereumClientError::InvalidResponseErrorJsonMapExpected)?;
+    let result = map
+        .get("result")
+        .ok_or(EthereumClientError::InvalidResponseErrorMissingResultField)?;
+    let result_str = result
+        .as_str()
+        .ok_or(EthereumClientError::InvalidResponseErrorResultFieldExpectedToBeString)?;
+    let result_decoded = eth_decode_hex(result_str).map_err(|_| {
+        EthereumClientError::InvalidResponseErrorResultFieldExpectedToBeEthEncodedHex
+    })?;
+
+    let mut eth_decoded = ethabi::decode(
+        &[
+            ethabi::param_type::ParamType::Uint(80),
+            ethabi::param_type::ParamType::Int(256),
+            ethabi::param_type::ParamType::Uint(256),
+            ethabi::param_type::ParamType::Uint(256),
+            ethabi::param_type::ParamType::Uint(80),
+        ],
+        &result_decoded,
+    )
+    .map_err(|_| EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailed)?;
+    let mut eth_decoded_drain = eth_decoded.drain(..);
+    let round_id = safe_extract_u128(&mut eth_decoded_drain)?;
+    let answer = safe_extract_i128(&mut eth_decoded_drain)?;
+    let started_at = safe_extract_u128(&mut eth_decoded_drain)?;
+    let updated_at = safe_extract_u128(&mut eth_decoded_drain)?;
+    let answered_in_round = safe_extract_u128(&mut eth_decoded_drain)?;
+
+    if eth_decoded_drain.next().is_some() {
+        return Err(
+            EthereumClientError::InvalidResponseErrorResultFieldEthAbiDecodeFailedTooManyValues,
+        );
+    }
+
+    let response = ChainLinkLatestRoundDataResponse {
+        round_id,
+        answer,
+        started_at,
+        updated_at,
+        answered_in_round,
+    };
+
+    Ok(response)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -341,5 +492,11 @@ mod tests {
             println!("{}", actual.err().unwrap());
             assert!(false);
         }
+    }
+
+    #[test]
+    fn test_chainlink() {
+        const RESPONSE: &str = r#"{"jsonrpc":"2.0","id":1,"result":"0x0000000000000000000000000000000000000000000000020000000000000bbb0000000000000000000000000000000000000000000000000000001871d50140000000000000000000000000000000000000000000000000000000005ffdbbdc000000000000000000000000000000000000000000000000000000005ffdbbdc0000000000000000000000000000000000000000000000020000000000000bbb"}"#;
+        let deserialized = deserialize_chainlink_latest_round_data_call_response(RESPONSE).unwrap();
     }
 }
