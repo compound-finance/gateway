@@ -261,12 +261,16 @@ mod tests {
         get_test_cases().drain(..).for_each(test_eth_recover_case);
     }
 
-    fn get_test_keyring(case: &TestCase) -> (KeyId, InMemoryKeyring) {
+    fn get_test_keyring_from_test_case(case: &TestCase) -> (KeyId, InMemoryKeyring) {
+        get_test_keyring(case.private_key.clone())
+    }
+
+    pub fn get_test_keyring(private_key: String) -> (KeyId, InMemoryKeyring) {
         let key_id = KeyId {
             data: "hello".into(),
         };
         let mut keyring = InMemoryKeyring::new();
-        let private_key_bytes = eth_decode_hex(case.private_key.clone());
+        let private_key_bytes = eth_decode_hex(private_key.clone());
         let pair = EcdsaPair::from_seed_slice(&private_key_bytes).unwrap();
         keyring.add(&key_id, pair);
 
@@ -274,7 +278,7 @@ mod tests {
     }
 
     fn test_sign_case(case: TestCase) {
-        let (key_id, keyring) = get_test_keyring(&case);
+        let (key_id, keyring) = get_test_keyring_from_test_case(&case);
         let message: Vec<u8> = case.data.into();
         let messages = vec![message];
         let sigs = keyring.sign(messages, &key_id).unwrap();
@@ -290,7 +294,7 @@ mod tests {
     }
 
     fn test_public_key_case(case: TestCase) {
-        let (key_id, keyring) = get_test_keyring(&case);
+        let (key_id, keyring) = get_test_keyring_from_test_case(&case);
         let actual_address = keyring.get_eth_address(&key_id).unwrap();
         let expected_address = eth_decode_hex(case.address);
         assert_eq!(actual_address, expected_address);

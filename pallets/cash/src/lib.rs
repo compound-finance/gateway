@@ -52,8 +52,11 @@ mod oracle;
 mod tests;
 
 // OCW storage constants
-pub const OCW_STORAGE_LOCK_KEY: &[u8; 10] = b"cash::lock";
-pub const OCW_LATEST_CACHED_BLOCK: &[u8; 11] = b"cash::block";
+pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
+pub const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
+pub const OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER: &[u8; 41] =
+    b"cash::latest_price_feed_poll_block_number";
+pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
@@ -128,14 +131,14 @@ decl_storage! {
         // LiquidationIncentive;
 
         /// Mapping of latest prices for each asset symbol.
-        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => GenericPrice;
+        Price get(fn price): map hasher(blake2_128_concat) Symbol => GenericPrice;
 
         /// Mapping of assets to the last time their price was updated.
         PriceTime get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
 
         // XXX I think the logic for this mapping needs to be inverted so we have prices stored by symbol
         /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) Symbol => GenericAsset;
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Symbol;
 
         // PriceReporter;
         // PriceKeyMapping;
@@ -143,9 +146,11 @@ decl_storage! {
     add_extra_genesis {
         config(validators): GenericSet;
         config(reporters): GenericSet;
+        config(price_key_mapping): GenericSet;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
+            Module::<T>::initialize_price_key_mapping(config.price_key_mapping.clone());
         })
     }
 }
@@ -200,6 +205,30 @@ decl_error! {
 
         /// An error related to the oracle
         OpenOracleError,
+
+        /// Open oracle cannot parse the signature
+        OpenOracleErrorInvalidSignature,
+
+        /// Open oracle cannot parse the signature
+        OpenOracleErrorInvalidReporter,
+
+        /// Open oracle cannot parse the message
+        OpenOracleErrorInvalidMessage,
+
+        /// Open oracle cannot update price due to stale price
+        OpenOracleErrorStalePrice,
+
+        /// Open oracle cannot fetch price due to an http error
+        OpenOracleHttpFetchError,
+
+        /// Open oracle cannot deserialize the messages and/or signatures from eth encoded hex to binary
+        OpenOracleApiResponseHexError,
+
+        /// Open oracle offchain worker made an attempt to update the price but failed in the extrinsic
+        OpenOraclePostPriceExtrinsicError,
+
+        /// An unsupported symbol was provided to the oracle.
+        OpenOracleErrorInvalidSymbol,
 
         /// An error related to the chain_spec file contents
         GenesisConfigError,
@@ -405,7 +434,7 @@ decl_module! {
             // a really simple idea to do it once a minute on average is to just use probability
             // and only update the feed every now and then. It is a function of how many validators
             // are running.
-            let result = Self::process_open_price_feed();
+            let result = Self::process_open_price_feed(block_number);
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
             }
@@ -427,17 +456,26 @@ impl<T: Config> Module<T> {
         let hashed = compound_crypto::keccak(&payload);
         let recovered = cash_err!(
             compound_crypto::eth_recover(&hashed, &signature),
-            <Error<T>>::OpenOracleError
+            <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
         let reporters = Reporters::get();
         if !reporters
             .iter()
             .any(|e| e.as_slice() == recovered.as_slice())
         {
-            return Err(<Error<T>>::OpenOracleError);
+            return Err(<Error<T>>::OpenOracleErrorInvalidReporter);
         }
 
-        let parsed = cash_err!(oracle::parse_message(&payload), <Error<T>>::OpenOracleError)?;
+        // parse message and check it
+        let parsed = cash_err!(
+            oracle::parse_message(&payload),
+            <Error<T>>::OpenOracleErrorInvalidMessage
+        )?;
+
+        let symbol = cash_err!(
+            crate::core::Symbol::from_str(&parsed.key),
+            <Error<T>>::OpenOracleErrorInvalidSymbol
+        )?;
 
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
@@ -445,6 +483,23 @@ impl<T: Config> Module<T> {
             (parsed.value as f64) / 1000000.0
         );
         // todo: more sanity checking on the value
+        // note - the API for GET does not return an Option but if the value is not present it
+        // returns Default::default(). Thus, we explicitly check if the key for the ticker is supported
+        // or not.
+
+        if PriceTime::contains_key(&symbol) {
+            // it has been updated at some point, make sure we are updating to a more recent price
+            let last_updated = PriceTime::get(&symbol);
+            if parsed.timestamp <= last_updated {
+                return Err(<Error<T>>::OpenOracleErrorStalePrice);
+            }
+        }
+
+        // WARNING begin storage - all checks must happen above
+
+        Price::insert(&symbol, parsed.value as u128);
+        PriceTime::insert(&symbol, parsed.timestamp as u128);
+
         // todo: update storage
         Ok(())
     }
@@ -494,24 +549,73 @@ impl<T: Config> Module<T> {
         Reporters::put(converted);
     }
 
+    /// Set the initial set of open price feed price reporters from the genesis config
+    fn initialize_price_key_mapping(price_key_mapping: GenericSet) {
+        assert!(
+            !price_key_mapping.is_empty(),
+            "price_key_mapping must be set in the genesis config"
+        );
+
+        for record in price_key_mapping {
+            let mut tokens = record.split(":");
+            let ticker = tokens.next().expect("No ticker present");
+            let symbol = Symbol::from_str(ticker).expect("Ticker was not a valid symbol");
+            let chain = tokens.next().expect("No blockchain present");
+            let address = tokens.next().expect("No address present");
+            assert!(
+                tokens.next().is_none(),
+                "Too many colons in price key mapping element"
+            );
+            assert!(chain == "ETH", "Invalid blockchain");
+
+            let decoded = hex::decode(&address).expect("Address is not in hex format");
+
+            let chain_asset: GenericAsset = (ChainId::Eth, decoded);
+            PriceKeyMapping::insert(chain_asset, symbol);
+        }
+    }
+
     /// Procedure for offchain worker to processes messages coming out of the open price feed
-    pub fn process_open_price_feed() -> Result<(), Error<T>> {
+    pub fn process_open_price_feed(block_number: T::BlockNumber) -> Result<(), Error<T>> {
+        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_OPEN_PRICE_FEED);
+        if lock.try_lock().is_err() {
+            // working in another thread, no big deal
+            return Ok(());
+        }
+        // check to see if it is time to poll or not
+        let latest_price_feed_poll_block_number_storage =
+            StorageValueRef::persistent(OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER);
+        if let Some(Some(latest_poll_block_number)) =
+            latest_price_feed_poll_block_number_storage.get::<T::BlockNumber>()
+        {
+            let poll_interval_blocks = <T as frame_system::Config>::BlockNumber::from(
+                params::OCW_OPEN_ORACLE_POLL_INTERVAL_BLOCKS,
+            );
+            if block_number - latest_poll_block_number < poll_interval_blocks {
+                return Ok(());
+            }
+        }
+        // poll
         let api_response = cash_err!(
             crate::oracle::open_price_feed_request_okex(),
-            <Error<T>>::HttpFetchingError
+            <Error<T>>::OpenOracleHttpFetchError
         )?;
         let messages_and_signatures = cash_err!(
             api_response.to_message_signature_pairs(),
-            <Error<T>>::OpenOracleError
+            <Error<T>>::OpenOracleApiResponseHexError
         )?;
         for (msg, sig) in messages_and_signatures {
             // adding some debug info in here, this will become very chatty
             let call = <Call<T>>::post_price(msg, sig);
-            cash_err!(
+            let _ = cash_err!(
                 SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()),
-                <Error<T>>::OpenOracleError
-            )?;
+                <Error<T>>::OpenOraclePostPriceExtrinsicError
+            );
+            // note - there is a log message in cash_err if this extrinsic fails but we should
+            // still try to update the other prices even if one extrinsic fails, thus the result
+            // is ignored and we continue in this loop
         }
+        latest_price_feed_poll_block_number_storage.set(&block_number);
         Ok(())
     }
 
@@ -535,7 +639,7 @@ impl<T: Config> Module<T> {
         // Create a reference to Local Storage value.
         // Since the local storage is common for all offchain workers, it's a good practice
         // to prepend our entry with the pallet name.
-        let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_BLOCK);
+        let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_ETHEREUM_BLOCK);
 
         // Local storage is persisted and shared between runs of the offchain workers,
         // offchain workers may run concurrently. We can use the `mutate` function to
@@ -572,7 +676,7 @@ impl<T: Config> Module<T> {
         //   3) `with_block_deadline` - lock with default time but custom block expiration
         //   4) `with_block_and_time_deadline` - lock with custom time and block expiration
         // Here we choose the default one for now.
-        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_KEY);
+        let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_ETHEREUM_EVENTS);
 
         // We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
         //   executed by previous run of ocw, so the function just returns.
@@ -666,8 +770,9 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
-            Call::post_price(_, _) => ValidTransaction::with_tag_prefix("CashPallet")
+            Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
+                .and_provides(sig)
                 .propagate(true)
                 .build(),
             _ => InvalidTransaction::Call.into(),

@@ -16,3 +16,6 @@ pub const MIN_TX_VALUE: Quantity<{ Symbol::USD }> = Quantity::from_nominal(1.0);
 
 /// Flat transfer fee (CASH).
 pub const TRANSFER_FEE: Quantity<{ Symbol::CASH }> = Quantity::from_nominal(0.01);
+
+/// Number of blocks between HTTP requests via offchain workers to open oracle price reporters
+pub const OCW_OPEN_ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;

@@ -87,7 +87,6 @@ jobs:
       - name: Substrate setup
         run: |
           ./scripts/get_substrate.sh --fast
-
     
       - name: Install yarn ethereum dependencies
         run: cd ethereum && yarn install

@@ -93,6 +93,7 @@ pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Ve
 pub enum Reason {
     None,
     MinTxValueNotMet,
+    InvalidSymbol,
 }
 
 /// Type for the abstract symbol of an asset, not tied to a chain.
@@ -107,6 +108,12 @@ pub enum Symbol {
     USDC,
 }
 
+impl Default for Symbol {
+    fn default() -> Self {
+        Symbol::CASH
+    }
+}
+
 impl Symbol {
     pub const fn decimals(self) -> u8 {
         match self {
@@ -117,6 +124,19 @@ impl Symbol {
             Symbol::TEZ => 6,
             Symbol::USD => 6,
             Symbol::USDC => 6,
+        }
+    }
+
+    pub fn from_str(input: &str) -> Result<Symbol, Reason> {
+        match input {
+            "CASH" => Ok(Symbol::CASH),
+            "DOT" => Ok(Symbol::DOT),
+            "ETH" => Ok(Symbol::ETH),
+            "SOL" => Ok(Symbol::SOL),
+            "TEZ" => Ok(Symbol::TEZ),
+            "USD" => Ok(Symbol::USD),
+            "USDC" => Ok(Symbol::USDC),
+            _ => Err(Reason::InvalidSymbol),
         }
     }
 }
@@ -267,7 +287,7 @@ impl<const S: Symbol> Mul<Index> for Quantity<S> {
 pub fn price<T: Config, const S: Symbol>() -> Price<S> {
     match S {
         Symbol::CASH => Price::from_nominal(1.0),
-        _ => Price(<Module<T>>::prices(S)),
+        _ => Price(<Module<T>>::price(S)),
     }
 }
 
