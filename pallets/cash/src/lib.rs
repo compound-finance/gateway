@@ -158,6 +158,9 @@ decl_event!(
     {
         XXXPhantomFakeEvent(AccountId), // XXX
 
+        /// XXX -- For testing
+        GoldieLocks(GenericAsset, GenericAccount, GenericQty),
+
         /// XXX
         MagicExtract(GenericQty, GenericAccount, Notice<Ethereum>),
 
@@ -272,7 +275,7 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = 10] // XXX how are we doing weights?
+        #[weight = 1] // XXX how are we doing weights?
         pub fn process_eth_event(origin, payload: SignedPayload, sig: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
             print("process_eth_event(origin,payload,sig)");
             ensure_none(origin)?;
@@ -319,8 +322,8 @@ decl_module! {
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
                     if signers_new.len() > validators.len() * 2 / 3 {
-                        match core::apply_eth_event_internal(event) {
-                            Ok(_) => {
+                        match core::apply_eth_event_internal::<T>(event) {
+                            Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                                 Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
                                 Ok(())
@@ -337,11 +340,10 @@ decl_module! {
                         Ok(())
                     }
                 }
-
                 // XXX potential retry logic to allow retrying Failures
                 EventStatus::<Ethereum>::Failed { hash, .. } => {
                     // XXX require(compute_hash(payload) == hash, "event data differs from failure");
-                    match core::apply_eth_event_internal(event) {
+                    match core::apply_eth_event_internal::<T>(event) {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                             Self::deposit_event(RawEvent::ProcessedEthEvent(payload));

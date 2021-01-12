@@ -2,6 +2,21 @@ const { debug, log } = require('./log');
 
 let trxId = 0;
 
+function waitForEvent(api, pallet, method, onFinalize = true) {
+  return new Promise((resolve, reject) => {
+    api.query.system.events((events) => {
+
+      // Loop through the Vec<EventRecord>
+      events.forEach(({ event }) => {
+        log(`Found event: ${event.section}:${event.method}`);
+        if (event.section === pallet && event.method === method) {
+          return resolve(event);
+        }
+      });
+    });
+  });
+}
+
 function sendAndWaitForEvents(call, onFinalize = true) {
   return new Promise((resolve, reject) => {
     let unsub;
@@ -25,6 +40,8 @@ function sendAndWaitForEvents(call, onFinalize = true) {
           unsub();
           resolve(events);
         }
+      } else if (status.isInvalid) {
+        reject("Transaction failed (Invalid)");
       }
     }).then((unsub_) => unsub = unsub_);
 
@@ -36,7 +53,10 @@ function findEvent(events, pallet, method) {
   return events.find(({ event }) => event.section === pallet && event.method === method);
 }
 
-function getEventData({ event }) {
+function getEventData(event) {
+  if (event.event) { // Events are sometimes wrapped, let's make it easy for the caller
+    event = event.event;
+  }
   const types = event.typeDef;
 
   return event.data.reduce((acc, value, index) => {
@@ -52,5 +72,6 @@ function getEventData({ event }) {
 module.exports = {
   findEvent,
   getEventData,
-  sendAndWaitForEvents
+  sendAndWaitForEvents,
+  waitForEvent
 };

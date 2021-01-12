@@ -6,7 +6,7 @@ const { log, error } = require('../util/log');
 const { canConnectTo } = require('../util/net');
 const { loadTypes } = require('../util/types');
 const { genPort, sleep, until } = require('../util/util');
-const { getEventData, findEvent, sendAndWaitForEvents } = require('../util/substrate');
+const { getEventData, findEvent, sendAndWaitForEvents, waitForEvent } = require('../util/substrate');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { Keyring } = require('@polkadot/api');
 
@@ -63,6 +63,11 @@ describe('golden path', () => {
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
                     1
                   ]
+                ]
+              },
+              palletCash: {
+                validators: [
+                  "04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4"
                 ]
               }
             }
@@ -152,21 +157,22 @@ describe('golden path', () => {
   });
 
   test('magic extraction', async () => {
-    let call = api.tx.cash.magicExtract({
-      chain: "Eth",
-      account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
-    }, "1000");
+    let call = api.tx.cash.magicExtract(
+      [
+        "Eth",
+        "0xc00e94cb662c3520282e6f5717214004a7f26888"
+      ], 1000);
 
     let events = await sendAndWaitForEvents(call, false);
     let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
 
     expect(magicExtractEvent).toBeDefined();
     expect(getEventData(magicExtractEvent)).toEqual({
-      CashAmount: 1000,
-      ChainAccount: {
-        chain: "Eth",
-        account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
-      },
+      GenericQty: 1000,
+      GenericAccount: [
+        "Eth",
+        "0xc00e94cb662c3520282e6f5717214004a7f26888"
+      ],
       Notice: {
         ExtractionNotice: {
           id: [expect.any(Number), 0],
@@ -180,32 +186,21 @@ describe('golden path', () => {
     // Everything's good.
   }, 600000 /* 10m */);
 
-  test.only('lock asset', async () => {
+  test('lock asset', async () => {
     let tx = await contracts.starport.methods.lockETH().send({ value: 1e18, from: accounts[0] });
-    log({ tx });
+    let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false);
 
-    await sleep(50000);
-
-    // Check for events not via trx
-    // let events = await sendAndWaitForEvents(call, false);
-    // let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
-
-    // expect(magicExtractEvent).toBeDefined();
-    // expect(getEventData(magicExtractEvent)).toEqual({
-    //   CashAmount: 1000,
-    //   ChainAccount: {
-    //     chain: "Eth",
-    //     account: "0xc00e94cb662c3520282e6f5717214004a7f26888"
-    //   },
-    //   Notice: {
-    //     ExtractionNotice: {
-    //       id: [expect.any(Number), 0],
-    //       parent: "0x0000000000000000000000000000000000000000000000000000000000000000", "asset": "0x0000000000000000000000000000000000000000",
-    //       account: "0xc00e94cb662c3520282e6f5717214004a7f26888",
-    //       amount: 1000
-    //     }
-    //   }
-    // });
+    expect(getEventData(goldieLocksEvent)).toEqual({
+      "GenericAccount": [
+        "Eth",
+        accounts[0].toLowerCase(),
+      ],
+      "GenericAsset": [
+        "Eth",
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      ],
+      "GenericQty": "0x00000000000000000de0b6b3a7640000"
+    });
 
     // Everything's good.
   }, 600000 /* 10m */);
