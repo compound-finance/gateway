@@ -9,5 +9,6 @@ members = [
     'runtime',
     'std',
     'compound-crypto',
-    'open-oracle-mock-reporter'
+    'open-oracle-mock-reporter',
+    'trx-request'
 ]
