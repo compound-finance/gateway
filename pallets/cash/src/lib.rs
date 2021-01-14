@@ -739,18 +739,26 @@ impl<T: Config> Module<T> {
     }
 
     fn update_earliest_block_with_pending_events() -> Result<(), Error<T>> {
-        let mut min_block_number = u32::MAX;
-        for ((block_number, log_index), status) in EthEventQueue::iter() {
-            let is_pending = match status {
-                EventStatus::<Ethereum>::Pending { signers } => true,
-                _ => false,
-            };
-            if (is_pending == true && block_number < min_block_number) {
-                min_block_number = block_number;
-            }
-        }
-        if (min_block_number != u32::MAX) {
-            PendingEventsBlock::put(min_block_number);
+        let block_numbers: Vec<u32> = EthEventQueue::iter()
+            .filter_map(|((block_number, log_index), status)| {
+                if match status {
+                    EventStatus::<Ethereum>::Pending { signers } => true,
+                    _ => false,
+                } {
+                    Some(block_number)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let min_block_number = block_numbers.iter().min();
+        if (min_block_number.is_some()) {
+            let min_block = min_block_number.unwrap();
+            debug::native::info!(
+                "Updating earliest block number with pending events {:?}",
+                min_block
+            );
+            PendingEventsBlock::put(min_block);
         }
         Ok(())
     }
