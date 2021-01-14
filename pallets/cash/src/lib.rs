@@ -120,6 +120,8 @@ decl_storage! {
         /// Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
+        PendingEventsBlock get(fn pending_events_block): u32;
+
         /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
 
@@ -318,8 +320,6 @@ decl_module! {
             let recover = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
             let signer = recover.serialize();
 
-            // XXX
-            // XXX require(signer == known validator); // XXX
             // Check that signer is a known validator, otherwise throw an error
             let validators = <Validators>::get();
             if !validators.contains(&signer) {
@@ -349,19 +349,18 @@ decl_module! {
                             Ok(_) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                                 Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
-                                Ok(())
                             }
 
                             Err(reason) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash: Ethereum::hash_bytes(payload.as_slice()), reason: reason });
                                 Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, reason));
-                                Ok(())
                             }
                         }
                     } else {
                         EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Pending { signers: signers_new });
-                        Ok(())
                     }
+                    Self::update_earliest_block_with_pending_events();
+                    Ok(())
                 }
 
                 // XXX potential retry logic to allow retrying Failures
@@ -371,15 +370,15 @@ decl_module! {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                             Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
-                            Ok(())
                         }
 
                         Err(new_reason) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
                             Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, new_reason));
-                            Ok(())
                         }
                     }
+                    Self::update_earliest_block_with_pending_events();
+                    Ok(())
                 }
 
                 EventStatus::<Ethereum>::Done => {
@@ -658,7 +657,8 @@ impl<T: Config> Module<T> {
         if let Some(Some(cached_block_num)) = s_info.get::<String>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
             debug::native::info!("Last cached block number: {:?}", cached_block_num);
-            from_block = events::get_next_block_hex(cached_block_num)
+            let pending_events_block = PendingEventsBlock::get();
+            from_block = events::get_next_block_hex(cached_block_num, pending_events_block)
                 .map_err(|_| <Error<T>>::HttpFetchingError)?;
         } else {
             // Validator's cache is empty, fetch events from the earliest available block
@@ -736,6 +736,23 @@ impl<T: Config> Module<T> {
         r[0..64].copy_from_slice(&sig.0.serialize()[..]);
         r[64] = sig.1.serialize();
         return r;
+    }
+
+    fn update_earliest_block_with_pending_events() -> Result<(), Error<T>> {
+        let mut min_block_number = u32::MAX;
+        for ((block_number, log_index), status) in EthEventQueue::iter() {
+            let is_pending = match status {
+                EventStatus::<Ethereum>::Pending { signers } => true,
+                _ => false,
+            };
+            if (is_pending == true && block_number < min_block_number) {
+                min_block_number = block_number;
+            }
+        }
+        if (min_block_number != u32::MAX) {
+            PendingEventsBlock::put(min_block_number);
+        }
+        Ok(())
     }
 }
 
