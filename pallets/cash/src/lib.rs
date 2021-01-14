@@ -738,7 +738,7 @@ impl<T: Config> Module<T> {
         return r;
     }
 
-    fn update_earliest_block_with_pending_events() -> Result<(), Error<T>> {
+    fn update_earliest_block_with_pending_events() {
         let block_numbers: Vec<u32> = EthEventQueue::iter()
             .filter_map(|((block_number, log_index), status)| {
                 if match status {
@@ -760,7 +760,6 @@ impl<T: Config> Module<T> {
             );
             PendingEventsBlock::put(min_block);
         }
-        Ok(())
     }
 }
 
