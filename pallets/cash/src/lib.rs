@@ -6,6 +6,7 @@
 #[macro_use]
 extern crate alloc;
 extern crate ethereum_client;
+extern crate trx_request;
 
 use codec::{alloc::string::String, Decode};
 use frame_support::{
@@ -17,6 +18,7 @@ use frame_system::{
 };
 use our_std::{
     convert::{TryFrom, TryInto},
+    fmt, str,
     vec::Vec,
 };
 use sp_runtime::{
@@ -37,6 +39,7 @@ use crate::core::{
     SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
+use crate::trx_req::*;
 use sp_runtime::print;
 
 mod chains;
@@ -44,6 +47,7 @@ mod core;
 mod events;
 mod notices;
 mod params;
+mod trx_req;
 
 #[cfg(test)]
 mod mock;
@@ -236,6 +240,9 @@ decl_error! {
 
         /// An error related to the chain_spec file contents
         GenesisConfigError,
+
+        /// Trx request parsing error
+        TrxRequestParseError,
     }
 }
 
@@ -302,6 +309,26 @@ decl_module! {
 
             // Return a successful DispatchResult
             Ok(())
+        }
+
+        // TODO
+        #[weight = 1]
+        pub fn exec_trx_request(origin, request: Vec<u8>) -> dispatch::DispatchResult {
+            // // TODO: Add more error information here
+            print("submit_trx_request");
+            let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
+            print(request_str);
+            // // TODO: Add more error information here
+            let trx_request = trx_request::parse_request(request_str).map_err(|_| <Error<T>>::TrxRequestParseError)?;
+            match trx_request {
+                trx_request::TrxRequest::MagicExtract(amount, account) => {
+                    // TODO: Improve errors here, possibly use `into()`
+                    let gen_account = trx_req::account_to_generic(account);
+                    // TODO: Create real "max" function checker
+                    let gen_amount = trx_req::max_amount_to_generic(amount, &|| 5);
+                    Module::<T>::magic_extract(origin, gen_account, gen_amount)
+                }
+            }
         }
 
         #[weight = 1] // XXX how are we doing weights?
@@ -778,6 +805,11 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
+            Call::exec_trx_request(payload) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .and_provides(payload)
+                .propagate(true)
+                .build(),
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)

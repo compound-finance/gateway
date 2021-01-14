@@ -35,6 +35,7 @@ our-std = { path = "../../std", default-features = false }
 ethereum-client = { path = "../../ethereum_client", default-features = false }
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
 compound-crypto = { path = '../../compound-crypto', default-features = false }
+trx-request = { path = '../../trx-request', default-features = false }
 
 [features]
 default = ['std']
