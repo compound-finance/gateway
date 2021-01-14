@@ -37,6 +37,7 @@ use crate::core::{
     SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
+use crate::rates::{InterestRateModel, Rate};
 use sp_runtime::print;
 
 mod chains;
@@ -44,6 +45,7 @@ mod core;
 mod events;
 mod notices;
 mod params;
+mod rates;
 
 #[cfg(test)]
 mod mock;
@@ -106,11 +108,18 @@ decl_storage! {
         // TotalCashHoldPrincipal;
         // TotalCashBorrowPrincipal;
         // TotalSupplyPrincipal[asset];
+
+        TotalSupplyPrincipal get(fn total_supply_principal): map hasher(blake2_128_concat) GenericAsset => GenericQty;
         // TotalBorrowPrincipal[asset];
+
+        TotalBorrowPrincipal get(fn total_borrow_principal): map hasher(blake2_128_concat) GenericAsset => GenericQty;
+
         // CashHoldPrincipal[account];
         // CashBorrowPrincipal[account];
         // SupplyPrincipal[asset][account];
         // BorrowPrincipal[asset][account];
+
+        Model get(fn model): map hasher(blake2_128_concat) GenericAsset => crate::rates::InterestRateModel;
 
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) GenericAccount => Nonce;
@@ -137,7 +146,6 @@ decl_storage! {
         /// Mapping of assets to the last time their price was updated.
         PriceTime get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
 
-        // XXX I think the logic for this mapping needs to be inverted so we have prices stored by symbol
         /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
         PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Symbol;
 
@@ -151,7 +159,7 @@ decl_storage! {
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_price_key_mapping(config.price_key_mapping.clone());
+            Module::<T>::initialize_asset_maps(config.price_key_mapping.clone());
         })
     }
 }
@@ -236,6 +244,21 @@ decl_error! {
 
         /// An error related to the chain_spec file contents
         GenesisConfigError,
+
+        /// Invalid parameters to a provided interest rate model
+        InterestRateModelInvalidParameters,
+
+        /// Asset is not supported
+        AssetNotSupported,
+
+        /// No interest rate model is provided for the given asset
+        InterestRateModelNotSet,
+
+        /// Could not get the borrow rate on the asset but there was a model to try
+        InterestRateModelGetBorrowRateFailed,
+
+        /// Could not get the utilization ratio
+        InterestRateModelGetUtilizationFailed,
     }
 }
 
@@ -267,6 +290,14 @@ decl_module! {
         pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Self::post_price_internal(payload, signature)?;
+            Ok(())
+        }
+
+        /// Update the interest rate model for a given asset. This is only called by governance
+        #[weight = 0]
+        pub fn update_interest_rate_model(origin, asset: GenericAsset, model: InterestRateModel) -> dispatch::DispatchResult {
+            ensure_none(origin)?;
+            Self::update_interest_rate_model_internal(asset, model)?;
             Ok(())
         }
 
@@ -451,6 +482,47 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
+    /// Check to make sure an asset is supported. Only returns Err when the asset is not supported
+    /// by compound chain.
+    fn check_asset_supported(asset: &GenericAsset) -> Result<(), Error<T>> {
+        if !PriceKeyMapping::contains_key(&asset) {
+            return Err(<Error<T>>::AssetNotSupported);
+        }
+
+        Ok(())
+    }
+
+    /// Update the interest rate model
+    fn update_interest_rate_model_internal(
+        asset: GenericAsset,
+        model: InterestRateModel,
+    ) -> Result<(), Error<T>> {
+        Self::check_asset_supported(&asset)?;
+        cash_err!(
+            model.check_parameters(),
+            <Error<T>>::InterestRateModelInvalidParameters
+        )?;
+        Model::insert(&asset, model);
+        Ok(())
+    }
+
+    /// Get the borrow rate for the given asset
+    fn get_borrow_rate(asset: &GenericAsset) -> Result<Rate, Error<T>> {
+        if !Model::contains_key(asset) {
+            return Err(<Error<T>>::InterestRateModelNotSet);
+        }
+
+        let model = Model::get(asset);
+        let utilization = Self::get_utilization(asset)?;
+
+        let rate = cash_err!(
+            model.get_borrow_rate(utilization, 0),
+            <Error<T>>::InterestRateModelGetBorrowRateFailed
+        )?;
+
+        Ok(rate)
+    }
+
     /// Body of the post_price extrinsic
     /// * checks signature of message
     /// * parses message
@@ -460,6 +532,8 @@ impl<T: Config> Module<T> {
     /// body of this function here.
     fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
         // check signature
+        // note that this is actually a double-hash situation but that is expected behavior
+        // the hashed message is hashed again in the eth convention inside eth_recover
         let hashed = compound_crypto::keccak(&payload);
         let recovered = cash_err!(
             compound_crypto::eth_recover(&hashed, &signature),
@@ -511,6 +585,23 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
+    /// Get the utilization in the provided asset.
+    fn get_utilization(asset: &GenericAsset) -> Result<crate::rates::Utilization, Error<T>> {
+        Self::check_asset_supported(asset)?;
+        // important note - because we know that our asset is _supported_
+        // it allows us to get the default value zero if these values are not set.
+        // it is possible that these keys do not exist for that asset.
+        let total_supply_principal = TotalSupplyPrincipal::get(asset);
+        let total_borrow_principal = TotalBorrowPrincipal::get(asset);
+
+        let utilization = cash_err!(
+            crate::rates::get_utilization(total_supply_principal, total_borrow_principal),
+            <Error<T>>::InterestRateModelGetUtilizationFailed
+        )?;
+
+        Ok(utilization)
+    }
+
     /// Convert from the chain spec file format hex encoded strings into the local storage format, binary blob
     fn hex_string_vec_to_binary_vec<U: TryFrom<Vec<u8>>>(
         data: Vec<String>,
@@ -556,8 +647,18 @@ impl<T: Config> Module<T> {
         Reporters::put(converted);
     }
 
-    /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_price_key_mapping(price_key_mapping: GenericSet) {
+    /// Initializes several maps that use asset as their key to sane default values explicitly
+    ///
+    /// Maps initialized by this function
+    ///
+    /// * TotalSupplyPrincipal
+    /// * TotalBorrowPrincipal
+    /// * BorrowIndex
+    /// * SupplyIndex
+    /// * Model
+    /// * PriceKeyMapping
+    ///
+    fn initialize_asset_maps(price_key_mapping: GenericSet) {
         assert!(
             !price_key_mapping.is_empty(),
             "price_key_mapping must be set in the genesis config"
@@ -578,7 +679,16 @@ impl<T: Config> Module<T> {
             let decoded = hex::decode(&address).expect("Address is not in hex format");
 
             let chain_asset: GenericAsset = (ChainId::Eth, decoded);
-            PriceKeyMapping::insert(chain_asset, symbol);
+            let zero_index: Index = 0u8.into();
+
+            TotalSupplyPrincipal::insert(&chain_asset, 0);
+            TotalBorrowPrincipal::insert(&chain_asset, 0);
+            // note - these indexes are 0 at the start due to the new additive index method
+            BorrowIndex::insert(&chain_asset, zero_index.clone());
+            SupplyIndex::insert(&chain_asset, zero_index);
+            // todo: we may want to do better with genesis having configurable initial interest rate models
+            Model::insert(&chain_asset, InterestRateModel::default());
+            PriceKeyMapping::insert(&chain_asset, symbol);
         }
     }
 
