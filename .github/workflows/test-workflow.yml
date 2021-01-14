@@ -2,6 +2,17 @@ name: Test
 on: push
 
 jobs:
+  cargo-format:
+    name: substrate-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Cargo fmt
+        run: |
+          cargo fmt -- --check
+
   substrate-tests:
     name: substrate-tests
     runs-on: ubuntu-latest
@@ -18,10 +29,6 @@ jobs:
       - name: Substrate setup
         run: |
           ./scripts/get_substrate.sh --fast
-
-      - name: Cargo fmt
-        run: |
-          cargo fmt -- --check
 
       - name: Install cargo2junit
         run: |
