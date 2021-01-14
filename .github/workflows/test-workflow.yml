@@ -3,7 +3,7 @@ on: push
 
 jobs:
   cargo-format:
-    name: substrate-tests
+    name: Cargo Format Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -14,7 +14,7 @@ jobs:
           cargo fmt -- --check
 
   substrate-tests:
-    name: substrate-tests
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Test Note for ${{ github.ref }}
@@ -69,7 +69,7 @@ jobs:
         continue-on-error: true
 
   integration-tests:
-    name: integration-tests
+    name: Integration Tests
     runs-on: ubuntu-latest
     steps:
       - name: Test Note for ${{ github.ref }}
@@ -149,7 +149,7 @@ jobs:
         continue-on-error: true
 
   eth-tests:
-    name: eth-tests
+    name: Ethereum Tests
     runs-on: ubuntu-latest
     defaults:
       run:
