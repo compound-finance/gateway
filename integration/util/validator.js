@@ -6,7 +6,8 @@ const child_process = require('child_process');
 const execFile = util.promisify(child_process.execFile);
 const { log, error } = require('./log');
 
-let target = path.join(__dirname, '..', '..', 'target', 'release', 'compound-chain');
+let profile = process.env['PROFILE'] ? process.env['PROFILE'] : 'release';
+let target = path.join(__dirname, '..', '..', 'target', profile, 'compound-chain');
 
 async function tmpFile(name) {
   folder = await fs.mkdtemp(path.join(os.tmpdir()));

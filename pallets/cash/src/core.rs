@@ -14,7 +14,9 @@ use crate::{
     params::MIN_TX_VALUE,
     Config,
     Module,
+    RawEvent::GoldieLocks,
 };
+use sp_runtime::print;
 
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
@@ -92,6 +94,7 @@ pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Ve
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
     None,
+    NotImplemented,
     MinTxValueNotMet,
     InvalidSymbol,
 }
@@ -180,6 +183,12 @@ impl<C: Chain> From<Asset<C>> for GenericAsset {
     }
 }
 
+impl<C: Chain> From<Account<C>> for GenericAccount {
+    fn from(account: Account<C>) -> Self {
+        (C::ID, account.0.into())
+    }
+}
+
 /// XXX doc
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Price<const S: Symbol>(pub GenericPrice);
@@ -219,14 +228,20 @@ where
     }
 }
 
-impl<const S: Symbol, T> From<T> for Quantity<S>
-where
-    T: Into<GenericQty>,
-{
-    fn from(raw: T) -> Self {
-        Quantity(raw.into())
+impl<const S: Symbol> From<Quantity<S>> for GenericQty {
+    fn from(quantity: Quantity<S>) -> Self {
+        quantity.0.into()
     }
 }
+
+// impl<const S: Symbol, T> From<T> for Quantity<S>
+// where
+//     T: Into<GenericQty>,
+// {
+//     fn from(raw: T) -> Self {
+//         Quantity(raw.into())
+//     }
+// }
 
 impl<T> From<T> for Index
 where
@@ -293,20 +308,34 @@ pub fn price<T: Config, const S: Symbol>() -> Price<S> {
 
 // Protocol interface //
 
-pub fn apply_eth_event_internal(event: eth::Event) -> Result<eth::Event, Reason> {
-    // XXX
-    // Pattern match Event:
-    //  When Gov(title:string, extrinsics:bytes[]):
-    //   Decode a SCALE-encoded set of extrinsics from the event
-    //   For each extrinsic, dispatch the given extrinsic as Root
-    //  When Lock(Asset:address, Holder:address, Amount:uint256):
-    //   Build AccountIdent=("eth", account)
-    //   Build AssetIdent=("eth", asset)
-    //   Call lockInternal(AssetIdent, AccountIdent, Amount)
-    //  When LockCash(Account:address, Amount: uint256, CashYieldIndex: uint256):
-    //   Build AccountIdent=("eth", account)
-    //   Call lockCashInternal(AccountIdent, Amount)
-    Ok(event) // XXX
+pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reason> {
+    match event.data {
+        eth::EventData::Lock {
+            asset,
+            holder,
+            amount,
+        } => {
+            //  When Lock(Asset:address, Holder:address, Amount:uint256):
+            //   Build AccountIdent=("eth", account)
+            //   Build AssetIdent=("eth", asset)
+            //   Call lockInternal(AssetIdent, AccountIdent, Amount)
+            print("applying lock event...");
+            lock_internal::<T, Ethereum, { Symbol::ETH }>(
+                Asset(asset),
+                Account(holder),
+                Quantity(amount.into()),
+            )
+        }
+        _ => {
+            //  When Gov(title:string, extrinsics:bytes[]):
+            //   Decode a SCALE-encoded set of extrinsics from the event
+            //   For each extrinsic, dispatch the given extrinsic as Root
+            //  When LockCash(Account:address, Amount: uint256, CashYieldIndex: uint256):
+            //   Build AccountIdent=("eth", account)
+            //   Call lockCashInternal(AccountIdent, Amount)
+            Err(Reason::NotImplemented)
+        }
+    }
 }
 
 pub fn lock_internal<T: Config, C: Chain, const S: Symbol>(
@@ -314,6 +343,10 @@ pub fn lock_internal<T: Config, C: Chain, const S: Symbol>(
     holder: Account<C>,
     amount: Quantity<S>,
 ) -> Result<(), Reason> {
+    print("lock internal...");
+
+    Module::<T>::deposit_event(GoldieLocks(asset.into(), holder.into(), amount.into()));
+
     // XXX
     // Read Require AmountPriceAssetParamsMinTxValue
     // Read Principal =AmountSupplyIndexAsset

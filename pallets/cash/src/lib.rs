@@ -37,6 +37,7 @@ use crate::core::{
     SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
+use sp_runtime::print;
 
 mod chains;
 mod core;
@@ -161,6 +162,9 @@ decl_event!(
         AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
     {
         XXXPhantomFakeEvent(AccountId), // XXX
+
+        /// XXX -- For testing
+        GoldieLocks(GenericAsset, GenericAccount, GenericQty),
 
         /// XXX
         MagicExtract(GenericQty, GenericAccount, Notice<Ethereum>),
@@ -300,8 +304,12 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = 0] // XXX how are we doing weights?
+        #[weight = 1] // XXX how are we doing weights?
         pub fn process_eth_event(origin, payload: SignedPayload, sig: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+            print("process_eth_event(origin,payload,sig)");
+            // TODO: We probably should ensure none here? It currently breaks tests...
+            // ensure_none(origin)?;
+
             // XXX do we want to store/check hash to allow replaying?
             //let signer = recover(payload); // XXX
 
@@ -345,8 +353,8 @@ decl_module! {
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
                     if signers_new.len() > validators.len() * 2 / 3 {
-                        match core::apply_eth_event_internal(event) {
-                            Ok(_) => {
+                        match core::apply_eth_event_internal::<T>(event) {
+                            Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                                 Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
                                 Ok(())
@@ -363,11 +371,10 @@ decl_module! {
                         Ok(())
                     }
                 }
-
                 // XXX potential retry logic to allow retrying Failures
                 EventStatus::<Ethereum>::Failed { hash, .. } => {
                     // XXX require(compute_hash(payload) == hash, "event data differs from failure");
-                    match core::apply_eth_event_internal(event) {
+                    match core::apply_eth_event_internal::<T>(event) {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                             Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
@@ -749,12 +756,13 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::process_eth_event(_payload, signature) => {
+            Call::process_eth_event(payload, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
+                    .priority(100)
                     // The transaction is only valid for next 10 blocks. After that it's
                     // going to be revalidated by the pool.
                     .longevity(10)
-                    .and_provides(signature)
+                    .and_provides(payload)
                     // It's fine to propagate that transaction to other peers, which means it can be
                     // created even by nodes that don't produce blocks.
                     // Note that sometimes it's better to keep it for yourself (if you are the block
