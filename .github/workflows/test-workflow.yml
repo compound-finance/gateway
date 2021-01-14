@@ -2,8 +2,19 @@ name: Test
 on: push
 
 jobs:
+  cargo-format:
+    name: Cargo Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Cargo fmt
+        run: |
+          cargo fmt -- --check
+
   substrate-tests:
-    name: substrate-tests
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Test Note for ${{ github.ref }}
@@ -18,10 +29,6 @@ jobs:
       - name: Substrate setup
         run: |
           ./scripts/get_substrate.sh --fast
-
-      - name: Cargo fmt
-        run: |
-          cargo fmt -- --check
 
       - name: Install cargo2junit
         run: |
@@ -62,7 +69,7 @@ jobs:
         continue-on-error: true
 
   integration-tests:
-    name: integration-tests
+    name: Integration Tests
     runs-on: ubuntu-latest
     steps:
       - name: Test Note for ${{ github.ref }}
@@ -142,7 +149,7 @@ jobs:
         continue-on-error: true
 
   eth-tests:
-    name: eth-tests
+    name: Ethereum Tests
     runs-on: ubuntu-latest
     defaults:
       run:
