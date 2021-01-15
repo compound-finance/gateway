@@ -1,7 +1,7 @@
 #![feature(str_split_once)]
 // TODO: Are we okay with this?
 #![allow(incomplete_features)]
-#![feature(unsized_locals, unsized_fn_params)]
+#![feature(unsized_locals)]
 
 mod hex_util;
 mod lex;

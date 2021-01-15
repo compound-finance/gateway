@@ -34,9 +34,6 @@ macro_rules! require_min_tx_value {
 
 // Type aliases //
 
-/// Type for representing an annualized rate on Compound Chain.
-pub type APR = u128; // XXX custom rate type?
-
 /// Type for a nonce.
 pub type Nonce = u32;
 

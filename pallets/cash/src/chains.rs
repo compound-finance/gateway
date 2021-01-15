@@ -1,7 +1,8 @@
 // Note: The substrate build requires these be imported
 pub use our_std::vec::Vec;
 
-use crate::core::{GenericQty, Index, Timestamp, APR};
+use crate::core::{GenericQty, Index, Timestamp};
+use crate::rates::Rate;
 use codec::{Decode, Encode};
 use our_std::{Debuggable, RuntimeDebug};
 
@@ -26,7 +27,7 @@ pub trait Chain {
     type Address: Debuggable + Clone + Eq + Into<Vec<u8>> = [u8; 20];
     type Amount: Debuggable + Clone + Eq + Into<GenericQty> = u128;
     type Index: Debuggable + Clone + Eq + Into<Index> = u128;
-    type Rate: Debuggable + Clone + Eq + Into<APR> = u128;
+    type Rate: Debuggable + Clone + Eq + Into<Rate> = u128;
     type Timestamp: Debuggable + Clone + Eq + Into<Timestamp> = u128; // XXX u64?
     type Hash: Debuggable + Clone + Eq = [u8; 32];
     type PublicKey: Debuggable + Clone + Eq = [u8; 32];

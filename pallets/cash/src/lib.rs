@@ -36,7 +36,7 @@ use crate::chains::{Chain, ChainId, Ethereum};
 use crate::core::{
     Account, Asset, EventStatus, GenericAccount, GenericAsset, GenericMsg, GenericPrice,
     GenericQty, GenericSet, GenericSigs, Index, Nonce, NoticeStatus, Reason, ReporterSet,
-    SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
+    SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig,
 };
 use crate::notices::{Notice, NoticeId}; // XXX move to core?
 use crate::rates::{InterestRateModel, Rate};
@@ -93,13 +93,13 @@ decl_storage! {
         CashYieldIndex get(fn cash_yield_index): Index;
 
         /// The upcoming base rate change for CASH and when, if any.
-        CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
+        CashYieldNext get(fn cash_yield_next): Option<(Rate, Timestamp)>;
 
-        /// The current APR on CASH held, and the base rate paid by borrowers.
-        CashYield get(fn cash_yield): APR;
+        /// The current Rate on CASH held, and the base rate paid by borrowers.
+        CashYield get(fn cash_yield): Rate;
 
-        /// The current APR surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
-        CashSpread get(fn cash_spread): APR;
+        /// The current Rate surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
+        CashSpread get(fn cash_spread): Rate;
 
         /// An index to track interest owed by asset borrowers.
         BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => Index;
