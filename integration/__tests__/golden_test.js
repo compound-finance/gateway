@@ -155,11 +155,7 @@ describe('golden path', () => {
   });
 
   test('magic extraction', async () => {
-    let call = api.tx.cash.magicExtract(
-      [
-        "Eth",
-        "0xc00e94cb662c3520282e6f5717214004a7f26888"
-      ], 1000);
+    let call = api.tx.cash.execTrxRequest("(magic-extract 1000 eth:0xc00e94cb662c3520282e6f5717214004a7f26888)");
 
     let events = await sendAndWaitForEvents(call, false);
     let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
