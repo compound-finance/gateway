@@ -34,24 +34,27 @@ use sp_runtime::{
 
 use crate::chains::{Chain, ChainId, Ethereum};
 use crate::core::{
-    Account, Asset, EventStatus, GenericAccount, GenericAsset, GenericMsg, GenericPrice,
-    GenericQty, GenericSet, GenericSigs, MulIndex, Nonce, NoticeStatus, Reason, ReporterSet,
-    SignedPayload, Symbol, Timestamp, ValidatorSet, ValidatorSig, APR,
+    get_quantity, get_signer, Account, Asset, ChainAccount, ChainSignature, EventStatus,
+    GenericAccount, GenericAsset, GenericMaxQty, GenericMsg, GenericPrice, GenericQty, GenericSet,
+    GenericSigs, MulIndex, Nonce, NoticeStatus, Reason, ReporterSet, SignedPayload, Symbol,
+    Timestamp, ValidatorSet, ValidatorSig, APR,
 };
-use crate::notices::{Notice, NoticeId}; // XXX move to core?
+use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId}; // XXX move to core?
+
 use sp_runtime::print;
 
 mod chains;
 mod core;
 mod events;
 mod notices;
+mod oracle;
 mod params;
+mod sig;
 mod trx_req;
 
 #[cfg(test)]
 mod mock;
 
-mod oracle;
 #[cfg(test)]
 mod tests;
 
@@ -119,13 +122,13 @@ decl_storage! {
         Nonces get(fn nonces): map hasher(blake2_128_concat) GenericAccount => Nonce;
 
         // XXX delete me (part of magic extract)
-        CashBalance get(fn cash_balance): map hasher(blake2_128_concat) GenericAccount => Option<GenericQty>;
+        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<GenericQty>;
 
         /// Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
         /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
-        EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus<Ethereum>>;
+        EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
 
         /// Eth addresses of price reporters for open oracle
         Reporters get(fn reporters): ReporterSet;
@@ -174,7 +177,7 @@ decl_event!(
         GoldieLocks(GenericAsset, GenericAccount, GenericQty),
 
         /// XXX
-        MagicExtract(GenericQty, GenericAccount, Notice<Ethereum>),
+        MagicExtract(GenericQty, ChainAccount, Notice),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -246,6 +249,18 @@ decl_error! {
 
         /// Trx request parsing error
         TrxRequestParseError,
+
+        /// Signature recovery errror
+        InvalidSignature,
+
+        /// Sender issue
+        InvalidChain,
+
+        /// Failure in internal logic
+        Failed,
+
+        /// Notice issue
+        InvalidNoticeParams,
     }
 }
 
@@ -280,82 +295,39 @@ decl_module! {
             Ok(())
         }
 
-        // XXX this function is temporary and will be deleted after we reach a certain point
-        /// An example dispatchable that takes a singles value as a parameter, writes the value to
-        /// storage and emits an event. This function must be dispatched by a signed extrinsic.
-        #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn magic_extract(origin, account: GenericAccount, amount: GenericQty) -> dispatch::DispatchResult {
-            let () = ensure_none(origin)?;
-            let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
-
-            // Update storage -- TODO: increment this-- sure why not?
-            let curr_cash_balance: GenericQty = <CashBalance>::get(&account).unwrap_or_default();
-            let next_cash_balance: GenericQty = curr_cash_balance + amount;
-            <CashBalance>::insert(&account, next_cash_balance);
-
-            let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
-            // Add to Notice Queue
-            let notice = Notice::ExtractionNotice {
-                id: NoticeId(now.into(), 0),  // XXX need to keep state of current gen/within gen for each, also parent
-                parent: [0u8; 32], // XXX,
-                asset: Asset([0u8; 20]),
-                amount: amount.try_into()
-                    .unwrap_or_else(|_| panic!("Amount does not fit on chain")),
-                account: Account(account.1.clone().try_into() // XXX avoid clone?
-                    .unwrap_or_else(|_| panic!("Address has wrong number of bytes")))
-            };
-            EthNoticeQueue::insert(notice.id(), NoticeStatus::<Ethereum>::Pending { signers: vec![], signatures: vec![], notice: notice.clone()});
-
-            // Emit an event or two.
-            Self::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
-            Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice.id(), notices::encode_ethereum_notice(notice), vec![])); // XXX signatures
-
-            // Return a successful DispatchResult
-            Ok(())
-        }
-
         // TODO
         #[weight = 1]
-        pub fn exec_trx_request(origin, request: Vec<u8>) -> dispatch::DispatchResult {
+        pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainSignature) -> dispatch::DispatchResult {
+            ensure_none(origin)?;
+
             // // TODO: Add more error information here
             print("submit_trx_request");
             let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
             print(request_str);
             // // TODO: Add more error information here
+            let sender = cash_err!(get_signer(&chains::eth::prepend_eth_signing_msg(&request), signature), Error::<T>::InvalidSignature)?;
             let trx_request = trx_request::parse_request(request_str).map_err(|_| <Error<T>>::TrxRequestParseError)?;
+
             match trx_request {
-                trx_request::TrxRequest::MagicExtract(amount, account) => {
-                    // TODO: Improve errors here, possibly use `into()`
-                    let gen_account = trx_req::account_to_generic(account);
-                    // TODO: Create real "max" function checker
-                    let gen_amount = trx_req::max_amount_to_generic(amount, &|| 5);
-                    Module::<T>::magic_extract(origin, gen_account, gen_amount)
+                trx_request::TrxRequest::MagicExtract(amount, account) =>{
+                    magic_extract_internal::<T>(sender, account.into(), amount.into()).map_err(|r| Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
+                    Ok(())
                 }
             }
         }
 
         #[weight = 1] // XXX how are we doing weights?
-        pub fn process_eth_event(origin, payload: SignedPayload, sig: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            print("process_eth_event(origin,payload,sig)");
-            // TODO: We probably should ensure none here? It currently breaks tests...
-            // ensure_none(origin)?;
+        pub fn process_eth_event(origin, payload: SignedPayload, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+            print(format!("process_eth_event(origin,payload,sig): {} {}", hex::encode(&payload), hex::encode(&signature)).as_str());
+            ensure_none(origin)?;
 
             // XXX do we want to store/check hash to allow replaying?
-            //let signer = recover(payload); // XXX
+            // TODO: use more generic function?
+            let signer = cash_err!(
+                chains::eth::recover(&payload[..], signature),
+                Error::<T>::InvalidSignature)?;
 
-            // XXX how do we want to deal with these crypto errors?
-            // XXX Toni WIP
-            // Recover signature part
-            let mut sig_part: [u8; 64] = [0; 64];
-            sig_part[0..64].copy_from_slice(&sig[0..64]);
-            let signature = secp256k1::Signature::parse(&sig_part);
-            // Recover RecoveryId part
-            let recovery_id = cash_err!(secp256k1::RecoveryId::parse(sig[64]), <Error<T>>::SignedPayloadError)?;
-            // Recover validator's public key from signature
-            let message = secp256k1::Message::parse(&chains::eth::keccak(payload.clone()));
-            let recover = secp256k1::recover(&message, &signature, &recovery_id).map_err(|_| <Error<T>>::SignedPayloadError)?;
-            let signer = recover.serialize();
-
+            print(format!("signer: {}", hex::encode(&signer)).as_str());
             // XXX
             // XXX require(signer == known validator); // XXX
             // Check that signer is a known validator, otherwise throw an error
@@ -431,27 +403,27 @@ decl_module! {
             //let signer = recover(payload); // XXX
             //require(signer == known validator); // XXX
 
-            let status = <EthNoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::<Ethereum>::Missing);
+            let status = <EthNoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::Missing);
             match status {
-                NoticeStatus::<Ethereum>::Missing => {
+                NoticeStatus::Missing => {
                     Ok(())
                 }
 
-                NoticeStatus::<Ethereum>::Pending { signers, signatures, notice } => {
+                NoticeStatus::Pending { signers, signatures, notice } => {
                     // XXX sets?
                     // let signers_new = {signer | signers};
                     // let signatures_new = {signature | signatures };
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                           EthNoticeQueue::insert(notice_id, NoticeStatus::<Ethereum>::Done);
-                           Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice_id, notices::encode_ethereum_notice(notice), signatures)); // XXX generic
+                           EthNoticeQueue::insert(notice_id, NoticeStatus::Done);
+                           Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice_id, notice.encode_ethereum_notice(), signatures)); // XXX generic
                            Ok(())
                     // } else {
-                    //     EthNoticeQueue::insert(event.id, NoticeStatus::<Ethereum>::Pending { signers: signers_new, signatures, notice});
+                    //     EthNoticeQueue::insert(event.id, NoticeStatus::Pending { signers: signers_new, signatures, notice});
                     //     Ok(())
                     // }
                 }
 
-                NoticeStatus::<Ethereum>::Done => {
+                NoticeStatus::Done => {
                     // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
                     Ok(())
                 }
@@ -762,7 +734,7 @@ impl<T: Config> Module<T> {
             // XXX
             let payload =
                 events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let signature = Self::sign_payload(payload.clone());
+            let signature = chains::eth::sign(&payload);
             let call = Call::process_eth_event(payload, signature);
 
             // XXX Unsigned tx for now
@@ -773,21 +745,6 @@ impl<T: Config> Module<T> {
             }
         }
         Ok(())
-    }
-
-    // XXX JF: why are we using secp256k1 to sign these? this is just for offchain <> validator?
-    /// XXX this part will be rewritten as soon as keys are done
-    fn sign_payload(payload: Vec<u8>) -> ValidatorSig {
-        // XXX HORRIBLE, but something to move on, at least I can decode signature
-        let not_so_secret: [u8; 32] =
-            hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
-        let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
-        let message = secp256k1::Message::parse(&chains::eth::keccak(payload.clone()));
-        let sig = secp256k1::sign(&message, &private_key);
-        let mut r: [u8; 65] = [0; 65];
-        r[0..64].copy_from_slice(&sig.0.serialize()[..]);
-        r[64] = sig.1.serialize();
-        return r;
     }
 }
 
@@ -816,18 +773,13 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
-            Call::magic_extract(_account, _amount) => {
+            Call::exec_trx_request(request, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
-                    .and_provides("magic")
+                    .and_provides(request)
                     .propagate(true)
                     .build()
             }
-            Call::exec_trx_request(payload) => ValidTransaction::with_tag_prefix("CashPallet")
-                .longevity(10)
-                .and_provides(payload)
-                .propagate(true)
-                .build(),
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)
@@ -836,4 +788,62 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             _ => InvalidTransaction::Call.into(),
         }
     }
+}
+
+// XXX this function is temporary and will be deleted after we reach a certain point
+pub fn magic_extract_internal<T: Config>(
+    sender: ChainAccount,
+    account: ChainAccount,
+    max_amount: GenericMaxQty,
+) -> Result<(), Error<T>> {
+    let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
+
+    let amount = get_quantity(max_amount, &|| 5);
+
+    // Update storage -- TODO: increment this-- sure why not?
+    let curr_cash_balance: GenericQty = <CashBalance>::get(&account).unwrap_or_default();
+    let next_cash_balance: GenericQty = curr_cash_balance + amount;
+    <CashBalance>::insert(&account, next_cash_balance);
+
+    let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
+    // Add to Notice Queue
+    // Note: we need to generalize this since it's not guaranteed to be Eth
+    let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
+                                    // TODO: This asset needs to match the chain-- which for Cash, there might be different
+                                    //       versions of a given asset per chain
+    let notice = Notice::CashExtractionNotice(match account {
+        ChainAccount::Eth(eth_account) => CashExtractionNotice::Eth {
+            id: notice_id,
+            parent: [0u8; 32],
+            account: eth_account,
+            amount,
+            cash_yield_index: 1000,
+        },
+        _ => return Err(Error::<T>::InvalidNoticeParams),
+    });
+
+    // TODO: Why is this Eth notice queue? Should this be specific to Eth?
+    EthNoticeQueue::insert(
+        notice_id,
+        NoticeStatus::Pending {
+            signers: vec![],
+            signatures: vec![],
+            notice: notice.clone(),
+        },
+    );
+
+    let encoded_notice = notice.encode_ethereum_notice();
+    let signature = chains::eth::sign(&encoded_notice[..]);
+
+    // Emit an event or two.
+    <Module<T>>::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
+    <Module<T>>::deposit_event(RawEvent::SignedNotice(
+        ChainId::Eth,
+        notice_id,
+        encoded_notice,
+        vec![signature.to_vec()],
+    )); // XXX signatures
+
+    // Return a successful DispatchResult
+    Ok(())
 }
