@@ -7,8 +7,7 @@ use tiny_keccak::Hasher;
 /// * The key id provided is unknown
 /// * The HSM is not available
 /// * The HSM failed to sign this request for some other reason
-#[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, our_std::Debuggable)]
 pub enum CryptoError {
     Unknown,
     KeyNotFound,
@@ -17,6 +16,10 @@ pub enum CryptoError {
     ParseError,
     RecoverError,
     HSMError,
+    EnvironmentVariablePrivateKeyNotSet,
+    HexDecodeFailed,
+    EnvironmentVariableHexDecodeFailed,
+    EnvironmentVariableInvalidSeed,
 }
 
 /// The default key id for the eth authority key (l1)
@@ -92,4 +95,18 @@ pub fn eth_recover(message: &[u8], sig: &[u8]) -> Result<Vec<u8>, CryptoError> {
 
 pub fn bytes_to_eth_hex_string(message: &[u8]) -> String {
     format!("0x{}", hex::encode(message))
+}
+
+pub(crate) fn eth_decode_hex(message: &str) -> Result<Vec<u8>, CryptoError> {
+    eth_decode_hex_ascii(message.as_bytes())
+}
+
+const ETH_HEX_PREFIX: &str = "0x";
+
+pub(crate) fn eth_decode_hex_ascii(message: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    if &message[..2] != ETH_HEX_PREFIX.as_bytes() {
+        hex::decode(message).map_err(|_| CryptoError::HexDecodeFailed)
+    } else {
+        hex::decode(&message[2..]).map_err(|_| CryptoError::HexDecodeFailed)
+    }
 }

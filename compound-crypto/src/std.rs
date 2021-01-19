@@ -1,6 +1,8 @@
+use crate::eth_decode_hex;
 use crate::no_std::*;
 use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
+use sp_core::sp_std::convert::TryInto;
 use sp_core::Pair;
 use std::collections::hash_map::HashMap;
 use std::sync::Arc;
@@ -177,12 +179,41 @@ lazy_static::lazy_static! {
     pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = Mutex::new(Arc::new(dev_keyring()));
 }
 
+const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";
+
+fn get_eth_private_key_from_environment_variable() -> Result<EcdsaPair, CryptoError> {
+    let eth_private_key_string = std::env::var(ETH_PRIVATE_KEY_ENV_VAR)
+        .map_err(|_| CryptoError::EnvironmentVariablePrivateKeyNotSet)?;
+    if eth_private_key_string.len() == 0 {
+        return Err(CryptoError::EnvironmentVariablePrivateKeyNotSet);
+    }
+
+    let eth_private_key_bytes = eth_decode_hex(&eth_private_key_string)
+        .map_err(|_| CryptoError::EnvironmentVariableHexDecodeFailed)?;
+    // note - seed is a misnomer - it is actually the private key :(
+    let pair = EcdsaPair::from_seed_slice(&eth_private_key_bytes)
+        .map_err(|_| CryptoError::EnvironmentVariableInvalidSeed)?;
+
+    Ok(pair)
+}
+
 /// Sets up the development keyring, an in memory keyring loaded with the `//ALICE` key
 /// for signing messages headed to ethereum.
 pub fn dev_keyring() -> InMemoryKeyring {
     let mut keyring = InMemoryKeyring::new();
-    let eth_key_id = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
-    let (pair, _) = EcdsaPair::from_string_with_seed("//ALICE", None).unwrap();
+    let eth_key_id: KeyId = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
+
+    let pair = match get_eth_private_key_from_environment_variable() {
+        Ok(pair) => pair,
+        Err(CryptoError::EnvironmentVariablePrivateKeyNotSet) => {
+            let (pair, _) = EcdsaPair::from_string_with_seed("//ALICE", None).unwrap();
+            pair
+        }
+        Err(err) => panic!(
+            "Error while decoding private key material for eth key! {:?}",
+            err
+        ),
+    };
     keyring.add(&eth_key_id, pair);
 
     keyring
@@ -223,18 +254,18 @@ mod tests {
     }
 
     /// Helper function to decode 0x... to bytes
-    fn eth_decode_hex(hex: String) -> Vec<u8> {
+    fn eth_decode_hex_unsafe(hex: String) -> Vec<u8> {
         let hex = hex.as_bytes();
         hex::decode(&hex[2..]).unwrap()
     }
 
     /// Test out eth signature function
     fn test_eth_sign_case(case: TestCase) {
-        let private_key = eth_decode_hex(case.private_key);
+        let private_key = eth_decode_hex_unsafe(case.private_key);
         let message: Vec<u8> = case.data.into();
         let secret_key = SecretKey::parse_slice(&private_key).unwrap();
         let actual_sig = eth_sign(&message, &secret_key);
-        let expected_sig = eth_decode_hex(case.signature);
+        let expected_sig = eth_decode_hex_unsafe(case.signature);
         assert_eq!(actual_sig, expected_sig);
     }
 
@@ -248,9 +279,9 @@ mod tests {
     /// Test out eth recover function
     fn test_eth_recover_case(case: TestCase) {
         let message: Vec<u8> = case.data.into();
-        let sig = eth_decode_hex(case.signature);
+        let sig = eth_decode_hex_unsafe(case.signature);
         let actual_address = eth_recover(&message, &sig).unwrap();
-        let expected_address = eth_decode_hex(case.address);
+        let expected_address = eth_decode_hex_unsafe(case.address);
         assert_eq!(actual_address, expected_address);
     }
 
@@ -270,7 +301,7 @@ mod tests {
             data: "hello".into(),
         };
         let mut keyring = InMemoryKeyring::new();
-        let private_key_bytes = eth_decode_hex(private_key.clone());
+        let private_key_bytes = eth_decode_hex_unsafe(private_key.clone());
         let pair = EcdsaPair::from_seed_slice(&private_key_bytes).unwrap();
         keyring.add(&key_id, pair);
 
@@ -284,7 +315,7 @@ mod tests {
         let sigs = keyring.sign(messages, &key_id).unwrap();
         assert_eq!(sigs.len(), 1);
         let actual_sig = sigs[0].as_ref().unwrap();
-        let expected_sig = &eth_decode_hex(case.signature);
+        let expected_sig = &eth_decode_hex_unsafe(case.signature);
         assert_eq!(actual_sig, expected_sig);
     }
 
@@ -296,7 +327,7 @@ mod tests {
     fn test_public_key_case(case: TestCase) {
         let (key_id, keyring) = get_test_keyring_from_test_case(&case);
         let actual_address = keyring.get_eth_address(&key_id).unwrap();
-        let expected_address = eth_decode_hex(case.address);
+        let expected_address = eth_decode_hex_unsafe(case.address);
         assert_eq!(actual_address, expected_address);
     }
 
