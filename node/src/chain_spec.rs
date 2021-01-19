@@ -190,6 +190,10 @@ fn testnet_genesis(
                 "85615b076615317c80f14cbad6501eec031cd51c".into(),
                 "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into()
             ],
+            symbols: vec![ // XXX fixme + decimals
+                "ETH".into(),
+                "USDC".into(),
+            ],
             price_key_mapping: vec![
                 "USDC:ETH:deadbeef".into()
             ]

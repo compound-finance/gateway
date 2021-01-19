@@ -6,7 +6,7 @@
 mod hex_util;
 mod lex;
 use lex::{lex, Token};
-use logos::{Lexer, Logos};
+use logos::Lexer;
 use std::convert::TryInto;
 
 pub type Amount = u128;
@@ -118,7 +118,7 @@ fn parse<'a>(tokens: Lexer<'a, Token<'a>>) -> Result<TrxRequest, ParseError<'a>>
         [Token::LeftDelim, Token::Identifier("magic-extract"), args @ .., Token::RightDelim] => {
             parse_magic_extract(args)
         }
-        [Token::LeftDelim, Token::Identifier(fun), args @ .., Token::RightDelim] => {
+        [Token::LeftDelim, Token::Identifier(fun), .., Token::RightDelim] => {
             Err(ParseError::UnknownFunction(fun))
         }
         _ => Err(ParseError::InvalidExpression),

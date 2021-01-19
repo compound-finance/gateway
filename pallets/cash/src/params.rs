@@ -1,4 +1,4 @@
-use crate::core::{Quantity, Symbol};
+use crate::core::{Quantity, CASH, USD};
 
 // XXX do these belong in runtime interfaces config?
 
@@ -12,10 +12,10 @@ pub const MIN_NEXT_SYNC_TIME: u32 = 24 * 60 * 60 * 1000; // XXX
 pub const MIN_VALIDATOR_COUNT: u32 = 4; // XXX needed? in the way of dev?
 
 /// Minimum value (USD) required across all protocol interactions.
-pub const MIN_TX_VALUE: Quantity<{ Symbol::USD }> = Quantity::from_nominal(1.0);
+pub const MIN_TX_VALUE: Quantity = Quantity::from_nominal(USD, 1.0);
 
 /// Flat transfer fee (CASH).
-pub const TRANSFER_FEE: Quantity<{ Symbol::CASH }> = Quantity::from_nominal(0.01);
+pub const TRANSFER_FEE: Quantity = Quantity::from_nominal(CASH, 0.01);
 
-/// Number of blocks between HTTP requests via offchain workers to open oracle price reporters
+/// Number of blocks between HTTP requests from offchain workers to open oracle price feed.
 pub const OCW_OPEN_ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
