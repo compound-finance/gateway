@@ -27,7 +27,7 @@ pub enum Notice<C: Chain> {
         parent: C::Hash,
         account: Account<C>,
         amount: C::Amount,
-        cash_yield_index: C::Index,
+        cash_yield_index: C::MulIndex,
     },
 
     FutureYieldNotice {
@@ -35,7 +35,7 @@ pub enum Notice<C: Chain> {
         parent: C::Hash,
         next_cash_yield: C::Rate,
         next_cash_yield_start_at: C::Timestamp,
-        next_cash_yield_index: C::Index,
+        next_cash_yield_index: C::MulIndex,
     },
 
     SetSupplyCapNotice {

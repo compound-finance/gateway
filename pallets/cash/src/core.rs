@@ -4,6 +4,7 @@ pub use our_std::{fmt, result, result::Result};
 /// Setup
 use codec::{Decode, Encode};
 use our_std::{
+    convert::TryInto,
     ops::{Div, Mul},
     RuntimeDebug,
 };
@@ -100,47 +101,47 @@ pub enum Reason {
 }
 
 /// Type for the abstract symbol of an asset, not tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum Symbol {
-    CASH,
-    DOT,
-    ETH,
-    SOL,
-    TEZ,
-    USD,
-    USDC,
-}
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, RuntimeDebug)]
+pub struct Symbol(pub [char; 12], pub u8);
 
-impl Default for Symbol {
-    fn default() -> Self {
-        Symbol::CASH
-    }
-}
+// Define symbols used directly by the chain itself
+pub const NIL: char = 0 as char;
+pub const CASH: Symbol = Symbol(
+    ['C', 'A', 'S', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+    6,
+);
+pub const USD: Symbol = Symbol(
+    ['U', 'S', 'D', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+    6,
+);
 
 impl Symbol {
-    pub const fn decimals(self) -> u8 {
-        match self {
-            Symbol::CASH => 6,
-            Symbol::DOT => 10,
-            Symbol::ETH => 18,
-            Symbol::SOL => 18, // XXX ?
-            Symbol::TEZ => 6,
-            Symbol::USD => 6,
-            Symbol::USDC => 6,
-        }
+    pub const fn ticker(&self) -> &[char] {
+        &self.0
     }
 
-    pub fn from_str(input: &str) -> Result<Symbol, Reason> {
-        match input {
-            "CASH" => Ok(Symbol::CASH),
-            "DOT" => Ok(Symbol::DOT),
-            "ETH" => Ok(Symbol::ETH),
-            "SOL" => Ok(Symbol::SOL),
-            "TEZ" => Ok(Symbol::TEZ),
-            "USD" => Ok(Symbol::USD),
-            "USDC" => Ok(Symbol::USDC),
-            _ => Err(Reason::InvalidSymbol),
-        }
+    pub const fn decimals(&self) -> u8 {
+        self.1
+    }
+}
+
+impl Encode for Symbol {
+    fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
+        let mut bytes: Vec<u8> = self.0.to_vec().iter().map(|&c| c as u8).collect();
+        bytes.push(self.1);
+        bytes.using_encoded(f)
+    }
+}
+
+impl codec::EncodeLike for Symbol {}
+
+impl Decode for Symbol {
+    fn decode<I: codec::Input>(encoded: &mut I) -> Result<Self, codec::Error> {
+        let mut bytes: Vec<u8> = Decode::decode(encoded)?;
+        let decimals = bytes.pop().unwrap();
+        let chars: Vec<char> = bytes.iter().map(|&b| b as char).collect();
+        let ticker: [char; 12] = chars.try_into().expect("wrong number of chars");
+        Ok(Symbol(ticker, decimals))
     }
 }
 
@@ -169,11 +170,11 @@ pub enum NoticeStatus<C: Chain> {
     Done,
 }
 
-/// XXX doc
+/// Type for representing an account bound to a specific chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Account<C: Chain>(pub C::Address);
 
-/// XXX doc
+/// Type for representing an asset bound to a specific chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Asset<C: Chain>(pub C::Address);
 
@@ -189,121 +190,190 @@ impl<C: Chain> From<Account<C>> for GenericAccount {
     }
 }
 
-/// XXX doc
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Price<const S: Symbol>(pub GenericPrice);
-
-/// XXX doc
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Quantity<const S: Symbol>(pub GenericQty);
-
-/// Type for representing a balance index on Compound Chain.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, RuntimeDebug)]
-pub struct Index(pub Uint);
-
-impl<const S: Symbol> Price<S> {
-    pub const fn from_nominal(nominal: f64) -> Self {
-        Price::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint)) // XXX fixme
+impl From<Quantity> for GenericQty {
+    fn from(quantity: Quantity) -> Self {
+        quantity.amount().into()
     }
 }
 
-impl<const S: Symbol> Quantity<S> {
-    pub const fn from_nominal(nominal: f64) -> Self {
-        Quantity::<S>((nominal as Uint) * 10 ^ (S.decimals() as Uint)) // XXX fixme
+/// Type for representing a price (in USD), bound to its symbol.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct Price(pub Symbol, pub GenericPrice);
+
+/// Type for representing a quantity of an asset, bound to its symbol.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct Quantity(pub Symbol, pub GenericQty);
+
+/// Type for representing a multiplicative index on Compound Chain.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct MulIndex(pub Uint);
+
+impl Price {
+    pub const DECIMALS: u8 = USD.decimals(); // Note: must be >= USD.decimals()
+
+    pub const fn symbol(&self) -> Symbol {
+        self.0
+    }
+
+    pub const fn amount(&self) -> GenericPrice {
+        self.1
+    }
+
+    pub const fn from_nominal(symbol: Symbol, nominal: f64) -> Self {
+        Price(symbol, (nominal * pow10(Self::DECIMALS)) as Uint)
+    }
+
+    pub const fn to_nominal(&self) -> f64 {
+        (self.amount() as f64) / pow10(self.symbol().decimals())
     }
 }
 
-impl Default for Index {
+impl Quantity {
+    pub const fn symbol(&self) -> Symbol {
+        self.0
+    }
+
+    pub const fn amount(&self) -> GenericQty {
+        self.1
+    }
+
+    pub const fn from_nominal(symbol: Symbol, nominal: f64) -> Self {
+        Quantity(symbol, (nominal * pow10(symbol.decimals())) as Uint)
+    }
+
+    pub const fn to_nominal(&self) -> f64 {
+        (self.amount() as f64) / pow10(self.symbol().decimals())
+    }
+}
+
+impl Default for MulIndex {
     fn default() -> Self {
-        Index(1) // XXX do we need more 'precision' for ONE?
+        MulIndex(1) // XXX do we need more 'precision' for ONE?
     }
 }
 
-impl<const S: Symbol, T> From<T> for Price<S>
-where
-    T: Into<GenericPrice>,
-{
-    fn from(raw: T) -> Self {
-        Price(raw.into())
-    }
-}
-
-impl<const S: Symbol> From<Quantity<S>> for GenericQty {
-    fn from(quantity: Quantity<S>) -> Self {
-        quantity.0.into()
-    }
-}
-
-// impl<const S: Symbol, T> From<T> for Quantity<S>
-// where
-//     T: Into<GenericQty>,
-// {
-//     fn from(raw: T) -> Self {
-//         Quantity(raw.into())
-//     }
-// }
-
-impl<T> From<T> for Index
+impl<T> From<T> for MulIndex
 where
     T: Into<Uint>,
 {
     fn from(raw: T) -> Self {
-        Index(raw.into())
+        MulIndex(raw.into())
     }
 }
 
 // Price<S> * Quantity<S> -> Quantity<{ USD }>
-impl<const S: Symbol> Mul<Quantity<S>> for Price<S> {
-    type Output = Quantity<{ Symbol::USD }>;
+impl Mul<Quantity> for Price {
+    type Output = Quantity;
 
-    fn mul(self, rhs: Quantity<S>) -> Self::Output {
-        Quantity(self.0 * rhs.0) // XXX fixme (S.decimals())
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        assert!(
+            self.symbol() == rhs.symbol(),
+            "can only multiply a price and quantity for the same symbol"
+        );
+        Quantity(
+            USD,
+            self.amount() * rhs.amount()
+                / (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as GenericQty),
+        )
     }
 }
 
-// Quantity<S> * Price<S> -> Quantity<S>
-impl<const S: Symbol> Mul<Price<S>> for Quantity<S> {
-    type Output = Quantity<{ Symbol::USD }>;
+// Quantity<S> * Price<S> -> Quantity<{ USD }>
+impl Mul<Price> for Quantity {
+    type Output = Quantity;
 
-    fn mul(self, rhs: Price<S>) -> Self::Output {
-        Quantity(self.0 * rhs.0) // XXX fixme (S.decimals())
+    fn mul(self, rhs: Price) -> Self::Output {
+        assert!(
+            self.symbol() == rhs.symbol(),
+            "can only multiply a quantity and price for the same symbol"
+        );
+        Quantity(
+            USD,
+            self.amount() * rhs.amount()
+                / (pow10(Price::DECIMALS + self.symbol().decimals() - USD.decimals())
+                    as GenericQty),
+        )
     }
 }
 
 // Quantity<{ USD }> / Price<S> -> Quantity<S>
-impl<const S: Symbol> Div<Price<S>> for Quantity<{ Symbol::USD }> {
-    type Output = Quantity<{ S }>;
+impl Div<Price> for Quantity {
+    type Output = Quantity;
 
-    fn div(self, rhs: Price<S>) -> Self::Output {
-        Quantity(self.0 / rhs.0) // XXX fixme (S.decimals())
+    fn div(self, rhs: Price) -> Self::Output {
+        assert!(
+            self.symbol() == USD,
+            "division by price defined only for USD quantities"
+        );
+        assert!(rhs.amount() > 0, "division by price not greater than zero");
+        Quantity(
+            rhs.symbol(),
+            self.amount()
+                * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals())
+                    as GenericPrice)
+                / rhs.amount(),
+        )
     }
 }
 
 // Quantity<{ USD }> / Quantity<S> -> Price<S>
-impl<const S: Symbol> Div<Quantity<S>> for Quantity<{ Symbol::USD }> {
-    type Output = Price<S>;
+impl Div<Quantity> for Quantity {
+    type Output = Price;
 
-    fn div(self, rhs: Quantity<S>) -> Self::Output {
-        Price(self.0 / rhs.0) // XXX fixme (S.decimals())
+    fn div(self, rhs: Quantity) -> Self::Output {
+        assert!(
+            self.symbol() == USD,
+            "division by quantity defined only for USD quantities"
+        );
+        assert!(
+            rhs.amount() > 0,
+            "division by quantity not greater than zero"
+        );
+        Price(
+            rhs.symbol(),
+            self.amount()
+                * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as GenericQty)
+                / rhs.amount(),
+        )
     }
 }
 
-// Quantity<S> * Index -> Quantity<S>
-impl<const S: Symbol> Mul<Index> for Quantity<S> {
-    type Output = Quantity<S>;
+// Quantity<S> * MulIndex -> Quantity<S>
+impl Mul<MulIndex> for Quantity {
+    type Output = Quantity;
 
-    fn mul(self, rhs: Index) -> Self::Output {
-        Quantity(self.0 * rhs.0)
+    fn mul(self, rhs: MulIndex) -> Self::Output {
+        Quantity(self.symbol(), self.amount() * rhs.0)
     }
 }
 
 // Helper functions //
 
-pub fn price<T: Config, const S: Symbol>() -> Price<S> {
-    match S {
-        Symbol::CASH => Price::from_nominal(1.0),
-        _ => Price(<Module<T>>::price(S)),
+pub const fn pow10(decimals: u8) -> f64 {
+    let mut i = 0;
+    let mut v = 10.0;
+    loop {
+        i += 1;
+        if i >= decimals {
+            return v;
+        }
+        v *= 10.0;
     }
+}
+
+pub fn price<T: Config>(symbol: Symbol) -> Price {
+    match symbol {
+        CASH => Price::from_nominal(CASH, 1.0),
+        _ => Price(symbol, <Module<T>>::prices(symbol)),
+    }
+}
+
+pub fn symbol<T: Config, C: Chain>(asset: Asset<C>) -> Symbol {
+    // XXX lookup in storage
+    Symbol(
+        ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+        18,
+    )
 }
 
 // Protocol interface //
@@ -320,10 +390,10 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
             //   Build AssetIdent=("eth", asset)
             //   Call lockInternal(AssetIdent, AccountIdent, Amount)
             print("applying lock event...");
-            lock_internal::<T, Ethereum, { Symbol::ETH }>(
+            lock_internal::<T, Ethereum>(
                 Asset(asset),
                 Account(holder),
-                Quantity(amount.into()),
+                Quantity(symbol::<T, Ethereum>(Asset(asset)), amount.into()),
             )
         }
         _ => {
@@ -338,10 +408,10 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
     }
 }
 
-pub fn lock_internal<T: Config, C: Chain, const S: Symbol>(
+pub fn lock_internal<T: Config, C: Chain>(
     asset: Asset<C>,
     holder: Account<C>,
-    amount: Quantity<S>,
+    amount: Quantity,
 ) -> Result<(), Reason> {
     print("lock internal...");
 
@@ -359,7 +429,7 @@ pub fn lock_internal<T: Config, C: Chain, const S: Symbol>(
 
 pub fn lock_cash_internal<T: Config, C: Chain>(
     holder: Account<C>,
-    amount: Quantity<{ Symbol::CASH }>,
+    amount: Quantity, // XXX CashQuantity?
 ) -> Result<(), Reason> {
     // XXX
     // Read Require AmountPriceCASHParamsMinTxValue
@@ -372,16 +442,16 @@ pub fn lock_cash_internal<T: Config, C: Chain>(
     Ok(())
 }
 
-pub fn extract_principal_internal<T: Config, C: Chain, const S: Symbol>(
+pub fn extract_principal_internal<T: Config, C: Chain>(
     asset: Asset<C>,
     holder: Account<C>,
     recipient: Account<C>,
-    principal: Quantity<S>,
+    principal: Quantity,
 ) -> Result<(), Reason> {
     // Require Recipient.Chain=Asset.Chain XXX proven by compiler
     let supply_index = <Module<T>>::supply_index(Into::<GenericAsset>::into(asset));
     let amount = principal * supply_index;
-    require_min_tx_value!(amount * price::<T, S>());
+    require_min_tx_value!(amount * price::<T>(principal.symbol()));
 
     // Read Require HasLiquidityToReduceCollateralAsset(Holder, Asset, Amount)
     // ReadsCashBorrowPrincipalBorrower, CashCostIndexPair, CashYield, CashSpread, Price*, SupplyPrincipal*, Borrower, StabilityFactor*
@@ -401,11 +471,11 @@ pub fn extract_principal_internal<T: Config, C: Chain, const S: Symbol>(
 pub fn extract_cash_principal_internal<T: Config, C: Chain>(
     holder: Account<C>,
     recipient: Account<C>,
-    principal: Quantity<{ Symbol::CASH }>,
+    principal: Quantity, // XXX CashQuantity?
 ) -> Result<(), Reason> {
     let yield_index = <Module<T>>::cash_yield_index();
     let amount = principal * yield_index;
-    require_min_tx_value!(amount * price::<T, { Symbol::CASH }>());
+    require_min_tx_value!(amount * price::<T>(CASH));
 
     // Note: we do not check health here, since CASH cannot be borrowed against yet.
     // let chain_cash_hold_principal_new = <Module<T>>::chain_cash_hold_principal(recipient.chain) + amount_principal;
@@ -421,5 +491,92 @@ pub fn extract_cash_principal_internal<T: Config, C: Chain>(
 
 #[cfg(test)]
 mod tests {
-    // XXX
+    use super::*;
+
+    const ETH: Symbol = Symbol(
+        ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+        18,
+    );
+
+    #[test]
+    fn test_one() {
+        let a = Quantity(CASH, 1000000);
+        let b = Quantity::from_nominal(CASH, 1.0);
+        let c = b.to_nominal();
+        assert_eq!(a, b);
+        assert_eq!(c, 1.0);
+    }
+
+    #[test]
+    fn test_mul_qp() {
+        // Quantity<S> * Price<S> -> Quantity<USD>
+        // Price<S> * Quantity<S> -> Quantity<USD>
+        let q = Quantity::from_nominal(CASH, 1.0);
+        let p = Price::from_nominal(CASH, 2.0);
+        assert_eq!(q * p, Quantity::from_nominal(USD, 2.0));
+        assert_eq!(p * q, Quantity::from_nominal(USD, 2.0));
+    }
+
+    #[test]
+    #[should_panic(expected = "can only multiply a quantity and price for the same symbol")]
+    fn test_mul_qp_error() {
+        let _ = Quantity::from_nominal(ETH, 1.0) * Price::from_nominal(CASH, 2.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "can only multiply a price and quantity for the same symbol")]
+    fn test_mul_pq_error() {
+        let _ = Price::from_nominal(CASH, 2.0) * Quantity::from_nominal(ETH, 1.0);
+    }
+
+    #[test]
+    fn test_div_qp() {
+        // Quantity<{ USD }> / Price<S> -> Quantity<S>
+        let q = Quantity::from_nominal(USD, 365.0);
+        let p = Price::from_nominal(ETH, 10.0);
+        assert_eq!(q / p, Quantity::from_nominal(ETH, 36.5));
+    }
+
+    #[test]
+    #[should_panic(expected = "division by price defined only for USD quantities")]
+    fn test_div_qp_error() {
+        let _ = Quantity::from_nominal(CASH, 2.0) / Price::from_nominal(ETH, 1.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "division by price not greater than zero")]
+    fn test_div_qp_div_zero() {
+        let _ = Quantity::from_nominal(USD, 2.0) / Price::from_nominal(ETH, 0.0);
+    }
+
+    #[test]
+    fn test_div_qq() {
+        // Quantity<{ USD }> / Quantity<S> -> Price<S>
+        let q = Quantity::from_nominal(USD, 10.0);
+        let u = Quantity::from_nominal(ETH, 3.0);
+        assert_eq!(q / u, Price::from_nominal(ETH, 3.33333333333));
+    }
+
+    #[test]
+    #[should_panic(expected = "division by quantity defined only for USD quantities")]
+    fn test_div_qq_error() {
+        let _ = Quantity::from_nominal(CASH, 2.0) / Quantity::from_nominal(ETH, 1.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "division by quantity not greater than zero")]
+    fn test_div_qq_div_zero() {
+        let _ = Quantity::from_nominal(USD, 2.0) / Quantity::from_nominal(ETH, 0.0);
+    }
+
+    #[test]
+    fn test_scale_codec() {
+        let a = Quantity::from_nominal(CASH, 3.0);
+        let encoded = a.encode();
+        dbg!(encoded.clone()); // XXX
+        let decoded = Decode::decode(&mut encoded.as_slice());
+        let b = decoded.expect("value did not decode");
+        dbg!(u128::MAX); // XXX
+        assert_eq!(a, b);
+    }
 }
