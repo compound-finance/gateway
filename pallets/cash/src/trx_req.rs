@@ -1,14 +1,13 @@
 extern crate trx_request;
 
-use crate::chains::*;
-use crate::core::*;
+use crate::types::{AssetAmount, ChainAccount, Maxable};
 use trx_request::*;
 
-impl From<trx_request::MaxAmount> for GenericMaxQty {
+impl From<trx_request::MaxAmount> for Maxable<AssetAmount> {
     fn from(amt: MaxAmount) -> Self {
         match amt {
-            MaxAmount::Max => GenericMaxQty::Max,
-            MaxAmount::Amt(amt) => GenericMaxQty::Qty(amt),
+            MaxAmount::Max => Maxable::Max,
+            MaxAmount::Amt(amt) => Maxable::Value(amt),
         }
     }
 }
@@ -27,10 +26,7 @@ mod tests {
 
     #[test]
     fn test_max_amount_to_generic() {
-        assert_eq!(
-            GenericMaxQty::from(MaxAmount::Amt(5)),
-            GenericMaxQty::Qty(5)
-        );
-        assert_eq!(GenericMaxQty::from(MaxAmount::Max), GenericMaxQty::Max);
+        assert_eq!(Maxable::from(MaxAmount::Amt(5)), Maxable::Value(5));
+        assert_eq!(Maxable::from(MaxAmount::Max), Maxable::Max);
     }
 }
