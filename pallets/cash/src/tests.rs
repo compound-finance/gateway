@@ -74,11 +74,7 @@ fn process_eth_event_happy_path() {
         // XXX
         let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
 
-        let sig = chains::eth::sign(vec![payload.clone()])
-            .unwrap()
-            .drain(..)
-            .next()
-            .unwrap()
+        let sig = chains::eth::sign_one(payload.clone())
             .unwrap(); // Sign with our "shared" private key for now
 
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));

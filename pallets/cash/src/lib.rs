@@ -741,12 +741,8 @@ impl<T: Config> Module<T> {
             // XXX
             let payload =
                 events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let signature = chains::eth::sign(vec![payload.clone()])
-                .unwrap()
-                .drain(..)
-                .next()
-                .unwrap()
-                .unwrap();
+            let signature = chains::eth::sign_one(payload.clone())
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
             let call = Call::process_eth_event(payload, signature);
 
             // XXX Unsigned tx for now
@@ -845,12 +841,10 @@ pub fn magic_extract_internal<T: Config>(
     );
 
     let encoded_notice = notice.encode_ethereum_notice();
-    let signature = chains::eth::sign(vec![encoded_notice.clone()])
-        .unwrap()
-        .drain(..)
-        .next()
-        .unwrap()
-        .unwrap();
+    let signature = cash_err!(
+        chains::eth::sign_one(encoded_notice.clone()),
+        Error::<T>::InvalidSignature
+    )?;
 
     // Emit an event or two.
     <Module<T>>::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));

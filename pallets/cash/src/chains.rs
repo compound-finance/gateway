@@ -216,6 +216,13 @@ pub mod eth {
 
         Ok(result)
     }
+
+    /// Sign messages for the ethereum network
+    pub fn sign_one(message: Vec<u8>) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
+        let mut sigs = sign(vec![message])?;
+        let mut sig_drain = sigs.drain(..);
+        sig_drain.next().ok_or(CryptoError::Unknown)?
+    }
 }
 
 pub mod dot {
