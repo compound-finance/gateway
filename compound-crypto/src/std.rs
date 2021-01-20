@@ -91,7 +91,7 @@ fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
     let (sig, recovery) = secp256k1::sign(&message, &private_key);
     let recovery_term = recovery.serialize() + ETH_ADD_TO_V;
     let mut sig: Vec<u8> = sig.serialize().into();
-    sig.extend_from_slice(&[0; 31]); // need to pad out for eth_abi
+    // sig.extend_from_slice(&[0; 31]); // need to pad out for eth_abi
     sig.push(recovery_term);
     sig
 }
@@ -181,6 +181,10 @@ lazy_static::lazy_static! {
 
 const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";
 
+const ETH_PRIVATE_KEY_DEFAULT_VALUE: &str =
+    "50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374";
+
+/// For dev - get the eth private key from an environment variable
 fn get_eth_private_key_from_environment_variable() -> Result<EcdsaPair, CryptoError> {
     let eth_private_key_string = std::env::var(ETH_PRIVATE_KEY_ENV_VAR)
         .map_err(|_| CryptoError::EnvironmentVariablePrivateKeyNotSet)?;
@@ -197,8 +201,11 @@ fn get_eth_private_key_from_environment_variable() -> Result<EcdsaPair, CryptoEr
     Ok(pair)
 }
 
-/// Sets up the development keyring, an in memory keyring loaded with the `//ALICE` key
+/// Sets up the development keyring, an in memory keyring loaded with the default key
 /// for signing messages headed to ethereum.
+///
+/// WARNING - This function will panic whenever a bad private key is set in the environment
+/// variable. That is "ok" because it should only be used during boot.
 pub fn dev_keyring() -> InMemoryKeyring {
     let mut keyring = InMemoryKeyring::new();
     let eth_key_id: KeyId = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
@@ -206,8 +213,10 @@ pub fn dev_keyring() -> InMemoryKeyring {
     let pair = match get_eth_private_key_from_environment_variable() {
         Ok(pair) => pair,
         Err(CryptoError::EnvironmentVariablePrivateKeyNotSet) => {
-            let (pair, _) = EcdsaPair::from_string_with_seed("//ALICE", None).unwrap();
-            pair
+            // fall back to the default value used in unit tests and used on the testnet
+            let default_private_key_hex = hex::decode(ETH_PRIVATE_KEY_DEFAULT_VALUE).unwrap();
+            // note - seed is a misnomer - it is actually the private key :(
+            EcdsaPair::from_seed_slice(&default_private_key_hex).unwrap()
         }
         Err(err) => panic!(
             "Error while decoding private key material for eth key! {:?}",

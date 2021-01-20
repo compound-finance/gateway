@@ -13,9 +13,11 @@ use crate::{
     chains::{eth, Chain, ChainId, Ethereum},
     notices::Notice, // XXX move here, encoding to chains
     params::MIN_TX_VALUE,
+    CashBalance,
     Config,
     Module,
     RawEvent::GoldieLocks,
+    Store,
 };
 use sp_runtime::print;
 
@@ -31,6 +33,11 @@ macro_rules! require_min_tx_value {
     ($value:expr) => {
         require!($value >= MIN_TX_VALUE, Reason::MinTxValueNotMet);
     };
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ConversionError {
+    ConvertFromBytesToEthAddress,
 }
 
 // Type aliases //
@@ -60,16 +67,44 @@ pub type GenericAsset = (ChainId, GenericAddr);
 pub type GenericMsg = Vec<u8>;
 
 /// Type for a generic signature, potentially for any chain.
-pub type GenericSig = Vec<u8>;
+pub type SigData = Vec<u8>;
+
+/// Type for a generic signature, potentially for any chain.
+pub type GenericSig = (ChainId, SigData);
 
 /// Type for a bunch of generic signatures.
-pub type GenericSigs = Vec<GenericSig>;
+pub type GenericSigs = Vec<SigData>;
 
 /// Type for representing a price, potentially for any symbol.
 pub type GenericPrice = Uint;
 
 /// Type for representing a quantity, potentially of any symbol.
 pub type GenericQty = Uint;
+
+/// Type for representing a quantity, potentially of any symbol.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum GenericMaxQty {
+    Max,
+    Qty(GenericQty),
+}
+
+impl From<u128> for GenericMaxQty {
+    fn from(amt: u128) -> Self {
+        GenericMaxQty::Qty(amt)
+    }
+}
+
+/// Type for chain signatures
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainSignature {
+    Eth(<Ethereum as Chain>::Signature),
+}
+
+/// Type for chain accounts
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAccount {
+    Eth(<Ethereum as Chain>::Address),
+}
 
 /// Type for a generic set, for validators/reporters in the genesis config.
 pub type GenericSet = Vec<String>;
@@ -83,8 +118,8 @@ pub type SignedPayload = Vec<u8>; // XXX
 /// Type for signature used to verify that a signed payload comes from a validator.
 pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
 
-/// Type for a public key used to identify a validator.
-pub type ValidatorKey = [u8; 65]; // XXX secp256k1 public key, but why secp256k1?
+/// Type for an address used to identify a validator.
+pub type ValidatorKey = [u8; 20]; // XXX secp256k1 public key, but why secp256k1?
 
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
@@ -160,12 +195,12 @@ pub enum EventStatus<C: Chain> {
 
 /// Type for the status of a notice on the queue.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum NoticeStatus<C: Chain> {
+pub enum NoticeStatus {
     Missing,
     Pending {
         signers: crate::ValidatorSet,
         signatures: GenericSigs,
-        notice: Notice<C>,
+        notice: Notice,
     },
     Done,
 }
@@ -193,6 +228,16 @@ impl<C: Chain> From<Account<C>> for GenericAccount {
 impl From<Quantity> for GenericQty {
     fn from(quantity: Quantity) -> Self {
         quantity.amount().into()
+    }
+}
+
+impl ChainAccount {
+    pub fn try_from_eth_address_bytes(from: &[u8]) -> Result<ChainAccount, ConversionError> {
+        let addr = from
+            .try_into()
+            .map_err(|_| ConversionError::ConvertFromBytesToEthAddress)?;
+
+        Ok(ChainAccount::Eth(addr))
     }
 }
 
@@ -487,6 +532,18 @@ pub fn extract_cash_principal_internal<T: Config, C: Chain>(
     //     Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew;
     //     Add CashExtractionNotice(Recipient, Amount, YieldIndex) to NoticeQueueRecipient.Chain;
     Ok(()) // XXX
+}
+
+pub fn get_quantity(max: GenericMaxQty, when_max: &dyn Fn() -> GenericQty) -> GenericQty {
+    match max {
+        GenericMaxQty::Max => when_max(),
+        GenericMaxQty::Qty(qty) => qty,
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum RecoveryError {
+    RecoveryError,
 }
 
 #[cfg(test)]

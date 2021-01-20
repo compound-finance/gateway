@@ -2,6 +2,7 @@
 pub use our_std::vec::Vec;
 
 use crate::core::{GenericQty, MulIndex, Timestamp, APR};
+
 use codec::{Decode, Encode};
 use our_std::{Debuggable, RuntimeDebug};
 
@@ -29,7 +30,7 @@ pub trait Chain {
     type Rate: Debuggable + Clone + Eq + Into<APR> = u128;
     type Timestamp: Debuggable + Clone + Eq + Into<Timestamp> = u128; // XXX u64?
     type Hash: Debuggable + Clone + Eq = [u8; 32];
-    type PublicKey: Debuggable + Clone + Eq = [u8; 32];
+    type PublicKey: Debuggable + Clone + Eq = [u8; 64];
     type Signature: Debuggable + Clone + Eq = [u8; 65]; // XXX
     type EventId: Debuggable + Clone + Eq + Ord;
     type Event: Debuggable + Clone + Eq;
@@ -128,6 +129,11 @@ pub mod eth {
     use our_std::RuntimeDebug;
     use tiny_keccak::Hasher;
 
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub enum RecoveryError {
+        SignatureRecoveryError,
+    }
+
     pub type BlockNumber = u32;
     pub type LogIndex = u32;
 
@@ -160,12 +166,24 @@ pub mod eth {
     }
 
     /// Helper function to quickly run keccak in the Ethereum-style
-    pub fn keccak(input: Vec<u8>) -> <Ethereum as Chain>::Hash {
+    /// TODO: Add to trait?
+    pub fn digest(input: &[u8]) -> <Ethereum as Chain>::Hash {
         let mut output = [0u8; 32];
         let mut hasher = tiny_keccak::Keccak::v256();
         hasher.update(&input[..]);
         hasher.finalize(&mut output);
         output
+    }
+
+    /// Helper function to build address from public key
+    /// TODO: Add to trait?
+    pub fn address_from_public_key(
+        public_key: <Ethereum as Chain>::PublicKey,
+    ) -> <Ethereum as Chain>::Address {
+        let mut address: [u8; 20] = [0; 20];
+        let hash = digest(&public_key[..]);
+        address.copy_from_slice(&hash[12..]);
+        address
     }
 
     /// Convert Result<Vec<u8>, CryptoError> to Result<<Ethereum as Chain>::Signature, CryptoError>
