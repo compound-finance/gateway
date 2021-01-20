@@ -56,6 +56,9 @@ pub fn get_max_value<T>(max: Maxable<T>, when_max: &dyn Fn() -> T) -> T {
   }
 }
 
+/// Either an AssetAmount or max
+pub type MaxableAssetAmount = Maxable<AssetAmount>;
+
 /// Type for chain signatures
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
@@ -97,6 +100,9 @@ pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Ve
 
 /// Type for a set of configuration values
 pub type ConfigSet<T> = Vec<T>;
+
+/// Type for a set of configuration strings
+pub type ConfigSetString = ConfigSet<String>;
 
 /// Type for the status of an event on the queue.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]

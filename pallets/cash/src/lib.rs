@@ -39,8 +39,8 @@ use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::symbol::Symbol;
 use crate::types::{
     get_max_value, AssetAmount, AssetPrice, ChainAccount, ChainAsset, ChainSignature,
-    ChainSignatureList, ConfigSet, EncodedNotice, EventStatus, Maxable, MulIndex, Nonce,
-    NoticeStatus, ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig, APR,
+    ChainSignatureList, ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, MulIndex,
+    Nonce, NoticeStatus, ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 
 use sp_runtime::print;
@@ -157,10 +157,10 @@ decl_storage! {
         // PriceKeyMapping;
     }
     add_extra_genesis {
-        config(validators): ConfigSet<String>;
-        config(reporters): ConfigSet<String>;
-        config(symbols): ConfigSet<String>; // XXX initialize symbol from string: (ticker, decimals)
-        config(price_key_mapping): ConfigSet<String>;
+        config(validators): ConfigSetString;
+        config(reporters): ConfigSetString;
+        config(symbols): ConfigSetString; // XXX initialize symbol from string: (ticker, decimals)
+        config(price_key_mapping): ConfigSetString;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
@@ -531,7 +531,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of validators from the genesis config
-    fn initialize_validators(validators: ConfigSet<String>) {
+    fn initialize_validators(validators: ConfigSetString) {
         assert!(
             !validators.is_empty(),
             "Validators must be set in the genesis config"
@@ -547,7 +547,7 @@ impl<T: Config> Module<T> {
 
     // XXX actually symbols is a map with decimals
     /// Set the initial set of supported symbols from the genesis config
-    fn initialize_symbols(symbols: ConfigSet<String>) {
+    fn initialize_symbols(symbols: ConfigSetString) {
         assert!(
             !symbols.is_empty(),
             "Symbols must be set in the genesis config"
@@ -563,7 +563,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_reporters(reporters: ConfigSet<String>) {
+    fn initialize_reporters(reporters: ConfigSetString) {
         assert!(
             !reporters.is_empty(),
             "Open price feed price reporters must be set in the genesis config"
@@ -578,7 +578,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_price_key_mapping(price_key_mapping: ConfigSet<String>) {
+    fn initialize_price_key_mapping(price_key_mapping: ConfigSetString) {
         assert!(
             !price_key_mapping.is_empty(),
             "price_key_mapping must be set in the genesis config"
@@ -800,7 +800,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
 pub fn magic_extract_internal<T: Config>(
     sender: ChainAccount,
     account: ChainAccount,
-    max_amount: Maxable<AssetAmount>,
+    max_amount: MaxableAssetAmount,
 ) -> Result<(), Error<T>> {
     let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
 

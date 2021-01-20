@@ -1,5 +1,80 @@
 {
-  "Compound": {},
+  "Source0": "TypesRS",
+  "APR": "u128",
+  "Nonce": "u32",
+  "Timestamp": "u128",
+  "Uint": "u128",
+  "EncodedNotice": "Vec<u8>",
+  "AssetPrice": "Uint",
+  "AssetAmount": "Uint",
+  "CashAmount": "Uint",
+  "MaxAssetAmount": {
+    "_enum": {
+      "Max": [],
+      "Value": ["AssetAmount"]
+    }
+  },
+  "ChainSignature": {
+    "_enum": {
+      "Eth": ["[u8; 65]"]
+    }
+  },
+  "ChainSignatureList": {
+    "_enum": {
+      "Eth": ["Vec<[u8; 65]>"]
+    }
+  },
+  "ChainAccount": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainAsset": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ReporterSet": "Vec<[u8; 20]>",
+  "SignedPayload": "Vec<u8>",
+  "ValidatorSig": "[u8; 65]",
+  "ValidatorKey": "[u8; 20]",
+  "ValidatorSet": "Vec<ValidatorKey>",
+  "ConfigSetString": "Vec<String>",
+  "EventStatus": {
+    "_enum": {
+      "Pending": {
+        "signers": "ValidatorSet"
+      },
+      "Failed": {
+        "hash": "[u8; 32]",
+        "reason": "Reason"
+      },
+      "Done": {}
+    }
+  },
+  "NoticeStatusPending": {
+    "_enum": {
+      "signers": "ValidatorSet",
+      "signatures": "ChainSignatureList",
+      "notice": "Notice"
+    }
+  },
+  "NoticeStatus": {
+    "_enum": {
+      "Missing": [],
+      "Pending": "NoticeStatusPending",
+      "Notice": "Notice",
+      "Done": []
+    }
+  },
+  "Price": ["Symbol", "AssetPrice"],
+  "Quantity": ["Symbol", "AssetAmount"],
+  "MulIndex" : "Uint",
+
+  "Source1": "SymbolRS",
+  "Symbol": "[u32; 12]",
+
+  "Source2": "ChainsRS",
   "ChainId": {
     "_enum": [
       "Comp",
@@ -9,17 +84,16 @@
       "Tez"
     ]
   },
+  "Compound": {},
+  "Ethereum": {},
+  "Polkadot": {},
+  "Solana": {},
+  "Tezos": {},
+
+  "Source3": "NoticesRS",
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",
-  "CatLike": {
-    "weight": "[u64; 5]"
-  },
-  "Animal": {
-    "_enum": {
-      "Cat": "CatLike"
-    }
-  },
   "ExtractionNoticeEth": {
     "id": "NoticeId",
     "parent": "[u8; 32]",
@@ -86,63 +160,14 @@
       "ChangeAuthorityNotice": "ChangeAuthorityNotice"
     }
   },
+
+  "Source4": "CoreRS",
   "Reason": {
     "_enum": [
       "None",
       "NotImplemented",
       "MinTxValueNotMet",
       "InvalidSymbol"
-    ]
-  },
-  "ChainAccount": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
-    }
-  },
-  "ChainSignature": {
-    "_enum": {
-      "Eth": ["[u8; 65]"]
-    }
-  },
-  "APR": "u128",
-  "Nonce": "u32",
-  "Timestamp": "u128",
-  "Uint": "u128",
-  "GenericAddr": "Vec<u8>",
-  "GenericAccount": "(ChainId, GenericAddr)",
-  "GenericAsset": "(ChainId, GenericAddr)",
-  "GenericMsg": "Vec<u8>",
-  "SigData": "Vec<u8>",
-  "GenericSig": "(ChainId, SigData)",
-  "GenericSigs": "Vec<SigData>",
-  "GenericPrice": "Uint",
-  "GenericQty": "Uint",
-  "GenericSet": "Vec<String>",
-  "SignedPayload": "Vec<u8>",
-  "ValidatorSig": "[u8; 65]",
-  "ValidatorKey": "[u8; 20]",
-  "ValidatorSet": "Vec<ValidatorKey>",
-  "EventStatus": {
-    "_enum": {
-      "Pending": {
-        "signers": "ValidatorSet"
-      },
-      "Failed": {
-        "hash": "[u8; 32]",
-        "reason": "Reason"
-      },
-      "Done": {}
-    }
-  },
-  "Symbol": {
-    "_enum": [
-      "CASH",
-      "DOT",
-      "ETH",
-      "SOL",
-      "TEZ",
-      "USD",
-      "USDC"
     ]
   }
 }

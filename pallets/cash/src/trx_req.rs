@@ -1,9 +1,9 @@
 extern crate trx_request;
 
-use crate::types::{AssetAmount, ChainAccount, Maxable};
+use crate::types::{AssetAmount, ChainAccount, Maxable, MaxableAssetAmount};
 use trx_request::*;
 
-impl From<trx_request::MaxAmount> for Maxable<AssetAmount> {
+impl From<trx_request::MaxAmount> for MaxableAssetAmount {
     fn from(amt: MaxAmount) -> Self {
         match amt {
             MaxAmount::Max => Maxable::Max,

@@ -53,7 +53,7 @@ describe('magic extract and goldie unlocks', () => {
 
     expect(magicExtractEvent).toBeDefined();
     expect(getEventData(magicExtractEvent)).toEqual({
-      GenericQty: 1000,
+      AssetAmount: 1000,
       ChainAccount: {
         Eth: "0xc00e94cb662c3520282e6f5717214004a7f26888",
       },
@@ -74,13 +74,16 @@ describe('magic extract and goldie unlocks', () => {
 
     expect(signedNotice).toBeDefined();
     let eventData = getEventData(signedNotice);
-    let notice = eventData['GenericMsg'];
-    expect(notice).toBeDefined();
-    let noticeSigs = eventData['GenericSigs'];
-    expect(noticeSigs).toBeDefined();
+    expect(eventData).toHaveProperty('ChainId', "Eth");
+    expect(eventData).toHaveProperty('NoticeId', [0, 0]);
+    expect(eventData).toHaveProperty('EncodedNotice');
+    expect(eventData).toHaveProperty('ChainSignatureList');
+    let notice = eventData['EncodedNotice'];
+    let noticeSigs = eventData['ChainSignatureList'];
+    expect(noticeSigs).toHaveProperty('Eth');
 
     // TODO: This should probably be "unlockCash"
-    let tx = await contracts.starport.methods.unlock(notice, noticeSigs).send({ from: accounts[0] });
+    let tx = await contracts.starport.methods.unlock(notice, noticeSigs['Eth']).send({ from: accounts[0] });
 
     let unlockEvent = tx.events['Unlock'];
     expect(notice).toBeDefined();
@@ -88,7 +91,7 @@ describe('magic extract and goldie unlocks', () => {
     expect(getEventValues(unlockEvent)).toEqual({
       account: "0xc00e94Cb662C3520282E6f5717214004A7f26888",
       amount: "1000",
-      asset: "0x00000000000000000000000000000000000003e8" // uhhh?
+      asset: "0x00000000000000000000000000000000000003e8", // uhhh?
     });
 
     // TODO: Update once Starport actually unlocks tokens
@@ -102,15 +105,13 @@ describe('magic extract and goldie unlocks', () => {
     let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false);
 
     expect(getEventData(goldieLocksEvent)).toEqual({
-      "GenericAccount": [
-        "Eth",
-        accounts[0].toLowerCase(),
-      ],
-      "GenericAsset": [
-        "Eth",
-        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      ],
-      "GenericQty": "0x00000000000000000de0b6b3a7640000"
+      ChainAccount: {
+        Eth: accounts[0].toLowerCase(),
+      },
+      ChainAsset: {
+        Eth: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      },
+      AssetAmount: "0x00000000000000000de0b6b3a7640000",
     });
 
     // Everything's good.
@@ -121,15 +122,13 @@ describe('magic extract and goldie unlocks', () => {
     let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false);
 
     expect(getEventData(goldieLocksEvent)).toEqual({
-      "GenericAccount": [
-        "Eth",
-        accounts[0].toLowerCase(),
-      ],
-      "GenericAsset": [
-        "Eth",
-        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      ],
-      "GenericQty": "0x00000000000000000de0b6b3a7640000"
+      ChainAccount: {
+        Eth: accounts[0].toLowerCase(),
+      },
+      ChainAsset: {
+        Eth: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      },
+      AssetAmount: "0x00000000000000000de0b6b3a7640000",
     });
 
     // Everything's good.
