@@ -40,7 +40,7 @@ use crate::core::{
     Timestamp, ValidatorSet, ValidatorSig,
 };
 use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId}; // XXX move to core?
-use crate::rates::{InterestRateModel, Rate};
+use crate::rates::{InterestRateModel, APR};
 use crate::trx_req::*;
 use sp_runtime::print;
 
@@ -510,7 +510,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Get the borrow rate for the given asset
-    fn get_borrow_rate(asset: &GenericAsset) -> Result<Rate, Error<T>> {
+    fn get_borrow_rate(asset: &GenericAsset) -> Result<APR, Error<T>> {
         if !Model::contains_key(asset) {
             return Err(<Error<T>>::InterestRateModelNotSet);
         }

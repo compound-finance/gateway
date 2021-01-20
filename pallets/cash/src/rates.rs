@@ -25,7 +25,7 @@ pub enum RatesError {
 pub type Utilization = Uint;
 
 /// Interest rate
-pub type Rate = Uint;
+pub type APR = Uint;
 
 const UTILIZATION_ONE: Uint = 10000;
 
@@ -67,10 +67,10 @@ pub fn get_utilization(
 #[derive(Debuggable, Encode, Decode, PartialEq, Eq, Copy, Clone)]
 pub enum InterestRateModel {
     Kink {
-        zero_rate: Rate,
-        kink_rate: Rate,
+        zero_rate: APR,
+        kink_rate: APR,
         kink_utilization: Utilization,
-        full_rate: Rate,
+        full_rate: APR,
     },
 }
 
@@ -88,10 +88,10 @@ impl Default for InterestRateModel {
 
 impl InterestRateModel {
     pub fn new_kink(
-        zero_rate: Rate,
-        kink_rate: Rate,
+        zero_rate: APR,
+        kink_rate: APR,
         kink_utilization: Utilization,
-        full_rate: Rate,
+        full_rate: APR,
     ) -> InterestRateModel {
         InterestRateModel::Kink {
             zero_rate,
@@ -143,8 +143,8 @@ impl InterestRateModel {
     pub fn get_borrow_rate(
         self: &Self,
         utilization: Utilization,
-        current_rate: Rate,
-    ) -> Result<Rate, RatesError> {
+        current_rate: APR,
+    ) -> Result<APR, RatesError> {
         match self {
             Self::Kink {
                 zero_rate,
@@ -239,7 +239,7 @@ mod test {
     struct InterestRateModelGetBorrowRateTestCase {
         model: InterestRateModel,
         utilization: Utilization,
-        expected: Result<Rate, RatesError>,
+        expected: Result<APR, RatesError>,
         message: &'static str,
     }
 
