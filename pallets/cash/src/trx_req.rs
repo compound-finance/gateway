@@ -27,6 +27,6 @@ mod tests {
     #[test]
     fn test_max_amount_to_generic() {
         assert_eq!(Maxable::from(MaxAmount::Amt(5)), Maxable::Value(5));
-        assert_eq!(Maxable::from(MaxAmount::Max), Maxable::Max);
+        assert_eq!(Maxable::<AssetAmount>::from(MaxAmount::Max), Maxable::Max);
     }
 }

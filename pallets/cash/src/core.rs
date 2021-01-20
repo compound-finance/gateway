@@ -70,7 +70,7 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
     }
 }
 
-pub fn lock_internal<T: Config, C: Chain>(
+pub fn lock_internal<T: Config>(
     asset: ChainAsset,
     holder: ChainAccount,
     amount: AssetAmount,
@@ -110,10 +110,12 @@ pub fn extract_principal_internal<T: Config>(
     recipient: ChainAccount,
     principal: AssetAmount,
 ) -> Result<(), Reason> {
+    // TODO: Do we need a Symbol here for these?
+
     // Require Recipient.Chain=Asset.Chain XXX proven by compiler
-    let supply_index = <Module<T>>::supply_index(asset);
-    let amount = principal * supply_index;
-    require_min_tx_value!(amount * price::<T>(principal.symbol()));
+    // let supply_index = <Module<T>>::supply_index(asset);
+    // let amount = principal * supply_index;
+    // require_min_tx_value!(amount * price::<T>(principal.symbol()));
 
     // Read Require HasLiquidityToReduceCollateralAsset(Holder, Asset, Amount)
     // ReadsCashBorrowPrincipalBorrower, CashCostIndexPair, CashYield, CashSpread, Price*, SupplyPrincipal*, Borrower, StabilityFactor*
@@ -135,9 +137,10 @@ pub fn extract_cash_principal_internal<T: Config, C: Chain>(
     recipient: ChainAccount,
     principal: CashAmount,
 ) -> Result<(), Reason> {
-    let yield_index = <Module<T>>::cash_yield_index();
-    let amount = principal * yield_index;
-    require_min_tx_value!(amount * price::<T>(CASH));
+    // TODO: Do we need a symbol here for these?
+    // let yield_index = <Module<T>>::cash_yield_index();
+    // let amount = principal * yield_index;
+    // require_min_tx_value!(amount * price::<T>(CASH));
 
     // Note: we do not check health here, since CASH cannot be borrowed against yet.
     // let chain_cash_hold_principal_new = <Module<T>>::chain_cash_hold_principal(recipient.chain) + amount_principal;

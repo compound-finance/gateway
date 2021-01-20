@@ -2,6 +2,7 @@ use crate::{
   chains::{Chain, ChainId, Ethereum},
   notices::Notice,
   symbol::{Symbol, CASH, NIL, USD},
+  Config, Module,
 };
 use codec::{Decode, Encode};
 use our_std::{
@@ -23,26 +24,8 @@ pub type Timestamp = u128; // XXX u64?
 /// Type of the largest possible unsigned integer on Compound Chain.
 pub type Uint = u128;
 
-/// Type for a generic address, potentially on any chain.
-pub type GenericAddr = Vec<u8>;
-
-/// Type for a generic account, tied to one of the possible chains.
-pub type GenericAccount = (ChainId, GenericAddr);
-
-/// Type for a generic asset, tied to one of the possible chains.
-pub type GenericAsset = (ChainId, GenericAddr);
-
 /// Type for a generic encoded message, potentially for any chain.
 pub type EncodedNotice = Vec<u8>;
-
-/// Type for a generic signature, potentially for any chain.
-pub type SigData = Vec<u8>;
-
-/// Type for a generic signature, potentially for any chain.
-pub type GenericSig = (ChainId, SigData);
-
-/// Type for a bunch of generic signatures.
-pub type GenericSigs = Vec<SigData>;
 
 /// Type for representing a price, potentially for any symbol.
 pub type AssetPrice = Uint;
@@ -77,6 +60,12 @@ pub fn get_max_value<T>(max: Maxable<T>, when_max: &dyn Fn() -> T) -> T {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
   Eth(<Ethereum as Chain>::Signature),
+}
+
+/// Type for a list of chain signatures
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainSignatureList {
+  Eth(Vec<<Ethereum as Chain>::Signature>),
 }
 
 /// Type for chain accounts
@@ -128,7 +117,7 @@ pub enum NoticeStatus {
   Missing,
   Pending {
     signers: crate::ValidatorSet,
-    signatures: GenericSigs,
+    signatures: ChainSignatureList,
     notice: Notice,
   },
   Done,
@@ -136,11 +125,11 @@ pub enum NoticeStatus {
 
 /// Type for representing a price (in USD), bound to its symbol.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct Price(pub Symbol, pub GenericPrice);
+pub struct Price(pub Symbol, pub AssetPrice);
 
 /// Type for representing a quantity of an asset, bound to its symbol.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct Quantity(pub Symbol, pub GenericQty);
+pub struct Quantity(pub Symbol, pub AssetAmount);
 
 /// Type for representing a multiplicative index on Compound Chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
@@ -168,7 +157,7 @@ impl Price {
     self.0
   }
 
-  pub const fn amount(&self) -> GenericPrice {
+  pub const fn amount(&self) -> AssetPrice {
     self.1
   }
 
@@ -186,7 +175,7 @@ impl Quantity {
     self.0
   }
 
-  pub const fn amount(&self) -> GenericQty {
+  pub const fn amount(&self) -> AssetAmount {
     self.1
   }
 
@@ -211,7 +200,7 @@ impl Mul<Quantity> for Price {
     Quantity(
       USD,
       self.amount() * rhs.amount()
-        / (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as GenericQty),
+        / (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as AssetAmount),
     )
   }
 }
@@ -228,7 +217,7 @@ impl Mul<Price> for Quantity {
     Quantity(
       USD,
       self.amount() * rhs.amount()
-        / (pow10(Price::DECIMALS + self.symbol().decimals() - USD.decimals()) as GenericQty),
+        / (pow10(Price::DECIMALS + self.symbol().decimals() - USD.decimals()) as AssetAmount),
     )
   }
 }
@@ -246,7 +235,7 @@ impl Div<Price> for Quantity {
     Quantity(
       rhs.symbol(),
       self.amount()
-        * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as GenericPrice)
+        * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as AssetPrice)
         / rhs.amount(),
     )
   }
@@ -268,7 +257,7 @@ impl Div<Quantity> for Quantity {
     Price(
       rhs.symbol(),
       self.amount()
-        * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as GenericQty)
+        * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as AssetAmount)
         / rhs.amount(),
     )
   }
@@ -304,7 +293,7 @@ pub fn price<T: Config>(symbol: Symbol) -> Price {
   }
 }
 
-pub fn symbol<T: Config, C: Chain>(asset: Asset<C>) -> Symbol {
+pub fn symbol<T: Config>(asset: ChainAsset) -> Symbol {
   // XXX lookup in storage
   Symbol(
     ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],

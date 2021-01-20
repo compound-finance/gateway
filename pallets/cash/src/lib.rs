@@ -13,7 +13,7 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 use frame_system::{
-    ensure_none, ensure_signed,
+    ensure_none,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
 use our_std::{
@@ -38,9 +38,9 @@ use crate::core::Reason;
 use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::symbol::Symbol;
 use crate::types::{
-    get_max_value, AssetAmount, AssetPrice, ChainAccount, ChainSignature, ConfigSet, EncodedNotice,
-    EventStatus, GenericAsset, GenericSigs, Maxable, MulIndex, Nonce, NoticeStatus, ReporterSet,
-    SignedPayload, Timestamp, ValidatorSet, ValidatorSig, APR,
+    get_max_value, AssetAmount, AssetPrice, ChainAccount, ChainAsset, ChainSignature,
+    ChainSignatureList, ConfigSet, EncodedNotice, EventStatus, Maxable, MulIndex, Nonce,
+    NoticeStatus, ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig, APR,
 };
 
 use sp_runtime::print;
@@ -151,7 +151,7 @@ decl_storage! {
         PriceTimes get(fn price_times): map hasher(blake2_128_concat) Symbol => Timestamp;
 
         /// Mapping of assets to symbols.
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Option<Symbol>;
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
 
         // PriceReporter;
         // PriceKeyMapping;
@@ -190,7 +190,7 @@ decl_event!(
         FailedProcessingEthEvent(SignedPayload, Reason),
 
         /// Signed notice. [chain_id, notice_id, message, signatures]
-        SignedNotice(ChainId, NoticeId, EncodedNotice, GenericSigs),
+        SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
     }
 );
 
@@ -597,8 +597,10 @@ impl<T: Config> Module<T> {
             assert!(chain == "ETH", "Invalid blockchain");
 
             let decoded = hex::decode(&address).expect("Address is not in hex format");
+            let decoded_arr: <Ethereum as Chain>::Address =
+                decoded.try_into().expect("Invalid Ethereum address");
 
-            let chain_asset: GenericAsset = (ChainId::Eth, decoded);
+            let chain_asset: ChainAsset = ChainAsset::Eth(decoded_arr);
             PriceKeyMapping::insert(chain_asset, symbol);
         }
     }
@@ -831,7 +833,7 @@ pub fn magic_extract_internal<T: Config>(
         notice_id,
         NoticeStatus::Pending {
             signers: vec![],
-            signatures: vec![],
+            signatures: ChainSignatureList::Eth(vec![]),
             notice: notice.clone(),
         },
     );
@@ -845,7 +847,7 @@ pub fn magic_extract_internal<T: Config>(
         ChainId::Eth,
         notice_id,
         encoded_notice,
-        vec![signature.to_vec()],
+        ChainSignatureList::Eth(vec![signature]),
     )); // XXX signatures
 
     // Return a successful DispatchResult
