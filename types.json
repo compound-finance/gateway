@@ -9,28 +9,100 @@
       "Tez"
     ]
   },
-  "Notice": {
+  "EraId": "u32",
+  "EraIndex": "u32",
+  "NoticeId": "(EraId, EraIndex)",
+  "CatLike": {
+    "weight": "[u64; 5]"
+  },
+  "Animal": {
     "_enum": {
-      "ExtractionNotice": "ExtractionNotice"
+      "Cat": "CatLike"
     }
   },
-  "ExtractionNotice": {
+  "ExtractionNoticeEth": {
     "id": "NoticeId",
     "parent": "[u8; 32]",
     "asset": "[u8; 20]",
     "account": "[u8; 20]",
     "amount": "u128"
   },
-  "Signature": "Vec<u8>",
-  "EraId": "u32",
-  "EraIndex": "u32",
-  "NoticeId": "(EraId, EraIndex)",
+  "ExtractionNotice": {
+    "_enum": {
+      "Eth": "ExtractionNoticeEth"
+    }
+  },
+  "CashExtractionNoticeEth": {
+    "id": "NoticeId",
+    "parent": "[u8; 32]",
+    "account": "[u8; 20]",
+    "amount": "u128",
+    "cash_yield_index": "u128"
+  },
+  "CashExtractionNotice": {
+    "_enum": {
+      "Eth": "CashExtractionNoticeEth"
+    }
+  },
+  "FutureYieldNoticeEth": {
+    "id": "NoticeId",
+    "parent": "[u8; 32]",
+    "next_cash_yield": "u128",
+    "next_cash_yield_start_at": "u128",
+    "next_cash_yield_index": "u128"
+  },
+  "FutureYieldNotice": {
+    "_enum": {
+      "Eth": "FutureYieldNoticeEth"
+    }
+  },
+  "SetSupplyCapNoticeEth": {
+    "id": "NoticeId",
+    "parent": "[u8; 32]",
+    "asset": "[u8; 20]",
+    "amount": "u128"
+  },
+  "SetSupplyCapNotice": {
+    "_enum": {
+      "Eth": "SetSupplyCapNoticeEth"
+    }
+  },
+  "ChangeAuthorityNoticeEth": {
+    "id": "NoticeId",
+    "parent": "[u8; 32]",
+    "new_authorities": "Vec<[u8; 20]>"
+  },
+  "ChangeAuthorityNotice": {
+    "_enum": {
+      "Eth": "ChangeAuthorityNoticeEth"
+    }
+  },
+  "Notice": {
+    "_enum": {
+      "ExtractionNotice": "ExtractionNotice",
+      "CashExtractionNotice": "CashExtractionNotice",
+      "FutureYieldNotice": "FutureYieldNotice",
+      "SetSupplyCapNotice": "SetSupplyCapNotice",
+      "ChangeAuthorityNotice": "ChangeAuthorityNotice"
+    }
+  },
   "Reason": {
     "_enum": [
       "None",
       "NotImplemented",
-      "MinTxValueNotMet"
+      "MinTxValueNotMet",
+      "InvalidSymbol"
     ]
+  },
+  "ChainAccount": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainSignature": {
+    "_enum": {
+      "Eth": ["[u8; 65]"]
+    }
   },
   "APR": "u128",
   "Nonce": "u32",
@@ -40,14 +112,15 @@
   "GenericAccount": "(ChainId, GenericAddr)",
   "GenericAsset": "(ChainId, GenericAddr)",
   "GenericMsg": "Vec<u8>",
-  "GenericSig": "Vec<u8>",
-  "GenericSigs": "Vec<GenericSig>",
+  "SigData": "Vec<u8>",
+  "GenericSig": "(ChainId, SigData)",
+  "GenericSigs": "Vec<SigData>",
   "GenericPrice": "Uint",
   "GenericQty": "Uint",
   "GenericSet": "Vec<String>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
-  "ValidatorKey": "[u8; 65]",
+  "ValidatorKey": "[u8; 20]",
   "ValidatorSet": "Vec<ValidatorKey>",
   "EventStatus": {
     "_enum": {
