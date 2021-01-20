@@ -123,6 +123,8 @@ pub mod eth {
 
     use super::{Chain, Ethereum};
     use codec::{Decode, Encode};
+    use compound_crypto::CryptoError;
+    use our_std::convert::TryInto;
     use our_std::RuntimeDebug;
     use tiny_keccak::Hasher;
 
@@ -166,14 +168,35 @@ pub mod eth {
         output
     }
 
-    // TODO: match by chain for signing algorithm or implement as trait
-    pub fn sign(message: &Vec<u8>) -> <Ethereum as Chain>::Signature {
-        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
-        let sig = runtime_interfaces::keyring_interface::sign(vec![message.clone()], eth_key_id)
-            .expect("xxx never use expect or unwrap!");
-        let sig2: [u8; 65] = sig[0].unwrap().try_into().unwrap();
+    /// Convert Result<Vec<u8>, CryptoError> to Result<<Ethereum as Chain>::Signature, CryptoError>
+    /// it is a little messy so we wrap it in a function
+    fn convert_to_ethereum_signature(
+        x: Result<Vec<u8>, CryptoError>,
+    ) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
+        match x {
+            Ok(e) => match e.try_into() {
+                Ok(u) => Ok(u),
+                Err(_) => Err(CryptoError::InvalidKeyId),
+            },
+            Err(err) => Err(err),
+        }
+    }
 
-        sig2
+    /// Sign messages for the ethereum network
+    pub fn sign(
+        messages: Vec<Vec<u8>>,
+    ) -> Result<Vec<Result<<Ethereum as Chain>::Signature, CryptoError>>, CryptoError> {
+        // TODO: match by chain for signing algorithm or implement as trait
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(CryptoError::KeyNotFound)?;
+
+        let mut sig_results = runtime_interfaces::keyring_interface::sign(messages, eth_key_id)?;
+        let result = sig_results
+            .drain(..)
+            .map(convert_to_ethereum_signature)
+            .collect();
+
+        Ok(result)
     }
 }
 
