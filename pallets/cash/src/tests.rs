@@ -31,6 +31,7 @@ fn it_fails_exec_trx_request_signed() {
 #[test]
 fn it_magically_extracts() {
     new_test_ext().execute_with(|| {
+        runtime_interfaces::set_validator_config_dev_defaults();
         // Dispatch a signed extrinsic.
         assert_ok!(magic_extract_internal::<Test>(
             andrew(),
@@ -52,6 +53,7 @@ fn it_magically_extracts() {
 }
 
 fn initialize_storage() {
+    runtime_interfaces::set_validator_config_dev_defaults();
     CashModule::initialize_validators(vec![
         "6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
         "58547bfa800b08a61b4adacbb78664bba2cb9301".into(),
@@ -71,7 +73,13 @@ fn process_eth_event_happy_path() {
         // Dispatch a signed extrinsic.
         // XXX
         let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
-        let sig = chains::eth::sign(&payload); // Sign with our "shared" private key for now
+
+        let sig = chains::eth::sign(vec![payload.clone()])
+            .unwrap()
+            .drain(..)
+            .next()
+            .unwrap()
+            .unwrap(); // Sign with our "shared" private key for now
 
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));
         // Read pallet storage and assert an expected result.
