@@ -1,5 +1,6 @@
 use crate::{
-  chains::{eth, Chain, ChainId, Ethereum},
+  chains::{Chain, ChainId, Ethereum},
+  notices::Notice,
   symbol::{Symbol, CASH, NIL, USD},
 };
 use codec::{Decode, Encode};
@@ -49,6 +50,9 @@ pub type AssetPrice = Uint;
 /// Type for representing an amount of any asset
 pub type AssetAmount = Uint;
 
+/// Type for representing an amount of Cash
+pub type CashAmount = Uint;
+
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Maxable<T> {
@@ -56,7 +60,7 @@ pub enum Maxable<T> {
   Value(T),
 }
 
-impl From<T> for Maxable {
+impl<T> From<T> for Maxable<T> {
   fn from(t: T) -> Self {
     Maxable::Value(t)
   }
@@ -78,6 +82,12 @@ pub enum ChainSignature {
 /// Type for chain accounts
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainAccount {
+  Eth(<Ethereum as Chain>::Address),
+}
+
+/// Type for chain assets
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAsset {
   Eth(<Ethereum as Chain>::Address),
 }
 

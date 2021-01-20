@@ -106,10 +106,10 @@ decl_storage! {
         CashSpread get(fn cash_spread): APR;
 
         /// An index to track interest owed by asset borrowers.
-        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => MulIndex; // XXX will change to add
+        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) ChainAsset => MulIndex; // XXX will change to add
 
         /// An index to track interest earned by asset suppliers.
-        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => MulIndex; // XXX will change to add
+        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) ChainAsset => MulIndex; // XXX will change to add
 
         // XXX doc
         ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => AssetAmount;
@@ -178,7 +178,7 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX -- For testing
-        GoldieLocks(GenericAsset, ChainAccount, AssetAmount),
+        GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
         /// XXX
         MagicExtract(AssetAmount, ChainAccount, Notice),

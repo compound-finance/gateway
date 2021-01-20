@@ -1,3 +1,4 @@
+use codec::{Decode, Encode};
 use our_std::{convert::TryInto, RuntimeDebug};
 
 /// Type for the abstract symbol of an asset, not tied to a chain.

@@ -9,7 +9,8 @@ use crate::{
     chains::{eth, Chain, ChainId, Ethereum},
     notices::Notice, // XXX move here, encoding to chains
     params::MIN_TX_VALUE,
-    types::ChainSignature,
+    symbol::CASH,
+    types::{price, AssetAmount, CashAmount, ChainAccount, ChainAsset, ChainSignature},
     CashBalance,
     Config,
     Module,
@@ -55,11 +56,7 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
             //   Build AssetIdent=("eth", asset)
             //   Call lockInternal(AssetIdent, AccountIdent, Amount)
             print("applying lock event...");
-            lock_internal::<T, Ethereum>(
-                Asset(asset),
-                Account(holder),
-                Quantity(symbol::<T, Ethereum>(Asset(asset)), amount.into()),
-            )
+            lock_internal::<T>(ChainAsset::Eth(asset), ChainAccount::Eth(holder), amount)
         }
         _ => {
             //  When Gov(title:string, extrinsics:bytes[]):
@@ -74,13 +71,13 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
 }
 
 pub fn lock_internal<T: Config, C: Chain>(
-    asset: Asset<C>,
-    holder: Account<C>,
-    amount: Quantity,
+    asset: ChainAsset,
+    holder: ChainAccount,
+    amount: AssetAmount,
 ) -> Result<(), Reason> {
     print("lock internal...");
 
-    Module::<T>::deposit_event(GoldieLocks(asset.into(), holder.into(), amount.into()));
+    Module::<T>::deposit_event(GoldieLocks(asset, holder, amount));
 
     // XXX
     // Read Require AmountPriceAssetParamsMinTxValue
@@ -92,9 +89,9 @@ pub fn lock_internal<T: Config, C: Chain>(
     Ok(())
 }
 
-pub fn lock_cash_internal<T: Config, C: Chain>(
-    holder: Account<C>,
-    amount: Quantity, // XXX CashQuantity?
+pub fn lock_cash_internal<T: Config>(
+    holder: ChainAccount,
+    amount: CashAmount,
 ) -> Result<(), Reason> {
     // XXX
     // Read Require AmountPriceCASHParamsMinTxValue
@@ -107,14 +104,14 @@ pub fn lock_cash_internal<T: Config, C: Chain>(
     Ok(())
 }
 
-pub fn extract_principal_internal<T: Config, C: Chain>(
-    asset: Asset<C>,
-    holder: Account<C>,
-    recipient: Account<C>,
-    principal: Quantity,
+pub fn extract_principal_internal<T: Config>(
+    asset: ChainAsset,
+    holder: ChainAccount,
+    recipient: ChainAccount,
+    principal: AssetAmount,
 ) -> Result<(), Reason> {
     // Require Recipient.Chain=Asset.Chain XXX proven by compiler
-    let supply_index = <Module<T>>::supply_index(Into::<GenericAsset>::into(asset));
+    let supply_index = <Module<T>>::supply_index(asset);
     let amount = principal * supply_index;
     require_min_tx_value!(amount * price::<T>(principal.symbol()));
 
@@ -134,9 +131,9 @@ pub fn extract_principal_internal<T: Config, C: Chain>(
 //  probably not, probably inputs should always be fixed width?
 //   actually now I think we can always guarantee to parse ascii numbers in lisp requests into bigints
 pub fn extract_cash_principal_internal<T: Config, C: Chain>(
-    holder: Account<C>,
-    recipient: Account<C>,
-    principal: Quantity, // XXX CashQuantity?
+    holder: ChainAccount,
+    recipient: ChainAccount,
+    principal: CashAmount,
 ) -> Result<(), Reason> {
     let yield_index = <Module<T>>::cash_yield_index();
     let amount = principal * yield_index;
