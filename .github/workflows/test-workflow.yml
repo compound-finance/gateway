@@ -150,7 +150,7 @@ jobs:
 
   eth-tests:
     name: Ethereum Tests
-       runs-on: ubuntu-latest
+      runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ethereum
