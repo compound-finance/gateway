@@ -30,7 +30,7 @@ pub const USD: Symbol = Symbol(
 /// > warnings, but will likely panic at run-time.
 ///
 /// https://doc.rust-lang.org/reference/const_eval.html
-pub(crate) const fn pow10(decimals: u8) -> Uint {
+pub(crate) const fn static_pow10(decimals: u8) -> Uint {
     let mut i = 0;
     let mut v: Uint = 10;
     loop {
@@ -52,7 +52,7 @@ impl Symbol {
     }
 
     pub const fn one(&self) -> Uint {
-        pow10(self.decimals())
+        static_pow10(self.decimals())
     }
 }
 

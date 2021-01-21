@@ -1,4 +1,4 @@
-use crate::symbol::pow10;
+use crate::symbol::static_pow10;
 use crate::{
     chains::{Chain, ChainId, Ethereum},
     notices::Notice,
@@ -146,12 +146,12 @@ pub struct MulIndex(pub Uint);
 impl MulIndex {
     pub const DECIMALS: u8 = 4;
 
-    pub const ONE: MulIndex = MulIndex(10000);
+    pub const ONE: MulIndex = MulIndex(static_pow10(Self::DECIMALS));
 }
 
 impl Default for MulIndex {
     fn default() -> Self {
-        MulIndex(1)
+        MulIndex::ONE
     }
 }
 
@@ -208,7 +208,7 @@ const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
         return qty;
     }
 
-    let scalar = pow10(number_of_zeros_to_scale_up);
+    let scalar = static_pow10(number_of_zeros_to_scale_up);
 
     qty * scalar
 }
