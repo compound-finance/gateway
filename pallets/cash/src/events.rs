@@ -148,6 +148,12 @@ pub mod tests {
         ]
     }"#;
 
+    const NO_EVENTS_RESPONSE: &[u8; 69] = br#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result": []
+    }"#;
+
     const BLOCK_NUMBER_RESPONSE: &[u8; 79] = br#"{
         "jsonrpc": "2.0",
         "id": 1,
@@ -191,29 +197,25 @@ pub mod tests {
         assert_eq!(actual, expected);
     }
 
-    fn setup_config_values() {
+    fn get_mockup_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
+        // Set up config values
         let given_eth_starport_address: Vec<u8> =
             "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
         let given_eth_lock_event_topic: Vec<u8> =
             "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3".into();
-
         let config = runtime_interfaces::new_config(
             given_eth_starport_address.clone(),
             given_eth_lock_event_topic.clone(),
         );
         runtime_interfaces::config_interface::set(config);
-
         runtime_interfaces::set_validator_config_dev_defaults();
-        // let given_eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url();
-    }
 
-    #[test]
-    fn test_fetch_events_success() {
-        setup_config_values();
-        let calls: Vec<testing::PendingRequest> = vec![
+        let given_eth_rpc_url =
+            runtime_interfaces::validator_config_interface::get_eth_rpc_url().unwrap();
+        return vec![
             testing::PendingRequest{
                 method: "POST".into(),
-                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                uri: String::from_utf8(given_eth_rpc_url.clone()).unwrap(),
                 body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
                 response: Some(BLOCK_NUMBER_RESPONSE.to_vec()),
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -222,14 +224,19 @@ pub mod tests {
             },
             testing::PendingRequest{
                 method: "POST".into(),
-                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                uri: String::from_utf8(given_eth_rpc_url.clone()).unwrap(),
                 body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "earliest", "toBlock": "0xb27467", "topics":["0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"]}],"id":1}"#.to_vec(),
-                response: Some(EVENTS_RESPONSE.to_vec()),
+                response: Some(events_response.clone()),
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                 sent: true,
                 ..Default::default()
             }
         ];
+    }
+
+    #[test]
+    fn test_fetch_events_with_3_events() {
+        let calls: Vec<testing::PendingRequest> = get_mockup_http_calls(EVENTS_RESPONSE.to_vec());
 
         new_test_ext_with_http_calls(calls).execute_with(|| {
             let events_candidate = events::fetch_events("earliest".to_string());
@@ -252,6 +259,23 @@ pub mod tests {
                 lock_events[2].block_hash,
                 "0xa4a96e957718e3a30b77a667f93978d8f438bdcd56ff03545f08c833d9a26687"
             );
+        });
+    }
+
+    #[test]
+    fn test_fetch_events_with_no_events() {
+        let calls: Vec<testing::PendingRequest> =
+            get_mockup_http_calls(NO_EVENTS_RESPONSE.to_vec());
+
+        new_test_ext_with_http_calls(calls).execute_with(|| {
+            let events_candidate = events::fetch_events("earliest".to_string());
+            assert!(events_candidate.is_ok());
+            let starport_info = events_candidate.unwrap();
+            let latest_eth_block = starport_info.latest_eth_block;
+            let lock_events = starport_info.lock_events;
+
+            assert_eq!(latest_eth_block, "0xb27467");
+            assert_eq!(lock_events.len(), 0);
         });
     }
 }
