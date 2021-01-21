@@ -13,7 +13,7 @@ use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
 };
 use frame_system::{
-    ensure_none, ensure_signed,
+    ensure_none,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
 use our_std::{
@@ -33,15 +33,18 @@ use sp_runtime::{
 };
 
 use crate::chains::{Chain, ChainId, Ethereum};
-use crate::core::{
-    get_quantity, get_signer, Account, Asset, ChainAccount, ChainSignature, EventStatus,
-    GenericAccount, GenericAsset, GenericMaxQty, GenericMsg, GenericPrice, GenericQty, GenericSet,
-    GenericSigs, MulIndex, Nonce, NoticeStatus, Reason, ReporterSet, SignedPayload, Symbol,
-    Timestamp, ValidatorSet, ValidatorSig,
-};
-use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId}; // XXX move to core?
+use crate::core::get_signer;
+use crate::core::Reason;
+use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::rates::{InterestRateModel, APR};
+use crate::symbol::Symbol;
 use crate::trx_req::*;
+use crate::types::{
+    get_max_value, AssetAmount, AssetPrice, ChainAccount, ChainAsset, ChainSignature,
+    ChainSignatureList, ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, MulIndex,
+    Nonce, NoticeStatus, ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+};
+
 use sp_runtime::print;
 
 mod chains;
@@ -52,7 +55,9 @@ mod oracle;
 mod params;
 mod rates;
 mod sig;
+mod symbol;
 mod trx_req;
+mod types;
 
 #[cfg(test)]
 mod mock;
@@ -95,43 +100,43 @@ decl_storage! {
         CashYieldIndex get(fn cash_yield_index): MulIndex;
 
         /// The upcoming base rate change for CASH and when, if any.
-        CashYieldNext get(fn cash_yield_next): Option<(Rate, Timestamp)>;
+        CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
 
         /// The current Rate on CASH held, and the base rate paid by borrowers.
-        CashYield get(fn cash_yield): Rate;
+        CashYield get(fn cash_yield): APR;
 
         /// The current Rate surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
-        CashSpread get(fn cash_spread): Rate;
+        CashSpread get(fn cash_spread): APR;
 
         /// An index to track interest owed by asset borrowers.
-        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) GenericAsset => MulIndex; // XXX will change to add
+        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) ChainAsset => MulIndex; // XXX will change to add
 
         /// An index to track interest earned by asset suppliers.
-        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) GenericAsset => MulIndex; // XXX will change to add
+        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) ChainAsset => MulIndex; // XXX will change to add
 
         // XXX doc
-        ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => GenericQty;
+        ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => AssetAmount;
         // TotalCashHoldPrincipal;
         // TotalCashBorrowPrincipal;
         // TotalSupplyPrincipal[asset];
 
-        TotalSupplyPrincipal get(fn total_supply_principal): map hasher(blake2_128_concat) GenericAsset => GenericQty;
+        TotalSupplyPrincipal get(fn total_supply_principal): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
         // TotalBorrowPrincipal[asset];
 
-        TotalBorrowPrincipal get(fn total_borrow_principal): map hasher(blake2_128_concat) GenericAsset => GenericQty;
+        TotalBorrowPrincipal get(fn total_borrow_principal): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
 
         // CashHoldPrincipal[account];
         // CashBorrowPrincipal[account];
         // SupplyPrincipal[asset][account];
         // BorrowPrincipal[asset][account];
 
-        Model get(fn model): map hasher(blake2_128_concat) GenericAsset => crate::rates::InterestRateModel;
+        Model get(fn model): map hasher(blake2_128_concat) ChainAsset => crate::rates::InterestRateModel;
 
         /// The last used nonce for each account, initialized at zero.
-        Nonces get(fn nonces): map hasher(blake2_128_concat) GenericAccount => Nonce;
+        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
         // XXX delete me (part of magic extract)
-        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<GenericQty>;
+        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
 
         /// Mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
@@ -150,22 +155,22 @@ decl_storage! {
         Symbols get(fn symbols): map hasher(blake2_128_concat) String => Option<Symbol>;
 
         /// Mapping of latest prices for each asset symbol.
-        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => GenericPrice;
+        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => AssetPrice;
 
         /// Mapping of assets to the last time their price was updated.
         PriceTimes get(fn price_times): map hasher(blake2_128_concat) Symbol => Timestamp;
 
         /// Mapping of assets to symbols.
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) GenericAsset => Option<Symbol>;
+        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
 
         // PriceReporter;
         // PriceKeyMapping;
     }
     add_extra_genesis {
-        config(validators): GenericSet;
-        config(reporters): GenericSet;
-        config(symbols): GenericSet; // XXX initialize symbol from string: (ticker, decimals)
-        config(price_key_mapping): GenericSet;
+        config(validators): ConfigSetString;
+        config(reporters): ConfigSetString;
+        config(symbols): ConfigSetString; // XXX initialize symbol from string: (ticker, decimals)
+        config(price_key_mapping): ConfigSetString;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
@@ -183,10 +188,10 @@ decl_event!(
         XXXPhantomFakeEvent(AccountId), // XXX
 
         /// XXX -- For testing
-        GoldieLocks(GenericAsset, GenericAccount, GenericQty),
+        GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
         /// XXX
-        MagicExtract(GenericQty, ChainAccount, Notice),
+        MagicExtract(AssetAmount, ChainAccount, Notice),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -195,7 +200,7 @@ decl_event!(
         FailedProcessingEthEvent(SignedPayload, Reason),
 
         /// Signed notice. [chain_id, notice_id, message, signatures]
-        SignedNotice(ChainId, NoticeId, GenericMsg, GenericSigs),
+        SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
     }
 );
 
@@ -321,7 +326,7 @@ decl_module! {
 
         /// Update the interest rate model for a given asset. This is only called by governance
         #[weight = 0]
-        pub fn update_interest_rate_model(origin, asset: GenericAsset, model: InterestRateModel) -> dispatch::DispatchResult {
+        pub fn update_interest_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Self::update_interest_rate_model_internal(asset, model)?;
             Ok(())
@@ -487,7 +492,7 @@ decl_module! {
 impl<T: Config> Module<T> {
     /// Check to make sure an asset is supported. Only returns Err when the asset is not supported
     /// by compound chain.
-    fn check_asset_supported(asset: &GenericAsset) -> Result<(), Error<T>> {
+    fn check_asset_supported(asset: &ChainAsset) -> Result<(), Error<T>> {
         if !PriceKeyMapping::contains_key(&asset) {
             return Err(<Error<T>>::AssetNotSupported);
         }
@@ -497,7 +502,7 @@ impl<T: Config> Module<T> {
 
     /// Update the interest rate model
     fn update_interest_rate_model_internal(
-        asset: GenericAsset,
+        asset: ChainAsset,
         model: InterestRateModel,
     ) -> Result<(), Error<T>> {
         Self::check_asset_supported(&asset)?;
@@ -510,7 +515,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Get the borrow rate for the given asset
-    fn get_borrow_rate(asset: &GenericAsset) -> Result<APR, Error<T>> {
+    fn get_borrow_rate(asset: &ChainAsset) -> Result<APR, Error<T>> {
         if !Model::contains_key(asset) {
             return Err(<Error<T>>::InterestRateModelNotSet);
         }
@@ -590,7 +595,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Get the utilization in the provided asset.
-    fn get_utilization(asset: &GenericAsset) -> Result<crate::rates::Utilization, Error<T>> {
+    fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Error<T>> {
         Self::check_asset_supported(asset)?;
         // important note - because we know that our asset is _supported_
         // it allows us to get the default value zero if these values are not set.
@@ -622,7 +627,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of validators from the genesis config
-    fn initialize_validators(validators: GenericSet) {
+    fn initialize_validators(validators: ConfigSetString) {
         assert!(
             !validators.is_empty(),
             "Validators must be set in the genesis config"
@@ -638,7 +643,7 @@ impl<T: Config> Module<T> {
 
     // XXX actually symbols is a map with decimals
     /// Set the initial set of supported symbols from the genesis config
-    fn initialize_symbols(symbols: GenericSet) {
+    fn initialize_symbols(symbols: ConfigSetString) {
         assert!(
             !symbols.is_empty(),
             "Symbols must be set in the genesis config"
@@ -654,7 +659,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_reporters(reporters: GenericSet) {
+    fn initialize_reporters(reporters: ConfigSetString) {
         assert!(
             !reporters.is_empty(),
             "Open price feed price reporters must be set in the genesis config"
@@ -679,7 +684,7 @@ impl<T: Config> Module<T> {
     /// * Model
     /// * PriceKeyMapping
     ///
-    fn initialize_asset_maps(price_key_mapping: GenericSet) {
+    fn initialize_asset_maps(price_key_mapping: ConfigSetString) {
         assert!(
             !price_key_mapping.is_empty(),
             "price_key_mapping must be set in the genesis config"
@@ -698,8 +703,10 @@ impl<T: Config> Module<T> {
             assert!(chain == "ETH", "Invalid blockchain");
 
             let decoded = hex::decode(&address).expect("Address is not in hex format");
+            let decoded_arr: <Ethereum as Chain>::Address =
+                decoded.try_into().expect("Invalid Ethereum address");
 
-            let chain_asset: GenericAsset = (ChainId::Eth, decoded);
+            let chain_asset: ChainAsset = ChainAsset::Eth(decoded_arr);
             let zero_index: MulIndex = 0u8.into();
 
             TotalSupplyPrincipal::insert(&chain_asset, 0);
@@ -908,15 +915,15 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
 pub fn magic_extract_internal<T: Config>(
     sender: ChainAccount,
     account: ChainAccount,
-    max_amount: GenericMaxQty,
+    max_amount: MaxableAssetAmount,
 ) -> Result<(), Error<T>> {
     let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
 
-    let amount = get_quantity(max_amount, &|| 5);
+    let amount = get_max_value(max_amount, &|| 5);
 
     // Update storage -- TODO: increment this-- sure why not?
-    let curr_cash_balance: GenericQty = <CashBalance>::get(&account).unwrap_or_default();
-    let next_cash_balance: GenericQty = curr_cash_balance + amount;
+    let curr_cash_balance: AssetAmount = <CashBalance>::get(&account).unwrap_or_default();
+    let next_cash_balance: AssetAmount = curr_cash_balance + amount;
     <CashBalance>::insert(&account, next_cash_balance);
 
     let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
@@ -941,7 +948,7 @@ pub fn magic_extract_internal<T: Config>(
         notice_id,
         NoticeStatus::Pending {
             signers: vec![],
-            signatures: vec![],
+            signatures: ChainSignatureList::Eth(vec![]),
             notice: notice.clone(),
         },
     );
@@ -955,7 +962,7 @@ pub fn magic_extract_internal<T: Config>(
         ChainId::Eth,
         notice_id,
         encoded_notice,
-        vec![signature.to_vec()],
+        ChainSignatureList::Eth(vec![signature]),
     )); // XXX signatures
 
     // Return a successful DispatchResult

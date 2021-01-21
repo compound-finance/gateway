@@ -195,7 +195,7 @@ fn testnet_genesis(
                 "ETH".into(),
                 "USDC".into(),
             ],
-            price_key_mapping: vec!["USDC:ETH:deadbeef".into()],
+            price_key_mapping: vec!["USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()],
         }),
     }
 }

@@ -1,5 +1,5 @@
 /// Interest rate related calculations and utilities are concentrated here
-use crate::core::{GenericQty, Uint};
+use crate::types::{AssetAmount, Uint};
 use codec::{Decode, Encode};
 use our_std::Debuggable;
 
@@ -36,8 +36,8 @@ const MAX_RATE: Uint = 3500; // 35%
 /// Get the utilization ratio given the amount supplied and borrowed. These amounts should be in
 /// "today" money AKA "balance" money.
 pub fn get_utilization(
-    supplied: GenericQty,
-    borrowed: GenericQty,
+    supplied: AssetAmount,
+    borrowed: AssetAmount,
 ) -> Result<Utilization, RatesError> {
     if supplied == 0 {
         return Err(RatesError::UtilizationZeroSupplyError);
@@ -224,8 +224,8 @@ mod test {
     use super::*;
 
     struct UtilizationTestCase {
-        supplied: GenericQty,
-        borrowed: GenericQty,
+        supplied: AssetAmount,
+        borrowed: AssetAmount,
         expected: Result<Utilization, RatesError>,
         message: &'static str,
     }

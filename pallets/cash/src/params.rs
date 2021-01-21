@@ -1,4 +1,5 @@
-use crate::core::{Quantity, CASH, USD};
+use crate::symbol::{CASH, USD};
+use crate::types::Quantity;
 
 // XXX do these belong in runtime interfaces config?
 

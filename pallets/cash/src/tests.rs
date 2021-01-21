@@ -1,4 +1,4 @@
-use crate::{chains::*, core::*, mock::*, *};
+use crate::{chains::*, core::*, mock::*, symbol::*, *};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
 use sp_core::offchain::testing;
 
@@ -61,7 +61,9 @@ fn initialize_storage() {
         "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
     ]);
     CashModule::initialize_symbols(vec!["ETH".into()]); // XXX fixme + needs decimals
-    CashModule::initialize_asset_maps(vec!["USDC:ETH:deadbeef".into()]);
+    CashModule::initialize_asset_maps(vec![
+        "USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()
+    ]);
 }
 
 #[test]
