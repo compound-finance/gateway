@@ -278,4 +278,11 @@ pub mod tests {
             assert_eq!(lock_events.len(), 0);
         });
     }
+
+    #[test]
+    fn test_get_next_block_hex() {
+        let actual = events::get_next_block_hex("0xb27467".into());
+        assert!(actual.is_ok());
+        assert_eq!(actual.unwrap(), "0xB27468");
+    }
 }
