@@ -76,8 +76,9 @@ fn process_eth_event_happy_path() {
         // XXX
         let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
 
+        // signing key is the default key
         let sig = chains::eth::sign_one(payload.clone())
-            .unwrap(); // Sign with our "shared" private key for now
+            .unwrap();
 
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));
         // Read pallet storage and assert an expected result.
