@@ -91,7 +91,6 @@ fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
     let (sig, recovery) = secp256k1::sign(&message, &private_key);
     let recovery_term = recovery.serialize() + ETH_ADD_TO_V;
     let mut sig: Vec<u8> = sig.serialize().into();
-    // sig.extend_from_slice(&[0; 31]); // need to pad out for eth_abi
     sig.push(recovery_term);
     sig
 }
