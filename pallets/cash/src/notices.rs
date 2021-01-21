@@ -1,7 +1,6 @@
 use crate::{
     chains::{Chain, Ethereum},
-    core::{Account, Asset},
-    GenericMsg,
+    EncodedNotice,
 };
 use codec::{Decode, Encode};
 use our_std::{vec::Vec, RuntimeDebug};
@@ -74,7 +73,7 @@ pub enum Notice {
 }
 
 pub trait EncodeNotice {
-    fn encode_ethereum_notice(&self) -> GenericMsg;
+    fn encode_ethereum_notice(&self) -> EncodedNotice;
 }
 
 const ETH_CHAIN_IDENT: &'static [u8] = b"ETH";
@@ -99,7 +98,7 @@ fn encode_int128(raw: u128) -> Vec<u8> {
 }
 
 impl EncodeNotice for ExtractionNotice {
-    fn encode_ethereum_notice(&self) -> GenericMsg {
+    fn encode_ethereum_notice(&self) -> EncodedNotice {
         match self {
             ExtractionNotice::Eth {
                 id,
@@ -130,7 +129,7 @@ impl EncodeNotice for ExtractionNotice {
 }
 
 impl EncodeNotice for CashExtractionNotice {
-    fn encode_ethereum_notice(&self) -> GenericMsg {
+    fn encode_ethereum_notice(&self) -> EncodedNotice {
         match self {
             CashExtractionNotice::Eth {
                 id,
@@ -156,7 +155,7 @@ impl EncodeNotice for CashExtractionNotice {
 }
 
 impl EncodeNotice for FutureYieldNotice {
-    fn encode_ethereum_notice(&self) -> GenericMsg {
+    fn encode_ethereum_notice(&self) -> EncodedNotice {
         match self {
             FutureYieldNotice::Eth {
                 id,
@@ -179,7 +178,7 @@ impl EncodeNotice for FutureYieldNotice {
 }
 
 impl EncodeNotice for SetSupplyCapNotice {
-    fn encode_ethereum_notice(&self) -> GenericMsg {
+    fn encode_ethereum_notice(&self) -> EncodedNotice {
         match self {
             SetSupplyCapNotice::Eth {
                 id,
@@ -203,7 +202,7 @@ impl EncodeNotice for SetSupplyCapNotice {
 }
 
 impl EncodeNotice for ChangeAuthorityNotice {
-    fn encode_ethereum_notice(&self) -> GenericMsg {
+    fn encode_ethereum_notice(&self) -> EncodedNotice {
         match self {
             ChangeAuthorityNotice::Eth {
                 id,
@@ -227,7 +226,7 @@ impl EncodeNotice for ChangeAuthorityNotice {
 }
 
 impl EncodeNotice for Notice {
-    fn encode_ethereum_notice(&self) -> GenericMsg {
+    fn encode_ethereum_notice(&self) -> EncodedNotice {
         match self {
             Notice::ExtractionNotice(n) => n.encode_ethereum_notice(),
             Notice::CashExtractionNotice(n) => n.encode_ethereum_notice(),
