@@ -64,6 +64,20 @@ Note: while Compound Chain is private, you will need to add a deploy key to the 
 env deploy_key="$HOME/.ssh/id_rsa_compound_chain_deploy" ansible-playbook -i hosts --ssh-extra-args "-F ./ssh_config" ansible/chain.yml
 ```
 
+### Wiping and Restarting a Compound Chain deployment
+build another chain spec
+```sh
+# edit chain_spec.rs
+./target/release/compound-chain build-spec > myCustomSpec.json
+# edit myCustomSpec.json
+./target/release/compound-chain build-spec --chain=myCustomSpec.json --raw > customSpecRaw.json
+```
+
+```sh
+# in deployment directory eg brr/charlie
+ansible-playbook -i hosts --ssh-extra-args "-F ./ssh_config" purge-and-restart.yml
+```
+
 ## Best Practices
 
 If you need to run multiple isolated deployments, the best practice is to create a directory `deployment` and then sub-folders for each isolated deployment with a `main.tf` that references `./tf/main.tf`'s module. This is the official terraform way to handle fully hermetic deployments (i.e. more isolated than terraform workspaces). Note: the `deployment` folder is git ignored.

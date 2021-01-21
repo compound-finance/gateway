@@ -1,0 +1,19 @@
+---
+ - name: Dump
+   hosts: 
+      - full_node
+      - authority_node
+   tasks:
+   - name: Facts
+     setup:
+   - name: Files
+     delegate_to: localhost
+     file:
+       path: /tmp/{{authority}}/{{inventory_hostname}}/
+       state: directory
+   - name: Dump
+     delegate_to: localhost
+    #  run_once: true
+     copy:
+       content: "{{ hostvars[inventory_hostname] | to_nice_json }}"
+       dest: /tmp/{{authority}}/{{inventory_hostname}}/setup-dump.json
