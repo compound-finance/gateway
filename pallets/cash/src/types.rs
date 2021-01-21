@@ -1,3 +1,4 @@
+use crate::symbol::pow10;
 use crate::{
     chains::{Chain, ChainId, Ethereum},
     notices::Notice,
@@ -163,6 +164,55 @@ where
     }
 }
 
+/// A helper function for from_str on Quantity and Price
+const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
+    let bytes = s.as_bytes();
+    let mut i = bytes.len();
+    let mut provided_fractional_digits = 0;
+    let mut past_decimal = false;
+    let mut tenpow: Uint = 1;
+    // note - for is not allowed in `const` context
+    let mut qty: Uint = 0;
+
+    // going from the right of the string
+    loop {
+        i -= 1;
+        let byte = bytes[i];
+        if byte == b'.' {
+            past_decimal = true;
+            continue;
+        }
+
+        if !past_decimal {
+            provided_fractional_digits += 1;
+        }
+        let byte_as_num = byte - b'0';
+        // maybe check byte < 10 - not sure how to cause compile failure on that event
+
+        qty += (byte_as_num as Uint) * tenpow;
+
+        tenpow *= 10;
+        if i == 0 {
+            break;
+        }
+    }
+
+    // never passed the radix, it is a whole number
+    if !past_decimal {
+        provided_fractional_digits = 0;
+    }
+
+    let number_of_zeros_to_scale_up = decimals - provided_fractional_digits;
+
+    if number_of_zeros_to_scale_up == 0 {
+        return qty;
+    }
+
+    let scalar = pow10(number_of_zeros_to_scale_up);
+
+    qty * scalar
+}
+
 impl Price {
     pub const DECIMALS: u8 = USD.decimals(); // Note: must be >= USD.decimals()
 
@@ -173,6 +223,17 @@ impl Price {
     pub const fn amount(&self) -> AssetPrice {
         self.1
     }
+
+    /// Get a price from a string.
+    ///
+    /// Note this is for use in a const context, setting parameters etc
+    /// There is much clearer code that can and should be written for parsing quantities from
+    /// actual strings. The other from_str implementation should also return errors. This will
+    /// intentionally fail to compile in various overflow circumstances.
+    pub(crate) const fn from_str(symbol: Symbol, s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
+        Price(symbol, amount)
+    }
 }
 
 impl Quantity {
@@ -182,6 +243,17 @@ impl Quantity {
 
     pub const fn amount(&self) -> AssetAmount {
         self.1
+    }
+
+    /// Get a quantity from a string.
+    ///
+    /// Note this is for use in a const context, setting parameters etc
+    /// There is much clearer code that can and should be written for parsing quantities from
+    /// actual strings. The other from_str implementation should also return errors. This will
+    /// intentionally fail to compile in various overflow circumstances.
+    pub(crate) const fn from_str(symbol: Symbol, s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(symbol.decimals(), s);
+        Quantity(symbol, amount)
     }
 }
 
@@ -333,10 +405,31 @@ mod tests {
 
     #[test]
     fn test_scale_codec() {
-        let a = Quantity(CASH, 3000000);
+        let a = Quantity::from_str(CASH, "3");
         let encoded = a.encode();
         let decoded = Decode::decode(&mut encoded.as_slice());
         let b = decoded.expect("value did not decode");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_from_str_with_all_decimals() {
+        let a = Quantity::from_str(CASH, "123.456789");
+        let b = Quantity(CASH, 123456789);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_from_str_with_less_than_all_decimals() {
+        let a = Quantity::from_str(CASH, "123.4");
+        let b = Quantity(CASH, CASH.one() * 1234 / 10);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_from_str_with_no_decimals() {
+        let a = Quantity::from_str(CASH, "123");
+        let b = Quantity(CASH, CASH.one() * 123);
         assert_eq!(a, b);
     }
 }

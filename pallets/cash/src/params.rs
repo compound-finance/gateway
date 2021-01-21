@@ -13,10 +13,10 @@ pub const MIN_NEXT_SYNC_TIME: u32 = 24 * 60 * 60 * 1000; // XXX
 pub const MIN_VALIDATOR_COUNT: u32 = 4; // XXX needed? in the way of dev?
 
 /// Minimum value (USD) required across all protocol interactions.
-pub const MIN_TX_VALUE: Quantity = Quantity(USD, USD.one());
+pub const MIN_TX_VALUE: Quantity = Quantity::from_str(USD, "1");
 
 /// Flat transfer fee (CASH).
-pub const TRANSFER_FEE: Quantity = Quantity(CASH, CASH.one() / 100); // 0.01 CASH
+pub const TRANSFER_FEE: Quantity = Quantity::from_str(CASH, "0.01"); // 0.01 CASH
 
 /// Number of blocks between HTTP requests from offchain workers to open oracle price feed.
 pub const OCW_OPEN_ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;

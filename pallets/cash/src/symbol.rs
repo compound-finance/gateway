@@ -30,7 +30,7 @@ pub const USD: Symbol = Symbol(
 /// > warnings, but will likely panic at run-time.
 ///
 /// https://doc.rust-lang.org/reference/const_eval.html
-const fn pow10(decimals: u8) -> Uint {
+pub(crate) const fn pow10(decimals: u8) -> Uint {
     let mut i = 0;
     let mut v: Uint = 10;
     loop {
