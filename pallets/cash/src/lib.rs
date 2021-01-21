@@ -692,27 +692,27 @@ impl<T: Config> Module<T> {
                 .map_err(|_| <Error<T>>::HttpFetchingError)?;
         } else {
             // Validator's cache is empty, fetch events from the earliest block with pending events
-            // debug::native::info!("Block number has not been cached yet");
-            // let block_numbers: Vec<u32> = EthEventQueue::iter()
-            //     .filter_map(|((block_number, log_index), status)| {
-            //         if match status {
-            //             EventStatus::<Ethereum>::Pending { signers } => true,
-            //             _ => false,
-            //         } {
-            //             Some(block_number)
-            //         } else {
-            //             None
-            //         }
-            //     })
-            //     .collect();
-            // let pending_events_block = block_numbers.iter().min();
-            // if (pending_events_block.is_some()) {
-            //     let events_block: u32 = *pending_events_block.unwrap();
-            //     from_block = events::get_next_block_hex(events_block.to_string())
-            //         .map_err(|_| <Error<T>>::HttpFetchingError)?;
-            // } else {
-            from_block = String::from("earliest");
-            // }
+            debug::native::info!("Block number has not been cached yet");
+            let block_numbers: Vec<u32> = EthEventQueue::iter()
+                .filter_map(|((block_number, log_index), status)| {
+                    if match status {
+                        EventStatus::<Ethereum>::Pending { signers } => true,
+                        _ => false,
+                    } {
+                        Some(block_number)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let pending_events_block = block_numbers.iter().min();
+            if (pending_events_block.is_some()) {
+                let events_block: u32 = *pending_events_block.unwrap();
+                from_block = events::get_next_block_hex(events_block.to_string())
+                    .map_err(|_| <Error<T>>::HttpFetchingError)?;
+            } else {
+                from_block = String::from("earliest");
+            }
         }
 
         // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
