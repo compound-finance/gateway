@@ -183,16 +183,19 @@ fn testnet_genesis(
                 .expect("cannot get system time for genesis")
                 .as_millis(), // XXX we prob need pallet_timestamp but doesn't cover genesis anyway
             validators: vec![
-                "0458bfa2eec1cd8f451b41a1ad1034614986a6e65eabe24b5a7888d3f7422d6130e35d36561b207b1f9462bd8a982bd5b5204a2f8827b38469841ef537554ff1ba".into(),
-                "04c3e5ff2cb194d58e6a51ffe2df490c70d899fee4cdfff0a834fcdfd327a1d1bdaae3f1719d7fd9a9ee4472aa5b14e861adef01d9abd44ce82a85e19d6e21d3a4".into()
+                "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),
+                "435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),
             ],
             reporters: vec![
                 "85615b076615317c80f14cbad6501eec031cd51c".into(),
-                "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into()
+                "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
             ],
-            price_key_mapping: vec![
-                "USDC:ETH:deadbeef".into()
-            ]
+            symbols: vec![
+                // XXX fixme + decimals
+                "ETH".into(),
+                "USDC".into(),
+            ],
+            price_key_mapping: vec!["USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()],
         }),
     }
 }

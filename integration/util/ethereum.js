@@ -1,7 +1,6 @@
 const path = require('path');
 const fs = require('fs').promises;
 const ABI = require('web3-eth-abi');
-var Contract = require('web3-eth-contract');
 const { log, error } = require('./log');
 
 let contractsFile = path.join(__dirname, '..', '..', 'ethereum', '.build', 'contracts.json');
@@ -29,10 +28,10 @@ async function deployContract(web3, from, contracts, contractName, args) {
     data: constructorCall
   });
 
-  return new Contract(abi, res.contractAddress);
+  return new web3.eth.Contract(abi, res.contractAddress);
 }
 
-async function deployContracts(web3) {
+async function deployContracts(web3, validators) {
   let contracts;
   try {
     contracts = JSON.parse(await fs.readFile(contractsFile, 'utf8')).contracts;
@@ -44,7 +43,7 @@ async function deployContracts(web3) {
   log("Deploying cash token...");
   let cashToken = await deployContract(web3, accounts[0], contracts, 'CashToken', [accounts[0]]);
   log("Deploying starport...");
-  let starport = await deployContract(web3, accounts[0], contracts, 'Starport', [cashToken._address, accounts]);
+  let starport = await deployContract(web3, accounts[0], contracts, 'Starport', [cashToken._address, validators]);
 
   log(`CashToken=${cashToken._address}, Starport=${starport._address}`);
 
@@ -54,4 +53,21 @@ async function deployContracts(web3) {
   };
 }
 
-module.exports = { deployContracts };
+function getEventValues(event) {
+  let returnValues = event.returnValues;
+  return Object.entries(returnValues).reduce((acc, [k, v]) => {
+    if (Number.isNaN(Number(k))) {
+      return {
+        ...acc,
+        [k]: v
+      };
+    } else {
+      return acc;
+    }
+  }, {});
+}
+
+module.exports = {
+  deployContracts,
+  getEventValues
+};
