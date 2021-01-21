@@ -60,17 +60,9 @@ pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
     })
 }
 
-pub fn get_next_block_hex(
-    saved_block_hex: String,
-    pending_events_block: u32,
-) -> anyhow::Result<String> {
-    let saved_block = hex_to_u32(saved_block_hex)?;
-    let res_block_num = if saved_block > pending_events_block {
-        saved_block
-    } else {
-        pending_events_block
-    };
-    let next_block_num_hex = format!("{:#X}", res_block_num + 1);
+pub fn get_next_block_hex(block_num_hex: String) -> anyhow::Result<String> {
+    let block_num = hex_to_u32(block_num_hex)?;
+    let next_block_num_hex = format!("{:#X}", block_num + 1);
     Ok(next_block_num_hex)
 }
 

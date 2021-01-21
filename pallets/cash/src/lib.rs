@@ -384,15 +384,15 @@ decl_module! {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
                             Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
+                            Ok(())
                         }
 
                         Err(new_reason) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
                             Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, new_reason));
+                            Ok(())
                         }
                     }
-                    Self::update_earliest_block_with_pending_events();
-                    Ok(())
                 }
 
                 EventStatus::<Ethereum>::Done => {
@@ -688,13 +688,31 @@ impl<T: Config> Module<T> {
         if let Some(Some(cached_block_num)) = s_info.get::<String>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
             debug::native::info!("Last cached block number: {:?}", cached_block_num);
-            let pending_events_block = PendingEventsBlock::get();
-            from_block = events::get_next_block_hex(cached_block_num, pending_events_block)
+            from_block = events::get_next_block_hex(cached_block_num)
                 .map_err(|_| <Error<T>>::HttpFetchingError)?;
         } else {
-            // Validator's cache is empty, fetch events from the earliest available block
-            debug::native::info!("Block number has not been cached yet");
+            // Validator's cache is empty, fetch events from the earliest block with pending events
+            // debug::native::info!("Block number has not been cached yet");
+            // let block_numbers: Vec<u32> = EthEventQueue::iter()
+            //     .filter_map(|((block_number, log_index), status)| {
+            //         if match status {
+            //             EventStatus::<Ethereum>::Pending { signers } => true,
+            //             _ => false,
+            //         } {
+            //             Some(block_number)
+            //         } else {
+            //             None
+            //         }
+            //     })
+            //     .collect();
+            // let pending_events_block = block_numbers.iter().min();
+            // if (pending_events_block.is_some()) {
+            //     let events_block: u32 = *pending_events_block.unwrap();
+            //     from_block = events::get_next_block_hex(events_block.to_string())
+            //         .map_err(|_| <Error<T>>::HttpFetchingError)?;
+            // } else {
             from_block = String::from("earliest");
+            // }
         }
 
         // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
