@@ -485,8 +485,10 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidMessage
         )?;
 
-        let symbol = Symbols::get(parsed.key.clone()).expect("xxx our pattern for expect or err?");
-        // XXX <Error<T>>::OpenOracleErrorInvalidSymbol
+        let symbol = cash_err!(
+            Symbols::get(parsed.key.clone()).ok_or(<Error<T>>::OpenOracleErrorInvalidSymbol),
+            <Error<T>>::OpenOracleErrorInvalidSymbol
+        )?;
 
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
