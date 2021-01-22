@@ -28,3 +28,8 @@ integration/*.xml
 
 # Builds Ethereum contracts
 ethereum/.build/contracts.json
+
+# Coverage files
+*.profdata
+*.profraw
+lcov.info
