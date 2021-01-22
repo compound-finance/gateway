@@ -107,15 +107,24 @@ fn process_eth_event_happy_path() {
 }
 
 #[test]
-fn it_fails_for_bad_signature() {
+fn process_eth_event_fails_for_bad_signature() {
     new_test_ext().execute_with(|| {
         // Dispatch a signed extrinsic.
         assert_err!(
             CashModule::process_eth_event(Origin::signed(Default::default()), vec![], [0; 65]),
             DispatchError::BadOrigin
         );
-        // Read pallet storage and assert an expected result.
-        // XXX assert_eq!(CashModule::something(), Some(42));
+        // XXX check events here
+    });
+}
+
+#[test]
+fn process_eth_event_fails_if_not_validator() {
+    new_test_ext().execute_with(|| {
+        initialize_storage();
+        let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
+        let sig = [238, 16, 209, 247, 127, 204, 225, 110, 235, 0, 62, 178, 92, 3, 21, 98, 228, 151, 49, 101, 43, 60, 18, 190, 2, 53, 127, 122, 190, 161, 216, 207, 5, 8, 141, 244, 66, 182, 118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167, 209, 126, 30, 123, 73, 238, 34, 28];
+        assert_err!(CashModule::process_eth_event(Origin::none(), payload, sig), Error::<Test>::UnknownValidator);
     });
 }
 
