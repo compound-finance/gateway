@@ -173,14 +173,18 @@ const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
     let mut provided_fractional_digits = 0;
     let mut past_decimal = false;
     let mut tenpow: Uint = 1;
-    // note - for is not allowed in `const` context
     let mut qty: Uint = 0;
 
+    // note - for loop is not allowed in `const` context
     // going from the right of the string
     loop {
         i -= 1;
         let byte = bytes[i];
         if byte == b'.' {
+            if past_decimal {
+                // multiple radix - quit.
+                let _should_overflow = byte + u8::max_value();
+            }
             past_decimal = true;
             continue;
         }
@@ -188,8 +192,10 @@ const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
         if !past_decimal {
             provided_fractional_digits += 1;
         }
+        // will underflow whenever byte < b'0'
         let byte_as_num = byte - b'0';
-        // maybe check byte < 10 - not sure how to cause compile failure on that event
+        // will overflow whenever byte > b'9'
+        let _should_overflow = byte + (u8::max_value() - b'9');
 
         qty += (byte_as_num as Uint) * tenpow;
 
@@ -197,6 +203,11 @@ const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
         if i == 0 {
             break;
         }
+    }
+
+    if bytes.len() == 1 && past_decimal {
+        // only a radix provided, quit
+        let _should_overflow = bytes[0] + u8::max_value();
     }
 
     // never passed the radix, it is a whole number
@@ -409,23 +420,53 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_with_all_decimals() {
+    fn test_from_nominal_with_all_decimals() {
         let a = Quantity::from_nominal(CASH, "123.456789");
         let b = Quantity(CASH, 123456789);
         assert_eq!(a, b);
     }
 
     #[test]
-    fn test_from_str_with_less_than_all_decimals() {
+    fn test_from_nominal_with_less_than_all_decimals() {
         let a = Quantity::from_nominal(CASH, "123.4");
         let b = Quantity(CASH, CASH.one() * 1234 / 10);
         assert_eq!(a, b);
     }
 
     #[test]
-    fn test_from_str_with_no_decimals() {
+    fn test_from_nominal_with_no_decimals() {
         let a = Quantity::from_nominal(CASH, "123");
         let b = Quantity(CASH, CASH.one() * 123);
         assert_eq!(a, b);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_input_string_value_out_of_range_high() {
+        Quantity::from_nominal(CASH, ":");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_input_string_value_out_of_range_low() {
+        Quantity::from_nominal(CASH, "/");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_multiple_radix() {
+        Quantity::from_nominal(CASH, "12.34.56");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_only_radix() {
+        Quantity::from_nominal(CASH, ".");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_only_radix_multiple() {
+        Quantity::from_nominal(CASH, "...");
     }
 }
