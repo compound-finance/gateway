@@ -492,7 +492,6 @@ impl<T: Config> Module<T> {
             Symbols::get(parsed.key.clone()).ok_or(<Error<T>>::OpenOracleErrorInvalidSymbol),
             <Error<T>>::OpenOracleErrorInvalidSymbol
         )?;
-        // XXX
 
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
