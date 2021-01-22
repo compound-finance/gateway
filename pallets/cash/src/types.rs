@@ -324,14 +324,14 @@ pub trait SafeMul<Rhs = Self> {
     type Output;
 
     /// multiply self by the "right hand side" (RHS)
-    fn safe_mul(self, rhs: Rhs) -> Result<Self::Output, MathError>;
+    fn mul(self, rhs: Rhs) -> Result<Self::Output, MathError>;
 }
 
 // Price<S> * Quantity<S> -> Quantity<{ USD }>
 impl SafeMul<Quantity> for Price {
     type Output = Quantity;
 
-    fn safe_mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
+    fn mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
         if self.symbol() != rhs.symbol() {
             return Err(MathError::SymbolMismatch);
         }
@@ -352,9 +352,9 @@ impl SafeMul<Quantity> for Price {
 impl SafeMul<Price> for Quantity {
     type Output = Quantity;
 
-    fn safe_mul(self, rhs: Price) -> Result<Self::Output, MathError> {
+    fn mul(self, rhs: Price) -> Result<Self::Output, MathError> {
         // in this case, multiplication is transitive (unlike matrix multiplication for example)
-        rhs.safe_mul(self)
+        rhs.mul(self)
     }
 }
 
@@ -363,14 +363,14 @@ pub trait SafeDiv<Rhs = Self> {
     type Output;
 
     /// divide self by the "right hand side" (RHS)
-    fn safe_div(self, rhs: Rhs) -> Result<Self::Output, MathError>;
+    fn div(self, rhs: Rhs) -> Result<Self::Output, MathError>;
 }
 
 // Quantity<{ USD }> / Price<S> -> Quantity<S>
 impl SafeDiv<Price> for Quantity {
     type Output = Quantity;
 
-    fn safe_div(self, rhs: Price) -> Result<Self::Output, MathError> {
+    fn div(self, rhs: Price) -> Result<Self::Output, MathError> {
         if self.symbol() != USD {
             return Err(MathError::PriceNotUSD);
         }
@@ -394,7 +394,7 @@ impl SafeDiv<Price> for Quantity {
 impl SafeMul<MulIndex> for Quantity {
     type Output = Quantity;
 
-    fn safe_mul(self, rhs: MulIndex) -> Result<Self::Output, MathError> {
+    fn mul(self, rhs: MulIndex) -> Result<Self::Output, MathError> {
         let result = mul(
             self.amount(),
             self.symbol().decimals(),
@@ -411,8 +411,8 @@ impl SafeMul<MulIndex> for Quantity {
 impl SafeMul<Quantity> for MulIndex {
     type Output = Quantity;
 
-    fn safe_mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
-        rhs.safe_mul(self)
+    fn mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
+        rhs.mul(self)
     }
 }
 
@@ -533,7 +533,7 @@ mod tests {
     fn test_price_times_quantity() {
         let price = Price::from_nominal(ETH, "1500");
         let quantity = Quantity::from_nominal(ETH, "5.5");
-        let result = price.safe_mul(quantity).unwrap();
+        let result = price.mul(quantity).unwrap();
         let expected = Quantity::from_nominal(USD, "8250");
         assert_eq!(result, expected);
     }
@@ -543,7 +543,7 @@ mod tests {
         // same as example above just inverted
         let price = Price::from_nominal(ETH, "1500");
         let value = Quantity::from_nominal(USD, "8250");
-        let number_of_eth = value.safe_div(price).unwrap();
+        let number_of_eth = value.div(price).unwrap();
         let expected_number_of_eth = Quantity::from_nominal(ETH, "5.5");
         assert_eq!(number_of_eth, expected_number_of_eth);
     }
@@ -552,7 +552,7 @@ mod tests {
     fn test_mul_index() {
         let quantity_at_time_zero = Quantity::from_nominal(ETH, "100");
         let mul_index = MulIndex::from_nominal("1.01");
-        let quantity_now = mul_index.safe_mul(quantity_at_time_zero).unwrap();
+        let quantity_now = mul_index.mul(quantity_at_time_zero).unwrap();
         let expected_quantity = Quantity::from_nominal(ETH, "101");
         assert_eq!(quantity_now, expected_quantity);
     }
