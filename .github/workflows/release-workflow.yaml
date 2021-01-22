@@ -1,0 +1,22 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-release:
+    name: Build Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Cargo Build
+        run: |
+          cargo +nightly build --release
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: compound-chain
+          path: target/release/compound-chain
