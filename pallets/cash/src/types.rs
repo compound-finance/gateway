@@ -164,7 +164,7 @@ where
     }
 }
 
-/// A helper function for from_str on Quantity and Price
+/// A helper function for from_nominal on Quantity and Price
 const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
@@ -230,7 +230,7 @@ impl Price {
     /// There is much clearer code that can and should be written for parsing quantities from
     /// actual strings. The other from_str implementation should also return errors. This will
     /// intentionally fail to compile in various overflow circumstances.
-    pub(crate) const fn from_static_str(symbol: Symbol, s: &'static str) -> Self {
+    pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
         Price(symbol, amount)
     }
@@ -251,7 +251,7 @@ impl Quantity {
     /// There is much clearer code that can and should be written for parsing quantities from
     /// actual strings. The other from_str implementation should also return errors. This will
     /// intentionally fail to compile in various overflow circumstances.
-    pub(crate) const fn from_static_str(symbol: Symbol, s: &'static str) -> Self {
+    pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         let amount = uint_from_string_with_decimals(symbol.decimals(), s);
         Quantity(symbol, amount)
     }
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_scale_codec() {
-        let a = Quantity::from_static_str(CASH, "3");
+        let a = Quantity::from_nominal(CASH, "3");
         let encoded = a.encode();
         let decoded = Decode::decode(&mut encoded.as_slice());
         let b = decoded.expect("value did not decode");
@@ -414,21 +414,21 @@ mod tests {
 
     #[test]
     fn test_from_str_with_all_decimals() {
-        let a = Quantity::from_static_str(CASH, "123.456789");
+        let a = Quantity::from_nominal(CASH, "123.456789");
         let b = Quantity(CASH, 123456789);
         assert_eq!(a, b);
     }
 
     #[test]
     fn test_from_str_with_less_than_all_decimals() {
-        let a = Quantity::from_static_str(CASH, "123.4");
+        let a = Quantity::from_nominal(CASH, "123.4");
         let b = Quantity(CASH, CASH.one() * 1234 / 10);
         assert_eq!(a, b);
     }
 
     #[test]
     fn test_from_str_with_no_decimals() {
-        let a = Quantity::from_static_str(CASH, "123");
+        let a = Quantity::from_nominal(CASH, "123");
         let b = Quantity(CASH, CASH.one() * 123);
         assert_eq!(a, b);
     }
