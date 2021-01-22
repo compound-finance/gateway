@@ -157,8 +157,6 @@ fn test_post_price_invalid_signature() {
     });
 }
 
-fn get_test_keyring() {}
-
 #[test]
 fn test_post_price_invalid_reporter() {
     // an eth price message
@@ -191,8 +189,11 @@ fn test_post_price_stale_price() {
     });
 }
 
-fn get_eth() -> GenericAsset {
-    (ChainId::Eth, hex::decode("deadbeef").unwrap())
+fn get_eth() -> ChainAsset {
+    ChainAsset::Eth(
+        <[u8; 20]>::try_from(hex::decode("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap())
+            .unwrap(),
+    )
 }
 
 #[test]

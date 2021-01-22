@@ -1,3 +1,4 @@
+use crate::symbol::static_pow10;
 use crate::{
     chains::{Chain, ChainId, Ethereum},
     notices::Notice,
@@ -5,6 +6,7 @@ use crate::{
     Config, Module,
 };
 use codec::{Decode, Encode};
+use num_traits::Pow;
 use our_std::{
     ops::{Div, Mul},
     RuntimeDebug,
@@ -138,9 +140,23 @@ pub struct Quantity(pub Symbol, pub AssetAmount);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct MulIndex(pub Uint);
 
+impl MulIndex {
+    pub const DECIMALS: u8 = 4;
+
+    pub const ONE: MulIndex = MulIndex(static_pow10(Self::DECIMALS));
+
+    /// Get a price from a string.
+    ///
+    /// Only for use in const contexts.
+    pub(crate) const fn from_nominal(s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
+        MulIndex(amount)
+    }
+}
+
 impl Default for MulIndex {
     fn default() -> Self {
-        MulIndex(1) // XXX do we need more 'precision' for ONE?
+        MulIndex::ONE
     }
 }
 
@@ -151,6 +167,68 @@ where
     fn from(raw: T) -> Self {
         MulIndex(raw.into())
     }
+}
+
+/// A helper function for from_nominal on Quantity and Price
+///
+/// only for use in const contexts
+const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
+    let bytes = s.as_bytes();
+    let mut i = bytes.len();
+    let mut provided_fractional_digits = 0;
+    let mut past_decimal = false;
+    let mut tenpow: Uint = 1;
+    let mut qty: Uint = 0;
+
+    // note - for loop is not allowed in `const` context
+    // going from the right of the string
+    loop {
+        i -= 1;
+        let byte = bytes[i];
+        if byte == b'.' {
+            if past_decimal {
+                // multiple radix - quit.
+                let _should_overflow = byte + u8::max_value();
+            }
+            past_decimal = true;
+            continue;
+        }
+
+        if !past_decimal {
+            provided_fractional_digits += 1;
+        }
+        // will underflow whenever byte < b'0'
+        let byte_as_num = byte - b'0';
+        // will overflow whenever byte > b'9'
+        let _should_overflow = byte + (u8::max_value() - b'9');
+
+        qty += (byte_as_num as Uint) * tenpow;
+
+        tenpow *= 10;
+        if i == 0 {
+            break;
+        }
+    }
+
+    if bytes.len() == 1 && past_decimal {
+        // only a radix provided, quit
+        let _should_overflow = bytes[0] + u8::max_value();
+    }
+
+    // never passed the radix, it is a whole number
+    if !past_decimal {
+        provided_fractional_digits = 0;
+    }
+
+    let number_of_zeros_to_scale_up = decimals - provided_fractional_digits;
+
+    if number_of_zeros_to_scale_up == 0 {
+        return qty;
+    }
+
+    let scalar = static_pow10(number_of_zeros_to_scale_up);
+
+    qty * scalar
 }
 
 impl Price {
@@ -164,12 +242,12 @@ impl Price {
         self.1
     }
 
-    pub const fn from_nominal(symbol: Symbol, nominal: f64) -> Self {
-        Price(symbol, (nominal * pow10(Self::DECIMALS)) as Uint)
-    }
-
-    pub const fn to_nominal(&self) -> f64 {
-        (self.amount() as f64) / pow10(self.symbol().decimals())
+    /// Get a price from a string.
+    ///
+    /// Only for use in const contexts.
+    pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
+        Price(symbol, amount)
     }
 }
 
@@ -182,120 +260,156 @@ impl Quantity {
         self.1
     }
 
-    pub const fn from_nominal(symbol: Symbol, nominal: f64) -> Self {
-        Quantity(symbol, (nominal * pow10(symbol.decimals())) as Uint)
-    }
-
-    pub const fn to_nominal(&self) -> f64 {
-        (self.amount() as f64) / pow10(self.symbol().decimals())
+    /// Get a quantity from a string.
+    ///
+    /// Only for use in const contexts.
+    pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(symbol.decimals(), s);
+        Quantity(symbol, amount)
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum MathError {
+    Overflowed,
+    SymbolMismatch,
+    PriceNotUSD,
+    DivisionByZero,
+}
+
+/// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
+/// the output number of decimals.
+///
+/// Not recommended to use directly, to be used in SafeMath implementations.
+fn mul(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
+    let all_numerator_decimals = a_decimals.checked_add(b_decimals)?;
+
+    if all_numerator_decimals > out_decimals {
+        // scale down
+        let scale_decimals = all_numerator_decimals.checked_sub(out_decimals)?;
+        let scale = 10u128.checked_pow(scale_decimals as u32)?;
+        a.checked_mul(b)?.checked_div(scale)
+    } else {
+        // scale up
+        let scale_decimals = out_decimals.checked_sub(all_numerator_decimals)?;
+        let scale = 10u128.checked_pow(scale_decimals as u32)?;
+        a.checked_mul(b)?.checked_mul(scale)
+    }
+}
+
+/// Divide floating point numbers represented by a (value, number_of_decimals) pair and specify
+/// the output number of decimals.
+///
+/// Not recommended to use directly, to be used in SafeMath implementations.
+fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
+    let denom_decimals = b_decimals.checked_add(out_decimals)?;
+    if denom_decimals > a_decimals {
+        // scale up
+        let scale_decimals = denom_decimals.checked_sub(a_decimals)?;
+        let scale = 10u128.checked_pow(scale_decimals as u32)?;
+        a.checked_mul(scale)?.checked_div(b)
+    } else {
+        // scale down
+        let scale_decimals = a_decimals.checked_sub(denom_decimals)?;
+        let scale = 10u128.checked_pow(scale_decimals as u32)?;
+        a.checked_div(b)?.checked_div(scale)
+    }
+}
+
+pub trait SafeMul<Rhs = Self> {
+    /// The resulting type after multiplying
+    type Output;
+
+    /// multiply self by the "right hand side" (RHS)
+    fn mul(self, rhs: Rhs) -> Result<Self::Output, MathError>;
+}
+
 // Price<S> * Quantity<S> -> Quantity<{ USD }>
-impl Mul<Quantity> for Price {
+impl SafeMul<Quantity> for Price {
     type Output = Quantity;
 
-    fn mul(self, rhs: Quantity) -> Self::Output {
-        assert!(
-            self.symbol() == rhs.symbol(),
-            "can only multiply a price and quantity for the same symbol"
-        );
-        Quantity(
-            USD,
-            self.amount() * rhs.amount()
-                / (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals())
-                    as AssetAmount),
+    fn mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
+        if self.symbol() != rhs.symbol() {
+            return Err(MathError::SymbolMismatch);
+        }
+        let result = mul(
+            self.amount(),
+            Price::DECIMALS,
+            rhs.amount(),
+            rhs.symbol().decimals(),
+            USD.decimals(),
         )
+        .ok_or(MathError::Overflowed)?;
+
+        Ok(Quantity(USD, result as AssetAmount))
     }
 }
 
 // Quantity<S> * Price<S> -> Quantity<{ USD }>
-impl Mul<Price> for Quantity {
+impl SafeMul<Price> for Quantity {
     type Output = Quantity;
 
-    fn mul(self, rhs: Price) -> Self::Output {
-        assert!(
-            self.symbol() == rhs.symbol(),
-            "can only multiply a quantity and price for the same symbol"
-        );
-        Quantity(
-            USD,
-            self.amount() * rhs.amount()
-                / (pow10(Price::DECIMALS + self.symbol().decimals() - USD.decimals())
-                    as AssetAmount),
-        )
+    fn mul(self, rhs: Price) -> Result<Self::Output, MathError> {
+        // in this case, multiplication is transitive (unlike matrix multiplication for example)
+        rhs.mul(self)
     }
+}
+
+pub trait SafeDiv<Rhs = Self> {
+    /// The resulting type after dividing
+    type Output;
+
+    /// divide self by the "right hand side" (RHS)
+    fn div(self, rhs: Rhs) -> Result<Self::Output, MathError>;
 }
 
 // Quantity<{ USD }> / Price<S> -> Quantity<S>
-impl Div<Price> for Quantity {
+impl SafeDiv<Price> for Quantity {
     type Output = Quantity;
 
-    fn div(self, rhs: Price) -> Self::Output {
-        assert!(
-            self.symbol() == USD,
-            "division by price defined only for USD quantities"
-        );
-        assert!(rhs.amount() > 0, "division by price not greater than zero");
-        Quantity(
-            rhs.symbol(),
-            self.amount()
-                * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals()) as AssetPrice)
-                / rhs.amount(),
+    fn div(self, rhs: Price) -> Result<Self::Output, MathError> {
+        if self.symbol() != USD {
+            return Err(MathError::PriceNotUSD);
+        }
+        if rhs.amount() == 0 {
+            return Err(MathError::DivisionByZero);
+        }
+        let result = div(
+            self.amount(),
+            self.symbol().decimals(),
+            rhs.amount(),
+            Price::DECIMALS,
+            rhs.symbol().decimals(),
         )
-    }
-}
+        .ok_or(MathError::Overflowed)?;
 
-// Quantity<{ USD }> / Quantity<S> -> Price<S>
-impl Div<Quantity> for Quantity {
-    type Output = Price;
-
-    fn div(self, rhs: Quantity) -> Self::Output {
-        assert!(
-            self.symbol() == USD,
-            "division by quantity defined only for USD quantities"
-        );
-        assert!(
-            rhs.amount() > 0,
-            "division by quantity not greater than zero"
-        );
-        Price(
-            rhs.symbol(),
-            self.amount()
-                * (pow10(Price::DECIMALS + rhs.symbol().decimals() - USD.decimals())
-                    as AssetAmount)
-                / rhs.amount(),
-        )
+        Ok(Quantity(rhs.symbol(), result as AssetAmount))
     }
 }
 
 // Quantity<S> * MulIndex -> Quantity<S>
-impl Mul<MulIndex> for Quantity {
+impl SafeMul<MulIndex> for Quantity {
     type Output = Quantity;
 
-    fn mul(self, rhs: MulIndex) -> Self::Output {
-        Quantity(self.symbol(), self.amount() * rhs.0)
+    fn mul(self, rhs: MulIndex) -> Result<Self::Output, MathError> {
+        let result = mul(
+            self.amount(),
+            self.symbol().decimals(),
+            rhs.0,
+            MulIndex::DECIMALS,
+            self.symbol().decimals(),
+        )
+        .ok_or(MathError::Overflowed)?;
+
+        Ok(Quantity(self.symbol(), result))
     }
 }
 
-// Helper functions //
+impl SafeMul<Quantity> for MulIndex {
+    type Output = Quantity;
 
-pub const fn pow10(decimals: u8) -> f64 {
-    let mut i = 0;
-    let mut v = 10.0;
-    loop {
-        i += 1;
-        if i >= decimals {
-            return v;
-        }
-        v *= 10.0;
-    }
-}
-
-pub fn price<T: Config>(symbol: Symbol) -> Price {
-    match symbol {
-        CASH => Price::from_nominal(CASH, 1.0),
-        _ => Price(symbol, <Module<T>>::prices(symbol)),
+    fn mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
+        rhs.mul(self)
     }
 }
 
@@ -317,82 +431,163 @@ mod tests {
     );
 
     #[test]
-    fn test_one() {
-        let a = Quantity(CASH, 1000000);
-        let b = Quantity::from_nominal(CASH, 1.0);
-        let c = b.to_nominal();
-        assert_eq!(a, b);
-        assert_eq!(c, 1.0);
-    }
-
-    #[test]
-    fn test_mul_qp() {
-        // Quantity<S> * Price<S> -> Quantity<USD>
-        // Price<S> * Quantity<S> -> Quantity<USD>
-        let q = Quantity::from_nominal(CASH, 1.0);
-        let p = Price::from_nominal(CASH, 2.0);
-        assert_eq!(q * p, Quantity::from_nominal(USD, 2.0));
-        assert_eq!(p * q, Quantity::from_nominal(USD, 2.0));
-    }
-
-    #[test]
-    #[should_panic(expected = "can only multiply a quantity and price for the same symbol")]
-    fn test_mul_qp_error() {
-        let _ = Quantity::from_nominal(ETH, 1.0) * Price::from_nominal(CASH, 2.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "can only multiply a price and quantity for the same symbol")]
-    fn test_mul_pq_error() {
-        let _ = Price::from_nominal(CASH, 2.0) * Quantity::from_nominal(ETH, 1.0);
-    }
-
-    #[test]
-    fn test_div_qp() {
-        // Quantity<{ USD }> / Price<S> -> Quantity<S>
-        let q = Quantity::from_nominal(USD, 365.0);
-        let p = Price::from_nominal(ETH, 10.0);
-        assert_eq!(q / p, Quantity::from_nominal(ETH, 36.5));
-    }
-
-    #[test]
-    #[should_panic(expected = "division by price defined only for USD quantities")]
-    fn test_div_qp_error() {
-        let _ = Quantity::from_nominal(CASH, 2.0) / Price::from_nominal(ETH, 1.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "division by price not greater than zero")]
-    fn test_div_qp_div_zero() {
-        let _ = Quantity::from_nominal(USD, 2.0) / Price::from_nominal(ETH, 0.0);
-    }
-
-    #[test]
-    fn test_div_qq() {
-        // Quantity<{ USD }> / Quantity<S> -> Price<S>
-        let q = Quantity::from_nominal(USD, 10.0);
-        let u = Quantity::from_nominal(ETH, 3.0);
-        assert_eq!(q / u, Price::from_nominal(ETH, 3.33333333333));
-    }
-
-    #[test]
-    #[should_panic(expected = "division by quantity defined only for USD quantities")]
-    fn test_div_qq_error() {
-        let _ = Quantity::from_nominal(CASH, 2.0) / Quantity::from_nominal(ETH, 1.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "division by quantity not greater than zero")]
-    fn test_div_qq_div_zero() {
-        let _ = Quantity::from_nominal(USD, 2.0) / Quantity::from_nominal(ETH, 0.0);
-    }
-
-    #[test]
     fn test_scale_codec() {
-        let a = Quantity::from_nominal(CASH, 3.0);
+        let a = Quantity::from_nominal(CASH, "3");
         let encoded = a.encode();
         let decoded = Decode::decode(&mut encoded.as_slice());
         let b = decoded.expect("value did not decode");
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_from_nominal_with_all_decimals() {
+        let a = Quantity::from_nominal(CASH, "123.456789");
+        let b = Quantity(CASH, 123456789);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_from_nominal_with_less_than_all_decimals() {
+        let a = Quantity::from_nominal(CASH, "123.4");
+        let b = Quantity(CASH, CASH.one() * 1234 / 10);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_from_nominal_with_no_decimals() {
+        let a = Quantity::from_nominal(CASH, "123");
+        let b = Quantity(CASH, CASH.one() * 123);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_input_string_value_out_of_range_high() {
+        Quantity::from_nominal(CASH, ":");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_input_string_value_out_of_range_low() {
+        Quantity::from_nominal(CASH, "/");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_multiple_radix() {
+        Quantity::from_nominal(CASH, "12.34.56");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_only_radix() {
+        Quantity::from_nominal(CASH, ".");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_nominal_only_radix_multiple() {
+        Quantity::from_nominal(CASH, "...");
+    }
+
+    #[test]
+    fn test_mul_with_scale_output_equal() {
+        let result = mul(2000, 3, 30000, 4, 7);
+        assert_eq!(result, Some(60000000));
+    }
+
+    #[test]
+    fn test_mul_with_scale_output_up() {
+        let result = mul(2000, 3, 30000, 4, 8);
+        assert_eq!(result, Some(600000000));
+    }
+
+    #[test]
+    fn test_mul_with_scale_output_down() {
+        let result = mul(2000, 3, 30000, 4, 6);
+        assert_eq!(result, Some(6000000));
+    }
+
+    #[test]
+    fn test_div_with_scale_output_equal() {
+        let result = div(2000, 3, 30000, 4, 7);
+        assert_eq!(result, Some(6666666));
+    }
+
+    #[test]
+    fn test_div_with_scale_output_up() {
+        let result = div(2000, 3, 30000, 4, 8);
+        assert_eq!(result, Some(66666666));
+    }
+
+    #[test]
+    fn test_div_with_scale_output_down() {
+        let result = div(2000, 3, 30000, 4, 6);
+        assert_eq!(result, Some(666666));
+    }
+
+    #[test]
+    fn test_price_times_quantity() {
+        let price = Price::from_nominal(ETH, "1500");
+        let quantity = Quantity::from_nominal(ETH, "5.5");
+        let result = price.mul(quantity).unwrap();
+        let expected = Quantity::from_nominal(USD, "8250");
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_quantity_over_price() {
+        // same as example above just inverted
+        let price = Price::from_nominal(ETH, "1500");
+        let value = Quantity::from_nominal(USD, "8250");
+        let number_of_eth = value.div(price).unwrap();
+        let expected_number_of_eth = Quantity::from_nominal(ETH, "5.5");
+        assert_eq!(number_of_eth, expected_number_of_eth);
+    }
+
+    #[test]
+    fn test_mul_index() {
+        let quantity_at_time_zero = Quantity::from_nominal(ETH, "100");
+        let mul_index = MulIndex::from_nominal("1.01");
+        let quantity_now = mul_index.mul(quantity_at_time_zero).unwrap();
+        let expected_quantity = Quantity::from_nominal(ETH, "101");
+        assert_eq!(quantity_now, expected_quantity);
+    }
+
+    #[test]
+    fn test_mul_overflow() {
+        let result = mul(Uint::max_value() / 2 + 1, 0, 2, 0, 0);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_mul_overflow_boundary() {
+        let result = mul(Uint::max_value(), 0, 1, 0, 0);
+        assert_eq!(result, Some(Uint::max_value()));
+    }
+
+    #[test]
+    fn test_mul_overflow_boundary_2() {
+        // note max value is odd thus truncated here and we lose a digit
+        let result = mul(Uint::max_value() / 2, 0, 2, 0, 0);
+        assert_eq!(result, Some(Uint::max_value() - 1));
+    }
+
+    #[test]
+    fn test_div_by_zero() {
+        let result = div(1, 0, 0, 0, 0);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_div_overflow_decimals() {
+        let result = div(1, 0, 1, 0, u8::max_value());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_div_overflow_decimals_2() {
+        let result = div(1, u8::max_value(), 1, 0, 0);
+        assert_eq!(result, None);
     }
 }
