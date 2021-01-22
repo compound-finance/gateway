@@ -165,6 +165,8 @@ where
 }
 
 /// A helper function for from_nominal on Quantity and Price
+///
+/// only for use in const contexts
 const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
@@ -226,10 +228,7 @@ impl Price {
 
     /// Get a price from a string.
     ///
-    /// Note this is for use in a const context, setting parameters etc
-    /// There is much clearer code that can and should be written for parsing quantities from
-    /// actual strings. The other from_str implementation should also return errors. This will
-    /// intentionally fail to compile in various overflow circumstances.
+    /// Only for use in const contexts.
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
         Price(symbol, amount)
@@ -247,10 +246,7 @@ impl Quantity {
 
     /// Get a quantity from a string.
     ///
-    /// Note this is for use in a const context, setting parameters etc
-    /// There is much clearer code that can and should be written for parsing quantities from
-    /// actual strings. The other from_str implementation should also return errors. This will
-    /// intentionally fail to compile in various overflow circumstances.
+    /// Only for use in const contexts.
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         let amount = uint_from_string_with_decimals(symbol.decimals(), s);
         Quantity(symbol, amount)
