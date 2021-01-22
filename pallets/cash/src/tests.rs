@@ -54,7 +54,7 @@ fn it_magically_extracts() {
 fn initialize_storage() {
     CashModule::initialize_validators(vec![
         "6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
-        "58547bfa800b08a61b4adacbb78664bba2cb9301".into(),
+        "8ad1b2918c34ee5d3e881a57c68574ea9dbecb81".into(), // pk: 6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d
     ]);
     CashModule::initialize_reporters(vec![
         "85615b076615317c80f14cbad6501eec031cd51c".into(),
@@ -72,12 +72,37 @@ fn process_eth_event_happy_path() {
         initialize_storage();
         // Dispatch a signed extrinsic.
         // XXX
+        let event_id = (3858223, 0);
         let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
         let sig = chains::eth::sign(&payload); // Sign with our "shared" private key for now
 
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));
-        // Read pallet storage and assert an expected result.
-        // XXX assert_eq!(CashModule::something(), Some(42));
+        let event_status = CashModule::eth_event_queue(event_id).unwrap();
+        match event_status {
+            EventStatus::<Ethereum>::Pending { signers } => {
+                assert_eq!(signers.len(), 1);
+                assert_eq!(hex::encode(signers[0]), "6a72a2f14577d9cd0167801efdd54a07b40d2b61");
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+
+        // Second validator also saw this event
+        let payload_validator_2 = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
+        let sig_validator_2 = [238, 16, 209, 247, 127, 204, 226, 110, 235, 0, 62, 178, 92, 3, 21, 98, 228, 151, 49, 101, 43, 60, 18, 190, 2, 53, 127, 122, 190, 161, 216, 207, 5, 8, 141, 244, 66, 182, 118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167, 209, 126, 30, 123, 73, 238, 34, 28];
+        assert_ok!(CashModule::process_eth_event(Origin::none(), payload_validator_2, sig_validator_2));
+
+        let event_status_validator_2 = CashModule::eth_event_queue(event_id).unwrap();
+        match event_status_validator_2 {
+            EventStatus::<Ethereum>::Done => {
+               /// XXX check events here
+               assert!(true);
+            }
+            _ => {
+                assert!(false);
+            }
+        }
     });
 }
 
