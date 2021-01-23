@@ -74,6 +74,7 @@ fn process_eth_event_happy_path() {
         // XXX
         let event_id = (3858223, 0);
         let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
+        let checked_payload = payload.clone();
         let sig = chains::eth::sign(&payload); // Sign with our "shared" private key for now
 
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));
@@ -89,15 +90,22 @@ fn process_eth_event_happy_path() {
         }
 
         // Second validator also saw this event
-        let payload_validator_2 = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
+        let payload_validator_2 = checked_payload.clone();
         let sig_validator_2 = [238, 16, 209, 247, 127, 204, 226, 110, 235, 0, 62, 178, 92, 3, 21, 98, 228, 151, 49, 101, 43, 60, 18, 190, 2, 53, 127, 122, 190, 161, 216, 207, 5, 8, 141, 244, 66, 182, 118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167, 209, 126, 30, 123, 73, 238, 34, 28];
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload_validator_2, sig_validator_2));
-
         let event_status_validator_2 = CashModule::eth_event_queue(event_id).unwrap();
         match event_status_validator_2 {
             EventStatus::<Ethereum>::Done => {
-               /// XXX check events here
-               assert!(true);
+                // Check emitted events
+               let our_events = System::events()
+               .into_iter()
+               .map(|r| r.event)
+               .filter_map(|e| {
+                   if let TestEvent::cash(inner) = e { Some(inner) } else { None }
+                })
+                .collect::<Vec<_>>();
+               let expected_event = RawEvent::ProcessedEthEvent(checked_payload);
+               assert_eq!(our_events[1], expected_event);
             }
             _ => {
                 assert!(false);
@@ -114,7 +122,6 @@ fn process_eth_event_fails_for_bad_signature() {
             CashModule::process_eth_event(Origin::signed(Default::default()), vec![], [0; 65]),
             DispatchError::BadOrigin
         );
-        // XXX check events here
     });
 }
 
