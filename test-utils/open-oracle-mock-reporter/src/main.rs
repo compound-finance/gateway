@@ -1,4 +1,4 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+#![feature(proc_macro_hygiene, decl_macro, array_methods)]
 
 #[macro_use]
 extern crate rocket;
@@ -78,8 +78,10 @@ impl App {
         let timestamp_eth_abi = ethabi::Token::Uint(timestamp.into());
 
         let mut message_strings = Vec::new();
-        let mut digested_message_bytes_to_sign = Vec::new();
+        let mut digested_message_bytes_to_sign: Vec<compound_crypto::HashedMessageBytes> =
+            Vec::new();
         let mut price_strings = HashMap::new();
+        let mut digested: compound_crypto::HashedMessageBytes;
 
         for (key, value) in prices.iter() {
             let value: u64 = *value;
@@ -91,14 +93,18 @@ impl App {
                 ethabi_key,
                 ethabi_value,
             ]);
-            let digested = compound_crypto::keccak(&ethabi_encoded_bytes);
+            digested = compound_crypto::keccak(&ethabi_encoded_bytes);
             let hex_encoded_string =
                 compound_crypto::bytes_to_eth_hex_string(&ethabi_encoded_bytes);
             message_strings.push(hex_encoded_string);
-            digested_message_bytes_to_sign.push(Vec::from(digested));
+            digested_message_bytes_to_sign.push(digested);
             // todo: this may cause issues later with prices not matching during sanity check
             price_strings.insert(key.clone(), format!("{}", (value as f64) / (1000000.0)));
         }
+        let digested_message_bytes_to_sign: Vec<&[u8]> = digested_message_bytes_to_sign
+            .iter()
+            .map(|e| e.as_slice())
+            .collect();
 
         let signatures: Vec<String> = keyring
             .sign(digested_message_bytes_to_sign, &self.key_id)
@@ -106,7 +112,7 @@ impl App {
             .iter()
             .map(|e| {
                 let bytes = e.clone().as_ref().unwrap();
-                compound_crypto::bytes_to_eth_hex_string(&bytes)
+                compound_crypto::bytes_to_eth_hex_string(&bytes.as_slice())
             })
             .collect();
 
