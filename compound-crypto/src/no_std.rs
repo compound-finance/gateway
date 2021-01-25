@@ -18,7 +18,7 @@ pub type HashedMessageBytes = [u8; 32];
 /// * The key id provided is unknown
 /// * The HSM is not available
 /// * The HSM failed to sign this request for some other reason
-#[derive(Encode, Decode, our_std::Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, our_std::Debuggable)]
 pub enum CryptoError {
     Unknown,
     KeyNotFound,

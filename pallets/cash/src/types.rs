@@ -2,14 +2,15 @@ use crate::symbol::static_pow10;
 use crate::{
     chains::{Chain, ChainId, Ethereum},
     notices::Notice,
-    symbol::{Symbol, CASH, NIL, USD},
-    Config, Module,
+    symbol::{Symbol, CASH, USD},
 };
 use codec::{Decode, Encode};
-use num_traits::Pow;
-use our_std::RuntimeDebug;
+use our_std::{convert::TryFrom, RuntimeDebug};
 
 // Type aliases //
+
+/// Type for representing a fractional on Compound Chain, generally between [0, 1].
+pub type Fraction = u128; // XXX ?
 
 /// Type for a nonce.
 pub type Nonce = u32;
@@ -17,20 +18,32 @@ pub type Nonce = u32;
 /// Type for representing time on Compound Chain.
 pub type Timestamp = u128; // XXX u64?
 
+/// Type of the largest possible signed integer on Compound Chain.
+pub type Int = i128;
+
 /// Type of the largest possible unsigned integer on Compound Chain.
 pub type Uint = u128;
 
 /// Type for a generic encoded message, potentially for any chain.
 pub type EncodedNotice = Vec<u8>;
 
+/// Type for representing an amount, potentially of any symbol.
+pub type AssetAmount = Uint;
+
+/// Type for representing a balance of a specific asset.
+pub type AssetBalance = Int;
+
 /// Type for representing a price, potentially for any symbol.
 pub type AssetPrice = Uint;
 
-/// Type for representing an amount of any asset
-pub type AssetAmount = Uint;
+/// Type for representing an amount of a specific asset.
+pub type AssetQuantity = Quantity;
 
-/// Type for representing an amount of Cash
-pub type CashAmount = Uint;
+/// Type for representing an amount of CASH.
+pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
+
+/// Type for representing an amount of USD.
+pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -39,44 +52,78 @@ pub enum Maxable<T> {
     Value(T),
 }
 
+impl<T> Maxable<T> {
+    pub fn get_max_value(self, when_max: &dyn Fn() -> T) -> T {
+        match self {
+            Maxable::Max => when_max(),
+            Maxable::Value(t) => t,
+        }
+    }
+}
+
 impl<T> From<T> for Maxable<T> {
     fn from(t: T) -> Self {
         Maxable::Value(t)
     }
 }
 
-pub fn get_max_value<T>(max: Maxable<T>, when_max: &dyn Fn() -> T) -> T {
-    match max {
-        Maxable::Max => when_max(),
-        Maxable::Value(t) => t,
+/// Either an AssetAmount or max
+pub type MaxableAssetAmount = Maxable<AssetAmount>; // XXX now just used by magic
+
+/// Type for chain accounts
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAccount {
+    Eth(<Ethereum as Chain>::Address),
+}
+
+impl ChainAccount {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainAccount::Eth(_) => ChainId::Eth,
+        }
     }
 }
 
-/// Either an AssetAmount or max
-pub type MaxableAssetAmount = Maxable<AssetAmount>;
+/// Type for chain assets
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAsset {
+    Eth(<Ethereum as Chain>::Address),
+}
 
-/// Type for chain signatures
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+impl ChainAsset {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainAsset::Eth(_) => ChainId::Eth,
+        }
+    }
+}
+
+/// Type for a chain signature.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
     Eth(<Ethereum as Chain>::Signature),
+}
+
+impl ChainSignature {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainSignature::Eth(_) => ChainId::Eth,
+        }
+    }
+
+    pub fn recover(&self, message: &[u8]) -> Result<ChainAccount, Reason> {
+        match self {
+            ChainSignature::Eth(eth_sig) => Ok(ChainAccount::Eth(
+                <Ethereum as Chain>::recover_address(message, *eth_sig)?,
+            )),
+        }
+    }
 }
 
 /// Type for a list of chain signatures
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignatureList {
     Eth(Vec<<Ethereum as Chain>::Signature>),
-}
-
-/// Type for chain accounts
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainAccount {
-    Eth(<Ethereum as Chain>::Address),
-}
-
-/// Type for chain assets
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainAsset {
-    Eth(<Ethereum as Chain>::Address),
 }
 
 /// Type for a set of open price feed reporters.
@@ -125,6 +172,8 @@ pub enum NoticeStatus {
     Done,
 }
 
+// XXX ord should really assert symbol is same for these
+
 /// Type for representing a price (in USD), bound to its symbol.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct Price(pub Symbol, pub AssetPrice);
@@ -133,43 +182,101 @@ pub struct Price(pub Symbol, pub AssetPrice);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct Quantity(pub Symbol, pub AssetAmount);
 
-/// Type for representing a multiplicative index on Compound Chain.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct MulIndex(pub Uint);
+/// Type for representing an amount of CASH Principal.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+pub struct CashPrincipal(pub Int);
 
-impl MulIndex {
+/// Type for representing the multiplicative CASH index on Compound Chain.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct CashIndex(pub Uint);
+
+impl CashIndex {
     pub const DECIMALS: u8 = 4;
 
-    pub const ONE: MulIndex = MulIndex(static_pow10(Self::DECIMALS));
+    pub const ONE: CashIndex = CashIndex(static_pow10(Self::DECIMALS));
 
-    /// Get a price from a string.
-    ///
-    /// Only for use in const contexts.
-    pub(crate) const fn from_nominal(s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        MulIndex(amount)
+    /// Get a CASH index from a string.
+    pub const fn from_nominal(s: &'static str) -> Self {
+        CashIndex(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+
+    // CashPrincipal(-) * CashIndex -> Quantity<{ CASH }>
+    pub fn as_debt_amount(self, rhs: CashPrincipal) -> Result<Quantity, MathError> {
+        if rhs.0 <= 0 {
+            let result = ((-rhs.0) as AssetAmount)
+                .checked_mul(self.0)
+                .ok_or(MathError::Overflow)?;
+            Ok(Quantity(CASH, result / CashIndex::ONE.0))
+        } else {
+            Err(MathError::SignMismatch)
+        }
+    }
+
+    // CashPrincipal(+) * CashIndex -> Quantity<{ CASH }>
+    pub fn as_hold_amount(self, rhs: CashPrincipal) -> Result<Quantity, MathError> {
+        if rhs.0 >= 0 {
+            let result = (rhs.0 as AssetAmount)
+                .checked_mul(self.0)
+                .ok_or(MathError::Overflow)?;
+            Ok(Quantity(CASH, result / CashIndex::ONE.0))
+        } else {
+            Err(MathError::SignMismatch)
+        }
+    }
+
+    // Quantity<{ CASH }> / CashIndex -> CashPrincipal(-)
+    pub fn as_debt_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
+        let amount = rhs.1.checked_div(self.0).ok_or(MathError::DivisionByZero)?;
+        let signed = -Int::try_from(amount).or(Err(MathError::Overflow))?;
+        Ok(CashPrincipal(signed))
+    }
+
+    // Quantity<{ CASH }> / CashIndex -> CashPrincipal(+)
+    pub fn as_hold_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
+        let amount = rhs.1.checked_div(self.0).ok_or(MathError::DivisionByZero)?;
+        let signed = Int::try_from(amount).or(Err(MathError::Overflow))?;
+        Ok(CashPrincipal(signed))
     }
 }
 
-impl Default for MulIndex {
+impl Default for CashIndex {
     fn default() -> Self {
-        MulIndex::ONE
+        CashIndex::ONE
     }
 }
 
-impl<T> From<T> for MulIndex
+impl<T> From<T> for CashIndex
 where
     T: Into<Uint>,
 {
     fn from(raw: T) -> Self {
-        MulIndex(raw.into())
+        CashIndex(raw.into())
     }
 }
 
-/// A helper function for from_nominal on Quantity and Price
+/// Type for representing the additive asset indices on Compound Chain.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct AssetIndex(pub Uint);
+
+impl AssetIndex {
+    pub const DECIMALS: u8 = 4; // XXX needed for this one?
+
+    /// Get an asset index from a string.
+    pub const fn from_nominal(s: &'static str) -> Self {
+        AssetIndex(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+}
+
+impl Default for AssetIndex {
+    fn default() -> Self {
+        AssetIndex(0)
+    }
+}
+
+/// A helper function for from_nominal on Quantity and Price.
 ///
-/// only for use in const contexts
-pub(crate) const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
+/// Only for use in const contexts.
+pub const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
     let mut provided_fractional_digits = 0;
@@ -235,16 +342,13 @@ impl Price {
         self.0
     }
 
-    pub const fn amount(&self) -> AssetPrice {
+    pub const fn value(&self) -> AssetPrice {
         self.1
     }
 
     /// Get a price from a string.
-    ///
-    /// Only for use in const contexts.
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        Price(symbol, amount)
+        Price(symbol, uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 }
 
@@ -253,22 +357,52 @@ impl Quantity {
         self.0
     }
 
-    pub const fn amount(&self) -> AssetAmount {
+    pub const fn value(&self) -> AssetAmount {
         self.1
     }
 
     /// Get a quantity from a string.
-    ///
-    /// Only for use in const contexts.
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(symbol.decimals(), s);
-        Quantity(symbol, amount)
+        Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+/// Type for reporting failures for reasons outside of our control.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum Reason {
+    None,
+    NotImplemented,
+    ChainMismatch,
+    CryptoError(compound_crypto::CryptoError),
+    InsufficientChainCash,
+    InsufficientLiquidity,
+    InsufficientTotalFunds,
+    InvalidSignature,
+    InvalidSymbol,
+    KeyNotFound,
+    MathError(MathError),
+    MinTxValueNotMet,
+    RepayTooMuch,
+}
+
+impl From<MathError> for Reason {
+    fn from(err: MathError) -> Self {
+        Reason::MathError(err)
+    }
+}
+
+impl From<compound_crypto::CryptoError> for Reason {
+    fn from(err: compound_crypto::CryptoError) -> Self {
+        Reason::CryptoError(err)
+    }
+}
+
+/// Type for reporting failures from calculations.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum MathError {
-    Overflowed,
+    Overflow,
+    Underflow,
+    SignMismatch,
     SymbolMismatch,
     PriceNotUSD,
     DivisionByZero,
@@ -313,6 +447,8 @@ fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Op
     }
 }
 
+// XXX kinda sucks to import this to use?
+//  and do we even want to overload types?
 pub trait SafeMul<Rhs = Self> {
     /// The resulting type after multiplying
     type Output;
@@ -330,13 +466,13 @@ impl SafeMul<Quantity> for Price {
             return Err(MathError::SymbolMismatch);
         }
         let result = mul(
-            self.amount(),
+            self.value(),
             Price::DECIMALS,
-            rhs.amount(),
+            rhs.value(),
             rhs.symbol().decimals(),
             USD.decimals(),
         )
-        .ok_or(MathError::Overflowed)?;
+        .ok_or(MathError::Overflow)?;
 
         Ok(Quantity(USD, result as AssetAmount))
     }
@@ -368,59 +504,26 @@ impl SafeDiv<Price> for Quantity {
         if self.symbol() != USD {
             return Err(MathError::PriceNotUSD);
         }
-        if rhs.amount() == 0 {
+        if rhs.value() == 0 {
             return Err(MathError::DivisionByZero);
         }
         let result = div(
-            self.amount(),
+            self.value(),
             self.symbol().decimals(),
-            rhs.amount(),
+            rhs.value(),
             Price::DECIMALS,
             rhs.symbol().decimals(),
         )
-        .ok_or(MathError::Overflowed)?;
+        .ok_or(MathError::Overflow)?;
 
         Ok(Quantity(rhs.symbol(), result as AssetAmount))
     }
 }
 
-// Quantity<S> * MulIndex -> Quantity<S>
-impl SafeMul<MulIndex> for Quantity {
-    type Output = Quantity;
-
-    fn mul(self, rhs: MulIndex) -> Result<Self::Output, MathError> {
-        let result = mul(
-            self.amount(),
-            self.symbol().decimals(),
-            rhs.0,
-            MulIndex::DECIMALS,
-            self.symbol().decimals(),
-        )
-        .ok_or(MathError::Overflowed)?;
-
-        Ok(Quantity(self.symbol(), result))
-    }
-}
-
-impl SafeMul<Quantity> for MulIndex {
-    type Output = Quantity;
-
-    fn mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
-        rhs.mul(self)
-    }
-}
-
-pub fn symbol<T: Config>(asset: ChainAsset) -> Symbol {
-    // XXX lookup in storage
-    Symbol(
-        ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
-        18,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::symbol::*;
 
     const ETH: Symbol = Symbol(
         ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
@@ -544,11 +647,21 @@ mod tests {
 
     #[test]
     fn test_mul_index() {
-        let quantity_at_time_zero = Quantity::from_nominal(ETH, "100");
-        let mul_index = MulIndex::from_nominal("1.01");
-        let quantity_now = mul_index.mul(quantity_at_time_zero).unwrap();
-        let expected_quantity = Quantity::from_nominal(ETH, "101");
-        assert_eq!(quantity_now, expected_quantity);
+        let pprincipal = CashPrincipal(100000000);
+        let nprincipal = CashPrincipal(-100000000);
+        let index = CashIndex::from_nominal("1.01");
+        let pquantity = index.as_hold_amount(pprincipal).unwrap();
+        let nquantity = index.as_debt_amount(nprincipal).unwrap();
+        assert_eq!(
+            index.as_debt_amount(pprincipal),
+            Err(MathError::SignMismatch)
+        );
+        assert_eq!(pquantity, Quantity::from_nominal(CASH, "101"));
+        assert_eq!(
+            index.as_hold_amount(nprincipal),
+            Err(MathError::SignMismatch)
+        );
+        assert_eq!(nquantity, Quantity::from_nominal(CASH, "101"));
     }
 
     #[test]

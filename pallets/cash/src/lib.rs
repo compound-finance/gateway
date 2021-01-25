@@ -31,14 +31,14 @@ use sp_runtime::{
 };
 
 use crate::chains::{Chain, ChainId, Ethereum};
-use crate::core::Reason;
 use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::rates::{InterestRateModel, APR};
 use crate::symbol::Symbol;
 use crate::types::{
-    get_max_value, AssetAmount, AssetPrice, ChainAccount, ChainAsset, ChainSignature,
-    ChainSignatureList, ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, MulIndex,
-    Nonce, NoticeStatus, ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+    AssetAmount, AssetBalance, AssetIndex, AssetPrice, CashIndex, CashPrincipal, ChainAccount,
+    ChainAsset, ChainSignature, ChainSignatureList, ConfigSetString, EncodedNotice, EventStatus,
+    Fraction, MaxableAssetAmount, Nonce, NoticeStatus, Reason, ReporterSet, SignedPayload,
+    Timestamp, ValidatorSet, ValidatorSig,
 };
 
 use sp_runtime::print;
@@ -89,11 +89,8 @@ decl_storage! {
         /// The upcoming set of allowed validators, and their associated keys (or none).
         NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
 
-        /// An index to track interest owed by CASH borrowers.
-        CashCostIndex get(fn cash_cost_index): MulIndex;
-
-        /// An index to track interest earned by CASH holders.
-        CashYieldIndex get(fn cash_yield_index): MulIndex;
+        /// An index to track interest earned by CASH holders and owed by CASH borrowers.
+        GlobalCashIndex get(fn cash_index): CashIndex;
 
         /// The upcoming base rate change for CASH and when, if any.
         CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
@@ -101,77 +98,76 @@ decl_storage! {
         /// The current APR on CASH held, and the base rate paid by borrowers.
         CashYield get(fn cash_yield): APR;
 
-        /// The current APR surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
-        CashSpread get(fn cash_spread): APR;
+        /// The fraction of borrower interest that is paid to the protocol.
+        Spreads get(fn spread): map hasher(blake2_128_concat) ChainAsset => Fraction;
 
-        /// An index to track interest owed by asset borrowers.
-        BorrowIndex get(fn borrow_index): map hasher(blake2_128_concat) ChainAsset => MulIndex; // XXX will change to add
+        /// The mapping of indices to track interest owed by asset borrowers, by asset.
+        BorrowIndices get(fn borrow_index): map hasher(blake2_128_concat) ChainAsset => AssetIndex;
 
-        /// An index to track interest earned by asset suppliers.
-        SupplyIndex get(fn supply_index): map hasher(blake2_128_concat) ChainAsset => MulIndex; // XXX will change to add
+        /// The mapping of indices to track interest earned by asset suppliers, by asset.
+        SupplyIndices get(fn supply_index): map hasher(blake2_128_concat) ChainAsset => AssetIndex;
 
-        // XXX doc
-        ChainCashHoldPrincipal get(fn chain_cash_hold_principal): map hasher(blake2_128_concat) ChainId => AssetAmount;
-        // TotalCashHoldPrincipal;
-        // TotalCashBorrowPrincipal;
-        // TotalSupplyPrincipal[asset];
+        /// The total CASH principal held per chain.
+        ChainCashPrincipals get(fn chain_cash_principal): map hasher(blake2_128_concat) ChainId => CashPrincipal;
 
-        TotalSupplyPrincipal get(fn total_supply_principal): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
-        // TotalBorrowPrincipal[asset];
+        /// The total CASH principal in existence.
+        TotalCashPrincipal get(fn total_cash_principal): CashPrincipal;
 
-        TotalBorrowPrincipal get(fn total_borrow_principal): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
+        /// The total amount supplied per collateral asset.
+        TotalSupplyAssets get(fn total_supply_asset): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
 
-        // CashHoldPrincipal[account];
-        // CashBorrowPrincipal[account];
-        // SupplyPrincipal[asset][account];
-        // BorrowPrincipal[asset][account];
+        /// The total amount borrowed per collateral asset.
+        TotalBorrowAssets get(fn total_borrow_asset): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
 
-        Model get(fn model): map hasher(blake2_128_concat) ChainAsset => crate::rates::InterestRateModel;
+        /// The mapping of CASH principal, by account.
+        CashPrincipals get(fn cash_principal): map hasher(blake2_128_concat) ChainAccount => CashPrincipal;
+
+        /// The mapping of asset balances, by chain and account.
+        AssetBalances get(fn asset_balance): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetBalance;
+
+        RateModels get(fn model): map hasher(blake2_128_concat) ChainAsset => InterestRateModel;
 
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
-        // XXX delete me (part of magic extract)
-        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
-
-        /// Mapping of (status of) events witnessed on Ethereum, by event id.
+        /// The mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
-        /// Mapping of (status of) notices to be signed for Ethereum, by notice id.
+        /// The mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
-
-        /// Eth addresses of price reporters for open oracle
-        Reporters get(fn reporters): ReporterSet;
 
         // XXX
         // AssetInfo[asset];
         // LiquidationIncentive;
 
+        /// Mapping of assets to symbols.
+        AssetSymbols get(fn asset_symbol): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
+
         /// Mapping of strings to symbols.
-        Symbols get(fn symbols): map hasher(blake2_128_concat) String => Option<Symbol>;
+        Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
 
         /// Mapping of latest prices for each asset symbol.
-        Prices get(fn prices): map hasher(blake2_128_concat) Symbol => AssetPrice;
+        Prices get(fn price): map hasher(blake2_128_concat) Symbol => AssetPrice;
 
         /// Mapping of assets to the last time their price was updated.
-        PriceTimes get(fn price_times): map hasher(blake2_128_concat) Symbol => Timestamp;
+        PriceTimes get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
 
-        /// Mapping of assets to symbols.
-        PriceKeyMapping get(fn price_key_mapping): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
+        /// Ethereum addresses of open oracle price reporters.
+        PriceReporters get(fn reporters): ReporterSet; // XXX if > 1, how are we combining?
 
-        // PriceReporter;
-        // PriceKeyMapping;
+        // XXX delete me (part of magic extract)
+        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
         config(validators): ConfigSetString;
         config(reporters): ConfigSetString;
-        config(symbols): ConfigSetString; // XXX initialize symbol from string: (ticker, decimals)
-        config(price_key_mapping): ConfigSetString;
+        config(symbol): ConfigSetString; // XXX initialize symbol from string: (ticker, decimals)
+        config(asset_symbol): ConfigSetString;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_symbols(config.symbols.clone());
-            Module::<T>::initialize_asset_maps(config.price_key_mapping.clone());
+            Module::<T>::initialize_symbols(config.symbol.clone());
+            Module::<T>::initialize_asset_maps(config.asset_symbol.clone());
         })
     }
 }
@@ -202,7 +198,6 @@ decl_event!(
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        // XXX delete with magic extract
         /// Error returned when fetching starport info
         HttpFetchingError,
 
@@ -275,17 +270,15 @@ decl_error! {
         /// Could not get the utilization ratio
         InterestRateModelGetUtilizationFailed,
 
+        /// Notice issue
+        InvalidNoticeParams,
+
         /// Signature recovery errror
         InvalidSignature,
 
-        /// Sender issue
-        InvalidChain,
-
+        // XXX delete with magic extract
         /// Failure in internal logic
         Failed,
-
-        /// Notice issue
-        InvalidNoticeParams,
     }
 }
 
@@ -339,15 +332,8 @@ decl_module! {
             let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
             print(request_str);
             // // TODO: Add more error information here
-            let sender = match signature {
-                ChainSignature::Eth(eth_sig) =>
-                    ChainAccount::Eth(cash_err!(compound_crypto::eth_recover(&request, &eth_sig, true), Error::<T>::InvalidSignature)?)
-            };
-            match sender {
-                ChainAccount::Eth(s) =>
-                    print(format!("eth sender: {}", hex::encode(s)).as_str())
-            }
-            let trx_request = trx_request::parse_request(request_str).map_err(|_| <Error<T>>::TrxRequestParseError)?;
+            let sender = cash_err!(signature.recover(&request), <Error<T>>::InvalidSignature)?; // XXX error from reason?
+            let trx_request = cash_err!(trx_request::parse_request(request_str), <Error<T>>::TrxRequestParseError)?;
 
             match trx_request {
                 trx_request::TrxRequest::MagicExtract(amount, account) => {
@@ -365,7 +351,7 @@ decl_module! {
             // XXX do we want to store/check hash to allow replaying?
             // TODO: use more generic function?
             let signer: crate::types::ValidatorKey = cash_err!(
-                compound_crypto::eth_recover(&payload[..], &signature, false),
+                compound_crypto::eth_recover(&payload[..], &signature, false),  // XXX why is this using eth for validator sig though?
                 Error::<T>::InvalidSignature)?;
 
             print(format!("signer: {}", hex::encode(&signer[..])).as_str());
@@ -497,7 +483,7 @@ impl<T: Config> Module<T> {
     /// Check to make sure an asset is supported. Only returns Err when the asset is not supported
     /// by compound chain.
     fn check_asset_supported(asset: &ChainAsset) -> Result<(), Error<T>> {
-        if !PriceKeyMapping::contains_key(&asset) {
+        if !AssetSymbols::contains_key(&asset) {
             return Err(<Error<T>>::AssetNotSupported);
         }
 
@@ -514,24 +500,22 @@ impl<T: Config> Module<T> {
             model.check_parameters(),
             <Error<T>>::InterestRateModelInvalidParameters
         )?;
-        Model::insert(&asset, model);
+        RateModels::insert(&asset, model);
         Ok(())
     }
 
     /// Get the borrow rate for the given asset
-    fn get_borrow_rate(asset: &ChainAsset) -> Result<APR, Error<T>> {
-        if !Model::contains_key(asset) {
+    pub fn get_borrow_rate(asset: &ChainAsset) -> Result<APR, Error<T>> {
+        if !RateModels::contains_key(asset) {
+            // XXX we should just make this part of the model getter
             return Err(<Error<T>>::InterestRateModelNotSet);
         }
-
-        let model = Model::get(asset);
+        let model = RateModels::get(asset);
         let utilization = Self::get_utilization(asset)?;
-
         let rate = cash_err!(
             model.get_borrow_rate(utilization, 0),
             <Error<T>>::InterestRateModelGetBorrowRateFailed
         )?;
-
         Ok(rate)
     }
 
@@ -555,7 +539,7 @@ impl<T: Config> Module<T> {
             compound_crypto::eth_recover(&hashed, &parsed_sig, true),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
-        let reporters = Reporters::get();
+        let reporters = PriceReporters::get();
         if !reporters
             .iter()
             .any(|e| e.as_slice() == recovered.as_slice())
@@ -602,19 +586,14 @@ impl<T: Config> Module<T> {
     }
 
     /// Get the utilization in the provided asset.
-    fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Error<T>> {
+    pub fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Error<T>> {
         Self::check_asset_supported(asset)?;
-        // important note - because we know that our asset is _supported_
-        // it allows us to get the default value zero if these values are not set.
-        // it is possible that these keys do not exist for that asset.
-        let total_supply_principal = TotalSupplyPrincipal::get(asset);
-        let total_borrow_principal = TotalBorrowPrincipal::get(asset);
-
+        let total_supply = TotalSupplyAssets::get(asset);
+        let total_borrow = TotalBorrowAssets::get(asset);
         let utilization = cash_err!(
-            crate::rates::get_utilization(total_supply_principal, total_borrow_principal),
+            rates::get_utilization(total_supply, total_borrow),
             <Error<T>>::InterestRateModelGetUtilizationFailed
         )?;
-
         Ok(utilization)
     }
 
@@ -672,32 +651,28 @@ impl<T: Config> Module<T> {
             "Open price feed price reporters must be set in the genesis config"
         );
         assert!(
-            Reporters::get().is_empty(),
-            "Reporters are already set but they should only be set in the genesis config."
+            PriceReporters::get().is_empty(),
+            "Price reporters are already set but they should only be set in the genesis config."
         );
         let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
             .expect("Could not deserialize validators from genesis config");
-        Reporters::put(converted);
+        PriceReporters::put(converted);
     }
 
     /// Initializes several maps that use asset as their key to sane default values explicitly
     ///
     /// Maps initialized by this function
     ///
-    /// * TotalSupplyPrincipal
-    /// * TotalBorrowPrincipal
-    /// * BorrowIndex
-    /// * SupplyIndex
-    /// * Model
-    /// * PriceKeyMapping
+    /// * RateModels
+    /// * AssetSymbols
     ///
-    fn initialize_asset_maps(price_key_mapping: ConfigSetString) {
+    fn initialize_asset_maps(asset_symbols: ConfigSetString) {
         assert!(
-            !price_key_mapping.is_empty(),
-            "price_key_mapping must be set in the genesis config"
+            !asset_symbols.is_empty(),
+            "asset_symbols must be set in the genesis config"
         );
 
-        for record in price_key_mapping {
+        for record in asset_symbols {
             let mut tokens = record.split(":");
             let ticker = tokens.next().expect("No ticker present");
             let symbol = Symbols::get(ticker).expect("Ticker not a valid symbol");
@@ -714,16 +689,11 @@ impl<T: Config> Module<T> {
                 decoded.try_into().expect("Invalid Ethereum address");
 
             let chain_asset: ChainAsset = ChainAsset::Eth(decoded_arr);
-            let zero_index: MulIndex = 0u8.into();
 
-            TotalSupplyPrincipal::insert(&chain_asset, 0);
-            TotalBorrowPrincipal::insert(&chain_asset, 0);
-            // note - these indexes are 0 at the start due to the new additive index method
-            BorrowIndex::insert(&chain_asset, zero_index.clone());
-            SupplyIndex::insert(&chain_asset, zero_index);
+            // XXX
             // todo: we may want to do better with genesis having configurable initial interest rate models
-            Model::insert(&chain_asset, InterestRateModel::default());
-            PriceKeyMapping::insert(&chain_asset, symbol);
+            RateModels::insert(&chain_asset, InterestRateModel::default());
+            AssetSymbols::insert(&chain_asset, symbol);
         }
     }
 
@@ -862,8 +832,8 @@ impl<T: Config> Module<T> {
             // XXX
             let payload =
                 events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let signature =
-                chains::eth::sign_one(&payload).map_err(|_| <Error<T>>::HttpFetchingError)?;
+            let signature =  // XXX why are we signing with eth?
+                cash_err!(<Ethereum as Chain>::sign_message(&payload), <Error<T>>::InvalidSignature)?; // XXX
             let call = Call::process_eth_event(payload, signature);
 
             // XXX Unsigned tx for now
@@ -921,20 +891,20 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
 
 // XXX this function is temporary and will be deleted after we reach a certain point
 pub fn magic_extract_internal<T: Config>(
-    sender: ChainAccount,
+    _sender: ChainAccount,
     account: ChainAccount,
     max_amount: MaxableAssetAmount,
 ) -> Result<(), Error<T>> {
     let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
 
-    let amount = get_max_value(max_amount, &|| 5);
+    let amount = max_amount.get_max_value(&|| 5);
 
     // Update storage -- TODO: increment this-- sure why not?
     let curr_cash_balance: AssetAmount = <CashBalance>::get(&account).unwrap_or_default();
     let next_cash_balance: AssetAmount = curr_cash_balance + amount;
     <CashBalance>::insert(&account, next_cash_balance);
 
-    let now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
+    let _now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
     // Add to Notice Queue
     // Note: we need to generalize this since it's not guaranteed to be Eth
     let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
@@ -946,9 +916,8 @@ pub fn magic_extract_internal<T: Config>(
             parent: [0u8; 32],
             account: eth_account,
             amount,
-            cash_yield_index: 1000,
+            cash_index: 1000,
         },
-        _ => return Err(Error::<T>::InvalidNoticeParams),
     });
 
     // TODO: Why is this Eth notice queue? Should this be specific to Eth?
@@ -963,9 +932,9 @@ pub fn magic_extract_internal<T: Config>(
 
     let encoded_notice = notice.encode_ethereum_notice();
     let signature = cash_err!(
-        chains::eth::sign_one(&encoded_notice),
+        <Ethereum as Chain>::sign_message(&encoded_notice[..]),
         Error::<T>::InvalidSignature
-    )?;
+    )?; // XXX
 
     // Emit an event or two.
     <Module<T>>::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));

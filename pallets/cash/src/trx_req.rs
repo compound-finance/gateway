@@ -1,11 +1,14 @@
-extern crate trx_request;
+extern crate trx_request; // XXX why extern not use?
 
-use crate::types::{AssetAmount, ChainAccount, Maxable, MaxableAssetAmount};
+use crate::types::{ChainAccount, Maxable, MaxableAssetAmount};
 use trx_request::*;
 
+// XXX why are these the only things needed here?
+//  kind of hidden conversion
+//   can trx_request return real types?
 impl From<trx_request::MaxAmount> for MaxableAssetAmount {
-    fn from(amt: MaxAmount) -> Self {
-        match amt {
+    fn from(amount: MaxAmount) -> Self {
+        match amount {
             MaxAmount::Max => Maxable::Max,
             MaxAmount::Amt(amt) => Maxable::Value(amt),
         }
@@ -23,6 +26,7 @@ impl From<trx_request::Account> for ChainAccount {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::*;
 
     #[test]
     fn test_max_amount_to_generic() {

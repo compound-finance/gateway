@@ -1,7 +1,7 @@
 use crate::std::*;
 use crate::{
-    eth_keccak_for_signature, tagged_public_key_slice_to_raw, tagged_public_key_to_raw,
-    CryptoError, HashedMessageBytes, PublicKeyBytes, SignatureBytes, ETH_ADD_TO_V,
+    eth_keccak_for_signature, tagged_public_key_slice_to_raw, CryptoError, HashedMessageBytes,
+    PublicKeyBytes, SignatureBytes, ETH_ADD_TO_V,
 };
 use der_parser::parse_der;
 use rusoto_core::{Region, RusotoError};
@@ -61,7 +61,7 @@ impl KmsKeyring {
     /// environment are observed. Use environment variables AWS_REGION or AWS_DEFAULT_REGION to set
     /// the region use AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY OR AWS_SESSION_TOKEN and
     /// AWS_CREDENTIAL_EXPIRATION to authenticate.
-    fn new() -> KmsKeyring {
+    pub fn new() -> KmsKeyring {
         let region = Region::default();
         let client = KmsClient::new(region);
 

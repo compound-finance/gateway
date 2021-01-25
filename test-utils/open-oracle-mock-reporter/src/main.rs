@@ -111,7 +111,7 @@ impl App {
             .unwrap()
             .iter()
             .map(|e| {
-                let bytes = e.clone().as_ref().unwrap();
+                let bytes = e.as_ref().unwrap();
                 compound_crypto::bytes_to_eth_hex_string(&bytes.as_slice())
             })
             .collect();

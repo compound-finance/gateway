@@ -158,8 +158,16 @@ jobs:
           path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
 
-      # TODO: cache this step somehow if necessary?
-      #  could use parity/substrate image maybe but requires entrypoint on every step
+      - uses: actions/cache@v2
+        with:
+         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: |
+          ${{ runner.os }}-cargo-
+         path: |
+          /usr/local/bin/rustup
+          ~/.cargo
+          target
+
       - name: Substrate setup
         run: |
           ./scripts/get_substrate.sh --fast

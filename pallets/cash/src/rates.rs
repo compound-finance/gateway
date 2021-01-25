@@ -1,7 +1,7 @@
 /// Interest rate related calculations and utilities are concentrated here
 use crate::types::{uint_from_string_with_decimals, AssetAmount, Uint};
 use codec::{Decode, Encode};
-use our_std::{Debuggable, RuntimeDebug};
+use our_std::Debuggable;
 
 /// Error enum for interest rates
 #[derive(Debuggable, PartialEq, Eq, Encode, Decode)]
@@ -14,6 +14,33 @@ pub enum RatesError {
     ModelKinkUtilizationNotPositive,
     ModelRateOutOfBounds,
     Overflowed,
+}
+
+/// Annualized interest rate
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
+pub struct APR(Uint);
+
+impl From<Uint> for APR {
+    fn from(x: u128) -> Self {
+        APR(x)
+    }
+}
+
+impl APR {
+    pub const DECIMALS: u8 = 4;
+
+    pub(crate) const fn from_nominal(s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
+        APR(amount)
+    }
+
+    const MAX: APR = APR::from_nominal("0.35"); // 35%
+}
+
+impl Default for APR {
+    fn default() -> Self {
+        APR(0)
+    }
 }
 
 /// Utilization rate for a given market.
@@ -37,27 +64,6 @@ impl Utilization {
     const ONE: Utilization = Utilization::from_nominal("1");
 
     const ZERO: Utilization = Utilization::from_nominal("0");
-}
-
-/// Annualized interest rate
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
-pub struct APR(Uint);
-
-impl From<Uint> for APR {
-    fn from(x: u128) -> Self {
-        APR(x)
-    }
-}
-
-impl APR {
-    pub const DECIMALS: u8 = 4;
-
-    pub(crate) const fn from_nominal(s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        APR(amount)
-    }
-
-    const MAX: APR = APR::from_nominal("0.35"); // 35%
 }
 
 /// Internal function for getting a raw utilization. Used so that we can use ? operator with options
@@ -94,7 +100,7 @@ pub fn get_utilization(
 ///
 /// In the future we may support serde serialization and deserialization of this struct
 /// for the purpose of inclusion in the genesis configuration chain_spec file.
-#[derive(Debuggable, Encode, Decode, PartialEq, Eq, Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub enum InterestRateModel {
     Kink {
         zero_rate: APR,
@@ -108,12 +114,6 @@ pub enum InterestRateModel {
 impl Default for InterestRateModel {
     fn default() -> Self {
         Self::new_kink(0, 500, 8000, 2000)
-    }
-}
-
-impl Default for APR {
-    fn default() -> Self {
-        APR(0)
     }
 }
 
@@ -182,7 +182,7 @@ impl InterestRateModel {
         zero_rate: Uint,
         kink_rate: Uint,
         kink_utilization: Uint,
-        full_rate: Uint,
+        _full_rate: Uint,
     ) -> Option<Uint> {
         // utilization * (kink_rate - zero_rate) / kink_utilization + zero_rate
         utilization
@@ -194,7 +194,7 @@ impl InterestRateModel {
     /// The right side of the kink in the kink model.
     fn right_line(
         utilization: Uint,
-        zero_rate: Uint,
+        _zero_rate: Uint,
         kink_rate: Uint,
         kink_utilization: Uint,
         full_rate: Uint,
@@ -212,7 +212,7 @@ impl InterestRateModel {
     pub fn get_borrow_rate<T: Into<APR>>(
         self: &Self,
         utilization: Utilization,
-        current_rate: T,
+        _current_rate: T,
     ) -> Result<APR, RatesError> {
         match self {
             Self::Kink {

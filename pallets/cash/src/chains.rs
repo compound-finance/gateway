@@ -2,11 +2,12 @@
 pub use our_std::vec::Vec;
 
 use crate::rates::APR;
-use crate::types::{AssetAmount, MulIndex, Timestamp};
+use crate::types::{AssetAmount, CashIndex, Reason, Timestamp};
+
 use codec::{Decode, Encode};
 use our_std::{Debuggable, RuntimeDebug};
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainId {
     Comp,
     Eth,
@@ -26,7 +27,7 @@ pub trait Chain {
 
     type Address: Debuggable + Clone + Eq + Into<Vec<u8>> = [u8; 20];
     type Amount: Debuggable + Clone + Eq + Into<AssetAmount> = u128;
-    type MulIndex: Debuggable + Clone + Eq + Into<MulIndex> = u128;
+    type CashIndex: Debuggable + Clone + Eq + Into<CashIndex> = u128;
     type Rate: Debuggable + Clone + Eq + Into<APR> = u128;
     type Timestamp: Debuggable + Clone + Eq + Into<Timestamp> = u128; // XXX u64?
     type Hash: Debuggable + Clone + Eq = [u8; 32];
@@ -36,6 +37,8 @@ pub trait Chain {
     type Event: Debuggable + Clone + Eq;
 
     fn hash_bytes(data: &[u8]) -> Self::Hash;
+    fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
+    fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -59,8 +62,16 @@ impl Chain for Compound {
     type EventId = comp::EventId;
     type Event = comp::Event;
 
-    fn hash_bytes(data: &[u8]) -> Self::Hash {
-        [0u8; 32] // XXX
+    fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
     }
 }
 
@@ -71,7 +82,25 @@ impl Chain for Ethereum {
     type Event = eth::Event;
 
     fn hash_bytes(data: &[u8]) -> Self::Hash {
-        [0u8; 32] // XXX
+        use tiny_keccak::Hasher;
+        let mut hash = [0u8; 32];
+        let mut hasher = tiny_keccak::Keccak::v256();
+        hasher.update(&data[..]);
+        hasher.finalize(&mut hash);
+        hash
+    }
+
+    fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
+        Ok(compound_crypto::eth_recover(data, &signature, true)?)
+    }
+
+    fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason> {
+        let message = Vec::from(message);
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(Reason::KeyNotFound)?;
+        Ok(runtime_interfaces::keyring_interface::sign_one(
+            message, eth_key_id,
+        )?)
     }
 }
 
@@ -81,8 +110,16 @@ impl Chain for Polkadot {
     type EventId = dot::EventId;
     type Event = dot::Event;
 
-    fn hash_bytes(data: &[u8]) -> Self::Hash {
-        [1u8; 32] // XXX
+    fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
     }
 }
 
@@ -92,8 +129,16 @@ impl Chain for Solana {
     type EventId = sol::EventId;
     type Event = sol::Event;
 
-    fn hash_bytes(data: &[u8]) -> Self::Hash {
-        [2u8; 32] // XXX
+    fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
     }
 }
 
@@ -103,11 +148,23 @@ impl Chain for Tezos {
     type EventId = tez::EventId;
     type Event = tez::Event;
 
-    fn hash_bytes(data: &[u8]) -> Self::Hash {
-        [3u8; 32] // XXX
+    fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
     }
 }
 
+// XXX technically all the remaining mod::types I think could become ADTs instead
+//  which would also be a union type that would allow us to store them together
+//  in general storing types which add variants for chains over time *must* be ok
+//   or this strategy breaks and we need to re-visit everywhere in storage that's happening
 pub mod comp {
     use codec::{Decode, Encode};
     use our_std::RuntimeDebug;
@@ -124,10 +181,7 @@ pub mod eth {
 
     use super::{Chain, Ethereum};
     use codec::{Decode, Encode};
-    use compound_crypto::CryptoError;
-    use our_std::convert::TryInto;
     use our_std::RuntimeDebug;
-    use tiny_keccak::Hasher;
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub enum RecoveryError {
@@ -157,57 +211,12 @@ pub mod eth {
         LockCash {
             holder: <Ethereum as Chain>::Address,
             amount: <Ethereum as Chain>::Amount,
-            yield_index: <Ethereum as Chain>::MulIndex,
+            index: <Ethereum as Chain>::CashIndex,
         },
 
         Gov {
             // XXX all these become do?
         },
-    }
-
-    /// Helper function to quickly run keccak in the Ethereum-style
-    /// TODO: Add to trait?
-    pub fn digest(input: &[u8]) -> <Ethereum as Chain>::Hash {
-        let mut output = [0u8; 32];
-        let mut hasher = tiny_keccak::Keccak::v256();
-        hasher.update(&input[..]);
-        hasher.finalize(&mut output);
-        output
-    }
-
-    /// Helper function to build address from public key
-    /// TODO: Add to trait?
-    pub fn address_from_public_key(
-        public_key: <Ethereum as Chain>::PublicKey,
-    ) -> <Ethereum as Chain>::Address {
-        let mut address: [u8; 20] = [0; 20];
-        let hash = digest(&public_key[..]);
-        address.copy_from_slice(&hash[12..]);
-        address
-    }
-
-    /// Sign messages for the ethereum network
-    pub fn sign(
-        messages: Vec<&[u8]>,
-    ) -> Result<Vec<Result<<Ethereum as Chain>::Signature, CryptoError>>, CryptoError> {
-        // TODO: match by chain for signing algorithm or implement as trait
-        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
-            .ok_or(CryptoError::KeyNotFound)?;
-        // need to materialize this to pass over runtime interface boundary
-        let messages: Vec<Vec<u8>> = messages
-            .iter()
-            .map(|e| e.iter().map(|f| *f).collect())
-            .collect();
-
-        runtime_interfaces::keyring_interface::sign(messages, eth_key_id)
-    }
-
-    /// Sign messages for the ethereum network
-    pub fn sign_one(message: &[u8]) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
-        let message = Vec::from(message);
-        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
-            .ok_or(CryptoError::KeyNotFound)?;
-        runtime_interfaces::keyring_interface::sign_one(message, eth_key_id)
     }
 }
 
