@@ -101,11 +101,12 @@ pub trait KeyringInterface {
     fn sign(
         messages: Vec<Vec<u8>>,
         key_id: Vec<u8>,
-    ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError> {
+    ) -> Result<Vec<Result<compound_crypto::SignatureBytes, CryptoError>>, CryptoError> {
         let keyring = compound_crypto::KEYRING
             .lock()
             .map_err(|_| CryptoError::KeyringLock)?;
         let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
+        let messages: Vec<&[u8]> = messages.iter().map(|e| e.as_slice()).collect();
         keyring.sign(messages, &key_id)
     }
 }

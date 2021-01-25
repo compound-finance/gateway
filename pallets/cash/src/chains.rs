@@ -186,20 +186,6 @@ pub mod eth {
         address
     }
 
-    /// Convert Result<Vec<u8>, CryptoError> to Result<<Ethereum as Chain>::Signature, CryptoError>
-    /// it is a little messy so we wrap it in a function
-    fn convert_to_ethereum_signature(
-        x: Result<Vec<u8>, CryptoError>,
-    ) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
-        match x {
-            Ok(e) => match e.try_into() {
-                Ok(u) => Ok(u),
-                Err(_) => Err(CryptoError::InvalidKeyId),
-            },
-            Err(err) => Err(err),
-        }
-    }
-
     /// Sign messages for the ethereum network
     pub fn sign(
         messages: Vec<Vec<u8>>,
@@ -208,13 +194,7 @@ pub mod eth {
         let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
             .ok_or(CryptoError::KeyNotFound)?;
 
-        let mut sig_results = runtime_interfaces::keyring_interface::sign(messages, eth_key_id)?;
-        let result = sig_results
-            .drain(..)
-            .map(convert_to_ethereum_signature)
-            .collect();
-
-        Ok(result)
+        runtime_interfaces::keyring_interface::sign(messages, eth_key_id)
     }
 
     /// Sign messages for the ethereum network
