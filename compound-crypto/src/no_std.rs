@@ -200,3 +200,17 @@ pub(crate) fn eth_decode_hex_ascii(message: &[u8]) -> Result<Vec<u8>, CryptoErro
         hex::decode(&message[2..]).map_err(|_| CryptoError::HexDecodeFailed)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_eth_decode_hex_ascii_fails_on_unicode() {
+        let case = vec!["0💘"];
+        for case in cases {
+            assert!(case.len() > 2);
+            assert!(eth_decode_hex_ascii(case.as_bytes()).is_err());
+        }
+    }
+}
