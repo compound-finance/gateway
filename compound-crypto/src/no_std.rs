@@ -44,11 +44,13 @@ pub(crate) const ETH_ADD_TO_V: u8 = 27u8;
 
 /// Helper function to quickly run keccak in the Ethereum-style
 /// This includes the preamble and length ouf output
-pub(crate) fn eth_keccak_for_signature(input: &[u8]) -> HashedMessageBytes {
+pub(crate) fn eth_keccak_for_signature(input: &[u8], prepend_preamble: bool) -> HashedMessageBytes {
     let mut output = [0u8; 32];
     let mut hasher = tiny_keccak::Keccak::v256();
-    hasher.update(ETH_MESSAGE_PREAMBLE);
-    hasher.update(format!("{}", input.len()).as_bytes());
+    if prepend_preamble {
+        hasher.update(ETH_MESSAGE_PREAMBLE);
+        hasher.update(format!("{}", input.len()).as_bytes());
+    }
     hasher.update(input);
     hasher.finalize(&mut output);
     output
@@ -136,7 +138,11 @@ fn eth_get_chain(recovery_id: u8) -> Result<(u8, Option<u8>), CryptoError> {
 
 /// Recovers the signer's address from the given signature and message. The message is _not_
 /// expected to be a digest and is hashed inside.
-pub fn eth_recover(message: &[u8], sig: &SignatureBytes) -> Result<AddressBytes, CryptoError> {
+pub fn eth_recover(
+    message: &[u8],
+    sig: &SignatureBytes,
+    prepend_preamble: bool,
+) -> Result<AddressBytes, CryptoError> {
     if sig.len() == 0 {
         return Err(CryptoError::RecoverError);
     }
@@ -148,7 +154,7 @@ pub fn eth_recover(message: &[u8], sig: &SignatureBytes) -> Result<AddressBytes,
         secp256k1::RecoveryId::parse(recovery_id).map_err(|_| CryptoError::ParseError)?;
 
     let sig = secp256k1::Signature::parse_slice(&sig[..64]).map_err(|_| CryptoError::ParseError)?;
-    let digested = eth_keccak_for_signature(&message);
+    let digested = eth_keccak_for_signature(&message, prepend_preamble);
     let message =
         secp256k1::Message::parse_slice(&digested).map_err(|_| CryptoError::ParseError)?;
 

@@ -17,7 +17,6 @@ use crate::{
     RawEvent::GoldieLocks,
     Store,
 };
-use our_std::convert::TryInto;
 use sp_runtime::print;
 
 macro_rules! require {
@@ -46,16 +45,6 @@ pub enum Reason {
     NotImplemented,
     MinTxValueNotMet,
     InvalidSymbol,
-}
-
-impl ChainAccount {
-    pub fn try_from_eth_address_bytes(from: &[u8]) -> Result<ChainAccount, ConversionError> {
-        let addr = from
-            .try_into()
-            .map_err(|_| ConversionError::ConvertFromBytesToEthAddress)?;
-
-        Ok(ChainAccount::Eth(addr))
-    }
 }
 
 // Protocol interface //

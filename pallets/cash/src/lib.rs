@@ -305,11 +305,10 @@ decl_module! {
             let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
             print(request_str);
             // // TODO: Add more error information here
-            let eth_sig = match signature {
-                ChainSignature::Eth(sig) => sig
+            let sender = match signature {
+                ChainSignature::Eth(eth_sig) =>
+                    ChainAccount::Eth(cash_err!(compound_crypto::eth_recover(&request, &eth_sig, true), Error::<T>::InvalidSignature)?)
             };
-            let sender_account_bytes = cash_err!(compound_crypto::eth_recover(&request, &eth_sig), Error::<T>::InvalidSignature)?;
-            let sender = cash_err!(ChainAccount::try_from_eth_address_bytes(&sender_account_bytes), Error::<T>::InvalidSignature)?;
             let trx_request = trx_request::parse_request(request_str).map_err(|_| <Error<T>>::TrxRequestParseError)?;
 
             match trx_request {
@@ -327,10 +326,9 @@ decl_module! {
 
             // XXX do we want to store/check hash to allow replaying?
             // TODO: use more generic function?
-            let signer_account_bytes = cash_err!(
-                compound_crypto::eth_recover(&payload[..], &signature),
+            let signer: crate::types::ValidatorKey = cash_err!(
+                compound_crypto::eth_recover(&payload[..], &signature, false),
                 Error::<T>::InvalidSignature)?;
-            let signer: crate::types::ValidatorKey = cash_err!(signer_account_bytes.clone().try_into(), Error::<T>::InvalidSignature)?;
 
             print(format!("signer: {}", hex::encode(&signer_account_bytes)).as_str());
             // XXX
@@ -471,9 +469,8 @@ impl<T: Config> Module<T> {
             compound_crypto::eth_signature_from_bytes(&signature),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
-        let hashed = compound_crypto::keccak(&payload);
         let recovered = cash_err!(
-            compound_crypto::eth_recover(&hashed, &parsed_sig),
+            compound_crypto::eth_recover(&payload, &parsed_sig, false),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
         let reporters = Reporters::get();
