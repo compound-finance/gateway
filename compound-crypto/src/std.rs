@@ -75,6 +75,8 @@ pub trait Keyring {
         key_id: &KeyId,
     ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError>;
 
+    fn sign_one(self: &Self, message: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError>;
+
     /// Get the public key data for the key id provided.
     /// Fails whenever the key_id is not found in the keyring.
     fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError>;
@@ -177,6 +179,11 @@ impl Keyring for InMemoryKeyring {
             .collect();
 
         Ok(result)
+    }
+
+    fn sign_one(self: &Self, message: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
+        let private_key = self.get_private_key(key_id)?;
+        Ok(eth_sign(message, &private_key))
     }
 
     /// Get the public key associated with the given key id.

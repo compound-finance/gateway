@@ -37,6 +37,14 @@ impl Keyring for KmsKeyring {
             .block_on(self.sign_async(messages, key_id))
     }
 
+    fn sign_one(self: &Self, messages: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
+        // we will use the batch interface
+        self.sign(vec![messages], key_id)?
+            .drain(..)
+            .next()
+            .ok_or(CryptoError::Unknown)?
+    }
+
     /// Get the public key corresponding to the provided key ID.
     fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError> {
         self.runtime

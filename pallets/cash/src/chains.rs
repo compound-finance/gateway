@@ -188,20 +188,26 @@ pub mod eth {
 
     /// Sign messages for the ethereum network
     pub fn sign(
-        messages: Vec<Vec<u8>>,
+        messages: Vec<&[u8]>,
     ) -> Result<Vec<Result<<Ethereum as Chain>::Signature, CryptoError>>, CryptoError> {
         // TODO: match by chain for signing algorithm or implement as trait
         let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
             .ok_or(CryptoError::KeyNotFound)?;
+        // need to materialize this to pass over runtime interface boundary
+        let messages: Vec<Vec<u8>> = messages
+            .iter()
+            .map(|e| e.iter().map(|f| *f).collect())
+            .collect();
 
         runtime_interfaces::keyring_interface::sign(messages, eth_key_id)
     }
 
     /// Sign messages for the ethereum network
-    pub fn sign_one(message: Vec<u8>) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
-        let mut sigs = sign(vec![message])?;
-        let mut sig_drain = sigs.drain(..);
-        sig_drain.next().ok_or(CryptoError::Unknown)?
+    pub fn sign_one(message: &[u8]) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
+        let message = Vec::from(message);
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(CryptoError::KeyNotFound)?;
+        runtime_interfaces::keyring_interface::sign_one(message, eth_key_id)
     }
 }
 
