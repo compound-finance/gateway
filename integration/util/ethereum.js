@@ -63,9 +63,21 @@ let getTokenInfo = (accounts) => ({
     constructorArgs: []
   },
   USDC: {
-    build: 'FiatTokenV2.json',
-    contract: 'FiatTokenV2', // TODO: Is this sufficient
-    constructorArgs: []
+    build: 'FiatTokenV1.json',
+    contract: 'FiatTokenV1',
+    constructorArgs: [],
+    afterDeploy: async (contract, [owner, ..._accounts]) => {
+      await contract.methods.initialize(
+        "USD Coin",
+        "USDC",
+        "USD",
+        6,
+        owner,
+        owner,
+        owner,
+        owner
+      ).send({ from: owner, gas: 5000000 }); // Note: default gas is too low for this function
+    }
   }
 });
 
@@ -87,6 +99,9 @@ async function deployContracts(web3, validators) {
     let contractFile = await fs.readFile(path.join(__filename, '..', '..', '..', 'ethereum', '.build', info.build), 'utf8');
     let buildFile = JSON.parse(contractFile).contracts;
     let token = await deployContract(web3, accounts[0], buildFile, info.contract, info.constructorArgs);
+    if (typeof (info.afterDeploy) === 'function') {
+      await info.afterDeploy(token, accounts);
+    }
 
     return {
       ...acc,
