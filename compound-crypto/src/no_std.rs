@@ -136,7 +136,7 @@ fn eth_get_chain(recovery_id: u8) -> Result<(u8, Option<u8>), CryptoError> {
 
 /// Recovers the signer's address from the given signature and message. The message is _not_
 /// expected to be a digest and is hashed inside.
-pub fn eth_recover(message: &[u8], sig: &[u8]) -> Result<AddressBytes, CryptoError> {
+pub fn eth_recover(message: &[u8], sig: &SignatureBytes) -> Result<AddressBytes, CryptoError> {
     if sig.len() == 0 {
         return Err(CryptoError::RecoverError);
     }
@@ -157,6 +157,30 @@ pub fn eth_recover(message: &[u8], sig: &[u8]) -> Result<AddressBytes, CryptoErr
     let address = public_key_to_eth_address(recovered);
 
     Ok(address)
+}
+
+const ETH_SIGNATURE_PADDED_RECOVERY_LENGTH: usize = 96;
+const ETH_SIGNATURE_UNPADDED_RECOVERY_LENGTH: usize = 65;
+
+pub fn eth_signature_from_bytes(bytes: &[u8]) -> Result<SignatureBytes, CryptoError> {
+    if bytes.len() != ETH_SIGNATURE_PADDED_RECOVERY_LENGTH
+        && bytes.len() != ETH_SIGNATURE_PADDED_RECOVERY_LENGTH
+    {
+        return Err(CryptoError::ParseError);
+    }
+
+    match bytes {
+        [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30, e31, e32, e33, e34, e35, e36, e37, e38, e39, e40, e41, e42, e43, e44, e45, e46, e47, e48, e49, e50, e51, e52, e53, e54, e55, e56, e57, e58, e59, e60, e61, e62, e63, e64, .., last] => {
+            Ok([
+                *e1, *e2, *e3, *e4, *e5, *e6, *e7, *e8, *e9, *e10, *e11, *e12, *e13, *e14, *e15,
+                *e16, *e17, *e18, *e19, *e20, *e21, *e22, *e23, *e24, *e25, *e26, *e27, *e28, *e29,
+                *e30, *e31, *e32, *e33, *e34, *e35, *e36, *e37, *e38, *e39, *e40, *e41, *e42, *e43,
+                *e44, *e45, *e46, *e47, *e48, *e49, *e50, *e51, *e52, *e53, *e54, *e55, *e56, *e57,
+                *e58, *e59, *e60, *e61, *e62, *e63, *e64, *last,
+            ])
+        }
+        _ => Err(CryptoError::ParseError),
+    }
 }
 
 pub fn bytes_to_eth_hex_string(message: &[u8]) -> String {
