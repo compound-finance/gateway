@@ -1,0 +1,10 @@
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"author_insertKey",
+  "params": [
+    "gran",
+    "paper next author index wedding frost voice mention fetch waste march tilt",
+    "0x0fe9065f6450c5501df3efa6b13958949cb4b81a2147d68c14ad25366be1ccb4"
+  ]
+}

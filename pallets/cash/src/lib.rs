@@ -441,21 +441,19 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            debug::native::info!("Hello World from offchain workers from block {} !", block_number);
-
-            let result = Self::fetch_events_with_lock();
-            if let Err(e) = result {
-                debug::native::error!("offchain_worker error during fetch events: {:?}", e);
-            }
-            Self::process_eth_notices(block_number);
+            // let result = Self::fetch_events_with_lock();
+            // if let Err(e) = result {
+                // debug::native::error!("offchain_worker error during fetch events: {:?}", e);
+            // }
+            // Self::process_eth_notices(block_number);
             // todo: do this less often perhaps once a minute?
             // a really simple idea to do it once a minute on average is to just use probability
             // and only update the feed every now and then. It is a function of how many validators
             // are running.
-            let result = Self::process_open_price_feed(block_number);
-            if let Err(e) = result {
-                debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
-            }
+            // let result = Self::process_open_price_feed(block_number);
+            // if let Err(e) = result {
+                // debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
+            // }
         }
     }
 }
