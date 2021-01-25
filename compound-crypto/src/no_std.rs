@@ -164,7 +164,7 @@ const ETH_SIGNATURE_UNPADDED_RECOVERY_LENGTH: usize = 65;
 
 pub fn eth_signature_from_bytes(bytes: &[u8]) -> Result<SignatureBytes, CryptoError> {
     if bytes.len() != ETH_SIGNATURE_PADDED_RECOVERY_LENGTH
-        && bytes.len() != ETH_SIGNATURE_PADDED_RECOVERY_LENGTH
+        && bytes.len() != ETH_SIGNATURE_UNPADDED_RECOVERY_LENGTH
     {
         return Err(CryptoError::ParseError);
     }
@@ -207,7 +207,7 @@ mod test {
 
     #[test]
     fn test_eth_decode_hex_ascii_fails_on_unicode() {
-        let case = vec!["0💘"];
+        let cases = vec!["0💘"];
         for case in cases {
             assert!(case.len() > 2);
             assert!(eth_decode_hex_ascii(case.as_bytes()).is_err());
