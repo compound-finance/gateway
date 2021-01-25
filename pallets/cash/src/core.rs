@@ -10,7 +10,7 @@ use crate::{
     notices::Notice, // XXX move here, encoding to chains
     params::MIN_TX_VALUE,
     symbol::CASH,
-    types::{price, AssetAmount, CashAmount, ChainAccount, ChainAsset, ChainSignature},
+    types::{AssetAmount, CashAmount, ChainAccount, ChainAsset, ChainSignature},
     CashBalance,
     Config,
     Module,

@@ -198,8 +198,6 @@ fn test_post_price_invalid_signature() {
     });
 }
 
-fn get_test_keyring() {}
-
 #[test]
 fn test_post_price_invalid_reporter() {
     // an eth price message

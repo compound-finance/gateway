@@ -9,9 +9,7 @@ extern crate ethereum_client;
 extern crate trx_request;
 
 use codec::{alloc::string::String, Decode};
-use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage, dispatch, traits::Get,
-};
+use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{
     ensure_none,
     offchain::{CreateSignedTransaction, SubmitTransaction},
@@ -485,8 +483,10 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidMessage
         )?;
 
-        let symbol = Symbols::get(parsed.key.clone()).expect("xxx our pattern for expect or err?");
-        // XXX <Error<T>>::OpenOracleErrorInvalidSymbol
+        let symbol = cash_err!(
+            Symbols::get(parsed.key.clone()).ok_or(<Error<T>>::OpenOracleErrorInvalidSymbol),
+            <Error<T>>::OpenOracleErrorInvalidSymbol
+        )?;
 
         debug::native::info!(
             "Parsed price from open price feed: {:?} is worth {:?}",
