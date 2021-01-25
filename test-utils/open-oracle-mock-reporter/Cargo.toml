@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 libsecp256k1 = "0.3.2"
 rocket = "0.4.6"
-compound-crypto = { path = "../compound-crypto" }
+compound-crypto = { path = "../../compound-crypto" }
 hex = "0.4.2"
 serde = "1.0.118"
 serde_json = "1.0.61"
