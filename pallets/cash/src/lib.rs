@@ -330,7 +330,7 @@ decl_module! {
                 compound_crypto::eth_recover(&payload[..], &signature, false),
                 Error::<T>::InvalidSignature)?;
 
-            print(format!("signer: {}", hex::encode(&signer_account_bytes)).as_str());
+            print(format!("signer: {}", hex::encode(&signer[..])).as_str());
             // XXX
             // XXX require(signer == known validator); // XXX
             // Check that signer is a known validator, otherwise throw an error

@@ -120,7 +120,7 @@ impl KmsKeyring {
         let public_key_promise = self.get_public_key_async(&key_id);
         let mut requests = Vec::new();
         for message in messages {
-            let hashed = eth_keccak_for_signature(&message);
+            let hashed = eth_keccak_for_signature(&message, false);
             let request = SignRequest {
                 key_id: key_id.into(),
                 message: bytes::Bytes::copy_from_slice(&hashed),

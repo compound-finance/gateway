@@ -104,7 +104,7 @@ pub(crate) fn combine_sig_and_recovery(
 /// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
 /// This is called by web3.js https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/packages/web3-eth-accounts/package.json#L18
 fn eth_sign(message: &[u8], private_key: &SecretKey) -> SignatureBytes {
-    let hashed = eth_keccak_for_signature(message);
+    let hashed = eth_keccak_for_signature(message, false);
     // todo: there is something in this function that says "it is ok for the message to overflow.." that seems bad.
     let message = secp256k1::Message::parse(&hashed);
     let (sig, recovery) = secp256k1::sign(&message, &private_key);
@@ -255,7 +255,7 @@ mod tests {
         let private_key = eth_decode_hex_unsafe(case.private_key);
         let message: Vec<u8> = case.data.into();
         let secret_key = SecretKey::parse_slice(&private_key).unwrap();
-        let actual_sig = eth_sign(&message, &secret_key);
+        let actual_sig = eth_sign(&message, &secret_key, true);
         let expected_sig = eth_decode_hex_signature_unsafe(case.signature);
         assert_eq!(actual_sig, expected_sig);
     }
