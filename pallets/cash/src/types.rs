@@ -7,10 +7,7 @@ use crate::{
 };
 use codec::{Decode, Encode};
 use num_traits::Pow;
-use our_std::{
-    ops::{Div, Mul},
-    RuntimeDebug,
-};
+use our_std::RuntimeDebug;
 
 // Type aliases //
 
@@ -172,7 +169,7 @@ where
 /// A helper function for from_nominal on Quantity and Price
 ///
 /// only for use in const contexts
-const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
+pub(crate) const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
     let mut provided_fractional_digits = 0;

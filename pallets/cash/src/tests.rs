@@ -1,3 +1,4 @@
+use crate::rates::Utilization;
 use crate::{chains::*, core::*, mock::*, symbol::*, *};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
 use sp_core::offchain::testing;
@@ -263,7 +264,7 @@ fn test_get_utilization() {
         crate::TotalSupplyPrincipal::insert(&asset, 100);
         crate::TotalBorrowPrincipal::insert(&asset, 50);
         let utilization = CashModule::get_utilization(&asset).unwrap();
-        assert_eq!(utilization, 5000);
+        assert_eq!(utilization, Utilization::from_nominal("0.5"));
     });
 }
 
@@ -279,6 +280,6 @@ fn test_get_borrow_rate() {
         CashModule::update_interest_rate_model(Origin::none(), asset.clone(), expected_model)
             .unwrap();
         let borrow_rate = CashModule::get_borrow_rate(&asset).unwrap();
-        assert_eq!(borrow_rate, 101);
+        assert_eq!(borrow_rate, 101.into());
     });
 }
