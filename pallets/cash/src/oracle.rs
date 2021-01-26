@@ -305,7 +305,7 @@ pub mod tests {
 
         let hashed = compound_crypto::keccak(&msg);
         let recovered =
-            compound_crypto::eth_recover(&hashed, &eth_signature_from_bytes(&sig).unwrap())
+            compound_crypto::eth_recover(&hashed, &eth_signature_from_bytes(&sig).unwrap(), true)
                 .unwrap();
         assert_eq!(
             hex::encode(recovered),

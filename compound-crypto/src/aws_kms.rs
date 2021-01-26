@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(sig.len(), 65);
 
         // to verify, check that the address matches when you run recover
-        let expected_address = eth_recover(&message, &sig).unwrap();
+        let expected_address = eth_recover(&message, &sig, true).unwrap();
         let actual_public_key = keyring.get_public_key(&key_id).unwrap();
         let actual_address = crate::public_key_bytes_to_eth_address(&actual_public_key);
         assert_eq!(expected_address, actual_address, "address mismatch");

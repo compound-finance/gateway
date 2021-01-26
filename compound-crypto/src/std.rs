@@ -103,8 +103,8 @@ pub(crate) fn combine_sig_and_recovery(
 ///
 /// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
 /// This is called by web3.js https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/packages/web3-eth-accounts/package.json#L18
-fn eth_sign(message: &[u8], private_key: &SecretKey) -> SignatureBytes {
-    let hashed = eth_keccak_for_signature(message, false);
+fn eth_sign(message: &[u8], private_key: &SecretKey, prepend_preamble: bool) -> SignatureBytes {
+    let hashed = eth_keccak_for_signature(message, prepend_preamble);
     // todo: there is something in this function that says "it is ok for the message to overflow.." that seems bad.
     let message = secp256k1::Message::parse(&hashed);
     let (sig, recovery) = secp256k1::sign(&message, &private_key);
@@ -175,7 +175,7 @@ impl Keyring for InMemoryKeyring {
 
         let result = messages
             .iter()
-            .map(|message| Ok(eth_sign(message, &private_key)))
+            .map(|message| Ok(eth_sign(message, &private_key, false)))
             .collect();
 
         Ok(result)
@@ -183,7 +183,7 @@ impl Keyring for InMemoryKeyring {
 
     fn sign_one(self: &Self, message: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
         let private_key = self.get_private_key(key_id)?;
-        Ok(eth_sign(message, &private_key))
+        Ok(eth_sign(message, &private_key, false))
     }
 
     /// Get the public key associated with the given key id.
@@ -271,7 +271,7 @@ mod tests {
     fn test_eth_recover_case(case: TestCase) {
         let message: Vec<u8> = case.data.into();
         let sig = eth_decode_hex_signature_unsafe(case.signature);
-        let actual_address = eth_recover(&message, &sig).unwrap();
+        let actual_address = eth_recover(&message, &sig, true).unwrap();
         let expected_address = eth_decode_hex_address_unsafe(case.address);
         assert_eq!(actual_address, expected_address);
     }
@@ -301,8 +301,16 @@ mod tests {
 
     fn test_sign_case(case: TestCase) {
         let (key_id, keyring) = get_test_keyring_from_test_case(&case);
-        let message: Vec<u8> = case.data.into();
+        let mut message: Vec<u8> = format!(
+            "\x19Ethereum Signed Message:\n{}{}",
+            case.data.len(),
+            case.data
+        )
+        .as_bytes()
+        .into();
         let messages: Vec<&[u8]> = vec![&message];
+        // Note: we need to manually prepend here since `keyring` doesn't, itself
+        // support prepending messages
         let sigs = keyring.sign(messages, &key_id).unwrap();
         assert_eq!(sigs.len(), 1);
         let actual_sig = sigs[0].as_ref().unwrap();
