@@ -33,6 +33,11 @@ macro_rules! require_min_tx_value {
     };
 }
 
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ConversionError {
+    ConvertFromBytesToEthAddress,
+}
+
 /// Type for reporting failures for reasons outside of our control.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
@@ -157,16 +162,6 @@ pub fn extract_cash_principal_internal<T: Config, C: Chain>(
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum RecoveryError {
     RecoveryError,
-}
-
-pub fn get_signer(message: &[u8], sig: ChainSignature) -> Result<ChainAccount, RecoveryError> {
-    match sig {
-        ChainSignature::Eth(eth_sig) => {
-            let account =
-                eth::recover(message, eth_sig).map_err(|_| RecoveryError::RecoveryError)?;
-            Ok(ChainAccount::Eth(account))
-        }
-    }
 }
 
 #[cfg(test)]

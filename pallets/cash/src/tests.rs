@@ -31,6 +31,7 @@ fn it_fails_exec_trx_request_signed() {
 #[test]
 fn it_magically_extracts() {
     new_test_ext().execute_with(|| {
+        runtime_interfaces::set_validator_config_dev_defaults();
         // Dispatch a signed extrinsic.
         assert_ok!(magic_extract_internal::<Test>(
             andrew(),
@@ -52,6 +53,7 @@ fn it_magically_extracts() {
 }
 
 fn initialize_storage() {
+    runtime_interfaces::set_validator_config_dev_defaults();
     CashModule::initialize_validators(vec![
         "6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
         "8ad1b2918c34ee5d3e881a57c68574ea9dbecb81".into(), // pk: 6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d
@@ -75,7 +77,10 @@ fn process_eth_event_happy_path() {
         let event_id = (3858223, 0);
         let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
         let checked_payload = payload.clone();
-        let sig = chains::eth::sign(&payload); // Sign with our "shared" private key for now
+
+        // signing key is the default key
+        let sig = chains::eth::sign_one(&payload)
+            .unwrap();
 
         assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));
         let event_status = CashModule::eth_event_queue(event_id).unwrap();
@@ -190,7 +195,7 @@ fn test_post_price_happy_path() {
 fn test_post_price_invalid_signature() {
     // an eth price message
     let test_payload = hex::decode("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000002baa48a00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000").unwrap();
-    let test_signature = hex::decode("41a3f89a526dee766049f3699e9e975bfbabda4db677c9f5c41fbcc0730fccb84d08b2208c4ffae0b87bb162e2791cc305ee4e9a1d936f9e6154356154e9a8e900000000000000000000000000000000000000000000000000000000000000ff").unwrap();
+    let test_signature = hex::decode("41a3f89a526dee766049f3699e9e975bfbabda4db677c9f5c41fbcc0730fccb84d08b2208c4ffae0b87bb162e2791cc305ee4e9a1d936f9e6154356154e9a8e90000000000000000000000000000000000000000000000000000000000000003").unwrap();
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);

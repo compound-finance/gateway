@@ -70,6 +70,7 @@ async function initialize(opts = {}) {
     let logLevel = process.env['LOG'];
     let spawnOpts = logLevel ? { RUST_LOG: logLevel } : {};
     let extraArgs = logLevel ? [`-lruntime=${logLevel}`] : [];
+    let ethPrivateKey = "50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374";
 
     let ps = spawnValidator([
       '--chain',
@@ -86,7 +87,12 @@ async function initialize(opts = {}) {
       '--alice',
       ...extraArgs
     ], {
-      env: { ...spawnOpts, ETH_RPC_URL: `http://localhost:${web3Port}` }
+      env: {
+        ...spawnOpts,
+        ETH_RPC_URL: `http://localhost:${web3Port}`,
+        ETH_KEY: ethPrivateKey,
+        ETH_KEY_ID: "my_eth_key_id"
+      }
     });
 
     ps.on('error', (err) => {
