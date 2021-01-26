@@ -15,6 +15,16 @@
       "Value": ["AssetAmount"]
     }
   },
+  "InterestRateModel": {
+    "_enum": {
+      "Kink": {
+        "zero_rate": "APR",
+        "kink_rate": "APR",
+        "kink_utilization": "Utilization",
+        "full_rate": "APR"
+      }
+    }
+  },
   "ChainSignature": {
     "_enum": {
       "Eth": ["[u8; 65]"]
