@@ -1,9 +1,10 @@
 {
   "Source0": "TypesRS",
-  "APR": "u128",
   "Nonce": "u32",
   "Timestamp": "u128",
   "Uint": "u128",
+  "APR": ["Uint"],
+  "Utilization": ["Uint"],
   "EncodedNotice": "Vec<u8>",
   "AssetPrice": "Uint",
   "AssetAmount": "Uint",

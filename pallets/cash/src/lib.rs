@@ -35,7 +35,6 @@ use crate::core::Reason;
 use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::rates::{InterestRateModel, APR};
 use crate::symbol::Symbol;
-use crate::trx_req::*;
 use crate::types::{
     get_max_value, AssetAmount, AssetPrice, ChainAccount, ChainAsset, ChainSignature,
     ChainSignatureList, ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, MulIndex,
@@ -99,10 +98,10 @@ decl_storage! {
         /// The upcoming base rate change for CASH and when, if any.
         CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
 
-        /// The current Rate on CASH held, and the base rate paid by borrowers.
+        /// The current APR on CASH held, and the base rate paid by borrowers.
         CashYield get(fn cash_yield): APR;
 
-        /// The current Rate surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
+        /// The current APR surcharge on CASH borrowed, added to the CashYield to determine the CashCost.
         CashSpread get(fn cash_spread): APR;
 
         /// An index to track interest owed by asset borrowers.
