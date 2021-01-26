@@ -46,6 +46,7 @@ describe('magic extract and goldie unlocks', () => {
   test('magic extraction', async () => {
     let trxReq = "(magic-extract 1000 eth:0xc00e94cb662c3520282e6f5717214004a7f26888)";
     let sig = { Eth: await web3.eth.sign(trxReq, accounts[0]) };
+    let cashBalancePrior = await api.query.cash.cashBalance({ Eth: "0xc00e94cb662c3520282e6f5717214004a7f26888" });
     let call = api.tx.cash.execTrxRequest(trxReq, sig);
 
     let events = await sendAndWaitForEvents(call, false);
@@ -69,6 +70,10 @@ describe('magic extract and goldie unlocks', () => {
         }
       }
     });
+
+    let cashBalancePost = await api.query.cash.cashBalance({ Eth: "0xc00e94cb662c3520282e6f5717214004a7f26888" });
+
+    expect(cashBalancePost.unwrap() - cashBalancePrior.unwrapOr(0)).toEqual(1000);
 
     let signedNotice = findEvent(events, 'cash', 'SignedNotice');
 
