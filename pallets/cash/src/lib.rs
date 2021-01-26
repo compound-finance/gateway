@@ -465,17 +465,15 @@ impl<T: Config> Module<T> {
     /// body of this function here.
     fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
         // check signature
-        print("XXX0");
         let parsed_sig: <Ethereum as Chain>::Signature = cash_err!(
             compound_crypto::eth_signature_from_bytes(&signature),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
-        print("XXX1");
+        let hashed = compound_crypto::keccak(&payload);
         let recovered = cash_err!(
-            compound_crypto::eth_recover(&payload, &parsed_sig, true),
+            compound_crypto::eth_recover(&hashed, &parsed_sig, true),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
-        print(format!("Recovered: {}", hex::encode(&recovered[..])).as_str());
         let reporters = Reporters::get();
         if !reporters
             .iter()
