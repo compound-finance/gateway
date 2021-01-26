@@ -166,7 +166,7 @@ pub struct NewFullBase {
 
 /// Creates a full service from the configuration.
 pub fn new_full_base(
-    config: Configuration,
+    mut config: Configuration,
     with_startup_data: impl FnOnce(
         &sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
         &sc_consensus_babe::BabeLink<Block>,
@@ -185,6 +185,11 @@ pub fn new_full_base(
     } = new_partial(&config)?;
 
     let shared_voter_state = rpc_setup;
+
+    config
+        .network
+        .notifications_protocols
+        .push(sc_finality_grandpa::GRANDPA_PROTOCOL_NAME.into());
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
         sc_service::build_network(sc_service::BuildNetworkParams {
