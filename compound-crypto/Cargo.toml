@@ -19,6 +19,7 @@ rusoto_kms = { version = "0.45.0", optional = true }
 tokio = { version = "0.2", optional = true, default-features = false, features = ["tcp", "time", "rt-core", "fs"]}
 bytes = { version = "0.5.0", optional = true }
 der-parser = { version = "5.0.0", optional = true }
+our-std = { path = "../std", default-features = false }
 
 [features]
 default = ['std']
@@ -30,5 +31,6 @@ std = [
     'rusoto_kms',
     'tokio',
     'bytes',
-    'der-parser'
+    'der-parser',
+    'our-std/std'
 ]

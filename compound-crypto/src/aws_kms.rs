@@ -1,5 +1,8 @@
 use crate::std::*;
-use crate::{eth_keccak_for_signature, CryptoError, ETH_ADD_TO_V};
+use crate::{
+    eth_keccak_for_signature, tagged_public_key_slice_to_raw, tagged_public_key_to_raw,
+    CryptoError, HashedMessageBytes, PublicKeyBytes, SignatureBytes, ETH_ADD_TO_V,
+};
 use der_parser::parse_der;
 use rusoto_core::{Region, RusotoError};
 use rusoto_kms::{GetPublicKeyRequest, Kms, KmsClient, SignError, SignRequest, SignResponse};
@@ -26,16 +29,24 @@ impl Keyring for KmsKeyring {
     /// or a key alias.
     fn sign(
         self: &Self,
-        messages: Vec<Vec<u8>>,
+        messages: Vec<&[u8]>,
         key_id: &KeyId,
-    ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError> {
+    ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError> {
         self.runtime
             .borrow_mut()
             .block_on(self.sign_async(messages, key_id))
     }
 
+    fn sign_one(self: &Self, messages: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
+        // we will use the batch interface
+        self.sign(vec![messages], key_id)?
+            .drain(..)
+            .next()
+            .ok_or(CryptoError::Unknown)?
+    }
+
     /// Get the public key corresponding to the provided key ID.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError> {
         self.runtime
             .borrow_mut()
             .block_on(self.get_public_key_async(key_id))
@@ -62,7 +73,10 @@ impl KmsKeyring {
     }
 
     /// Get the public key corresponding to the key_id from KMS.
-    async fn get_public_key_async(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+    async fn get_public_key_async(
+        self: &Self,
+        key_id: &KeyId,
+    ) -> Result<PublicKeyBytes, CryptoError> {
         let request: GetPublicKeyRequest = GetPublicKeyRequest {
             key_id: key_id.clone().into(),
             ..Default::default()
@@ -92,21 +106,21 @@ impl KmsKeyring {
         }
 
         // let address = public_key_bytes_to_eth_address(actual_public_key);
-        Ok(Vec::from(&actual_public_key[1..]))
+        Ok(tagged_public_key_slice_to_raw(actual_public_key)?)
     }
 
     /// Sign the messages asynchronously. This submits multiple requests to the HSM in parallel
     /// one for each message.
     async fn sign_async(
         self: &Self,
-        messages: Vec<Vec<u8>>,
+        messages: Vec<&[u8]>,
         key_id: &KeyId,
-    ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError> {
+    ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError> {
         // launch all of the tasks
         let public_key_promise = self.get_public_key_async(&key_id);
         let mut requests = Vec::new();
         for message in messages {
-            let hashed = eth_keccak_for_signature(&message);
+            let hashed = eth_keccak_for_signature(&message, false);
             let request = SignRequest {
                 key_id: key_id.into(),
                 message: bytes::Bytes::copy_from_slice(&hashed),
@@ -140,8 +154,8 @@ impl KmsKeyring {
     fn result_to_signature(
         resolved: Result<SignResponse, RusotoError<SignError>>,
         public_key: &[u8],
-        digested: [u8; 32],
-    ) -> Result<Vec<u8>, CryptoError> {
+        digested: HashedMessageBytes,
+    ) -> Result<SignatureBytes, CryptoError> {
         // Parse the signature into something usable, lots of ways this can fail.
         let der_encoded_signature = resolved
             .map_err(|_| CryptoError::HSMError)?
@@ -171,11 +185,10 @@ impl KmsKeyring {
         }
 
         // combine signature with recovery ID so we can recover the public key of the signer later
-        let mut result = Vec::from(sig.serialize());
-        let recovery_id: u8 = recovery_id.into();
-        result.push(recovery_id + ETH_ADD_TO_V);
-
-        Ok(result)
+        Ok(combine_sig_and_recovery(
+            sig.serialize(),
+            recovery_id.serialize() + ETH_ADD_TO_V,
+        ))
     }
 }
 
@@ -206,7 +219,7 @@ mod tests {
     fn test_sign() {
         let (keyring, key_id) = get_test_setup();
         let message: Vec<u8> = "hello".into();
-        let messages: Vec<Vec<u8>> = vec![message.clone().into()];
+        let messages: Vec<&[u8]> = vec![&message];
         let message_len = messages.len();
 
         let mut result = keyring.sign(messages, &key_id).unwrap();
@@ -215,7 +228,7 @@ mod tests {
         assert_eq!(sig.len(), 65);
 
         // to verify, check that the address matches when you run recover
-        let expected_address = eth_recover(&message, &sig).unwrap();
+        let expected_address = eth_recover(&message, &sig, true).unwrap();
         let actual_public_key = keyring.get_public_key(&key_id).unwrap();
         let actual_address = crate::public_key_bytes_to_eth_address(&actual_public_key);
         assert_eq!(expected_address, actual_address, "address mismatch");

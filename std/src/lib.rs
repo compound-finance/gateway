@@ -12,6 +12,7 @@ pub use sp_std::convert;
 pub use sp_std::default;
 pub use sp_std::fmt;
 pub use sp_std::hash;
+pub use sp_std::if_std;
 pub use sp_std::iter;
 pub use sp_std::marker;
 pub use sp_std::mem;

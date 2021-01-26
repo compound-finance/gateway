@@ -1,0 +1,2425 @@
+{
+  "contracts": {
+    "contracts/Dai.sol:Dai": {
+      "abi": [
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "chainId_",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "src",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "guy",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "Approval",
+          "type": "event"
+        },
+        {
+          "anonymous": true,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "bytes4",
+              "name": "sig",
+              "type": "bytes4"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "arg1",
+              "type": "bytes32"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "arg2",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes",
+              "name": "data",
+              "type": "bytes"
+            }
+          ],
+          "name": "LogNote",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "src",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "dst",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "Transfer",
+          "type": "event"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "DOMAIN_SEPARATOR",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
+              "type": "bytes32"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "PERMIT_TYPEHASH",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
+              "type": "bytes32"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "allowance",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "approve",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "balanceOf",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "burn",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "decimals",
+          "outputs": [
+            {
+              "internalType": "uint8",
+              "name": "",
+              "type": "uint8"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "guy",
+              "type": "address"
+            }
+          ],
+          "name": "deny",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "mint",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "src",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "dst",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "move",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "name",
+          "outputs": [
+            {
+              "internalType": "string",
+              "name": "",
+              "type": "string"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "nonces",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "holder",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "spender",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "nonce",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "expiry",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "allowed",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint8",
+              "name": "v",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "r",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "s",
+              "type": "bytes32"
+            }
+          ],
+          "name": "permit",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "pull",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "push",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "guy",
+              "type": "address"
+            }
+          ],
+          "name": "rely",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "symbol",
+          "outputs": [
+            {
+              "internalType": "string",
+              "name": "",
+              "type": "string"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "totalSupply",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "dst",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "transfer",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "src",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "dst",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "transferFrom",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "version",
+          "outputs": [
+            {
+              "internalType": "string",
+              "name": "",
+              "type": "string"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "wards",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        }
+      ],
+      "bin": "608060405234801561001057600080fd5b506040516120d33803806120d38339818101604052602081101561003357600080fd5b810190808051906020019092919050505060016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550604051808061208160529139605201905060405180910390206040518060400160405280600e81526020017f44616920537461626c65636f696e000000000000000000000000000000000000815250805190602001206040518060400160405280600181526020017f3100000000000000000000000000000000000000000000000000000000000000815250805190602001208330604051602001808681526020018581526020018481526020018381526020018273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001955050505050506040516020818303038152906040528051906020012060058190555050611ee0806101a16000396000f3fe608060405234801561001057600080fd5b50600436106101425760003560e01c80637ecebe00116100b8578063a9059cbb1161007c578063a9059cbb146106b4578063b753a98c1461071a578063bb35783b14610768578063bf353dbb146107d6578063dd62ed3e1461082e578063f2d5d56b146108a657610142565b80637ecebe00146104a15780638fcbaf0c146104f957806395d89b411461059f5780639c52a7f1146106225780639dc29fac1461066657610142565b8063313ce5671161010a578063313ce567146102f25780633644e5151461031657806340c10f191461033457806354fd4d501461038257806365fae35e1461040557806370a082311461044957610142565b806306fdde0314610147578063095ea7b3146101ca57806318160ddd1461023057806323b872dd1461024e57806330adf81f146102d4575b600080fd5b61014f6108f4565b6040518080602001828103825283818151815260200191508051906020019080838360005b8381101561018f578082015181840152602081019050610174565b50505050905090810190601f1680156101bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b610216600480360360408110156101e057600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291908035906020019092919050505061092d565b604051808215151515815260200191505060405180910390f35b610238610a1f565b6040518082815260200191505060405180910390f35b6102ba6004803603606081101561026457600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050610a25565b604051808215151515815260200191505060405180910390f35b6102dc610f3a565b6040518082815260200191505060405180910390f35b6102fa610f61565b604051808260ff1660ff16815260200191505060405180910390f35b61031e610f66565b6040518082815260200191505060405180910390f35b6103806004803603604081101561034a57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050610f6c565b005b61038a611128565b6040518080602001828103825283818151815260200191508051906020019080838360005b838110156103ca5780820151818401526020810190506103af565b50505050905090810190601f1680156103f75780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6104476004803603602081101561041b57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050611161565b005b61048b6004803603602081101561045f57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919050505061128f565b6040518082815260200191505060405180910390f35b6104e3600480360360208110156104b757600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506112a7565b6040518082815260200191505060405180910390f35b61059d600480360361010081101561051057600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803573ffffffffffffffffffffffffffffffffffffffff1690602001909291908035906020019092919080359060200190929190803515159060200190929190803560ff16906020019092919080359060200190929190803590602001909291905050506112bf565b005b6105a76117fa565b6040518080602001828103825283818151815260200191508051906020019080838360005b838110156105e75780820151818401526020810190506105cc565b50505050905090810190601f1680156106145780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6106646004803603602081101561063857600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050611833565b005b6106b26004803603604081101561067c57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050611961565b005b610700600480360360408110156106ca57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050611df4565b604051808215151515815260200191505060405180910390f35b6107666004803603604081101561073057600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050611e09565b005b6107d46004803603606081101561077e57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050611e19565b005b610818600480360360208110156107ec57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050611e2a565b6040518082815260200191505060405180910390f35b6108906004803603604081101561084457600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050611e42565b6040518082815260200191505060405180910390f35b6108f2600480360360408110156108bc57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190505050611e67565b005b6040518060400160405280600e81526020017f44616920537461626c65636f696e00000000000000000000000000000000000081525081565b600081600360003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925846040518082815260200191505060405180910390a36001905092915050565b60015481565b600081600260008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541015610adc576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f4461692f696e73756666696369656e742d62616c616e6365000000000000000081525060200191505060405180910390fd5b3373ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff1614158015610bb457507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600360008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414155b15610db25781600360008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541015610cab576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601a8152602001807f4461692f696e73756666696369656e742d616c6c6f77616e636500000000000081525060200191505060405180910390fd5b610d31600360008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205483611e77565b600360008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505b610dfb600260008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205483611e77565b600260008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550610e87600260008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205483611e91565b600260008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508273ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef846040518082815260200191505060405180910390a3600190509392505050565b7fea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb60001b81565b601281565b60055481565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414611020576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4461692f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b611069600260008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205482611e91565b600260008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055506110b860015482611e91565b6001819055508173ffffffffffffffffffffffffffffffffffffffff16600073ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040518082815260200191505060405180910390a35050565b6040518060400160405280600181526020017f310000000000000000000000000000000000000000000000000000000000000081525081565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414611215576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4461692f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60016000808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b60026020528060005260406000206000915090505481565b60046020528060005260406000206000915090505481565b60006005547fea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb60001b8a8a8a8a8a604051602001808781526020018673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018481526020018381526020018215151515815260200196505050505050506040516020818303038152906040528051906020012060405160200180807f190100000000000000000000000000000000000000000000000000000000000081525060020183815260200182815260200192505050604051602081830303815290604052805190602001209050600073ffffffffffffffffffffffffffffffffffffffff168973ffffffffffffffffffffffffffffffffffffffff16141561148c576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260158152602001807f4461692f696e76616c69642d616464726573732d30000000000000000000000081525060200191505060405180910390fd5b60018185858560405160008152602001604052604051808581526020018460ff1660ff1681526020018381526020018281526020019450505050506020604051602081039080840390855afa1580156114e9573d6000803e3d6000fd5b5050506020604051035173ffffffffffffffffffffffffffffffffffffffff168973ffffffffffffffffffffffffffffffffffffffff1614611593576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4461692f696e76616c69642d7065726d6974000000000000000000000000000081525060200191505060405180910390fd5b60008614806115a25750854211155b611614576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4461692f7065726d69742d65787069726564000000000000000000000000000081525060200191505060405180910390fd5b600460008a73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008154809291906001019190505587146116d6576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260118152602001807f4461692f696e76616c69642d6e6f6e636500000000000000000000000000000081525060200191505060405180910390fd5b6000856116e4576000611706565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5b905080600360008c73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008b73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508873ffffffffffffffffffffffffffffffffffffffff168a73ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925836040518082815260200191505060405180910390a350505050505050505050565b6040518060400160405280600381526020017f444149000000000000000000000000000000000000000000000000000000000081525081565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054146118e7576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4461692f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60008060008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b80600260008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541015611a16576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260188152602001807f4461692f696e73756666696369656e742d62616c616e6365000000000000000081525060200191505060405180910390fd5b3373ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1614158015611aee57507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600360008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414155b15611cec5780600360008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541015611be5576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601a8152602001807f4461692f696e73756666696369656e742d616c6c6f77616e636500000000000081525060200191505060405180910390fd5b611c6b600360008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205482611e77565b600360008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505b611d35600260008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205482611e77565b600260008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550611d8460015482611e77565b600181905550600073ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040518082815260200191505060405180910390a35050565b6000611e01338484610a25565b905092915050565b611e14338383610a25565b505050565b611e24838383610a25565b50505050565b60006020528060005260406000206000915090505481565b6003602052816000526040600020602052806000526040600020600091509150505481565b611e72823383610a25565b505050565b6000828284039150811115611e8b57600080fd5b92915050565b6000828284019150811015611ea557600080fd5b9291505056fea265627a7a72315820e014c90ed78a166bda9f653e2c2bc9caa1c5d663b72caa96c638d345d286dfbe64736f6c634300050c0032454950373132446f6d61696e28737472696e67206e616d652c737472696e672076657273696f6e2c75696e7432353620636861696e49642c6164647265737320766572696679696e67436f6e747261637429",
+      "metadata": {
+        "version": "1",
+        "language": "Solidity",
+        "compiler": {
+          "version": "v0.5.12+commit.7709ece9"
+        },
+        "sources": {
+          "contracts/Dai.sol:Dai": {
+            "content": "// hevm: flattened sources of /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/dai.sol\r\npragma solidity =0.5.12;\r\n\r\n////// /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/lib.sol\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU General Public License for more details.\r\n\r\n// You should have received a copy of the GNU General Public License\r\n// along with this program.  If not, see <http://www.gnu.org/licenses/>.\r\n\r\n/* pragma solidity 0.5.12; */\r\n\r\ncontract LibNote {\r\n    event LogNote(\r\n        bytes4   indexed  sig,\r\n        address  indexed  usr,\r\n        bytes32  indexed  arg1,\r\n        bytes32  indexed  arg2,\r\n        bytes             data\r\n    ) anonymous;\r\n\r\n    modifier note {\r\n        _;\r\n        assembly {\r\n            // log an 'anonymous' event with a constant 6 words of calldata\r\n            // and four indexed topics: selector, caller, arg1 and arg2\r\n            let mark := msize                         // end of memory ensures zero\r\n            mstore(0x40, add(mark, 288))              // update free memory pointer\r\n            mstore(mark, 0x20)                        // bytes type data offset\r\n            mstore(add(mark, 0x20), 224)              // bytes size (padded)\r\n            calldatacopy(add(mark, 0x40), 0, 224)     // bytes payload\r\n            log4(mark, 288,                           // calldata\r\n                 shl(224, shr(224, calldataload(0))), // msg.sig\r\n                 caller,                              // msg.sender\r\n                 calldataload(4),                     // arg1\r\n                 calldataload(36)                     // arg2\r\n                )\r\n        }\r\n    }\r\n}\r\n\r\n////// /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/dai.sol\r\n// Copyright (C) 2017, 2018, 2019 dbrock, rain, mrchico\r\n\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU Affero General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n//\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU Affero General Public License for more details.\r\n//\r\n// You should have received a copy of the GNU Affero General Public License\r\n// along with this program.  If not, see <https://www.gnu.org/licenses/>.\r\n\r\n/* pragma solidity 0.5.12; */\r\n\r\n/* import \"./lib.sol\"; */\r\n\r\ncontract Dai is LibNote {\r\n    // --- Auth ---\r\n    mapping (address => uint) public wards;\r\n    function rely(address guy) external note auth { wards[guy] = 1; }\r\n    function deny(address guy) external note auth { wards[guy] = 0; }\r\n    modifier auth {\r\n        require(wards[msg.sender] == 1, \"Dai/not-authorized\");\r\n        _;\r\n    }\r\n\r\n    // --- ERC20 Data ---\r\n    string  public constant name     = \"Dai Stablecoin\";\r\n    string  public constant symbol   = \"DAI\";\r\n    string  public constant version  = \"1\";\r\n    uint8   public constant decimals = 18;\r\n    uint256 public totalSupply;\r\n\r\n    mapping (address => uint)                      public balanceOf;\r\n    mapping (address => mapping (address => uint)) public allowance;\r\n    mapping (address => uint)                      public nonces;\r\n\r\n    event Approval(address indexed src, address indexed guy, uint wad);\r\n    event Transfer(address indexed src, address indexed dst, uint wad);\r\n\r\n    // --- Math ---\r\n    function add(uint x, uint y) internal pure returns (uint z) {\r\n        require((z = x + y) >= x);\r\n    }\r\n    function sub(uint x, uint y) internal pure returns (uint z) {\r\n        require((z = x - y) <= x);\r\n    }\r\n\r\n    // --- EIP712 niceties ---\r\n    bytes32 public DOMAIN_SEPARATOR;\r\n    // bytes32 public constant PERMIT_TYPEHASH = keccak256(\"Permit(address holder,address spender,uint256 nonce,uint256 expiry,bool allowed)\");\r\n    bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;\r\n\r\n    constructor(uint256 chainId_) public {\r\n        wards[msg.sender] = 1;\r\n        DOMAIN_SEPARATOR = keccak256(abi.encode(\r\n            keccak256(\"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)\"),\r\n            keccak256(bytes(name)),\r\n            keccak256(bytes(version)),\r\n            chainId_,\r\n            address(this)\r\n        ));\r\n    }\r\n\r\n    // --- Token ---\r\n    function transfer(address dst, uint wad) external returns (bool) {\r\n        return transferFrom(msg.sender, dst, wad);\r\n    }\r\n    function transferFrom(address src, address dst, uint wad)\r\n        public returns (bool)\r\n    {\r\n        require(balanceOf[src] >= wad, \"Dai/insufficient-balance\");\r\n        if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {\r\n            require(allowance[src][msg.sender] >= wad, \"Dai/insufficient-allowance\");\r\n            allowance[src][msg.sender] = sub(allowance[src][msg.sender], wad);\r\n        }\r\n        balanceOf[src] = sub(balanceOf[src], wad);\r\n        balanceOf[dst] = add(balanceOf[dst], wad);\r\n        emit Transfer(src, dst, wad);\r\n        return true;\r\n    }\r\n    function mint(address usr, uint wad) external auth {\r\n        balanceOf[usr] = add(balanceOf[usr], wad);\r\n        totalSupply    = add(totalSupply, wad);\r\n        emit Transfer(address(0), usr, wad);\r\n    }\r\n    function burn(address usr, uint wad) external {\r\n        require(balanceOf[usr] >= wad, \"Dai/insufficient-balance\");\r\n        if (usr != msg.sender && allowance[usr][msg.sender] != uint(-1)) {\r\n            require(allowance[usr][msg.sender] >= wad, \"Dai/insufficient-allowance\");\r\n            allowance[usr][msg.sender] = sub(allowance[usr][msg.sender], wad);\r\n        }\r\n        balanceOf[usr] = sub(balanceOf[usr], wad);\r\n        totalSupply    = sub(totalSupply, wad);\r\n        emit Transfer(usr, address(0), wad);\r\n    }\r\n    function approve(address usr, uint wad) external returns (bool) {\r\n        allowance[msg.sender][usr] = wad;\r\n        emit Approval(msg.sender, usr, wad);\r\n        return true;\r\n    }\r\n\r\n    // --- Alias ---\r\n    function push(address usr, uint wad) external {\r\n        transferFrom(msg.sender, usr, wad);\r\n    }\r\n    function pull(address usr, uint wad) external {\r\n        transferFrom(usr, msg.sender, wad);\r\n    }\r\n    function move(address src, address dst, uint wad) external {\r\n        transferFrom(src, dst, wad);\r\n    }\r\n\r\n    // --- Approve by signature ---\r\n    function permit(address holder, address spender, uint256 nonce, uint256 expiry,\r\n                    bool allowed, uint8 v, bytes32 r, bytes32 s) external\r\n    {\r\n        bytes32 digest =\r\n            keccak256(abi.encodePacked(\r\n                \"\\x19\\x01\",\r\n                DOMAIN_SEPARATOR,\r\n                keccak256(abi.encode(PERMIT_TYPEHASH,\r\n                                     holder,\r\n                                     spender,\r\n                                     nonce,\r\n                                     expiry,\r\n                                     allowed))\r\n        ));\r\n\r\n        require(holder != address(0), \"Dai/invalid-address-0\");\r\n        require(holder == ecrecover(digest, v, r, s), \"Dai/invalid-permit\");\r\n        require(expiry == 0 || now <= expiry, \"Dai/permit-expired\");\r\n        require(nonce == nonces[holder]++, \"Dai/invalid-nonce\");\r\n        uint wad = allowed ? uint(-1) : 0;\r\n        allowance[holder][spender] = wad;\r\n        emit Approval(holder, spender, wad);\r\n    }\r\n}",
+            "keccak256": "0x86b76831789655bf08b9697ec769c64fc44c401fada4ba189a602c4a51cc628d"
+          }
+        },
+        "settings": {
+          "remappings": [],
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "metadata": {
+            "useLiteralContent": false
+          },
+          "compilationTarget": {
+            "contracts/Dai.sol:Dai": "Dai"
+          },
+          "libraries": {}
+        },
+        "output": {
+          "abi": [
+            {
+              "inputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "chainId_",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "constructor"
+            },
+            {
+              "anonymous": false,
+              "inputs": [
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "src",
+                  "type": "address"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "guy",
+                  "type": "address"
+                },
+                {
+                  "indexed": false,
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "Approval",
+              "type": "event"
+            },
+            {
+              "anonymous": true,
+              "inputs": [
+                {
+                  "indexed": true,
+                  "internalType": "bytes4",
+                  "name": "sig",
+                  "type": "bytes4"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "bytes32",
+                  "name": "arg1",
+                  "type": "bytes32"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "bytes32",
+                  "name": "arg2",
+                  "type": "bytes32"
+                },
+                {
+                  "indexed": false,
+                  "internalType": "bytes",
+                  "name": "data",
+                  "type": "bytes"
+                }
+              ],
+              "name": "LogNote",
+              "type": "event"
+            },
+            {
+              "anonymous": false,
+              "inputs": [
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "src",
+                  "type": "address"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "dst",
+                  "type": "address"
+                },
+                {
+                  "indexed": false,
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "Transfer",
+              "type": "event"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "DOMAIN_SEPARATOR",
+              "outputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "",
+                  "type": "bytes32"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "PERMIT_TYPEHASH",
+              "outputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "",
+                  "type": "bytes32"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                },
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "allowance",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "approve",
+              "outputs": [
+                {
+                  "internalType": "bool",
+                  "name": "",
+                  "type": "bool"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "balanceOf",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "burn",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "decimals",
+              "outputs": [
+                {
+                  "internalType": "uint8",
+                  "name": "",
+                  "type": "uint8"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "guy",
+                  "type": "address"
+                }
+              ],
+              "name": "deny",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "mint",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "src",
+                  "type": "address"
+                },
+                {
+                  "internalType": "address",
+                  "name": "dst",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "move",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "name",
+              "outputs": [
+                {
+                  "internalType": "string",
+                  "name": "",
+                  "type": "string"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "nonces",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "holder",
+                  "type": "address"
+                },
+                {
+                  "internalType": "address",
+                  "name": "spender",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "nonce",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "expiry",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "allowed",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "uint8",
+                  "name": "v",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "r",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "s",
+                  "type": "bytes32"
+                }
+              ],
+              "name": "permit",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "pull",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "push",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "guy",
+                  "type": "address"
+                }
+              ],
+              "name": "rely",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "symbol",
+              "outputs": [
+                {
+                  "internalType": "string",
+                  "name": "",
+                  "type": "string"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "totalSupply",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "dst",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "transfer",
+              "outputs": [
+                {
+                  "internalType": "bool",
+                  "name": "",
+                  "type": "bool"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "src",
+                  "type": "address"
+                },
+                {
+                  "internalType": "address",
+                  "name": "dst",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "transferFrom",
+              "outputs": [
+                {
+                  "internalType": "bool",
+                  "name": "",
+                  "type": "bool"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "version",
+              "outputs": [
+                {
+                  "internalType": "string",
+                  "name": "",
+                  "type": "string"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "wards",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            }
+          ],
+          "userdoc": [],
+          "devdoc": []
+        }
+      }
+    },
+    "contracts/Pot.sol:Pot": {
+      "abi": [
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "vat_",
+              "type": "address"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        },
+        {
+          "anonymous": true,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "bytes4",
+              "name": "sig",
+              "type": "bytes4"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "arg1",
+              "type": "bytes32"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "arg2",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes",
+              "name": "data",
+              "type": "bytes"
+            }
+          ],
+          "name": "LogNote",
+          "type": "event"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "Pie",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [],
+          "name": "cage",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "chi",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "guy",
+              "type": "address"
+            }
+          ],
+          "name": "deny",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [],
+          "name": "drip",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "tmp",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "dsr",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "exit",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "what",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "data",
+              "type": "uint256"
+            }
+          ],
+          "name": "file",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "what",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "addr",
+              "type": "address"
+            }
+          ],
+          "name": "file",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+            }
+          ],
+          "name": "join",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "live",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "pie",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "guy",
+              "type": "address"
+            }
+          ],
+          "name": "rely",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "rho",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "vat",
+          "outputs": [
+            {
+              "internalType": "contract VatLike",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "vow",
+          "outputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "wards",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        }
+      ],
+      "bin": "608060405234801561001057600080fd5b506040516115853803806115858339818101604052602081101561003357600080fd5b810190808051906020019092919050505060016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000208190555080600560006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506b033b2e3c9fd0803ce80000006003819055506b033b2e3c9fd0803ce8000000600481905550426007819055506001600881905550506114778061010e6000396000f3fe608060405234801561001057600080fd5b506004361061010b5760003560e01c806365fae35e116100a25780639c52a7f1116100715780639c52a7f1146103565780639f678cca1461039a578063bf353dbb146103b8578063c92aecc414610410578063d4e8be831461042e5761010b565b806365fae35e146102bc57806369245009146103005780637f8661a11461030a578063957aa58c146103385761010b565b80632c69ed58116100de5780632c69ed58146101ec57806336569e771461020a578063487bf08214610254578063626cb3c5146102725761010b565b8063049878f3146101105780630bebac861461013e57806320aba08b1461019657806329ae8114146101b4575b600080fd5b61013c6004803603602081101561012657600080fd5b810190808035906020019092919050505061047c565b005b6101806004803603602081101561015457600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506106c7565b6040518082815260200191505060405180910390f35b61019e6106df565b6040518082815260200191505060405180910390f35b6101ea600480360360408110156101ca57600080fd5b8101908080359060200190929190803590602001909291905050506106e5565b005b6101f4610961565b6040518082815260200191505060405180910390f35b610212610967565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b61025c61098d565b6040518082815260200191505060405180910390f35b61027a610993565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b6102fe600480360360208110156102d257600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506109b9565b005b610308610ae7565b005b6103366004803603602081101561032057600080fd5b8101908080359060200190929190505050610beb565b005b610340610dbf565b6040518082815260200191505060405180910390f35b6103986004803603602081101561036c57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610dc5565b005b6103a2610ef3565b6040518082815260200191505060405180910390f35b6103fa600480360360208110156103ce57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919050505061110e565b6040518082815260200191505060405180910390f35b610418611126565b6040518082815260200191505060405180910390f35b61047a6004803603604081101561044457600080fd5b8101908080359060200190929190803573ffffffffffffffffffffffffffffffffffffffff16906020019092919050505061112c565b005b60075442146104f3576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f506f742f72686f2d6e6f742d757064617465640000000000000000000000000081525060200191505060405180910390fd5b61053c600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054826112f3565b600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000208190555061058b600254826112f3565b600281905550600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663bb35783b33306105dd6004548661130d565b6040518463ffffffff1660e01b8152600401808473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018281526020019350505050600060405180830381600087803b15801561067957600080fd5b505af115801561068d573d6000803e3d6000fd5b505050505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b60016020528060005260406000206000915090505481565b60075481565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610799576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f506f742f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b600160085414610811576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600c8152602001807f506f742f6e6f742d6c697665000000000000000000000000000000000000000081525060200191505060405180910390fd5b6007544214610888576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f506f742f72686f2d6e6f742d757064617465640000000000000000000000000081525060200191505060405180910390fd5b7f64737200000000000000000000000000000000000000000000000000000000008214156108bc578060038190555061092a565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601b8152602001807f506f742f66696c652d756e7265636f676e697a65642d706172616d000000000081525060200191505060405180910390fd5b5961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a4505050565b60025481565b600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60035481565b600660009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610a6d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f506f742f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60016000808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610b9b576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f506f742f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60006008819055506b033b2e3c9fd0803ce80000006003819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a450565b610c34600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205482611339565b600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550610c8360025482611339565b600281905550600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663bb35783b3033610cd56004548661130d565b6040518463ffffffff1660e01b8152600401808473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018281526020019350505050600060405180830381600087803b158015610d7157600080fd5b505af1158015610d85573d6000803e3d6000fd5b505050505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b60085481565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610e79576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f506f742f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60008060008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b6000600754421015610f6d576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600f8152602001807f506f742f696e76616c69642d6e6f77000000000000000000000000000000000081525060200191505060405180910390fd5b610f95610f8d60035460075442036b033b2e3c9fd0803ce8000000611353565b600454611419565b90506000610fa582600454611339565b90508160048190555042600781905550600560009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663f24e23eb600660009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16306110236002548661130d565b6040518463ffffffff1660e01b8152600401808473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018281526020019350505050600060405180830381600087803b1580156110bf57600080fd5b505af11580156110d3573d6000803e3d6000fd5b50505050505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45090565b60006020528060005260406000206000915090505481565b60045481565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054146111e0576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f506f742f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b7f766f77000000000000000000000000000000000000000000000000000000000082141561124e5780600660006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506112bc565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601b8152602001807f506f742f66696c652d756e7265636f676e697a65642d706172616d000000000081525060200191505060405180910390fd5b5961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a4505050565b600082828401915081101561130757600080fd5b92915050565b60008082148061132a575082828385029250828161132757fe5b04145b61133357600080fd5b92915050565b600082828403915081111561134d57600080fd5b92915050565b600083600081146113f957600284066000811461137257859250611376565b8392505b50600283046002850494505b84156113f357858602868782041461139957600080fd5b818101818110156113a957600080fd5b858104975060028706156113e65787850285898204141589151516156113ce57600080fd5b838101818110156113de57600080fd5b878104965050505b5050600285049450611382565b50611411565b836000811461140b576000925061140f565b8392505b505b509392505050565b60006b033b2e3c9fd0803ce8000000611432848461130d565b8161143957fe5b0490509291505056fea265627a7a72315820b7227684b436faf1d04a5d490702801933389ea154dd9687a080634e807e7cfe64736f6c634300050c0032",
+      "metadata": {
+        "version": "1",
+        "language": "Solidity",
+        "compiler": {
+          "version": "v0.5.12+commit.7709ece9"
+        },
+        "sources": {
+          "contracts/Pot.sol:Pot": {
+            "content": "// hevm: flattened sources of /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/pot.sol\r\npragma solidity =0.5.12;\r\n\r\n////// /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/lib.sol\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU General Public License for more details.\r\n\r\n// You should have received a copy of the GNU General Public License\r\n// along with this program.  If not, see <http://www.gnu.org/licenses/>.\r\n\r\n/* pragma solidity 0.5.12; */\r\n\r\ncontract LibNote {\r\n    event LogNote(\r\n        bytes4   indexed  sig,\r\n        address  indexed  usr,\r\n        bytes32  indexed  arg1,\r\n        bytes32  indexed  arg2,\r\n        bytes             data\r\n    ) anonymous;\r\n\r\n    modifier note {\r\n        _;\r\n        assembly {\r\n            // log an 'anonymous' event with a constant 6 words of calldata\r\n            // and four indexed topics: selector, caller, arg1 and arg2\r\n            let mark := msize                         // end of memory ensures zero\r\n            mstore(0x40, add(mark, 288))              // update free memory pointer\r\n            mstore(mark, 0x20)                        // bytes type data offset\r\n            mstore(add(mark, 0x20), 224)              // bytes size (padded)\r\n            calldatacopy(add(mark, 0x40), 0, 224)     // bytes payload\r\n            log4(mark, 288,                           // calldata\r\n                 shl(224, shr(224, calldataload(0))), // msg.sig\r\n                 caller,                              // msg.sender\r\n                 calldataload(4),                     // arg1\r\n                 calldataload(36)                     // arg2\r\n                )\r\n        }\r\n    }\r\n}\r\n\r\n////// /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/pot.sol\r\n/// pot.sol -- Dai Savings Rate\r\n\r\n// Copyright (C) 2018 Rain <rainbreak@riseup.net>\r\n//\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU Affero General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n//\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU Affero General Public License for more details.\r\n//\r\n// You should have received a copy of the GNU Affero General Public License\r\n// along with this program.  If not, see <https://www.gnu.org/licenses/>.\r\n\r\n/* pragma solidity 0.5.12; */\r\n\r\n/* import \"./lib.sol\"; */\r\n\r\n/*\r\n   \"Savings Dai\" is obtained when Dai is deposited into\r\n   this contract. Each \"Savings Dai\" accrues Dai interest\r\n   at the \"Dai Savings Rate\".\r\n\r\n   This contract does not implement a user tradeable token\r\n   and is intended to be used with adapters.\r\n\r\n         --- `save` your `dai` in the `pot` ---\r\n\r\n   - `dsr`: the Dai Savings Rate\r\n   - `pie`: user balance of Savings Dai\r\n\r\n   - `join`: start saving some dai\r\n   - `exit`: remove some dai\r\n   - `drip`: perform rate collection\r\n\r\n*/\r\n\r\ncontract VatLike {\r\n    function move(address,address,uint256) external;\r\n    function suck(address,address,uint256) external;\r\n}\r\n\r\ncontract Pot is LibNote {\r\n    // --- Auth ---\r\n    mapping (address => uint) public wards;\r\n    function rely(address guy) external note auth { wards[guy] = 1; }\r\n    function deny(address guy) external note auth { wards[guy] = 0; }\r\n    modifier auth {\r\n        require(wards[msg.sender] == 1, \"Pot/not-authorized\");\r\n        _;\r\n    }\r\n\r\n    // --- Data ---\r\n    mapping (address => uint256) public pie;  // user Savings Dai\r\n\r\n    uint256 public Pie;  // total Savings Dai\r\n    uint256 public dsr;  // the Dai Savings Rate\r\n    uint256 public chi;  // the Rate Accumulator\r\n\r\n    VatLike public vat;  // CDP engine\r\n    address public vow;  // debt engine\r\n    uint256 public rho;  // time of last drip\r\n\r\n    uint256 public live;  // Access Flag\r\n\r\n    // --- Init ---\r\n    constructor(address vat_) public {\r\n        wards[msg.sender] = 1;\r\n        vat = VatLike(vat_);\r\n        dsr = ONE;\r\n        chi = ONE;\r\n        rho = now;\r\n        live = 1;\r\n    }\r\n\r\n    // --- Math ---\r\n    uint256 constant ONE = 10 ** 27;\r\n    function rpow(uint x, uint n, uint base) internal pure returns (uint z) {\r\n        assembly {\r\n            switch x case 0 {switch n case 0 {z := base} default {z := 0}}\r\n            default {\r\n                switch mod(n, 2) case 0 { z := base } default { z := x }\r\n                let half := div(base, 2)  // for rounding.\r\n                for { n := div(n, 2) } n { n := div(n,2) } {\r\n                    let xx := mul(x, x)\r\n                    if iszero(eq(div(xx, x), x)) { revert(0,0) }\r\n                    let xxRound := add(xx, half)\r\n                    if lt(xxRound, xx) { revert(0,0) }\r\n                    x := div(xxRound, base)\r\n                    if mod(n,2) {\r\n                        let zx := mul(z, x)\r\n                        if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) { revert(0,0) }\r\n                        let zxRound := add(zx, half)\r\n                        if lt(zxRound, zx) { revert(0,0) }\r\n                        z := div(zxRound, base)\r\n                    }\r\n                }\r\n            }\r\n        }\r\n    }\r\n\r\n    function rmul(uint x, uint y) internal pure returns (uint z) {\r\n        z = mul(x, y) / ONE;\r\n    }\r\n\r\n    function add(uint x, uint y) internal pure returns (uint z) {\r\n        require((z = x + y) >= x);\r\n    }\r\n\r\n    function sub(uint x, uint y) internal pure returns (uint z) {\r\n        require((z = x - y) <= x);\r\n    }\r\n\r\n    function mul(uint x, uint y) internal pure returns (uint z) {\r\n        require(y == 0 || (z = x * y) / y == x);\r\n    }\r\n\r\n    // --- Administration ---\r\n    function file(bytes32 what, uint256 data) external note auth {\r\n        require(live == 1, \"Pot/not-live\");\r\n        require(now == rho, \"Pot/rho-not-updated\");\r\n        if (what == \"dsr\") dsr = data;\r\n        else revert(\"Pot/file-unrecognized-param\");\r\n    }\r\n\r\n    function file(bytes32 what, address addr) external note auth {\r\n        if (what == \"vow\") vow = addr;\r\n        else revert(\"Pot/file-unrecognized-param\");\r\n    }\r\n\r\n    function cage() external note auth {\r\n        live = 0;\r\n        dsr = ONE;\r\n    }\r\n\r\n    // --- Savings Rate Accumulation ---\r\n    function drip() external note returns (uint tmp) {\r\n        require(now >= rho, \"Pot/invalid-now\");\r\n        tmp = rmul(rpow(dsr, now - rho, ONE), chi);\r\n        uint chi_ = sub(tmp, chi);\r\n        chi = tmp;\r\n        rho = now;\r\n        vat.suck(address(vow), address(this), mul(Pie, chi_));\r\n    }\r\n\r\n    // --- Savings Dai Management ---\r\n    function join(uint wad) external note {\r\n        require(now == rho, \"Pot/rho-not-updated\");\r\n        pie[msg.sender] = add(pie[msg.sender], wad);\r\n        Pie             = add(Pie,             wad);\r\n        vat.move(msg.sender, address(this), mul(chi, wad));\r\n    }\r\n\r\n    function exit(uint wad) external note {\r\n        pie[msg.sender] = sub(pie[msg.sender], wad);\r\n        Pie             = sub(Pie,             wad);\r\n        vat.move(address(this), msg.sender, mul(chi, wad));\r\n    }\r\n}",
+            "keccak256": "0x5b2cd484c46479ae995b8752ee42ad309661273654e86cb72f44683dc4e28f87"
+          }
+        },
+        "settings": {
+          "remappings": [],
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "metadata": {
+            "useLiteralContent": false
+          },
+          "compilationTarget": {
+            "contracts/Pot.sol:Pot": "Pot"
+          },
+          "libraries": {}
+        },
+        "output": {
+          "abi": [
+            {
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "vat_",
+                  "type": "address"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "constructor"
+            },
+            {
+              "anonymous": true,
+              "inputs": [
+                {
+                  "indexed": true,
+                  "internalType": "bytes4",
+                  "name": "sig",
+                  "type": "bytes4"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "bytes32",
+                  "name": "arg1",
+                  "type": "bytes32"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "bytes32",
+                  "name": "arg2",
+                  "type": "bytes32"
+                },
+                {
+                  "indexed": false,
+                  "internalType": "bytes",
+                  "name": "data",
+                  "type": "bytes"
+                }
+              ],
+              "name": "LogNote",
+              "type": "event"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "Pie",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [],
+              "name": "cage",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "chi",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "guy",
+                  "type": "address"
+                }
+              ],
+              "name": "deny",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [],
+              "name": "drip",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "tmp",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "dsr",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "exit",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "what",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "data",
+                  "type": "uint256"
+                }
+              ],
+              "name": "file",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "what",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "address",
+                  "name": "addr",
+                  "type": "address"
+                }
+              ],
+              "name": "file",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "wad",
+                  "type": "uint256"
+                }
+              ],
+              "name": "join",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "live",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "pie",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "guy",
+                  "type": "address"
+                }
+              ],
+              "name": "rely",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "rho",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "vat",
+              "outputs": [
+                {
+                  "internalType": "contract VatLike",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "vow",
+              "outputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "wards",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            }
+          ],
+          "userdoc": [],
+          "devdoc": []
+        }
+      }
+    },
+    "contracts/Jug.sol:Jug": {
+      "abi": [
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "vat_",
+              "type": "address"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        },
+        {
+          "anonymous": true,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "bytes4",
+              "name": "sig",
+              "type": "bytes4"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "arg1",
+              "type": "bytes32"
+            },
+            {
+              "indexed": true,
+              "internalType": "bytes32",
+              "name": "arg2",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes",
+              "name": "data",
+              "type": "bytes"
+            }
+          ],
+          "name": "LogNote",
+          "type": "event"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "base",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            }
+          ],
+          "name": "deny",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "ilk",
+              "type": "bytes32"
+            }
+          ],
+          "name": "drip",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "rate",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "ilk",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "what",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "data",
+              "type": "uint256"
+            }
+          ],
+          "name": "file",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "what",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "data",
+              "type": "uint256"
+            }
+          ],
+          "name": "file",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "what",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "data",
+              "type": "address"
+            }
+          ],
+          "name": "file",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
+              "type": "bytes32"
+            }
+          ],
+          "name": "ilks",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "duty",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rho",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "bytes32",
+              "name": "ilk",
+              "type": "bytes32"
+            }
+          ],
+          "name": "init",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": false,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "usr",
+              "type": "address"
+            }
+          ],
+          "name": "rely",
+          "outputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "vat",
+          "outputs": [
+            {
+              "internalType": "contract VatLike",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "vow",
+          "outputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "constant": true,
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "wards",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        }
+      ],
+      "bin": "608060405234801561001057600080fd5b5060405161131b38038061131b8339818101604052602081101561003357600080fd5b810190808051906020019092919050505060016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000208190555080600260006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050611242806100d96000396000f3fe608060405234801561001057600080fd5b50600436106100b45760003560e01c8063626cb3c511610071578063626cb3c51461020b57806365fae35e146102555780639c52a7f114610299578063bf353dbb146102dd578063d4e8be8314610335578063d9638d3614610383576100b4565b80631a0b287e146100b957806329ae8114146100fb57806336569e77146101335780633b6631951461017d57806344e2a5a8146101ab5780635001f3b5146101ed575b600080fd5b6100f9600480360360608110156100cf57600080fd5b810190808035906020019092919080359060200190929190803590602001909291905050506103cc565b005b6101316004803603604081101561011157600080fd5b8101908080359060200190929190803590602001909291905050506105f9565b005b61013b610786565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b6101a96004803603602081101561019357600080fd5b81019080803590602001909291905050506107ac565b005b6101d7600480360360208110156101c157600080fd5b8101908080359060200190929190505050610946565b6040518082815260200191505060405180910390f35b6101f5610c35565b6040518082815260200191505060405180910390f35b610213610c3b565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b6102976004803603602081101561026b57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610c61565b005b6102db600480360360208110156102af57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610d8f565b005b61031f600480360360208110156102f357600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610ebd565b6040518082815260200191505060405180910390f35b6103816004803603604081101561034b57600080fd5b8101908080359060200190929190803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610ed5565b005b6103af6004803603602081101561039957600080fd5b810190808035906020019092919050505061109c565b604051808381526020018281526020019250505060405180910390f35b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610480576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4a75672f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b6001600084815260200190815260200160002060010154421461050b576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260138152602001807f4a75672f72686f2d6e6f742d757064617465640000000000000000000000000081525060200191505060405180910390fd5b7f6475747900000000000000000000000000000000000000000000000000000000821415610553578060016000858152602001908152602001600020600001819055506105c1565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601b8152602001807f4a75672f66696c652d756e7265636f676e697a65642d706172616d000000000081525060200191505060405180910390fd5b5961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a450505050565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054146106ad576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4a75672f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b7f62617365000000000000000000000000000000000000000000000000000000008214156106e1578060048190555061074f565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601b8152602001807f4a75672f66696c652d756e7265636f676e697a65642d706172616d000000000081525060200191505060405180910390fd5b5961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a4505050565b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610860576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4a75672f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b600060016000838152602001908152602001600020905060008160000154146108f1576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260148152602001807f4a75672f696c6b2d616c72656164792d696e697400000000000000000000000081525060200191505060405180910390fd5b6b033b2e3c9fd0803ce80000008160000181905550428160010181905550505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b600060016000838152602001908152602001600020600101544210156109d4576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600f8152602001807f4a75672f696e76616c69642d6e6f77000000000000000000000000000000000081525060200191505060405180910390fd5b6000600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663d9638d36846040518263ffffffff1660e01b8152600401808281526020019150506040805180830381600087803b158015610a4a57600080fd5b505af1158015610a5e573d6000803e3d6000fd5b505050506040513d6040811015610a7457600080fd5b810190808051906020019092919080519060200190929190505050915050610aeb610ae5610aba60045460016000888152602001908152602001600020600001546110c0565b600160008781526020019081526020016000206001015442036b033b2e3c9fd0803ce80000006110da565b826111a0565b9150600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663b65337df84600360009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16610b5986866111e5565b6040518463ffffffff1660e01b8152600401808481526020018373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020018281526020019350505050600060405180830381600087803b158015610bc957600080fd5b505af1158015610bdd573d6000803e3d6000fd5b50505050426001600085815260200190815260200160002060010181905550505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a450919050565b60045481565b600360009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610d15576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4a75672f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60016000808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610e43576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4a75672f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b60008060008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a45050565b60006020528060005260406000206000915090505481565b60016000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205414610f89576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260128152602001807f4a75672f6e6f742d617574686f72697a6564000000000000000000000000000081525060200191505060405180910390fd5b7f766f770000000000000000000000000000000000000000000000000000000000821415610ff75780600360006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550611065565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601b8152602001807f4a75672f66696c652d756e7265636f676e697a65642d706172616d000000000081525060200191505060405180910390fd5b5961012081016040526020815260e0602082015260e0600060408301376024356004353360003560e01c60e01b61012085a4505050565b60016020528060005260406000206000915090508060000154908060010154905082565b60008183019050828110156110d457600080fd5b92915050565b600083600081146111805760028406600081146110f9578592506110fd565b8392505b50600283046002850494505b841561117a57858602868782041461112057600080fd5b8181018181101561113057600080fd5b8581049750600287061561116d57878502858982041415891515161561115557600080fd5b8381018181101561116557600080fd5b878104965050505b5050600285049450611109565b50611198565b83600081146111925760009250611196565b8392505b505b509392505050565b6000818302905060008214806111be5750828282816111bb57fe5b04145b6111c757600080fd5b6b033b2e3c9fd0803ce800000081816111dc57fe5b04905092915050565b60008183039050600083121580156111fe575060008212155b61120757600080fd5b9291505056fea265627a7a723158200023af420b223083e8aa3b6129e507ee5857930c353ee3c36cfefa6198a2a6b864736f6c634300050c0032",
+      "metadata": {
+        "version": "1",
+        "language": "Solidity",
+        "compiler": {
+          "version": "v0.5.12+commit.7709ece9"
+        },
+        "sources": {
+          "contracts/Jug.sol:Jug": {
+            "content": "// hevm: flattened sources of /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/jug.sol\r\npragma solidity =0.5.12;\r\n\r\n////// /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/lib.sol\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU General Public License for more details.\r\n\r\n// You should have received a copy of the GNU General Public License\r\n// along with this program.  If not, see <http://www.gnu.org/licenses/>.\r\n\r\n/* pragma solidity 0.5.12; */\r\n\r\ncontract LibNote {\r\n    event LogNote(\r\n        bytes4   indexed  sig,\r\n        address  indexed  usr,\r\n        bytes32  indexed  arg1,\r\n        bytes32  indexed  arg2,\r\n        bytes             data\r\n    ) anonymous;\r\n\r\n    modifier note {\r\n        _;\r\n        assembly {\r\n            // log an 'anonymous' event with a constant 6 words of calldata\r\n            // and four indexed topics: selector, caller, arg1 and arg2\r\n            let mark := msize                         // end of memory ensures zero\r\n            mstore(0x40, add(mark, 288))              // update free memory pointer\r\n            mstore(mark, 0x20)                        // bytes type data offset\r\n            mstore(add(mark, 0x20), 224)              // bytes size (padded)\r\n            calldatacopy(add(mark, 0x40), 0, 224)     // bytes payload\r\n            log4(mark, 288,                           // calldata\r\n                 shl(224, shr(224, calldataload(0))), // msg.sig\r\n                 caller,                              // msg.sender\r\n                 calldataload(4),                     // arg1\r\n                 calldataload(36)                     // arg2\r\n                )\r\n        }\r\n    }\r\n}\r\n\r\n////// /nix/store/8xb41r4qd0cjb63wcrxf1qmfg88p0961-dss-6fd7de0/src/jug.sol\r\n/* pragma solidity 0.5.12; */\r\n\r\n/* import \"./lib.sol\"; */\r\n\r\ncontract VatLike {\r\n    function ilks(bytes32) external returns (\r\n        uint256 Art,   // wad\r\n        uint256 rate   // ray\r\n    );\r\n    function fold(bytes32,address,int) external;\r\n}\r\n\r\ncontract Jug is LibNote {\r\n    // --- Auth ---\r\n    mapping (address => uint) public wards;\r\n    function rely(address usr) external note auth { wards[usr] = 1; }\r\n    function deny(address usr) external note auth { wards[usr] = 0; }\r\n    modifier auth {\r\n        require(wards[msg.sender] == 1, \"Jug/not-authorized\");\r\n        _;\r\n    }\r\n\r\n    // --- Data ---\r\n    struct Ilk {\r\n        uint256 duty;\r\n        uint256  rho;\r\n    }\r\n\r\n    mapping (bytes32 => Ilk) public ilks;\r\n    VatLike                  public vat;\r\n    address                  public vow;\r\n    uint256                  public base;\r\n\r\n    // --- Init ---\r\n    constructor(address vat_) public {\r\n        wards[msg.sender] = 1;\r\n        vat = VatLike(vat_);\r\n    }\r\n\r\n    // --- Math ---\r\n    function rpow(uint x, uint n, uint b) internal pure returns (uint z) {\r\n      assembly {\r\n        switch x case 0 {switch n case 0 {z := b} default {z := 0}}\r\n        default {\r\n          switch mod(n, 2) case 0 { z := b } default { z := x }\r\n          let half := div(b, 2)  // for rounding.\r\n          for { n := div(n, 2) } n { n := div(n,2) } {\r\n            let xx := mul(x, x)\r\n            if iszero(eq(div(xx, x), x)) { revert(0,0) }\r\n            let xxRound := add(xx, half)\r\n            if lt(xxRound, xx) { revert(0,0) }\r\n            x := div(xxRound, b)\r\n            if mod(n,2) {\r\n              let zx := mul(z, x)\r\n              if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) { revert(0,0) }\r\n              let zxRound := add(zx, half)\r\n              if lt(zxRound, zx) { revert(0,0) }\r\n              z := div(zxRound, b)\r\n            }\r\n          }\r\n        }\r\n      }\r\n    }\r\n    uint256 constant ONE = 10 ** 27;\r\n    function add(uint x, uint y) internal pure returns (uint z) {\r\n        z = x + y;\r\n        require(z >= x);\r\n    }\r\n    function diff(uint x, uint y) internal pure returns (int z) {\r\n        z = int(x) - int(y);\r\n        require(int(x) >= 0 && int(y) >= 0);\r\n    }\r\n    function rmul(uint x, uint y) internal pure returns (uint z) {\r\n        z = x * y;\r\n        require(y == 0 || z / y == x);\r\n        z = z / ONE;\r\n    }\r\n\r\n    // --- Administration ---\r\n    function init(bytes32 ilk) external note auth {\r\n        Ilk storage i = ilks[ilk];\r\n        require(i.duty == 0, \"Jug/ilk-already-init\");\r\n        i.duty = ONE;\r\n        i.rho  = now;\r\n    }\r\n    function file(bytes32 ilk, bytes32 what, uint data) external note auth {\r\n        require(now == ilks[ilk].rho, \"Jug/rho-not-updated\");\r\n        if (what == \"duty\") ilks[ilk].duty = data;\r\n        else revert(\"Jug/file-unrecognized-param\");\r\n    }\r\n    function file(bytes32 what, uint data) external note auth {\r\n        if (what == \"base\") base = data;\r\n        else revert(\"Jug/file-unrecognized-param\");\r\n    }\r\n    function file(bytes32 what, address data) external note auth {\r\n        if (what == \"vow\") vow = data;\r\n        else revert(\"Jug/file-unrecognized-param\");\r\n    }\r\n\r\n    // --- Stability Fee Collection ---\r\n    function drip(bytes32 ilk) external note returns (uint rate) {\r\n        require(now >= ilks[ilk].rho, \"Jug/invalid-now\");\r\n        (, uint prev) = vat.ilks(ilk);\r\n        rate = rmul(rpow(add(base, ilks[ilk].duty), now - ilks[ilk].rho, ONE), prev);\r\n        vat.fold(ilk, vow, diff(rate, prev));\r\n        ilks[ilk].rho = now;\r\n    }\r\n}",
+            "keccak256": "0xd048c81b2d6bc25393d98e5c64386afc2283168a69d9fdcd88f864b9b50a9bc2"
+          }
+        },
+        "settings": {
+          "remappings": [],
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "metadata": {
+            "useLiteralContent": false
+          },
+          "compilationTarget": {
+            "contracts/Jug.sol:Jug": "Jug"
+          },
+          "libraries": {}
+        },
+        "output": {
+          "abi": [
+            {
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "vat_",
+                  "type": "address"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "constructor"
+            },
+            {
+              "anonymous": true,
+              "inputs": [
+                {
+                  "indexed": true,
+                  "internalType": "bytes4",
+                  "name": "sig",
+                  "type": "bytes4"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "bytes32",
+                  "name": "arg1",
+                  "type": "bytes32"
+                },
+                {
+                  "indexed": true,
+                  "internalType": "bytes32",
+                  "name": "arg2",
+                  "type": "bytes32"
+                },
+                {
+                  "indexed": false,
+                  "internalType": "bytes",
+                  "name": "data",
+                  "type": "bytes"
+                }
+              ],
+              "name": "LogNote",
+              "type": "event"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "base",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                }
+              ],
+              "name": "deny",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "ilk",
+                  "type": "bytes32"
+                }
+              ],
+              "name": "drip",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "rate",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "ilk",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "what",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "data",
+                  "type": "uint256"
+                }
+              ],
+              "name": "file",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "what",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "data",
+                  "type": "uint256"
+                }
+              ],
+              "name": "file",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "what",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "address",
+                  "name": "data",
+                  "type": "address"
+                }
+              ],
+              "name": "file",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "",
+                  "type": "bytes32"
+                }
+              ],
+              "name": "ilks",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "duty",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "rho",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "bytes32",
+                  "name": "ilk",
+                  "type": "bytes32"
+                }
+              ],
+              "name": "init",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": false,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "usr",
+                  "type": "address"
+                }
+              ],
+              "name": "rely",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "vat",
+              "outputs": [
+                {
+                  "internalType": "contract VatLike",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [],
+              "name": "vow",
+              "outputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            },
+            {
+              "constant": true,
+              "inputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "name": "wards",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+            }
+          ],
+          "userdoc": [],
+          "devdoc": []
+        }
+      }
+    }
+  },
+  "version": "v0.5.12+commit.7709ece9"
+}

@@ -17,7 +17,7 @@ function waitForEvent(api, pallet, method, onFinalize = true) {
   });
 }
 
-function sendAndWaitForEvents(call, onFinalize = true) {
+function sendAndWaitForEvents(call, api, onFinalize = true) {
   return new Promise((resolve, reject) => {
     let unsub;
     let id = trxId++;
@@ -28,17 +28,44 @@ function sendAndWaitForEvents(call, onFinalize = true) {
     call.send(({ events = [], status }) => {
       debugMsg(`Current status is ${status}`);
 
+      let doResolve = (events) => {
+        unsub(); // Note: unsub isn't apparently working, but we _are_ calling it
+
+        let failures = events
+          .filter(({ event }) =>
+            api.events.system.ExtrinsicFailed.is(event)
+          )
+          // we know that data for system.ExtrinsicFailed is
+          // (DispatchError, DispatchInfo)
+          .map(({ event: { data: [error, info] } }) => {
+            if (error.isModule) {
+              // for module errors, we have the section indexed, lookup
+              const decoded = api.registry.findMetaError(error.asModule);
+              const { documentation, method, section } = decoded;
+
+              return new Error(`DispatchError: ${section}.${method}: ${documentation.join(' ')}`);
+            } else {
+              // Other, CannotLookup, BadOrigin, no extra info
+              return new Error(`DispatchError: ${error.toString()}`);
+            }
+          });
+
+        if (failures.length > 0) {
+          reject(failures[0]);
+        } else {
+          resolve(events);
+        }
+      };
+
       if (status.isInBlock) {
         debugMsg(`Transaction included at blockHash ${status.asInBlock}`);
         if (!onFinalize) {
-          unsub(); // Note: unsub isn't apparently working, but we _are_ calling it
-          resolve(events);
+          doResolve(events);
         }
       } else if (status.isFinalized) {
         debugMsg(`Transaction finalized at blockHash ${status.asFinalized}`);
         if (onFinalize) {
-          unsub();
-          resolve(events);
+          doResolve(events);
         }
       } else if (status.isInvalid) {
         reject("Transaction failed (Invalid)");

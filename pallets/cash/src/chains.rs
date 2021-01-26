@@ -124,10 +124,10 @@ pub mod eth {
 
     use super::{Chain, Ethereum};
     use codec::{Decode, Encode};
+    use compound_crypto::CryptoError;
+    use our_std::convert::TryInto;
     use our_std::RuntimeDebug;
     use tiny_keccak::Hasher;
-
-    use crate::sig;
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub enum RecoveryError {
@@ -186,42 +186,28 @@ pub mod eth {
         address
     }
 
-    pub fn prepend_eth_signing_msg(message: &[u8]) -> Vec<u8> {
-        let initial: Vec<u8> = b"\x19Ethereum Signed Message:\n".to_vec();
-        let length: Vec<u8> = message.len().to_string().as_bytes().to_vec();
-        let full_message: Vec<u8> = [initial, length, message.to_vec()].concat();
+    /// Sign messages for the ethereum network
+    pub fn sign(
+        messages: Vec<&[u8]>,
+    ) -> Result<Vec<Result<<Ethereum as Chain>::Signature, CryptoError>>, CryptoError> {
+        // TODO: match by chain for signing algorithm or implement as trait
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(CryptoError::KeyNotFound)?;
+        // need to materialize this to pass over runtime interface boundary
+        let messages: Vec<Vec<u8>> = messages
+            .iter()
+            .map(|e| e.iter().map(|f| *f).collect())
+            .collect();
 
-        full_message
+        runtime_interfaces::keyring_interface::sign(messages, eth_key_id)
     }
 
-    // TODO: match by chain for signing algorithm or implement as trait
-    pub fn sign(message: &[u8]) -> <Ethereum as Chain>::Signature {
-        // TODO: get this from somewhere else
-        let not_so_secret: [u8; 32] =
-            hex_literal::hex!["50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374"];
-        let private_key = secp256k1::SecretKey::parse(&not_so_secret).unwrap();
-        let msg = secp256k1::Message::parse(&digest(&message));
-        let x = secp256k1::sign(&msg, &private_key);
-
-        let mut r: [u8; 65] = [0; 65];
-        r[0..64].copy_from_slice(&x.0.serialize()[..]);
-        r[64] = x.1.serialize() + 27; // TODO: 27 (Handle EIP-155)
-        r
-    }
-
-    // TODO: Test this
-    pub fn recover(
-        message: &[u8],
-        signature: <Ethereum as Chain>::Signature,
-    ) -> Result<<Ethereum as Chain>::Address, RecoveryError> {
-        let msg_digest = digest(message);
-
-        let (rs, recovery_id, _chain_id) = sig::secp256k1_split_recovery_id(&signature)
-            .map_err(|_| RecoveryError::SignatureRecoveryError)?;
-
-        let pk = sig::secp256k1_recover(&msg_digest, &rs, recovery_id)
-            .map_err(|_| RecoveryError::SignatureRecoveryError)?;
-        Ok(address_from_public_key(pk))
+    /// Sign messages for the ethereum network
+    pub fn sign_one(message: &[u8]) -> Result<<Ethereum as Chain>::Signature, CryptoError> {
+        let message = Vec::from(message);
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(CryptoError::KeyNotFound)?;
+        runtime_interfaces::keyring_interface::sign_one(message, eth_key_id)
     }
 }
 

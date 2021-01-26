@@ -9,6 +9,7 @@ members = [
     'runtime',
     'std',
     'compound-crypto',
-    'open-oracle-mock-reporter',
+    'ethereum-client',
+    'test-utils/open-oracle-mock-reporter',
     'trx-request'
 ]

@@ -31,7 +31,6 @@ use sp_runtime::{
 };
 
 use crate::chains::{Chain, ChainId, Ethereum};
-use crate::core::get_signer;
 use crate::core::Reason;
 use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::rates::{InterestRateModel, APR};
@@ -52,8 +51,8 @@ mod notices;
 mod oracle;
 mod params;
 mod rates;
-mod sig;
 mod symbol;
+mod testdata;
 mod trx_req;
 mod types;
 
@@ -296,6 +295,7 @@ macro_rules! r#cash_err {
         match $expr {
             core::result::Result::Ok(val) => Ok(val),
             core::result::Result::Err(err) => {
+                print(format!("Error {:#?}", err).as_str());
                 debug::native::error!("Error {:#?}", err);
                 Err($new_err)
             }
@@ -340,12 +340,19 @@ decl_module! {
             let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
             print(request_str);
             // // TODO: Add more error information here
-            let sender = cash_err!(get_signer(&chains::eth::prepend_eth_signing_msg(&request), signature), Error::<T>::InvalidSignature)?;
+            let sender = match signature {
+                ChainSignature::Eth(eth_sig) =>
+                    ChainAccount::Eth(cash_err!(compound_crypto::eth_recover(&request, &eth_sig, true), Error::<T>::InvalidSignature)?)
+            };
+            match sender {
+                ChainAccount::Eth(s) =>
+                    print(format!("eth sender: {}", hex::encode(s)).as_str())
+            }
             let trx_request = trx_request::parse_request(request_str).map_err(|_| <Error<T>>::TrxRequestParseError)?;
 
             match trx_request {
-                trx_request::TrxRequest::MagicExtract(amount, account) =>{
-                    magic_extract_internal::<T>(sender, account.into(), amount.into()).map_err(|r| Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
+                trx_request::TrxRequest::MagicExtract(amount, account) => {
+                    cash_err!(magic_extract_internal::<T>(sender, account.into(), amount.into()), Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
                     Ok(())
                 }
             }
@@ -358,11 +365,11 @@ decl_module! {
 
             // XXX do we want to store/check hash to allow replaying?
             // TODO: use more generic function?
-            let signer = cash_err!(
-                chains::eth::recover(&payload[..], signature),
+            let signer: crate::types::ValidatorKey = cash_err!(
+                compound_crypto::eth_recover(&payload[..], &signature, false),
                 Error::<T>::InvalidSignature)?;
 
-            print(format!("signer: {}", hex::encode(&signer)).as_str());
+            print(format!("signer: {}", hex::encode(&signer[..])).as_str());
             // XXX
             // XXX require(signer == known validator); // XXX
             // Check that signer is a known validator, otherwise throw an error
@@ -538,11 +545,15 @@ impl<T: Config> Module<T> {
     /// body of this function here.
     fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
         // check signature
+        let parsed_sig: <Ethereum as Chain>::Signature = cash_err!(
+            compound_crypto::eth_signature_from_bytes(&signature),
+            <Error<T>>::OpenOracleErrorInvalidSignature
+        )?;
         // note that this is actually a double-hash situation but that is expected behavior
         // the hashed message is hashed again in the eth convention inside eth_recover
         let hashed = compound_crypto::keccak(&payload);
         let recovered = cash_err!(
-            compound_crypto::eth_recover(&hashed, &signature),
+            compound_crypto::eth_recover(&hashed, &parsed_sig, true),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
         let reporters = Reporters::get();
@@ -852,7 +863,8 @@ impl<T: Config> Module<T> {
             // XXX
             let payload =
                 events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let signature = chains::eth::sign(&payload);
+            let signature =
+                chains::eth::sign_one(&payload).map_err(|_| <Error<T>>::HttpFetchingError)?;
             let call = Call::process_eth_event(payload, signature);
 
             // XXX Unsigned tx for now
@@ -951,7 +963,10 @@ pub fn magic_extract_internal<T: Config>(
     );
 
     let encoded_notice = notice.encode_ethereum_notice();
-    let signature = chains::eth::sign(&encoded_notice[..]);
+    let signature = cash_err!(
+        chains::eth::sign_one(&encoded_notice),
+        Error::<T>::InvalidSignature
+    )?;
 
     // Emit an event or two.
     <Module<T>>::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
