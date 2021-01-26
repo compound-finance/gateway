@@ -923,6 +923,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "libsecp256k1",
+ "our-std",
  "parity-scale-codec",
  "rusoto_core",
  "rusoto_kms",
