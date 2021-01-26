@@ -166,7 +166,7 @@ pub mod tests {
                 method: "POST".into(),
                 uri: String::from_utf8(given_eth_rpc_url.clone()).unwrap(),
                 body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
-                response: Some(testdata::BLOCK_NUMBER_RESPONSE.to_vec()),
+                response: Some(testdata::json_responses::BLOCK_NUMBER_RESPONSE.to_vec()),
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                 sent: true,
                 ..Default::default()
@@ -186,7 +186,7 @@ pub mod tests {
     #[test]
     fn test_fetch_events_with_3_events() {
         let calls: Vec<testing::PendingRequest> =
-            get_mockup_http_calls(testdata::EVENTS_RESPONSE.to_vec());
+            get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
 
         new_test_ext_with_http_calls(calls).execute_with(|| {
             let events_candidate = events::fetch_events("earliest".to_string());
@@ -215,7 +215,7 @@ pub mod tests {
     #[test]
     fn test_fetch_events_with_no_events() {
         let calls: Vec<testing::PendingRequest> =
-            get_mockup_http_calls(testdata::NO_EVENTS_RESPONSE.to_vec());
+            get_mockup_http_calls(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
 
         new_test_ext_with_http_calls(calls).execute_with(|| {
             let events_candidate = events::fetch_events("earliest".to_string());
