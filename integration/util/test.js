@@ -11,10 +11,10 @@ const { Keyring } = require('@polkadot/api');
 
 async function initialize(opts = {}) {
   try {
-    let ganacheServer = ganache.server();
+    let ganacheServer = ganache.server(opts.ganacheServer);
     let provider = ganacheServer.provider;
 
-    let web3Port = genPort();
+    let web3Port = opts.web3Port || genPort();
 
     // Start web3 server
     log(`Starting Ethereum server on ${web3Port}...`);
@@ -63,9 +63,9 @@ async function initialize(opts = {}) {
       throw e;
     }
 
-    let rpcPort = genPort();
-    let p2pPort = genPort();
-    let wsPort = genPort();
+    let rpcPort = opts.rpcPort || genPort();
+    let p2pPort = opts.p2pPort || genPort();
+    let wsPort = opts.wsPort || genPort();
 
     let logLevel = process.env['LOG'];
     let spawnOpts = logLevel ? { RUST_LOG: logLevel } : {};
