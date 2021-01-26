@@ -48,7 +48,8 @@ describe('magic extract and goldie unlocks', () => {
     let sig = { Eth: await web3.eth.sign(trxReq, accounts[0]) };
     let call = api.tx.cash.execTrxRequest(trxReq, sig);
 
-    let events = await sendAndWaitForEvents(call, false);
+    let events = await sendAndWaitForEvents(call, api, false);
+
     let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
 
     expect(magicExtractEvent).toBeDefined();

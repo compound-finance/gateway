@@ -270,6 +270,7 @@ macro_rules! r#cash_err {
         match $expr {
             core::result::Result::Ok(val) => Ok(val),
             core::result::Result::Err(err) => {
+                print(format!("Error {:#?}", err).as_str());
                 debug::native::error!("Error {:#?}", err);
                 Err($new_err)
             }
@@ -310,11 +311,15 @@ decl_module! {
                 ChainSignature::Eth(eth_sig) =>
                     ChainAccount::Eth(cash_err!(compound_crypto::eth_recover(&request, &eth_sig, true), Error::<T>::InvalidSignature)?)
             };
+            match sender {
+                ChainAccount::Eth(s) =>
+                    print(format!("eth sender: {}", hex::encode(s)).as_str())
+            }
             let trx_request = trx_request::parse_request(request_str).map_err(|_| <Error<T>>::TrxRequestParseError)?;
 
             match trx_request {
-                trx_request::TrxRequest::MagicExtract(amount, account) =>{
-                    magic_extract_internal::<T>(sender, account.into(), amount.into()).map_err(|r| Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
+                trx_request::TrxRequest::MagicExtract(amount, account) => {
+                    cash_err!(magic_extract_internal::<T>(sender, account.into(), amount.into()), Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
                     Ok(())
                 }
             }
