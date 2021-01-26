@@ -90,7 +90,8 @@ async function initialize(opts = {}) {
       env: {
         ...spawnOpts,
         ETH_RPC_URL: `http://localhost:${web3Port}`,
-        ETH_KEY_ID: ethPrivateKey
+        ETH_KEY: ethPrivateKey,
+        ETH_KEY_ID: "my_eth_key_id"
       }
     });
 
