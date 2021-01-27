@@ -74,9 +74,11 @@ pub fn get_utilization(
     supplied: AssetAmount,
     borrowed: AssetAmount,
 ) -> Result<Utilization, RatesError> {
-    if supplied == 0 {
-        return Err(RatesError::UtilizationZeroSupplyError);
+    if supplied == 0 && borrowed == 0 {
+        // 0 over 0 is defined to be 0 utilization
+        return Ok(Utilization::ZERO);
     }
+
     if borrowed > supplied {
         return Err(RatesError::UtilizationBorrowedIsMoreThanSupplied);
     }
