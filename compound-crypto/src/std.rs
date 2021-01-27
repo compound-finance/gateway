@@ -1,9 +1,7 @@
+use crate::dev_keyring;
 use crate::no_std::*;
-use crate::{dev_keyring, eth_decode_hex};
 use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
-use sp_core::sp_std::convert::TryInto;
-use sp_core::Pair;
 use std::collections::hash_map::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -139,12 +137,12 @@ impl InMemoryKeyring {
     }
 
     /// Get the keypair associated with the given key id
-    fn get_keypair(self: &Self, key_id: &KeyId) -> Result<&EcdsaPair, CryptoError> {
+    pub fn get_keypair(self: &Self, key_id: &KeyId) -> Result<&EcdsaPair, CryptoError> {
         self.keys.get(&key_id.data).ok_or(CryptoError::KeyNotFound)
     }
 
     /// Get the private key associated with the key ID (for signing)
-    fn get_private_key(self: &Self, key_id: &KeyId) -> Result<SecretKey, CryptoError> {
+    pub fn get_private_key(self: &Self, key_id: &KeyId) -> Result<SecretKey, CryptoError> {
         let keypair = self.get_keypair(key_id)?;
         // note - it seems to me that this method is misnamed and this actually provides
         // the private key
@@ -156,7 +154,7 @@ impl InMemoryKeyring {
     }
 
     /// Get the eth address (bytes) associated with the given key id.
-    fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<AddressBytes, CryptoError> {
+    pub fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<AddressBytes, CryptoError> {
         let public_key = self.get_public_key(key_id)?;
         Ok(public_key_bytes_to_eth_address(&public_key))
     }
@@ -206,6 +204,8 @@ pub(crate) const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use our_std::convert::TryInto;
+    use sp_core::Pair;
 
     #[derive(Clone)]
     struct TestCase {
@@ -301,7 +301,7 @@ mod tests {
 
     fn test_sign_case(case: TestCase) {
         let (key_id, keyring) = get_test_keyring_from_test_case(&case);
-        let mut message: Vec<u8> = format!(
+        let message: Vec<u8> = format!(
             "\x19Ethereum Signed Message:\n{}{}",
             case.data.len(),
             case.data

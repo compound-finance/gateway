@@ -13,7 +13,6 @@ pub enum OracleError {
     JsonParseError,
     HttpError,
     InvalidOpenOracleApiResponse,
-    InvalidSignature,
 }
 
 /// A single decoded message from the price oracle

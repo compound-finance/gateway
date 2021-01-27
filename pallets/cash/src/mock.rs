@@ -1,5 +1,5 @@
 use crate::{Call, Config, Module};
-use frame_support::{assert_ok, impl_outer_event, impl_outer_origin, parameter_types};
+use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
 use sp_core::{
     offchain::{testing, OffchainExt, TransactionPoolExt},
     sr25519::Signature,

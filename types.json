@@ -1,38 +1,21 @@
 {
   "Source0": "TypesRS",
+  "Fraction": "u128",
   "Nonce": "u32",
   "Timestamp": "u128",
+  "Int": "i128",
   "Uint": "u128",
-  "APR": ["Uint"],
-  "Utilization": ["Uint"],
   "EncodedNotice": "Vec<u8>",
-  "AssetPrice": "Uint",
   "AssetAmount": "Uint",
-  "CashAmount": "Uint",
-  "MaxAssetAmount": {
+  "AssetBalance": "Int",
+  "AssetPrice": "Uint",
+  "AssetQuantity": "Quantity",
+  "CashQuantity": "Quantity",
+  "USDQuantity": "Quantity",
+  "MaxableAssetAmount": {
     "_enum": {
       "Max": [],
       "Value": ["AssetAmount"]
-    }
-  },
-  "InterestRateModel": {
-    "_enum": {
-      "Kink": {
-        "zero_rate": "APR",
-        "kink_rate": "APR",
-        "kink_utilization": "Utilization",
-        "full_rate": "APR"
-      }
-    }
-  },
-  "ChainSignature": {
-    "_enum": {
-      "Eth": ["[u8; 65]"]
-    }
-  },
-  "ChainSignatureList": {
-    "_enum": {
-      "Eth": ["Vec<[u8; 65]>"]
     }
   },
   "ChainAccount": {
@@ -43,6 +26,16 @@
   "ChainAsset": {
     "_enum": {
       "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainSignature": {
+    "_enum": {
+      "Eth": ["[u8; 65]"]
+    }
+  },
+  "ChainSignatureList": {
+    "_enum": {
+      "Eth": ["Vec<[u8; 65]>"]
     }
   },
   "ReporterSet": "Vec<[u8; 20]>",
@@ -80,7 +73,9 @@
   },
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
-  "MulIndex" : "Uint",
+  "CashPrincipal": ["Int"],
+  "CashIndex" : ["Uint"],
+  "AssetIndex": ["Uint"],
 
   "Source1": "SymbolRS",
   "Symbol": "[u32; 12]",
@@ -122,7 +117,7 @@
     "parent": "[u8; 32]",
     "account": "[u8; 20]",
     "amount": "u128",
-    "cash_yield_index": "u128"
+    "cash_index": "u128"
   },
   "CashExtractionNotice": {
     "_enum": {
@@ -134,7 +129,7 @@
     "parent": "[u8; 32]",
     "next_cash_yield": "u128",
     "next_cash_yield_start_at": "u128",
-    "next_cash_yield_index": "u128"
+    "next_cash_index": "u128"
   },
   "FutureYieldNotice": {
     "_enum": {
@@ -180,5 +175,19 @@
       "MinTxValueNotMet",
       "InvalidSymbol"
     ]
+  },
+
+  "Source5": "RatesRS",
+  "APR": ["Uint"],
+  "Utilization": ["Uint"],
+  "InterestRateModel": {
+    "_enum": {
+      "Kink": {
+        "zero_rate": "APR",
+        "kink_rate": "APR",
+        "kink_utilization": "Utilization",
+        "full_rate": "APR"
+      }
+    }
   }
 }

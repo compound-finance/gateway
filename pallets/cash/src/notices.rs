@@ -29,7 +29,7 @@ pub enum CashExtractionNotice {
         parent: <Ethereum as Chain>::Hash,
         account: <Ethereum as Chain>::Address,
         amount: <Ethereum as Chain>::Amount,
-        cash_yield_index: <Ethereum as Chain>::MulIndex,
+        cash_index: <Ethereum as Chain>::CashIndex,
     },
 }
 
@@ -40,7 +40,7 @@ pub enum FutureYieldNotice {
         parent: <Ethereum as Chain>::Hash,
         next_cash_yield: <Ethereum as Chain>::Rate,
         next_cash_yield_start_at: <Ethereum as Chain>::Timestamp,
-        next_cash_yield_index: <Ethereum as Chain>::MulIndex,
+        next_cash_index: <Ethereum as Chain>::CashIndex,
     },
 }
 
@@ -136,7 +136,7 @@ impl EncodeNotice for CashExtractionNotice {
                 parent,
                 account,
                 amount,
-                cash_yield_index,
+                cash_index,
             } => {
                 let amount_encoded = encode_int128(*amount); // XXX cast more safely XXX JF: already converted I think
                 [
@@ -146,7 +146,7 @@ impl EncodeNotice for CashExtractionNotice {
                     parent.to_vec(),
                     encode_addr(account),
                     amount_encoded,
-                    encode_int128(*cash_yield_index),
+                    encode_int128(*cash_index),
                 ]
                 .concat()
             }
@@ -162,7 +162,7 @@ impl EncodeNotice for FutureYieldNotice {
                 parent,
                 next_cash_yield,
                 next_cash_yield_start_at,
-                next_cash_yield_index,
+                next_cash_index,
             } => [
                 ETH_CHAIN_IDENT.to_vec(),
                 encode_int32(id.0),
@@ -170,7 +170,7 @@ impl EncodeNotice for FutureYieldNotice {
                 parent.to_vec(),
                 encode_int128(*next_cash_yield),
                 encode_int128(*next_cash_yield_start_at),
-                encode_int128(*next_cash_yield_index),
+                encode_int128(*next_cash_index),
             ]
             .concat(),
         }
@@ -277,7 +277,7 @@ mod tests {
             parent: [3u8; 32],
             account: [1u8; 20],
             amount: 55,
-            cash_yield_index: 75u128,
+            cash_index: 75u128,
         });
 
         let expected = [
@@ -307,7 +307,7 @@ mod tests {
             parent: [5u8; 32],
             next_cash_yield: 700u128,
             next_cash_yield_start_at: 200u128,
-            next_cash_yield_index: 400u128,
+            next_cash_index: 400u128,
         });
 
         let expected = [

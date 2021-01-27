@@ -1,23 +1,37 @@
 // Note: The substrate build requires these be re-exported.
-pub use our_std::{fmt, result, result::Result};
+pub use our_std::{
+    cmp::{max, min},
+    convert::TryFrom,
+    fmt, result,
+    result::Result,
+};
 
-/// Setup
-use codec::{Decode, Encode};
-use our_std::RuntimeDebug;
+// XXX do we really need to include these to access storage?
+use crate::sp_api_hidden_includes_decl_storage::hidden_include::StorageDoubleMap;
+use crate::sp_api_hidden_includes_decl_storage::hidden_include::StorageMap;
+use crate::sp_api_hidden_includes_decl_storage::hidden_include::StorageValue;
 
 use crate::{
-    chains::{eth, Chain, ChainId, Ethereum},
+    chains::eth,     // XXX event ADTs?
     notices::Notice, // XXX move here, encoding to chains
     params::MIN_TX_VALUE,
-    symbol::CASH,
-    types::{AssetAmount, CashAmount, ChainAccount, ChainAsset, ChainSignature},
-    CashBalance,
+    symbol::{Symbol, CASH, NIL}, // XXX NIL tmp
+    types::{
+        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, ChainAccount,
+        ChainAsset, Int, MathError, Price, Quantity, Reason, SafeMul, USDQuantity,
+    },
+    AssetBalances,
+    CashPrincipals,
+    ChainCashPrincipals,
     Config,
+    GlobalCashIndex,
     Module,
-    RawEvent::GoldieLocks,
-    Store,
+    Prices,
+    RawEvent::GoldieLocks, // XXX
+    TotalBorrowAssets,
+    TotalCashPrincipal,
+    TotalSupplyAssets,
 };
-use sp_runtime::print;
 
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
@@ -33,18 +47,145 @@ macro_rules! require_min_tx_value {
     };
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ConversionError {
-    ConvertFromBytesToEthAddress,
+// Public helper functions //
+
+pub fn symbol<T: Config>(asset: ChainAsset) -> Symbol {
+    // XXX lookup in storage
+    //  need to initialize with decimals first
+    Symbol(
+        ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+        18,
+    )
 }
 
-/// Type for reporting failures for reasons outside of our control.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum Reason {
-    None,
-    NotImplemented,
-    MinTxValueNotMet,
-    InvalidSymbol,
+pub fn price<T: Config>(symbol: Symbol) -> Price {
+    match symbol {
+        CASH => Price::from_nominal(CASH, "1.0"),
+        _ => Price(symbol, Prices::get(symbol)),
+    }
+}
+
+/// Return the USD value of the asset amount.
+pub fn value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, MathError> {
+    amount.mul(price::<T>(amount.symbol()))
+}
+
+// Internal helpers //
+
+fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
+    Ok(a.checked_add(b.value()).ok_or(MathError::Overflow)?)
+}
+
+fn add_amount_to_balance(
+    balance: AssetBalance,
+    amount: AssetQuantity,
+) -> Result<AssetBalance, MathError> {
+    let signed = Int::try_from(amount.value()).or(Err(MathError::Overflow))?;
+    Ok(balance.checked_add(signed).ok_or(MathError::Overflow)?)
+}
+
+fn add_principals(a: CashPrincipal, b: CashPrincipal) -> Result<CashPrincipal, MathError> {
+    Ok(CashPrincipal(
+        a.0.checked_add(b.0).ok_or(MathError::Overflow)?,
+    ))
+}
+
+fn sub_amount_from_raw(
+    a: AssetAmount,
+    b: AssetQuantity,
+    underflow: Reason,
+) -> Result<AssetAmount, Reason> {
+    Ok(a.checked_sub(b.value()).ok_or(underflow)?)
+}
+
+fn sub_amount_from_balance(
+    balance: AssetBalance,
+    amount: AssetQuantity,
+) -> Result<AssetBalance, MathError> {
+    let signed = Int::try_from(amount.value()).or(Err(MathError::Overflow))?;
+    Ok(balance.checked_sub(signed).ok_or(MathError::Underflow)?)
+}
+
+fn sub_principal_from_balance(
+    balance: CashPrincipal,
+    principal: CashPrincipal,
+) -> Result<CashPrincipal, MathError> {
+    let result = balance.0.checked_sub(principal.0);
+    Ok(CashPrincipal(result.ok_or(MathError::Underflow)?))
+}
+
+fn sub_principals(
+    a: CashPrincipal,
+    b: CashPrincipal,
+    underflow: Reason,
+) -> Result<CashPrincipal, Reason> {
+    Ok(CashPrincipal(a.0.checked_sub(b.0).ok_or(underflow)?))
+}
+
+fn neg_balance(balance: AssetBalance) -> AssetAmount {
+    if balance < 0 {
+        -balance as AssetAmount
+    } else {
+        0
+    }
+}
+
+fn pos_balance(balance: AssetBalance) -> AssetAmount {
+    if balance > 0 {
+        balance as AssetAmount
+    } else {
+        0
+    }
+}
+
+fn repay_and_supply_amount(
+    balance: AssetBalance,
+    amount: AssetQuantity,
+) -> (AssetQuantity, AssetQuantity) {
+    let Quantity(symbol, raw_amount) = amount;
+    let repay_amount = min(neg_balance(balance), raw_amount);
+    let supply_amount = raw_amount - repay_amount;
+    (
+        Quantity(symbol, supply_amount),
+        Quantity(symbol, repay_amount),
+    )
+}
+
+fn withdraw_and_borrow_amount(
+    balance: AssetBalance,
+    amount: AssetQuantity,
+) -> (AssetQuantity, AssetQuantity) {
+    let Quantity(symbol, raw_amount) = amount;
+    let withdraw_amount = min(pos_balance(balance), raw_amount);
+    let borrow_amount = raw_amount - withdraw_amount;
+    (
+        Quantity(symbol, withdraw_amount),
+        Quantity(symbol, borrow_amount),
+    )
+}
+
+fn repay_and_supply_principal(
+    balance: CashPrincipal,
+    principal: CashPrincipal,
+) -> (CashPrincipal, CashPrincipal) {
+    let repay_principal = max(min(-balance.0, principal.0), 0);
+    let supply_principal = principal.0 - repay_principal;
+    (
+        CashPrincipal(repay_principal),
+        CashPrincipal(supply_principal),
+    )
+}
+
+fn withdraw_and_borrow_principal(
+    balance: CashPrincipal,
+    principal: CashPrincipal,
+) -> (CashPrincipal, CashPrincipal) {
+    let withdraw_principal = max(min(balance.0, principal.0), 0);
+    let borrow_principal = principal.0 - withdraw_principal;
+    (
+        CashPrincipal(withdraw_principal),
+        CashPrincipal(borrow_principal),
+    )
 }
 
 // Protocol interface //
@@ -55,21 +196,23 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
             asset,
             holder,
             amount,
-        } => {
-            //  When Lock(Asset:address, Holder:address, Amount:uint256):
-            //   Build AccountIdent=("eth", account)
-            //   Build AssetIdent=("eth", asset)
-            //   Call lockInternal(AssetIdent, AccountIdent, Amount)
-            print("applying lock event...");
-            lock_internal::<T>(ChainAsset::Eth(asset), ChainAccount::Eth(holder), amount)
-        }
-        _ => {
-            //  When Gov(title:string, extrinsics:bytes[]):
+        } => lock_internal::<T>(
+            ChainAsset::Eth(asset),
+            ChainAccount::Eth(holder),
+            Quantity(symbol::<T>(ChainAsset::Eth(asset)), amount),
+        ),
+
+        eth::EventData::LockCash {
+            holder,
+            amount,
+            .. // XXX do we want to use index?
+        } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity(CASH, amount)),
+
+        eth::EventData::Gov {} => {
+            // XXX also handle 'remote control' trx requests (aka do)
+            // XXX are these 'do' now?
             //   Decode a SCALE-encoded set of extrinsics from the event
             //   For each extrinsic, dispatch the given extrinsic as Root
-            //  When LockCash(Account:address, Amount: uint256, CashYieldIndex: uint256):
-            //   Build AccountIdent=("eth", account)
-            //   Call lockCashInternal(AccountIdent, Amount)
             Err(Reason::NotImplemented)
         }
     }
@@ -78,90 +221,195 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
 pub fn lock_internal<T: Config>(
     asset: ChainAsset,
     holder: ChainAccount,
-    amount: AssetAmount,
+    amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    print("lock internal...");
+    require_min_tx_value!(value::<T>(amount)?);
 
-    Module::<T>::deposit_event(GoldieLocks(asset, holder, amount));
+    let holder_asset = AssetBalances::get(asset, holder);
+    let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
 
-    // XXX
-    // Read Require AmountPriceAssetParamsMinTxValue
-    // Read Principal =AmountSupplyIndexAsset
-    // Read TotalSupplyNew=TotalSupplyPrincipalAsset+Principal
-    // Read HolderSupplyNew=SupplyPrincipalAsset, Holder+Principal
-    // Set TotalSupplyPrincipalAsset=TotalSupplyNew
-    // Set SupplyPrincipalAsset, Holder=HolderSupplyNew
+    let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
+    let total_supply_new = add_amount_to_raw(TotalSupplyAssets::get(asset), holder_supply_amount)?;
+    let total_borrow_new = sub_amount_from_raw(
+        TotalBorrowAssets::get(asset),
+        holder_repay_amount,
+        Reason::RepayTooMuch,
+    )?;
+
+    AssetBalances::insert(asset, holder, holder_asset_new);
+    TotalSupplyAssets::insert(asset, total_supply_new);
+    TotalBorrowAssets::insert(asset, total_borrow_new);
+
+    // XXX real events
+    <Module<T>>::deposit_event(GoldieLocks(asset, holder, amount.value())); // XXX -> raw amount?
     Ok(())
 }
 
 pub fn lock_cash_internal<T: Config>(
     holder: ChainAccount,
-    amount: CashAmount,
+    amount: CashQuantity,
 ) -> Result<(), Reason> {
-    // XXX
-    // Read Require AmountPriceCASHParamsMinTxValue
-    // Read Principal =AmountCashYieldIndex
-    // Read ChainCashHoldPrincipalNew=TotalCashHoldPrincipalHolder.Chain-Principal
-    // Underflow: ${Sender.Chain} does not have enough total CASH to extract ${Amount}
-    // Read HolderCashHoldPrincipalNew=CashHoldPrincipalHolder+Principal
-    // Set TotalCashHoldPrincipalHolder.Chain=ChainCashHoldPrincipalNew
-    // Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew
+    require_min_tx_value!(value::<T>(amount)?);
+
+    let index = GlobalCashIndex::get();
+    let principal = index.as_hold_principal(amount)?;
+    let holder_cash_principal = CashPrincipals::get(holder);
+    let (holder_repay_principal, _holder_supply_principal) =
+        repay_and_supply_principal(holder_cash_principal, principal);
+
+    let chain_id = holder.chain_id();
+    let chain_cash_principal_new = sub_principals(
+        ChainCashPrincipals::get(chain_id),
+        principal,
+        Reason::InsufficientChainCash,
+    )?;
+    let holder_cash_principal_new = add_principals(holder_cash_principal, principal)?;
+    let total_cash_principal_new = sub_principals(
+        TotalCashPrincipal::get(),
+        holder_repay_principal,
+        Reason::RepayTooMuch,
+    )?;
+
+    ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
+    CashPrincipals::insert(holder, holder_cash_principal_new);
+    TotalCashPrincipal::put(total_cash_principal_new);
+
+    // XXX should we return events to be deposited?
     Ok(())
 }
 
-pub fn extract_principal_internal<T: Config>(
+pub fn extract_internal<T: Config>(
     asset: ChainAsset,
     holder: ChainAccount,
     recipient: ChainAccount,
-    principal: AssetAmount,
+    amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    // TODO: Do we need a Symbol here for these?
+    require!(
+        recipient.chain_id() == asset.chain_id(),
+        Reason::ChainMismatch
+    );
+    require_min_tx_value!(value::<T>(amount)?);
+    require!(
+        has_liquidity_to_reduce_asset(holder, amount),
+        Reason::InsufficientLiquidity
+    );
 
-    // Require Recipient.Chain=Asset.Chain XXX proven by compiler
-    // let supply_index = <Module<T>>::supply_index(asset);
-    // let amount = principal * supply_index;
-    // require_min_tx_value!(amount * price::<T>(principal.symbol()));
+    let holder_asset = AssetBalances::get(asset, holder);
+    let (holder_withdraw_amount, holder_borrow_amount) =
+        withdraw_and_borrow_amount(holder_asset, amount);
 
-    // Read Require HasLiquidityToReduceCollateralAsset(Holder, Asset, Amount)
-    // ReadsCashBorrowPrincipalBorrower, CashCostIndexPair, CashYield, CashSpread, Price*, SupplyPrincipal*, Borrower, StabilityFactor*
-    // Read TotalSupplyNew=TotalSupplyPrincipalAsset-Principal
-    // Underflow: Not enough total funds to extract ${Amount}
-    // Read HolderSupplyNew=SupplyPrincipalAsset, Holder-Principal
-    // Underflow: ${Holder} does not have enough funds to extract ${Amount}
-    // Set TotalSupplyPrincipalAsset=TotalSupplyNew
-    // Set SupplyPrincipalAsset, Holder=HolderSupplyNew
+    let holder_asset_new = sub_amount_from_balance(holder_asset, amount)?;
+    let total_supply_new = sub_amount_from_raw(
+        TotalSupplyAssets::get(asset),
+        holder_withdraw_amount,
+        Reason::InsufficientTotalFunds,
+    )?;
+    let total_borrow_new = add_amount_to_raw(TotalBorrowAssets::get(asset), holder_borrow_amount)?;
+
+    AssetBalances::insert(asset, holder, holder_asset_new);
+    TotalSupplyAssets::insert(asset, total_supply_new);
+    TotalBorrowAssets::insert(asset, total_borrow_new);
+
+    // XXX
     // Add ExtractionNotice(Asset, Recipient, Amount) to NoticeQueueRecipient.Chain
-    Ok(()) // XXX
+
+    Ok(()) // XXX events?
 }
 
-// XXX should we expect amounts are already converted to our bigint type here?
-//  probably not, probably inputs should always be fixed width?
-//   actually now I think we can always guarantee to parse ascii numbers in lisp requests into bigints
-pub fn extract_cash_principal_internal<T: Config, C: Chain>(
+pub fn extract_cash_principal_internal<T: Config>(
     holder: ChainAccount,
     recipient: ChainAccount,
-    principal: CashAmount,
+    principal: CashPrincipal,
 ) -> Result<(), Reason> {
-    // TODO: Do we need a symbol here for these?
-    // let yield_index = <Module<T>>::cash_yield_index();
-    // let amount = principal * yield_index;
-    // require_min_tx_value!(amount * price::<T>(CASH));
+    let index = GlobalCashIndex::get();
+    let amount = index.as_hold_amount(principal)?;
 
-    // Note: we do not check health here, since CASH cannot be borrowed against yet.
-    // let chain_cash_hold_principal_new = <Module<T>>::chain_cash_hold_principal(recipient.chain) + amount_principal;
-    // let holder_cash_hold_principal_new = <Module<T>>::cash_hold_principal(holder) - amount_principal;
-    // XXX Underflow: ${Account} does not have enough CASH to extract ${Amount};
-    // <Module<T>>::ChainCashHoldPrincipal::insert(recipient, chain_cash_hold_principal_new);
-    // <Module<T>>::C
-    //     Set TotalCashHoldPrincipalRecipient.Chain=ChainCashHoldPrincipalNew;
-    //     Set CashHoldPrincipalHolder=HolderCashHoldPrincipalNew;
-    //     Add CashExtractionNotice(Recipient, Amount, YieldIndex) to NoticeQueueRecipient.Chain;
-    Ok(()) // XXX
+    require_min_tx_value!(value::<T>(amount)?);
+    require!(
+        has_liquidity_to_reduce_cash(holder, amount),
+        Reason::InsufficientLiquidity
+    );
+
+    let holder_cash_principal = CashPrincipals::get(holder);
+    let (_holder_withdraw_principal, holder_borrow_principal) =
+        withdraw_and_borrow_principal(holder_cash_principal, principal);
+
+    let chain_id = recipient.chain_id();
+    let chain_cash_principal_new = add_principals(ChainCashPrincipals::get(chain_id), principal)?;
+    let holder_cash_principal_new = sub_principal_from_balance(holder_cash_principal, principal)?;
+    let total_cash_principal_new =
+        add_principals(TotalCashPrincipal::get(), holder_borrow_principal)?;
+
+    ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
+    CashPrincipals::insert(holder, holder_cash_principal_new);
+    TotalCashPrincipal::put(total_cash_principal_new);
+
+    // XXX
+    // Add CashExtractionNotice(Recipient, Amount, CashIndex) to NoticeQueueRecipient.Chain
+
+    Ok(()) // XXX events?
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum RecoveryError {
-    RecoveryError,
+pub fn transfer_internal<T: Config>(
+    _asset: ChainAsset,
+    _sender: ChainAccount,
+    _recipient: ChainAccount,
+    _amount: AssetQuantity,
+) -> Result<(), Reason> {
+    // XXX
+    Ok(())
+}
+
+pub fn transfer_cash_principal_internal<T: Config>(
+    _asset: ChainAsset,
+    _sender: ChainAccount,
+    _recipient: ChainAccount,
+    _principal: CashPrincipal,
+) -> Result<(), Reason> {
+    // XXX
+    // XXX require principal amount >= 0
+    Ok(())
+}
+
+pub fn liquidate_internal<T: Config>(
+    _asset: ChainAsset,
+    _collateral_asset: ChainAsset,
+    _liquidator: ChainAccount,
+    _borrower: ChainAccount,
+    _amount: AssetQuantity,
+) -> Result<(), Reason> {
+    // XXX
+    Ok(())
+}
+
+pub fn liquidate_cash_principal_internal<T: Config>(
+    _collateral_asset: ChainAsset,
+    _liquidator: ChainAccount,
+    _borrower: ChainAccount,
+    _principal: CashPrincipal,
+) -> Result<(), Reason> {
+    // XXX
+    Ok(())
+}
+
+pub fn liquidate_cash_collateral_internal<T: Config>(
+    _asset: ChainAsset,
+    _liquidator: ChainAccount,
+    _borrower: ChainAccount,
+    _amount: AssetQuantity,
+) -> Result<(), Reason> {
+    // XXX
+    Ok(())
+}
+
+// Liquidity Checks //
+
+pub fn has_liquidity_to_reduce_asset(_holder: ChainAccount, _amount: AssetQuantity) -> bool {
+    true // XXX
+}
+
+pub fn has_liquidity_to_reduce_cash(_holder: ChainAccount, _amount: CashQuantity) -> bool {
+    true // XXX
 }
 
 #[cfg(test)]
