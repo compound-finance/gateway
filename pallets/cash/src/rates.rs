@@ -278,8 +278,14 @@ mod test {
             UtilizationTestCase {
                 supplied: 0,
                 borrowed: 0,
-                expected: Err(RatesError::UtilizationZeroSupplyError),
-                message: "Zero supply implies an undefined utilization",
+                expected: Ok(Utilization::ZERO),
+                message: "Zero supply and zero borrow is defined as zero utilization",
+            },
+            UtilizationTestCase {
+                supplied: 0,
+                borrowed: 1,
+                expected: Err(RatesError::UtilizationBorrowedIsMoreThanSupplied),
+                message: "Borrowed can not be more than supplied, even when supplied is zero",
             },
             UtilizationTestCase {
                 supplied: 1,

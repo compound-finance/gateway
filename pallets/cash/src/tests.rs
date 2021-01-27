@@ -249,7 +249,7 @@ fn test_set_interest_rate_model() {
         initialize_storage();
         let asset = get_eth();
         let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
-        CashModule::update_interest_rate_model(Origin::none(), asset.clone(), expected_model)
+        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
             .unwrap();
         let actual_model = CashModule::model(asset);
         assert_eq!(actual_model, expected_model);
@@ -277,7 +277,7 @@ fn test_get_borrow_rate() {
         crate::TotalSupplyPrincipal::insert(&asset, 100);
         crate::TotalBorrowPrincipal::insert(&asset, 50);
 
-        CashModule::update_interest_rate_model(Origin::none(), asset.clone(), expected_model)
+        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
             .unwrap();
         let borrow_rate = CashModule::get_borrow_rate(&asset).unwrap();
         assert_eq!(borrow_rate, 101.into());

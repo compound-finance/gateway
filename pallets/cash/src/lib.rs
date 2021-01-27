@@ -11,7 +11,7 @@ extern crate trx_request;
 use codec::{alloc::string::String, Decode};
 use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{
-    ensure_none,
+    ensure_none, ensure_root,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
 use our_std::{
@@ -324,7 +324,7 @@ decl_module! {
         /// Update the interest rate model for a given asset. This is only called by governance
         #[weight = 0]
         pub fn update_interest_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
-            ensure_none(origin)?;
+            ensure_root(origin)?;
             Self::update_interest_rate_model_internal(asset, model)?;
             Ok(())
         }
