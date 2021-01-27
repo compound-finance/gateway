@@ -57,8 +57,6 @@ impl APR {
         APR(amount)
     }
 
-    const ONE: APR = APR::from_nominal("1");
-
     const MAX: APR = APR::from_nominal("0.35"); // 35%
 }
 
