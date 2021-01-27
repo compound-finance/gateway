@@ -1,8 +1,8 @@
 // Note: The substrate build requires these be imported
 pub use our_std::vec::Vec;
 
-use crate::types::{AssetAmount, MulIndex, Timestamp, APR};
-
+use crate::rates::APR;
+use crate::types::{AssetAmount, MulIndex, Timestamp};
 use codec::{Decode, Encode};
 use our_std::{Debuggable, RuntimeDebug};
 

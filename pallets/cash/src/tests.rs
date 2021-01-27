@@ -1,3 +1,4 @@
+use crate::rates::Utilization;
 use crate::{chains::*, core::*, mock::*, symbol::*, *};
 use frame_support::{assert_err, assert_noop, assert_ok, dispatch::DispatchError};
 use sp_core::offchain::testing;
@@ -63,8 +64,8 @@ fn initialize_storage() {
         "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
     ]);
     CashModule::initialize_symbols(vec!["ETH".into()]); // XXX fixme + needs decimals
-    CashModule::initialize_price_key_mapping(vec![
-        "USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into(),
+    CashModule::initialize_asset_maps(vec![
+        "USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()
     ]);
 }
 
@@ -232,5 +233,53 @@ fn test_post_price_stale_price() {
         // try to post the same thing again
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
         assert_err!(result, Error::<Test>::OpenOracleErrorStalePrice);
+    });
+}
+
+fn get_eth() -> ChainAsset {
+    ChainAsset::Eth(
+        <[u8; 20]>::try_from(hex::decode("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap())
+            .unwrap(),
+    )
+}
+
+#[test]
+fn test_set_interest_rate_model() {
+    new_test_ext().execute_with(|| {
+        initialize_storage();
+        let asset = get_eth();
+        let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
+        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
+            .unwrap();
+        let actual_model = CashModule::model(asset);
+        assert_eq!(actual_model, expected_model);
+    });
+}
+
+#[test]
+fn test_get_utilization() {
+    new_test_ext().execute_with(|| {
+        initialize_storage();
+        let asset = get_eth();
+        crate::TotalSupplyPrincipal::insert(&asset, 100);
+        crate::TotalBorrowPrincipal::insert(&asset, 50);
+        let utilization = CashModule::get_utilization(&asset).unwrap();
+        assert_eq!(utilization, Utilization::from_nominal("0.5"));
+    });
+}
+
+#[test]
+fn test_get_borrow_rate() {
+    new_test_ext().execute_with(|| {
+        initialize_storage();
+        let asset = get_eth();
+        let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
+        crate::TotalSupplyPrincipal::insert(&asset, 100);
+        crate::TotalBorrowPrincipal::insert(&asset, 50);
+
+        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
+            .unwrap();
+        let borrow_rate = CashModule::get_borrow_rate(&asset).unwrap();
+        assert_eq!(borrow_rate, 101.into());
     });
 }

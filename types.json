@@ -1,9 +1,10 @@
 {
   "Source0": "TypesRS",
-  "APR": "u128",
   "Nonce": "u32",
   "Timestamp": "u128",
   "Uint": "u128",
+  "APR": ["Uint"],
+  "Utilization": ["Uint"],
   "EncodedNotice": "Vec<u8>",
   "AssetPrice": "Uint",
   "AssetAmount": "Uint",
@@ -12,6 +13,16 @@
     "_enum": {
       "Max": [],
       "Value": ["AssetAmount"]
+    }
+  },
+  "InterestRateModel": {
+    "_enum": {
+      "Kink": {
+        "zero_rate": "APR",
+        "kink_rate": "APR",
+        "kink_utilization": "Utilization",
+        "full_rate": "APR"
+      }
     }
   },
   "ChainSignature": {
