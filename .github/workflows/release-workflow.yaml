@@ -1,22 +1,56 @@
-name: Release
 on:
-  push:
-    branches:
-      - main
+  create:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Upload Release Asset
 
 jobs:
-  build-release:
-    name: Build Release
+  build:
+    name: Upload Release Asset
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Run on architecture
+        uses: uraimo/run-on-arch-action@v2.0.8
+      - name: Checkout code
         uses: actions/checkout@v2
+                  # Create an artifacts directory
+          setup: |
+            mkdir -p "${PWD}/artifacts"
 
-      - name: Cargo Build
-        run: |
-          cargo +nightly build --release
+          # Mount the artifacts directory as /artifacts in the container
+          dockerRunArgs: |
+            --volume "${PWD}/artifacts:/artifacts"
+      
+      - name: build release for architecture
+          with: 
+            arch: aarch64
+            distro: ubuntu18.04
+            githubToken: ${{ github.token }} # Not required, but speeds up builds
+            run: |
+            cargo +nightly build --release
+            cp target/release/compound-chain "/artifacts/compound-chain-release"
 
-      - uses: actions/upload-artifact@v2
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: compound-chain
-          path: target/release/compound-chain
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: /artifacts/compound-chain-release
+          asset_name: compound-chain
+          asset_content_type: application/zip
