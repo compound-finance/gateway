@@ -131,31 +131,37 @@ function tokenInfoMap(ctx) {
     zrx: {
       build: 'zrx.json',
       contract: 'ZRXToken',
+      decimals: 18,
       constructorArgs: [],
     },
     dai: {
       build: 'dai.json',
       contract: 'Dai',
+      decimals: 18,
       constructorArgs: [0] // TODO: ChainId
     },
     comp: {
       build: 'compound.json',
       contract: 'Comp',
+      decimals: 18,
       constructorArgs: [accounts[0]]
     },
     bat: {
       build: 'bat.json',
       contract: 'BAToken',
+      decimals: 18,
       constructorArgs: ['0x0000000000000000000000000000000000000000', accounts[0], 0, 0]
     },
     wbtc: {
       build: 'wbtc.json',
       contract: 'WBTC',
+      decimals: 8,
       constructorArgs: []
     },
     usdc: {
       build: 'FiatTokenV1.json',
       contract: 'FiatTokenV1',
+      decimals: 6,
       constructorArgs: [],
       afterDeploy: async (contract, owner) => {
         await contract.methods.initialize(

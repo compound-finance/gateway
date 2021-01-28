@@ -39,7 +39,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     stripHexPrefix(validator.eth_account)
   );
   let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
-  let symbols = tokensInfo.map(([symbol, _]) => symbol.toUpperCase());
+  let symbols = tokensInfo.map(([symbol, info]) => [symbol.toUpperCase(), info.decimals]);
 
   return {
     name: 'Integration Test Network',
@@ -57,7 +57,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         },
         palletCash: {
           validators,
-          symbol: symbols
+          symbols
         }
       }
     }
