@@ -146,8 +146,8 @@ fn repay_and_supply_amount(
     let repay_amount = min(neg_balance(balance), raw_amount);
     let supply_amount = raw_amount - repay_amount;
     (
-        Quantity(symbol, supply_amount),
         Quantity(symbol, repay_amount),
+        Quantity(symbol, supply_amount),
     )
 }
 
@@ -415,4 +415,65 @@ pub fn has_liquidity_to_reduce_cash(_holder: ChainAccount, _amount: CashQuantity
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::symbol::USD;
+
+    #[test]
+    fn test_helpers() {
+        assert_eq!(neg_balance(100), 0);
+        assert_eq!(pos_balance(-100), 0);
+        assert_eq!(neg_balance(-100), 100);
+        assert_eq!(pos_balance(100), 100);
+
+        let amount = Quantity(USD, 100);
+        assert_eq!(
+            repay_and_supply_amount(0, amount),
+            (Quantity(USD, 0), amount)
+        );
+        assert_eq!(
+            repay_and_supply_amount(-50, amount),
+            (Quantity(USD, 50), Quantity(USD, 50))
+        );
+        assert_eq!(
+            repay_and_supply_amount(-100, amount),
+            (amount, Quantity(USD, 0))
+        );
+        assert_eq!(
+            withdraw_and_borrow_amount(0, amount),
+            (Quantity(USD, 0), amount)
+        );
+        assert_eq!(
+            withdraw_and_borrow_amount(50, amount),
+            (Quantity(USD, 50), Quantity(USD, 50))
+        );
+        assert_eq!(
+            withdraw_and_borrow_amount(100, amount),
+            (amount, Quantity(USD, 0))
+        );
+
+        let principal = CashPrincipal(100);
+        assert_eq!(
+            repay_and_supply_principal(CashPrincipal(0), principal),
+            (CashPrincipal(0), principal)
+        );
+        assert_eq!(
+            repay_and_supply_principal(CashPrincipal(-50), principal),
+            (CashPrincipal(50), CashPrincipal(50))
+        );
+        assert_eq!(
+            repay_and_supply_principal(CashPrincipal(-100), principal),
+            (principal, CashPrincipal(0))
+        );
+        assert_eq!(
+            withdraw_and_borrow_principal(CashPrincipal(0), principal),
+            (CashPrincipal(0), principal)
+        );
+        assert_eq!(
+            withdraw_and_borrow_principal(CashPrincipal(50), principal),
+            (CashPrincipal(50), CashPrincipal(50))
+        );
+        assert_eq!(
+            withdraw_and_borrow_principal(CashPrincipal(100), principal),
+            (principal, CashPrincipal(0))
+        );
+    }
 }
