@@ -82,5 +82,3 @@
     - name: re-read facts after adding public key fact
       ansible.builtin.setup:
         filter: ansible_local
-
-    # TODO: Generate passwords, too.

@@ -1,0 +1,25 @@
+
+- name: add grandpa author key to keystore
+  uri:
+    url: http://localhost:9933
+    method: "POST"
+    body_format: json
+    body: |
+        {
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"author_insertKey",
+            "params": [
+                "gran",
+                "{{ mnemonic }}",
+                "{{ grandpa_public_key }}"
+            ]
+        }
+  register: insertion
+  until: insertion.status == 200
+  retries: 10
+  delay: 5
+
+- name: show erpsonse
+    debug:
+        var: insertion
