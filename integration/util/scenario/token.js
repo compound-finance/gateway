@@ -3,7 +3,8 @@ const BigNumber = require('bignumber.js');
 const { lookupBy } = require('../util');
 
 class Token {
-  constructor(symbol, name, decimals, token, owner, ctx) {
+  constructor(ticker, symbol, name, decimals, token, owner, ctx) {
+    this.ticker = ticker;
     this.symbol = symbol;
     this.name = name;
     this.decimals = decimals;
@@ -82,7 +83,7 @@ class Token {
 
 class EtherToken extends Token {
   constructor(ctx) {
-    super('ether', 18, null, null, ctx);
+    super('ether', 'ETH', 'Ether', 18, null, null, ctx);
   }
 
   ethAddress() {
@@ -115,12 +116,12 @@ class Tokens {
   }
 
   get(lookup) {
-    return lookupBy(Token, 'symbol', this.tokens, lookup);
+    return lookupBy(Token, 'ticker', this.tokens, lookup);
   }
 
   tokenObjects() {
     return Object.fromEntries(this.tokens.map((token) =>
-      [token.symbol.toUpperCase(), token.toTokenObject()]));
+      [token.symbol, token.toTokenObject()]));
   }
 }
 
@@ -189,17 +190,18 @@ function undec(tokenAmount, decimals) {
   return Number(`${tokenAmount.toString()}e-${decimals}`);
 }
 
-async function buildToken(tokenSym, tokenInfo, ctx) {
-  ctx.log(`Deploying ${tokenSym}...`);
+async function buildToken(ticker, tokenInfo, ctx) {
+  ctx.log(`Deploying ${ticker}...`);
 
   let owner = ctx.eth.defaultFrom;
   let tokenContract = await ctx.eth.__deployContract(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructorArgs, {from: owner});
   if (typeof (tokenInfo.afterDeploy) === 'function') {
     await tokenInfo.afterDeploy(tokenContract, owner);
   }
-  let name = Number(await tokenContract.methods.name().call());
+  let symbol = await tokenContract.methods.symbol().call();
+  let name = await tokenContract.methods.name().call();
   let decimals = Number(await tokenContract.methods.decimals().call());
-  let token = new Token(tokenSym, name, decimals, tokenContract, owner, ctx);
+  let token = new Token(ticker, symbol, name, decimals, tokenContract, owner, ctx);
 
   if (tokenInfo.balances) {
     await Object.entries(tokenInfo.balances).reduce(async (acc, [actor, amount]) => {
@@ -219,10 +221,10 @@ async function buildTokens(tokensInfoHash, ctx) {
   ctx.log("Deploying Erc20 Tokens...");
 
   let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
-  let tokens = await tokensInfo.reduce(async (acc, [tokenSym, tokenInfo]) => {
+  let tokens = await tokensInfo.reduce(async (acc, [ticker, tokenInfo]) => {
     return [
       ...await acc,
-      await buildToken(tokenSym, tokenInfo, ctx)
+      await buildToken(ticker, tokenInfo, ctx)
     ];
   }, Promise.resolve([]));
 

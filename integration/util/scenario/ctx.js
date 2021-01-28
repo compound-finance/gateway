@@ -142,7 +142,7 @@ async function buildCtx(scenInfo={}) {
   ctx.prices = await buildPrices(scenInfo.tokens, ctx);
 
   aliasBy(ctx, ctx.actors.all(), 'name');
-  aliasBy(ctx, ctx.tokens.all(), 'symbol');
+  aliasBy(ctx, ctx.tokens.all(), 'ticker');
   aliasBy(ctx, ctx.validators.all(), 'name');
 
   return ctx;

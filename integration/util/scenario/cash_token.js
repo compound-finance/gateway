@@ -15,6 +15,7 @@ class CashToken {
   toToken() {
     return new Token(
       'cash', // TODO: Consider pulling these from the token itself
+      'CASH',
       'Cash Token',
       18,
       this.ethAddress(),
