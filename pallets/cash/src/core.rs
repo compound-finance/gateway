@@ -6,10 +6,8 @@ pub use our_std::{
     result::Result,
 };
 
-// XXX do we really need to include these to access storage?
-use crate::sp_api_hidden_includes_decl_storage::hidden_include::StorageDoubleMap;
-use crate::sp_api_hidden_includes_decl_storage::hidden_include::StorageMap;
-use crate::sp_api_hidden_includes_decl_storage::hidden_include::StorageValue;
+// Import these traits so we can interact with the substrate storage modules.
+use frame_support::storage::{StorageDoubleMap, StorageMap, StorageValue};
 
 use crate::{
     chains::eth,     // XXX event ADTs?
