@@ -62,7 +62,7 @@ fn initialize_storage() {
         "85615b076615317c80f14cbad6501eec031cd51c".into(),
         "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
     ]);
-    CashModule::initialize_symbols(vec!["ETH".into()]); // XXX fixme + needs decimals
+    CashModule::initialize_symbols(vec![("USDC".into(), 6), ("ETH".into(), 18)]); // XXX fixme
     CashModule::initialize_asset_maps(vec![
         "USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()
     ]);
