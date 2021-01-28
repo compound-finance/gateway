@@ -223,7 +223,7 @@ pub fn lock_internal<T: Config>(
     holder: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    require_min_tx_value!(value::<T>(amount)?);
+    // require_min_tx_value!(value::<T>(amount)?);
 
     let holder_asset = AssetBalances::get(asset, holder);
     let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);

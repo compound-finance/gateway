@@ -1,8 +1,9 @@
 const { debug, log } = require('./log');
 
+// TODO: Consider moving into ctx
 let trxId = 0;
 
-function waitForEvent(api, pallet, method, onFinalize = true) {
+function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = null) {
   return new Promise((resolve, reject) => {
     api.query.system.events((events) => {
 
@@ -11,13 +12,15 @@ function waitForEvent(api, pallet, method, onFinalize = true) {
         debug(`Found event: ${event.section}:${event.method}`);
         if (event.section === pallet && event.method === method) {
           return resolve(event);
+        } else if (failureEvent && event.section === failureEvent[0] && event.method === failureEvent[1]) {
+          return reject(new Error(`Found failure event ${event.section}:${event.method} - ${JSON.stringify(getEventData(event))}`));
         }
       });
     });
   });
 }
 
-function sendAndWaitForEvents(call, api, onFinalize = true) {
+function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = true) {
   return new Promise((resolve, reject) => {
     let unsub;
     let id = trxId++;
@@ -29,7 +32,7 @@ function sendAndWaitForEvents(call, api, onFinalize = true) {
       debugMsg(`Current status is ${status}`);
 
       let doResolve = (events) => {
-        unsub(); // Note: unsub isn't apparently working, but we _are_ calling it
+        unsub(); // Note: unsub isn't apparently working, but we are calling it
 
         let failures = events
           .filter(({ event }) =>
@@ -38,19 +41,21 @@ function sendAndWaitForEvents(call, api, onFinalize = true) {
           // we know that data for system.ExtrinsicFailed is
           // (DispatchError, DispatchInfo)
           .map(({ event: { data: [error, info] } }) => {
+            debug(() => `sendAndWaitForEvents[id=${id}] - Failing call: ${JSON.stringify(call)} ${call.toString()}`);
+
             if (error.isModule) {
               // for module errors, we have the section indexed, lookup
               const decoded = api.registry.findMetaError(error.asModule);
               const { documentation, method, section } = decoded;
 
-              return new Error(`DispatchError: ${section}.${method}: ${documentation.join(' ')}`);
+              return new Error(`DispatchError[id=${id}]: ${section}.${method}: ${documentation.join(' ')}`);
             } else {
               // Other, CannotLookup, BadOrigin, no extra info
-              return new Error(`DispatchError: ${error.toString()}`);
+              return new Error(`DispatchError[id=${id}]: ${error.toString()}`);
             }
           });
 
-        if (failures.length > 0) {
+        if (rejectOnFailure && failures.length > 0) {
           reject(failures[0]);
         } else {
           resolve(events);

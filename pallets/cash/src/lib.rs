@@ -36,9 +36,9 @@ use crate::rates::{InterestRateModel, APR};
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, CashIndex, CashPrincipal, ChainAccount,
-    ChainAsset, ChainSignature, ChainSignatureList, ConfigSetString, EncodedNotice, EventStatus,
-    Fraction, MaxableAssetAmount, Nonce, NoticeStatus, Reason, ReporterSet, SignedPayload,
-    Timestamp, ValidatorSet, ValidatorSig,
+    ChainAsset, ChainSignature, ChainSignatureList, ConfigSet, ConfigSetString, EncodedNotice,
+    EventStatus, Fraction, MaxableAssetAmount, Nonce, NoticeStatus, Reason, ReporterSet,
+    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 
 use sp_runtime::print;
@@ -161,12 +161,12 @@ decl_storage! {
     add_extra_genesis {
         config(validators): ConfigSetString;
         config(reporters): ConfigSetString;
-        config(symbol): ConfigSetString; // XXX initialize symbol from string: (ticker, decimals)
+        config(symbols): ConfigSet<(String, u8)>; // XXX initialize symbol from string: (ticker, decimals)
         config(asset_symbol): ConfigSetString;
         build(|config| {
             Module::<T>::initialize_validators(config.validators.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_symbols(config.symbol.clone());
+            Module::<T>::initialize_symbols(config.symbols.clone());
             Module::<T>::initialize_asset_maps(config.asset_symbol.clone());
         })
     }
@@ -629,13 +629,13 @@ impl<T: Config> Module<T> {
 
     // XXX actually symbols is a map with decimals
     /// Set the initial set of supported symbols from the genesis config
-    fn initialize_symbols(symbols: ConfigSetString) {
+    fn initialize_symbols(symbols: ConfigSet<(String, u8)>) {
         assert!(
             !symbols.is_empty(),
             "Symbols must be set in the genesis config"
         );
 
-        for (ticker, decimals) in vec![("ETH", 18), ("USDC", 6)] {
+        for (ticker, decimals) in symbols {
             // XXX
             let mut chars: Vec<char> = ticker.chars().collect();
             chars.resize(12, 0 as char);

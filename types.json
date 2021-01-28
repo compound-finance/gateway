@@ -168,12 +168,46 @@
   },
 
   "Source4": "CoreRS",
-  "Reason": {
+  "CryptoError": {
     "_enum": [
-      "None",
-      "NotImplemented",
-      "MinTxValueNotMet",
-      "InvalidSymbol"
+      "Unknown",
+      "KeyNotFound",
+      "KeyringLock",
+      "InvalidKeyId",
+      "ParseError",
+      "RecoverError",
+      "HSMError",
+      "EnvironmentVariablePrivateKeyNotSet",
+      "HexDecodeFailed",
+      "EnvironmentVariableHexDecodeFailed",
+      "EnvironmentVariableInvalidSeed"
+    ]
+  },
+  "Reason": {
+    "_enum": {
+      "None": "",
+      "NotImplemented": "",
+      "ChainMismatch": "",
+      "CryptoError": "CryptoError",
+      "InsufficientChainCash": "",
+      "InsufficientLiquidity": "",
+      "InsufficientTotalFunds": "",
+      "InvalidSignature": "",
+      "InvalidSymbol": "",
+      "KeyNotFound": "",
+      "MathError": "MathError",
+      "MinTxValueNotMet": "",
+      "RepayTooMuch": ""
+    }
+  },
+  "MathError": {
+    "_enum": [
+      "Overflow",
+      "Underflow",
+      "SignMismatch",
+      "SymbolMismatch",
+      "PriceNotUSD",
+      "DivisionByZero"
     ]
   },
 
