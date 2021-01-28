@@ -1,4 +1,38 @@
 
+const baseScenInfo = {
+  eth_opts: {
+    provider: 'ganache', // [env=PROVIDER]
+    ganache: {
+      opts: {},
+      web3_port: null
+    },
+  },
+  default_actor: null,
+  actors: ["ashley", "bert"],
+  validators: ["alice"],
+  tokens: [
+    "zrx",
+    "dai",
+    "comp",
+    "bat",
+    "wbtc",
+    "usdc",
+  ],
+  chain_spec: { // TODO: Allow override of chain spec?
+    base_chain: "local",
+    use_temp: true,
+    props: {}
+  },
+  starport: {},
+  cash_token: {},
+  contracts_dir: null, // [env=BUILD_DIR]
+  log_level: 'info', // [env=LOG]
+  link_validator: true, // abort if validator panics [env=LINK_VALIDATOR]
+  profile: 'release', // or debug [env=PROFILE]
+  target: null, // compound-chain binary [env=CHAIN_BIN]
+  types_file: null, // types.json file [env=TYPES_FILE]
+};
+
 // Helper function to take an info that might be
 // either an array of objects or strings or an
 // object and returns it as an entries array. Strings
@@ -39,40 +73,6 @@ async function instantiateInfo(info, type, indexKey, infoMap) {
     throw new Error(`Invalid type for ${type}: ${JSON.stringify(info)}`);
   }
 }
-
-const baseScenInfo = {
-  eth_opts: {
-    provider: 'ganache', // [env=PROVIDER]
-    ganache: {
-      opts: {},
-      web3_port: null
-    },
-  },
-  default_actor: null,
-  actors: ["ashley", "bert"],
-  validators: ["alice"],
-  tokens: [
-    "zrx",
-    "dai",
-    "comp",
-    "bat",
-    "wbtc",
-    "usdc",
-  ],
-  chain_spec: { // TODO: Allow override of chain spec?
-    base_chain: "local",
-    use_temp: true,
-    props: {}
-  },
-  starport: {},
-  cash_token: {},
-  contracts_dir: null, // [env=BUILD_DIR]
-  log_level: 'info', // [env=LOG]
-  link_validator: true, // abort if validator panics [env=LINK_VALIDATOR]
-  profile: 'release', // or debug [env=PROFILE]
-  target: null, // compound-chain binary [env=CHAIN_BIN]
-  types_file: null, // types.json file [env=TYPES_FILE]
-};
 
 module.exports = {
   baseScenInfo,

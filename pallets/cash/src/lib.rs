@@ -36,9 +36,9 @@ use crate::rates::{InterestRateModel, APR};
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, CashIndex, CashPrincipal, ChainAccount,
-    ChainAsset, ChainSignature, ChainSignatureList, ConfigSet, ConfigSetString, EncodedNotice, EventStatus,
-    Fraction, MaxableAssetAmount, Nonce, NoticeStatus, Reason, ReporterSet, SignedPayload,
-    Timestamp, ValidatorSet, ValidatorSig,
+    ChainAsset, ChainSignature, ChainSignatureList, ConfigSet, ConfigSetString, EncodedNotice,
+    EventStatus, Fraction, MaxableAssetAmount, Nonce, NoticeStatus, Reason, ReporterSet,
+    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 
 use sp_runtime::print;

@@ -20,7 +20,7 @@ function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = nul
   });
 }
 
-function sendAndWaitForEvents(call, api, onFinalize = true) {
+function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = true) {
   return new Promise((resolve, reject) => {
     let unsub;
     let id = trxId++;
@@ -55,7 +55,7 @@ function sendAndWaitForEvents(call, api, onFinalize = true) {
             }
           });
 
-        if (failures.length > 0) {
+        if (rejectOnFailure && failures.length > 0) {
           reject(failures[0]);
         } else {
           resolve(events);
