@@ -18,7 +18,7 @@ class CashToken {
       'CASH',
       'Cash Token',
       18,
-      this.ethAddress(),
+      this.cashToken,
       this.owner,
       this.ctx
     );
