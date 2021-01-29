@@ -64,6 +64,7 @@ mod tests;
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
 pub const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
+pub const OCW_LATEST_PRICE_FEED_TIMESTAMP: &[u8; 33] = b"cash::latest_price_feed_timestamp";
 pub const OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER: &[u8; 41] =
     b"cash::latest_price_feed_poll_block_number";
 pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_open_price_feed";
@@ -360,7 +361,7 @@ decl_module! {
             // Check that signer is a known validator, otherwise throw an error
             let validators = <Validators>::get();
             if !validators.contains(&signer) {
-                debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
+                print(format!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators).as_str());
                 return Err(Error::<T>::UnknownValidator)?
             }
 
@@ -370,7 +371,7 @@ decl_module! {
                 EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
                     if signers.contains(&signer) {
-                        debug::native::error!("Validator has already signed this payload {:?}", signer);
+                        print(format!("Validator has already signed this payload {:?}", signer).as_str());
                         return Err(Error::<T>::AlreadySigned)?
                     }
 
@@ -722,10 +723,28 @@ impl<T: Config> Module<T> {
             crate::oracle::open_price_feed_request_okex(),
             <Error<T>>::OpenOracleHttpFetchError
         )?;
-        let messages_and_signatures = cash_err!(
+
+        let messages_and_signatures_and_timestamp = cash_err!(
             api_response.to_message_signature_pairs(),
             <Error<T>>::OpenOracleApiResponseHexError
         )?;
+        let (messages_and_signatures, timestamp) = messages_and_signatures_and_timestamp;
+
+        // Check to see if Coinbase api prices were updated or not
+        let latest_price_feed_timestamp_storage =
+            StorageValueRef::persistent(OCW_LATEST_PRICE_FEED_TIMESTAMP);
+        if let Some(Some(latest_price_feed_timestamp)) =
+            latest_price_feed_timestamp_storage.get::<String>()
+        {
+            if latest_price_feed_timestamp == timestamp {
+                print(format!().as_str(
+                    "Open oracle prices for timestamp {:?} has been already posted",
+                    timestamp,
+                ));
+                return Ok(());
+            }
+        }
+
         for (msg, sig) in messages_and_signatures {
             // adding some debug info in here, this will become very chatty
             let call = <Call<T>>::post_price(msg, sig);
@@ -738,6 +757,7 @@ impl<T: Config> Module<T> {
             // is ignored and we continue in this loop
         }
         latest_price_feed_poll_block_number_storage.set(&block_number);
+        latest_price_feed_timestamp_storage.set(&timestamp);
         Ok(())
     }
 
