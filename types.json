@@ -78,7 +78,7 @@
   "AssetIndex": ["Uint"],
 
   "Source1": "SymbolRS",
-  "Symbol": "[u32; 12]",
+  "Symbol": ["[u8; 12]", "u8"],
 
   "Source2": "ChainsRS",
   "ChainId": {
