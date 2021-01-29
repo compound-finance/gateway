@@ -7,30 +7,27 @@ pub use our_std::{
 };
 
 // Import these traits so we can interact with the substrate storage modules.
-use frame_support::storage::{StorageDoubleMap, StorageMap, StorageValue};
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
 
 use crate::{
-    chains::{eth, ChainAccount, ChainAsset}, // XXX event ADTs?
-    notices::Notice,                         // XXX move here, encoding to chains
+    chains::{
+        eth, ChainAccount, ChainAsset, ChainAssetAccount, ChainSignature, ChainSignatureList,
+    },
+    notices,
+    notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeStatus},
     params::MIN_TX_VALUE,
+    reason::{MathError, Reason},
     symbol::{Symbol, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, MathError,
-        Price, Quantity, Reason, SafeMul, USDQuantity,
+        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, Price,
+        Quantity, SafeMul, USDQuantity,
     },
-    AssetBalances,
-    AssetSymbols,
-    CashPrincipals,
-    ChainCashPrincipals,
-    Config,
-    Event::GoldieLocks, // XXX
-    GlobalCashIndex,
-    Module,
-    Prices,
-    TotalBorrowAssets,
-    TotalCashPrincipal,
-    TotalSupplyAssets,
+    AssetBalances, AssetSymbols, Call, CashPrincipals, ChainCashPrincipals, Config, Event,
+    GlobalCashIndex, Module, NoticeQueue, Prices, SubmitTransaction, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets,
 };
+
+use sp_runtime::print;
 
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
@@ -50,6 +47,26 @@ macro_rules! require_min_tx_value {
 
 pub fn symbol<T: Config>(asset: ChainAsset) -> Option<Symbol> {
     AssetSymbols::get(asset)
+}
+
+pub fn next_notice_id() -> Result<NoticeId, Reason> {
+    let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
+                                    // TODO: This asset needs to match the chain-- which for Cash, there might be different
+                                    //       versions of a given asset per chain
+
+    Ok(notice_id)
+}
+
+pub fn try_chain_asset_account(
+    asset: ChainAsset,
+    account: ChainAccount,
+) -> Option<ChainAssetAccount> {
+    match (asset, account) {
+        (ChainAsset::Eth(eth_asset), ChainAccount::Eth(eth_account)) => {
+            Some(ChainAssetAccount::Eth(eth_asset, eth_account))
+        }
+        _ => None,
+    }
 }
 
 pub fn price<T: Config>(symbol: Symbol) -> Price {
@@ -233,7 +250,7 @@ pub fn lock_internal<T: Config>(
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
     // XXX real events
-    <Module<T>>::deposit_event(GoldieLocks(asset, holder, amount.value())); // XXX -> raw amount?
+    <Module<T>>::deposit_event(Event::GoldieLocks(asset, holder, amount.value())); // XXX -> raw amount?
     Ok(())
 }
 
@@ -274,10 +291,8 @@ pub fn extract_internal<T: Config>(
     recipient: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    require!(
-        recipient.chain_id() == asset.chain_id(),
-        Reason::ChainMismatch
-    );
+    let chain_asset_account =
+        try_chain_asset_account(asset, recipient).ok_or(Reason::ChainMismatch)?;
     require_min_tx_value!(value::<T>(amount)?);
     require!(
         has_liquidity_to_reduce_asset(holder, amount),
@@ -300,8 +315,25 @@ pub fn extract_internal<T: Config>(
     TotalSupplyAssets::insert(asset, total_supply_new);
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
-    // XXX
-    // Add ExtractionNotice(Asset, Recipient, Amount) to NoticeQueueRecipient.Chain
+    // TODO: Significantly improve this
+    let notice_id = next_notice_id()?;
+    let notice = Notice::ExtractionNotice(match chain_asset_account {
+        ChainAssetAccount::Eth(eth_asset, eth_account) => Ok(ExtractionNotice::Eth {
+            id: notice_id,
+            parent: [0u8; 32],
+            asset: eth_asset,
+            account: eth_account,
+            amount: amount.1,
+        }),
+        _ => Err(Reason::AssetExtractionNotSupported),
+    }?);
+    let encoded_notice = notice.encode_notice();
+
+    // Add to Notice Queue
+    NoticeQueue::insert(notice_id, NoticeStatus::from(notice.clone()));
+
+    // Deposit Notice Event
+    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
 
     Ok(()) // XXX events?
 }
@@ -402,9 +434,113 @@ pub fn has_liquidity_to_reduce_cash(_holder: ChainAccount, _amount: CashQuantity
     true // XXX
 }
 
+// Off chain worker //
+
+pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
+    // TODO: Do we want to return a failure here in any case, or collect them, etc?
+    for (notice_id, notice_status) in NoticeQueue::iter() {
+        match notice_status {
+            NoticeStatus::Pending {
+                signature_pairs,
+                notice,
+            } => {
+                let signer = notices::get_signer_key_for_notice(&notice)?;
+
+                if !notices::has_signer(&signature_pairs, signer) {
+                    // find parent
+                    // id = notice.gen_id(parent)
+
+                    // XXX
+                    // submit onchain call for aggregating the price
+                    let signature: ChainSignature = notices::sign_notice_chain(&notice)?;
+
+                    print(
+                        format!("Posting Signature for [{},{}]", notice_id.0, notice_id.1).as_str(),
+                    );
+
+                    let call = <Call<T>>::publish_signature(notice_id, signature);
+
+                    // TODO: Do we want to short-circuit on an error here?
+                    let _res =
+                        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
+                            .map_err(|()| Reason::FailedToSubmitExtrinsic);
+                }
+
+                ()
+            }
+            _ => (),
+        }
+    }
+
+    Ok(())
+}
+
+pub fn publish_signature_internal(
+    notice_id: NoticeId,
+    signature: ChainSignature,
+) -> Result<(), Reason> {
+    print(format!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1).as_str());
+    let status = <NoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::Missing);
+
+    match status {
+        NoticeStatus::Missing => Ok(()),
+
+        NoticeStatus::Pending {
+            signature_pairs,
+            notice,
+        } => {
+            let signer: ChainAccount = signature.recover(&notice.encode_notice())?; // XXX
+            let has_signer_v = notices::has_signer(&signature_pairs, signer);
+
+            require!(!has_signer_v, Reason::NoticeAlreadySigned);
+
+            // TODO: Can this be easier?
+            let signature_pairs_next = match (signature_pairs, signer, signature) {
+                (
+                    ChainSignatureList::Eth(eth_signature_list),
+                    ChainAccount::Eth(eth_account),
+                    ChainSignature::Eth(eth_sig),
+                ) => {
+                    let mut eth_signature_list_mut = eth_signature_list.clone();
+                    eth_signature_list_mut.push((eth_account, eth_sig));
+                    Ok(ChainSignatureList::Eth(eth_signature_list_mut))
+                }
+                _ => Err(Reason::SignatureMismatch),
+            }?;
+
+            // require(signer == known validator); // XXX
+
+            // XXX sets?
+            // let signers_new = {signer | signers};
+            // let signatures_new = {signature | signatures };
+
+            // if len(signers_new & Validators) > 2/3 * len(Validators) {
+            // NoticeQueue::insert(notice_id, NoticeStatus::Done);
+            // Self::deposit_event(Event::SignedNotice(ChainId::Eth, notice_id, notice.encode_notice(), signatures)); // XXX generic
+            // Ok(())
+            // } else {
+            NoticeQueue::insert(
+                notice_id,
+                NoticeStatus::Pending {
+                    signature_pairs: signature_pairs_next,
+                    notice,
+                },
+            );
+            Ok(())
+            // }
+        }
+
+        NoticeStatus::Done => {
+            // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock::*;
     use crate::symbol::USD;
 
     #[test]
@@ -465,5 +601,119 @@ mod tests {
             withdraw_and_borrow_principal(CashPrincipal(100), principal),
             (principal, CashPrincipal(0))
         );
+    }
+
+    #[test]
+    fn test_next_notice_id() {
+        assert_eq!(next_notice_id(), Ok(NoticeId(0, 0)));
+    }
+
+    #[test]
+    fn test_extract_internal_min_value() {
+        let asset = ChainAsset::Eth([238; 20]);
+        let holder = ChainAccount::Eth([0; 20]);
+        let recipient = ChainAccount::Eth([0; 20]);
+
+        new_test_ext().execute_with(|| {
+            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
+            let symbol = symbol::<Test>(asset).expect("asset not found");
+            let quantity = Quantity::from_nominal(symbol, "5.0");
+            Prices::insert(symbol, 100_000); // $0.10
+            let asset_balances_pre = AssetBalances::get(asset, holder);
+            let total_supply_pre = TotalSupplyAssets::get(asset);
+            let total_borrows_pre = TotalBorrowAssets::get(asset);
+            let notice_queue_pre: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let events_pre: Vec<_> = System::events().into_iter().collect();
+
+            let res = extract_internal::<Test>(asset, holder, recipient, quantity);
+
+            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+
+            let asset_balances_post = AssetBalances::get(asset, holder);
+            let total_supply_post = TotalSupplyAssets::get(asset);
+            let total_borrows_post = TotalBorrowAssets::get(asset);
+            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let events_post: Vec<_> = System::events().into_iter().collect();
+
+            assert_eq!(asset_balances_pre, asset_balances_post);
+            assert_eq!(total_supply_pre, total_supply_post);
+            assert_eq!(total_borrows_pre, total_borrows_post);
+            assert_eq!(notice_queue_pre.len(), notice_queue_post.len());
+            assert_eq!(events_pre.len(), events_post.len());
+        });
+    }
+
+    #[test]
+    fn test_extract_internal_sufficient_value() {
+        let eth_asset = [238; 20];
+        let asset = ChainAsset::Eth(eth_asset);
+        let eth_holder = [0; 20];
+        let eth_recipient = [0; 20];
+        let holder = ChainAccount::Eth(eth_holder);
+        let recipient = ChainAccount::Eth(eth_recipient);
+
+        new_test_ext().execute_with(|| {
+            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
+            let symbol = symbol::<Test>(asset).expect("asset not found");
+            let quantity = Quantity::from_nominal(symbol, "50.0");
+            Prices::insert(symbol, 100_000); // $0.10
+            let asset_balances_pre = AssetBalances::get(asset, holder);
+            let total_supply_pre = TotalSupplyAssets::get(asset);
+            let total_borrows_pre = TotalBorrowAssets::get(asset);
+            let notice_queue_pre: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let events_pre: Vec<_> = System::events().into_iter().collect();
+
+            let res = extract_internal::<Test>(asset, holder, recipient, quantity);
+
+            assert_eq!(res, Ok(()));
+
+            let asset_balances_post = AssetBalances::get(asset, holder);
+            let total_supply_post = TotalSupplyAssets::get(asset);
+            let total_borrows_post = TotalBorrowAssets::get(asset);
+            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let events_post: Vec<_> = System::events().into_iter().collect();
+
+            assert_eq!(
+                asset_balances_pre - 50000000000000000000,
+                asset_balances_post
+            ); // 50e18
+            assert_eq!(total_supply_pre, total_supply_post);
+            assert_eq!(total_borrows_pre + 50000000000000000000, total_borrows_post);
+            assert_eq!(notice_queue_pre.len() + 1, notice_queue_post.len());
+            assert_eq!(events_pre.len() + 1, events_post.len());
+
+            let notice_status = notice_queue_post.into_iter().next().unwrap();
+            let notice_event = events_post.into_iter().next().unwrap();
+
+            let expected_notice_id = NoticeId(0, 0);
+            let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: expected_notice_id,
+                parent: [0u8; 32],
+                asset: eth_asset,
+                account: eth_recipient,
+                amount: 50000000000000000000,
+            });
+            let expected_notice_encoded = expected_notice.encode_notice();
+
+            assert_eq!(
+                (
+                    expected_notice_id,
+                    NoticeStatus::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![]),
+                        notice: expected_notice.clone()
+                    }
+                ),
+                notice_status
+            );
+
+            assert_eq!(
+                TestEvent::cash(Event::Notice(
+                    expected_notice_id,
+                    expected_notice,
+                    expected_notice_encoded
+                )),
+                notice_event.event
+            );
+        });
     }
 }

@@ -43,6 +43,12 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
           .map(({ event: { data: [error, info] } }) => {
             debug(() => `sendAndWaitForEvents[id=${id}] - Failing call: ${JSON.stringify(call)} ${call.toString()}`);
 
+            if (call.method && call.method.callIndex && call.method.callIndex.length === 2) {
+              let [failModule, failExtrinsic] = call.method.callIndex;
+
+              debug(() => `sendAndWaitForEvents[id=${id}] - Hint: check module #${failModule}'s #${failExtrinsic} extrinsic`);
+            }
+
             if (error.isModule) {
               // for module errors, we have the section indexed, lookup
               const decoded = api.registry.findMetaError(error.asModule);
@@ -101,9 +107,24 @@ function getEventData(event) {
   }, {});
 }
 
+function getEventName(event) {
+  return `${event.event.section}:${event.event.method}`;
+}
+
+function getNotice(events) {
+  let noticeEvent = events.find(({ event }) => event.section === 'cash' && event.method === 'Notice');
+  if (!noticeEvent) {
+    throw new Error(`Notice event not found. Events: ${events.map(getEventName).join(', ')})`);
+  }
+
+  return getEventData(noticeEvent);
+}
+
 module.exports = {
   findEvent,
   getEventData,
   sendAndWaitForEvents,
-  waitForEvent
+  waitForEvent,
+  getNotice,
+  getEventName,
 };

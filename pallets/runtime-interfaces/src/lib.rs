@@ -117,6 +117,14 @@ pub trait KeyringInterface {
         let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
         keyring.sign_one(&message, &key_id)
     }
+
+    fn get_public_key(key_id: Vec<u8>) -> Result<[u8; 64], CryptoError> {
+        let keyring = compound_crypto::KEYRING
+            .lock()
+            .map_err(|_| CryptoError::KeyringLock)?;
+        let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
+        keyring.get_public_key(&key_id)
+    }
 }
 
 /// Set an environment variable to a value if it is not already set to an existing value.
