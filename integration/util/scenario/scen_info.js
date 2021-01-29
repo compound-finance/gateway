@@ -9,7 +9,7 @@ const baseScenInfo = {
   },
   default_actor: null,
   actors: ["ashley", "bert"],
-  validators: ["alice"],
+  validators: ["alice", "bob"],
   tokens: [
     "zrx",
     "dai",
