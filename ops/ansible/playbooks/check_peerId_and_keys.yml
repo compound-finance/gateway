@@ -3,9 +3,9 @@
    hosts: 
       - authority_node
    tasks:
-  #   - name: Show substrate facts
-  #     debug:
-  #       var: ansible_local.substrate
+    - name: Show substrate facts
+      debug:
+        var: ansible_local.substrate
 
     - name: check key
       uri:

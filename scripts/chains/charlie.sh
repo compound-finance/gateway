@@ -4,12 +4,21 @@ set -e
 
 cd $(dirname ${BASH_SOURCE[0]})/../..
 
+
+while getopts p flag
+do
+    case "${flag}" in
+        p) purge=true;;
+    esac
+done
+
+if [ "$purge" = true ] ; then
 ./target/release/compound-chain purge-chain --base-path /tmp/chainz/charlie --chain ./compoundChainSpecRaw.json --database paritydb -y
+fi
 
 ./target/release/compound-chain \
   --base-path /tmp/chainz/charlie \
   --chain ./compoundChainSpecRaw.json \
-  --charlie \
   --port 30335 \
   --ws-port 9947 \
   --rpc-port 9935 \

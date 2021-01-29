@@ -23,7 +23,7 @@
       retries: 10
       delay: 5
 
-    - name: show babe erpsonse
+    - name: show babe response
       debug:
         var: babe_insertion
 
