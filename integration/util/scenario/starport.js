@@ -44,8 +44,11 @@ class Starport {
     }
   }
 
-  async unlock(notice, signatures) {
-    return await this.starport.methods.unlock(notice, signatures).send({ from: this.ctx.eth.defaultFrom });
+  async unlock(notice, signaturePairs) {
+    let encoded = notice.EncodedNotice;
+    let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());
+    this.ctx.log({ encoded, signatures });
+    return await this.starport.methods.unlock(encoded, signatures).send({ from: this.ctx.eth.defaultFrom });
   }
 }
 

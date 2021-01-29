@@ -6,7 +6,6 @@ const child_process = require('child_process');
 const execFile = util.promisify(child_process.execFile);
 const { merge, stripHexPrefix } = require('../util');
 const { getValidatorsInfo } = require('./validator');
-const { getTokensInfo } = require('./token');
 
 class ChainSpec {
   constructor(chainSpecInfo, chainSpecFile, ctx) {
@@ -21,6 +20,11 @@ class ChainSpec {
 }
 
 async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
+  let tokens = ctx.tokens;
+  if (!tokens) {
+    throw new Error(`Tokens required to build chain spec`);
+  }
+
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
 
   let babe = validatorsInfo.map(([_, validator]) =>
@@ -38,8 +42,10 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   let validators = validatorsInfo.map(([_, validator]) =>
     stripHexPrefix(validator.eth_account)
   );
-  let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
-  let symbols = tokensInfo.map(([symbol, info]) => [symbol.toUpperCase(), info.decimals]);
+  let assets = tokens.all().map((token) => ({
+    symbol: `${token.symbol.toUpperCase()}/${token.decimals}`,
+    asset: `eth:${token.ethAddress()}`
+  }));
 
   return {
     name: 'Integration Test Network',
@@ -57,7 +63,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         },
         palletCash: {
           validators,
-          symbols
+          assets
         }
       }
     }

@@ -1,7 +1,7 @@
 use crate::symbol::static_pow10;
 use crate::{
-    chains::{Chain, ChainAsset, ChainSignatureList, Ethereum},
-    notices::Notice,
+    chains::{Chain, ChainAsset, Ethereum},
+    reason::{MathError, Reason},
     symbol::{Symbol, CASH, USD},
 };
 use codec::{Decode, Encode};
@@ -130,25 +130,8 @@ pub type ConfigSetString = ConfigSet<String>;
 /// Type for the status of an event on the queue.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventStatus<C: Chain> {
-    Pending {
-        signers: crate::ValidatorSet,
-    },
-    Failed {
-        hash: C::Hash,
-        reason: crate::Reason,
-    },
-    Done,
-}
-
-/// Type for the status of a notice on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum NoticeStatus {
-    Missing,
-    Pending {
-        signers: crate::ValidatorSet,
-        signatures: ChainSignatureList,
-        notice: Notice,
-    },
+    Pending { signers: crate::ValidatorSet },
+    Failed { hash: C::Hash, reason: Reason },
     Done,
 }
 
@@ -345,59 +328,6 @@ impl Quantity {
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
     }
-}
-
-/// Type for reporting failures for reasons outside of our control.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum Reason {
-    None,
-    NotImplemented,
-    BadAccount,
-    BadAddress,
-    BadAsset,
-    BadChainId,
-    BadSymbol,
-    ChainMismatch,
-    CryptoError(compound_crypto::CryptoError),
-    InsufficientChainCash,
-    InsufficientLiquidity,
-    InsufficientTotalFunds,
-    InvalidSignature,
-    KeyNotFound,
-    MathError(MathError),
-    MinTxValueNotMet,
-    NoSuchAsset,
-    ParseIntError,
-    RepayTooMuch,
-}
-
-impl From<MathError> for Reason {
-    fn from(err: MathError) -> Self {
-        Reason::MathError(err)
-    }
-}
-
-impl From<compound_crypto::CryptoError> for Reason {
-    fn from(err: compound_crypto::CryptoError) -> Self {
-        Reason::CryptoError(err)
-    }
-}
-
-impl our_std::fmt::Display for Reason {
-    fn fmt(&self, f: &mut our_std::fmt::Formatter) -> our_std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-/// Type for reporting failures from calculations.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum MathError {
-    Overflow,
-    Underflow,
-    SignMismatch,
-    SymbolMismatch,
-    PriceNotUSD,
-    DivisionByZero,
 }
 
 /// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify

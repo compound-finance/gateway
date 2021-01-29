@@ -29,17 +29,21 @@ function years(n) {
 function buildScenariosInternal(name, baseScenInfo, opts, scenarios, testFn) {
   if (Array.isArray(opts)) {
     scenarios = opts;
+    opts = {};
   }
 
   describe(name, () => {
     scenarios.forEach((scenario) => {
       let realTestFn = scenario.only ?
-        test.only : ( scenario.skip ? test.skip : testFn );
+        test.only : (scenario.skip ? test.skip : testFn);
 
       realTestFn(scenario.name, async () => {
         let scenInfo = merge(baseScenInfo, scenario.info || {});
         let ctx = await buildCtx(scenInfo);
         try {
+          if (opts.beforeEach) {
+            await opts.beforeEach(ctx);
+          }
           await scenario.scenario(ctx);
         } finally {
           await ctx.teardown();

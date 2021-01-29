@@ -46,7 +46,10 @@ const ethChainType = () => {
 
 const encodeUint = (num) => ethers.utils.defaultAbiCoder.encode(['uint'], [num]).slice(2);
 
-const encodeAddr = (addr) => ethers.utils.defaultAbiCoder.encode(['address'], [addr]).slice(2);
+const encodeAddr = (addr) => {
+  let address = addr.hasOwnProperty('_address') ? addr._address : addr;
+  return ethers.utils.defaultAbiCoder.encode(['address'], [address]).slice(2);
+}
 
 const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -255,14 +258,21 @@ describe('Starport', () => {
     });
 
     describe.only('unlock', () => {
+      // TODO: Check insufficient token balance
       it('should unlock asset', async () => {
-        const [asset, account] = createAccounts(2).map(a => a.address);
+        await tokenA.methods.transfer(starport._address, 1500).send({ from: root });
+        const [account] = createAccounts(1).map(a => a.address);
         const amount = '1000';
-        const notice = userMsg + encodeAddr(account) + encodeUint(amount) + encodeAddr(asset);
 
+        expect(Number(await tokenA.methods.balanceOf(starport._address).call())).toEqual(1500);
+
+        const notice = userMsg + encodeAddr(tokenA) + encodeUint(amount) + encodeAddr(account);
         const sigs = authorityAccts.map(acct => sign(notice, acct).sig);
+
         const tx = await send(starport, 'unlock', [notice, sigs], { from: a1 });
-        expect(tx.events.Unlock.returnValues).toMatchObject({asset, account, amount});
+
+        expect(tx.events.Unlock.returnValues).toMatchObject({asset: tokenA._address, account, amount});
+        expect(Number(await tokenA.methods.balanceOf(starport._address).call())).toEqual(500);
       });
 
       // unsigned notice from compound chain
