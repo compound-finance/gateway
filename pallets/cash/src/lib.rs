@@ -737,10 +737,13 @@ impl<T: Config> Module<T> {
             latest_price_feed_timestamp_storage.get::<String>()
         {
             if latest_price_feed_timestamp == timestamp {
-                print(format!().as_str(
-                    "Open oracle prices for timestamp {:?} has been already posted",
-                    timestamp,
-                ));
+                print(
+                    format!(
+                        "Open oracle prices for timestamp {:?} has been already posted",
+                        timestamp
+                    )
+                    .as_str(),
+                );
                 return Ok(());
             }
         }
