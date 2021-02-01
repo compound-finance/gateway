@@ -2,6 +2,8 @@ use compound_chain_runtime::{
     wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
     GrandpaConfig, Signature, SudoConfig, SystemConfig,
 };
+use our_std::str::FromStr;
+use pallet_cash::types::ConfigAsset;
 use sc_service::ChainType;
 use sp_consensus_babe::AuthorityId as BabeId;
 use sp_core::{sr25519, Pair, Public};
@@ -231,17 +233,30 @@ fn testnet_genesis(
             last_block_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
-                .as_millis(), // XXX we prob need pallet_timestamp but doesn't cover genesis anyway
-            validators: vec![
-                "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),
-                "435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),
+                .as_millis(),
+
+            assets: vec![
+                ConfigAsset {
+                    symbol: FromStr::from_str("ETH/18").unwrap(),
+                    asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+                        .unwrap(),
+                },
+                ConfigAsset {
+                    symbol: FromStr::from_str("USDC/6").unwrap(),
+                    asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                        .unwrap(),
+                },
             ],
+
             reporters: vec![
                 "85615b076615317c80f14cbad6501eec031cd51c".into(),
                 "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
             ],
-            symbols: vec![("ETH".into(), 18), ("USDC".into(), 6)],
-            asset_symbol: vec!["USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()],
+
+            validators: vec![
+                "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),
+                "435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),
+            ],
         }),
     }
 }
