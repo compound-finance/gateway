@@ -459,8 +459,6 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            debug::native::info!("Hello World from offchain workers from block {} !", block_number);
-
             let result = Self::fetch_events_with_lock();
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error during fetch events: {:?}", e);

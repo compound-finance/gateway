@@ -131,7 +131,57 @@ pub fn local_testnet_config() -> ChainSpec {
         // Telemetry
         None,
         // Protocol ID
+        Some("local"),
+        // Properties
+        Some(get_properties()),
+        // Extensions
         None,
+    )
+}
+
+fn staging_testnet_genesis() -> GenesisConfig {
+    testnet_genesis(
+        // Initial PoA authorities
+        vec![
+            authority_keys_from_seed("Alice"),
+            authority_keys_from_seed("Bob"),
+            authority_keys_from_seed("Charlie"),
+        ],
+        // Sudo account
+        get_account_id_from_seed::<sr25519::Public>("Alice"),
+        // Pre-funded accounts
+        vec![
+            get_account_id_from_seed::<sr25519::Public>("Alice"),
+            get_account_id_from_seed::<sr25519::Public>("Bob"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie"),
+            get_account_id_from_seed::<sr25519::Public>("Dave"),
+            get_account_id_from_seed::<sr25519::Public>("Eve"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+        ],
+        true,
+    )
+}
+
+pub fn staging_testnet_config() -> ChainSpec {
+    ChainSpec::from_genesis(
+        // Name
+        "Staging Testnet",
+        // ID
+        "staging_testnet",
+        ChainType::Live,
+        staging_testnet_genesis,
+        // Bootnodes
+        vec![],
+        // Telemetry
+        None,
+        // Protocol ID
+        Some("compound-chain-staging"),
         // Properties
         Some(get_properties()),
         // Extensions
