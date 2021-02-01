@@ -5,8 +5,10 @@ use crate::rates::APR;
 use crate::types::{AssetAmount, CashIndex, Reason, Timestamp};
 
 use codec::{Decode, Encode};
-use our_std::{Debuggable, RuntimeDebug};
+use our_std::{convert::TryInto, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
+/// Type for representing the selection of a supported chain.
+#[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainId {
     Comp,
@@ -16,9 +18,167 @@ pub enum ChainId {
     Tez,
 }
 
+impl ChainId {
+    pub fn to_account(self, addr: &str) -> Result<ChainAccount, Reason> {
+        match self {
+            ChainId::Comp => Ok(ChainAccount::Comp(Compound::to_address(addr)?)),
+            ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::to_address(addr)?)),
+            ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::to_address(addr)?)),
+            ChainId::Sol => Ok(ChainAccount::Sol(Solana::to_address(addr)?)),
+            ChainId::Tez => Ok(ChainAccount::Tez(Tezos::to_address(addr)?)),
+        }
+    }
+
+    pub fn to_asset(self, addr: &str) -> Result<ChainAsset, Reason> {
+        match self {
+            ChainId::Comp => Ok(ChainAsset::Comp(Compound::to_address(addr)?)),
+            ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::to_address(addr)?)),
+            ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::to_address(addr)?)),
+            ChainId::Sol => Ok(ChainAsset::Sol(Solana::to_address(addr)?)),
+            ChainId::Tez => Ok(ChainAsset::Tez(Tezos::to_address(addr)?)),
+        }
+    }
+}
+
 impl Default for ChainId {
     fn default() -> Self {
         ChainId::Eth
+    }
+}
+
+/// Type for an account tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAccount {
+    Comp(<Compound as Chain>::Address),
+    Eth(<Ethereum as Chain>::Address),
+    Dot(<Polkadot as Chain>::Address),
+    Sol(<Solana as Chain>::Address),
+    Tez(<Tezos as Chain>::Address),
+}
+
+impl ChainAccount {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainAccount::Eth(_) => ChainId::Eth,
+            _ => panic!("XXX not implemented"),
+        }
+    }
+}
+
+// Implement deserialization for ChainAccounts so we can use them in GenesisConfig / ChainSpec JSON.
+//  i.e. "eth:0x..." <> Eth(0x...)
+impl our_std::str::FromStr for ChainAccount {
+    type Err = Reason;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        if let Some((chain_id_str, address_str)) = String::from(string).split_once(":") {
+            let chain_id = ChainId::from_str(chain_id_str)?;
+            Ok(chain_id.to_account(address_str)?)
+        } else {
+            Err(Reason::BadAsset)
+        }
+    }
+}
+
+// For serialize (which we don't really use, but are required to implement)
+impl From<ChainAccount> for String {
+    fn from(asset: ChainAccount) -> String {
+        match asset {
+            ChainAccount::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
+            _ => panic!("XXX not implemented"),
+        }
+    }
+}
+
+/// Type for an asset tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAsset {
+    Comp(<Compound as Chain>::Address),
+    Eth(<Ethereum as Chain>::Address),
+    Dot(<Polkadot as Chain>::Address),
+    Sol(<Solana as Chain>::Address),
+    Tez(<Tezos as Chain>::Address),
+}
+
+// For serialize (which we don't really use, but are required to implement)
+impl ChainAsset {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainAsset::Eth(_) => ChainId::Eth,
+            _ => panic!("XXX not implemented"),
+        }
+    }
+}
+
+// Implement deserialization for ChainAssets so we can use them in GenesisConfig / ChainSpec JSON.
+//  i.e. "eth:0x..." <> Eth(0x...)
+impl our_std::str::FromStr for ChainAsset {
+    type Err = Reason;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        if let Some((chain_id_str, address_str)) = String::from(string).split_once(":") {
+            let chain_id = ChainId::from_str(chain_id_str)?;
+            Ok(chain_id.to_asset(address_str)?)
+        } else {
+            Err(Reason::BadAsset)
+        }
+    }
+}
+
+impl From<ChainAsset> for String {
+    fn from(asset: ChainAsset) -> String {
+        match asset {
+            ChainAsset::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
+            _ => panic!("XXX not implemented"),
+        }
+    }
+}
+
+/// Type for a signature tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainSignature {
+    Comp(<Compound as Chain>::Signature),
+    Eth(<Ethereum as Chain>::Signature),
+    Dot(<Polkadot as Chain>::Signature),
+    Sol(<Solana as Chain>::Signature),
+    Tez(<Tezos as Chain>::Signature),
+}
+
+impl ChainSignature {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainSignature::Eth(_) => ChainId::Eth,
+            _ => panic!("XXX not implemented"),
+        }
+    }
+
+    pub fn recover(&self, message: &[u8]) -> Result<ChainAccount, Reason> {
+        match self {
+            ChainSignature::Eth(eth_sig) => Ok(ChainAccount::Eth(
+                <Ethereum as Chain>::recover_address(message, *eth_sig)?,
+            )),
+
+            _ => panic!("XXX not implemented"),
+        }
+    }
+}
+
+/// Type for a list of chain signatures.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainSignatureList {
+    Eth(Vec<<Ethereum as Chain>::Signature>),
+}
+
+// Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
+impl our_std::str::FromStr for ChainId {
+    type Err = Reason;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_uppercase().as_str() {
+            "ETH" => Ok(ChainId::Eth),
+            "SOL" => Ok(ChainId::Sol),
+            _ => Err(Reason::BadChainId),
+        }
     }
 }
 
@@ -39,6 +199,7 @@ pub trait Chain {
     fn hash_bytes(data: &[u8]) -> Self::Hash;
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
+    fn to_address(addr: &str) -> Result<Self::Address, Reason>;
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -73,6 +234,10 @@ impl Chain for Compound {
     fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
         panic!("XXX not implemented");
     }
+
+    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
 }
 
 impl Chain for Ethereum {
@@ -102,6 +267,17 @@ impl Chain for Ethereum {
             message, eth_key_id,
         )?)
     }
+
+    fn to_address(addr: &str) -> Result<Self::Address, Reason> {
+        if addr.len() == 42 && &addr[0..2] == "0x" {
+            if let Ok(bytes) = hex::decode(&addr[2..42]) {
+                if let Ok(address) = bytes.try_into() {
+                    return Ok(address);
+                }
+            }
+        }
+        return Err(Reason::BadAddress);
+    }
 }
 
 impl Chain for Polkadot {
@@ -119,6 +295,10 @@ impl Chain for Polkadot {
     }
 
     fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 }
@@ -140,6 +320,10 @@ impl Chain for Solana {
     fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
         panic!("XXX not implemented");
     }
+
+    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
 }
 
 impl Chain for Tezos {
@@ -157,6 +341,10 @@ impl Chain for Tezos {
     }
 
     fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 }

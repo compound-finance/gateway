@@ -1,27 +1,27 @@
 use crate::symbol::static_pow10;
 use crate::{
-    chains::{Chain, ChainId, Ethereum},
+    chains::{Chain, ChainAsset, ChainSignatureList, Ethereum},
     notices::Notice,
     symbol::{Symbol, CASH, USD},
 };
 use codec::{Decode, Encode};
-use our_std::{convert::TryFrom, RuntimeDebug};
+use our_std::{convert::TryFrom, Deserialize, RuntimeDebug, Serialize};
 
 // Type aliases //
 
-/// Type for representing a fractional on Compound Chain, generally between [0, 1].
-pub type Fraction = u128; // XXX ?
+/// Type for representing a percentage/fractional, often between [0, 100].
+pub type Bips = u128;
 
 /// Type for a nonce.
 pub type Nonce = u32;
 
-/// Type for representing time on Compound Chain.
+/// Type for representing time.
 pub type Timestamp = u128; // XXX u64?
 
-/// Type of the largest possible signed integer on Compound Chain.
+/// Type of the largest possible signed integer.
 pub type Int = i128;
 
-/// Type of the largest possible unsigned integer on Compound Chain.
+/// Type of the largest possible unsigned integer.
 pub type Uint = u128;
 
 /// Type for a generic encoded message, potentially for any chain.
@@ -70,62 +70,6 @@ impl<T> From<T> for Maxable<T> {
 /// Either an AssetAmount or max
 pub type MaxableAssetAmount = Maxable<AssetAmount>; // XXX now just used by magic
 
-/// Type for chain accounts
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainAccount {
-    Eth(<Ethereum as Chain>::Address),
-}
-
-impl ChainAccount {
-    pub fn chain_id(&self) -> ChainId {
-        match *self {
-            ChainAccount::Eth(_) => ChainId::Eth,
-        }
-    }
-}
-
-/// Type for chain assets
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainAsset {
-    Eth(<Ethereum as Chain>::Address),
-}
-
-impl ChainAsset {
-    pub fn chain_id(&self) -> ChainId {
-        match *self {
-            ChainAsset::Eth(_) => ChainId::Eth,
-        }
-    }
-}
-
-/// Type for a chain signature.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainSignature {
-    Eth(<Ethereum as Chain>::Signature),
-}
-
-impl ChainSignature {
-    pub fn chain_id(&self) -> ChainId {
-        match *self {
-            ChainSignature::Eth(_) => ChainId::Eth,
-        }
-    }
-
-    pub fn recover(&self, message: &[u8]) -> Result<ChainAccount, Reason> {
-        match self {
-            ChainSignature::Eth(eth_sig) => Ok(ChainAccount::Eth(
-                <Ethereum as Chain>::recover_address(message, *eth_sig)?,
-            )),
-        }
-    }
-}
-
-/// Type for a list of chain signatures
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainSignatureList {
-    Eth(Vec<<Ethereum as Chain>::Signature>),
-}
-
 /// Type for a set of open price feed reporters.
 pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
 
@@ -140,6 +84,44 @@ pub type ValidatorKey = [u8; 20]; // XXX secp256k1 public key, but why secp256k1
 
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
+
+/// Type for representing a quantity, potentially of any symbol.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ConfigAsset {
+    #[serde(deserialize_with = "deserialize_from_str")]
+    #[serde(serialize_with = "serialize_into_str")]
+    pub symbol: Symbol,
+
+    #[serde(deserialize_with = "deserialize_from_str")]
+    #[serde(serialize_with = "serialize_into_str")]
+    pub asset: ChainAsset,
+}
+
+// For using in GenesisConfig / ChainSpec JSON.
+our_std::if_std! {
+    use std::fmt::Display;
+    use std::str::FromStr;
+    use serde::{de, Deserializer, Serializer};
+
+    fn deserialize_from_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+    where
+        T: FromStr,
+        T::Err: Display,
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        T::from_str(&s).map_err(de::Error::custom)
+    }
+
+    fn serialize_into_str<T, S>(val: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: Copy + Into<String>,
+        S: Serializer,
+    {
+        let s: String = (*val).into();
+        serializer.serialize_str(&s)
+    }
+}
 
 /// Type for a set of configuration values
 pub type ConfigSet<T> = Vec<T>;
@@ -186,7 +168,7 @@ pub struct Quantity(pub Symbol, pub AssetAmount);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
 pub struct CashPrincipal(pub Int);
 
-/// Type for representing the multiplicative CASH index on Compound Chain.
+/// Type for representing the multiplicative CASH index.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct CashIndex(pub Uint);
 
@@ -254,7 +236,7 @@ where
     }
 }
 
-/// Type for representing the additive asset indices on Compound Chain.
+/// Type for representing the additive asset indices.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct AssetIndex(pub Uint);
 
@@ -372,16 +354,22 @@ impl Quantity {
 pub enum Reason {
     None,
     NotImplemented,
+    BadAccount,
+    BadAddress,
+    BadAsset,
+    BadChainId,
+    BadSymbol,
     ChainMismatch,
     CryptoError(compound_crypto::CryptoError),
     InsufficientChainCash,
     InsufficientLiquidity,
     InsufficientTotalFunds,
     InvalidSignature,
-    InvalidSymbol,
     KeyNotFound,
     MathError(MathError),
     MinTxValueNotMet,
+    NoSuchAsset,
+    ParseIntError,
     RepayTooMuch,
 }
 
@@ -394,6 +382,12 @@ impl From<MathError> for Reason {
 impl From<compound_crypto::CryptoError> for Reason {
     fn from(err: compound_crypto::CryptoError) -> Self {
         Reason::CryptoError(err)
+    }
+}
+
+impl our_std::fmt::Display for Reason {
+    fn fmt(&self, f: &mut our_std::fmt::Formatter) -> our_std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

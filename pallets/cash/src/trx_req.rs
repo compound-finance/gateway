@@ -1,6 +1,7 @@
 extern crate trx_request; // XXX why extern not use?
 
-use crate::types::{ChainAccount, Maxable, MaxableAssetAmount};
+use crate::chains::ChainAccount;
+use crate::types::{Maxable, MaxableAssetAmount};
 use trx_request::*;
 
 // XXX why are these the only things needed here?
