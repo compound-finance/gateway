@@ -2,6 +2,10 @@ use crate::{chains::*, core::*, mock::*, rates::*, reason::Reason, symbol::*, *}
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
 use sp_core::offchain::testing;
+use sp_core::offchain::{
+    testing::{PoolState, TestOffchainExt, TestTransactionPoolExt},
+    OffchainExt, TransactionPoolExt,
+};
 
 const ETH: Symbol = Symbol::new("ETH", 18);
 
@@ -288,4 +292,13 @@ fn test_get_borrow_rate() {
         let borrow_rate = CashModule::get_borrow_rate(&asset).unwrap();
         assert_eq!(borrow_rate, 101.into());
     });
+}
+
+#[test]
+fn basic_offchain_worker_test() {
+    new_test_ext().execute_with(|| {
+        initialize_storage(); // sets up ETH
+
+        // CashModule::offchain_worker(12);
+    })
 }
