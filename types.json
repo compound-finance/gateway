@@ -18,26 +18,6 @@
       "Value": ["AssetAmount"]
     }
   },
-  "ChainAccount": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
-    }
-  },
-  "ChainAsset": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
-    }
-  },
-  "ChainSignature": {
-    "_enum": {
-      "Eth": ["[u8; 65]"]
-    }
-  },
-  "ChainSignatureList": {
-    "_enum": {
-      "Eth": ["Vec<[u8; 65]>"]
-    }
-  },
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
@@ -83,6 +63,26 @@
   "Source2": "ChainsRS",
   "ChainId": {
     "_enum": ["Comp", "Eth", "Dot", "Sol", "Tez"]
+  },
+  "ChainAccount": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainAsset": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainSignature": {
+    "_enum": {
+      "Eth": ["[u8; 65]"]
+    }
+  },
+  "ChainSignatureList": {
+    "_enum": {
+      "Eth": ["Vec<[u8; 65]>"]
+    }
   },
   "Compound": {},
   "Ethereum": {},
