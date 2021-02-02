@@ -190,7 +190,7 @@ jobs:
 
       - name: Build Compound Chain
         run: |
-          cargo +nightly build --release
+          cargo +nightly-2020-11-15 build --release
 
       - name: Run Integration Test
         run: |
