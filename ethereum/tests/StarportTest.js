@@ -257,7 +257,7 @@ describe('Starport', () => {
       });
     });
 
-    describe.only('unlock', () => {
+    describe('unlock', () => {
       // TODO: Check insufficient token balance
       it('should unlock asset', async () => {
         await tokenA.methods.transfer(starport._address, 1500).send({ from: root });
