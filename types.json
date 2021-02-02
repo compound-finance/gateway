@@ -74,21 +74,15 @@
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
   "CashPrincipal": ["Int"],
-  "CashIndex" : ["Uint"],
+  "CashIndex": ["Uint"],
   "AssetIndex": ["Uint"],
 
   "Source1": "SymbolRS",
-  "Symbol": ["[u8; 12]", "u8"],
+  "Symbol": "([u8; 12], u8)",
 
   "Source2": "ChainsRS",
   "ChainId": {
-    "_enum": [
-      "Comp",
-      "Eth",
-      "Dot",
-      "Sol",
-      "Tez"
-    ]
+    "_enum": ["Comp", "Eth", "Dot", "Sol", "Tez"]
   },
   "Compound": {},
   "Ethereum": {},
@@ -201,14 +195,7 @@
     }
   },
   "MathError": {
-    "_enum": [
-      "Overflow",
-      "Underflow",
-      "SignMismatch",
-      "SymbolMismatch",
-      "PriceNotUSD",
-      "DivisionByZero"
-    ]
+    "_enum": ["Overflow", "Underflow", "SignMismatch", "SymbolMismatch", "PriceNotUSD", "DivisionByZero"]
   },
 
   "Source5": "RatesRS",
