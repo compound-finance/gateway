@@ -23,10 +23,10 @@ use crate::{
     CashPrincipals,
     ChainCashPrincipals,
     Config,
+    Event::GoldieLocks, // XXX
     GlobalCashIndex,
     Module,
     Prices,
-    RawEvent::GoldieLocks, // XXX
     TotalBorrowAssets,
     TotalCashPrincipal,
     TotalSupplyAssets,
