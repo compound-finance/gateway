@@ -114,7 +114,7 @@ fn process_eth_event_happy_path() {
                         if let TestEvent::cash(inner) = e { Some(inner) } else { None }
                     })
                     .collect::<Vec<_>>();
-                let expected_event = RawEvent::ProcessedEthEvent(checked_payload);
+                let expected_event = Event::ProcessedEthEvent(checked_payload);
                 assert_eq!(our_events[1], expected_event);
             }
 

@@ -73,7 +73,7 @@ pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_ope
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+    type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
 
     /// The overarching dispatch call type.
     type Call: From<Call<Self>>;
@@ -178,12 +178,7 @@ decl_storage! {
 }
 
 decl_event!(
-    pub enum Event<T>
-    where
-        AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
-    {
-        XXXPhantomFakeEvent(AccountId), // XXX
-
+    pub enum Event {
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
@@ -390,13 +385,13 @@ decl_module! {
                         match core::apply_eth_event_internal::<T>(event) {
                             Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                                Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
+                                Self::deposit_event(Event::ProcessedEthEvent(payload));
                                 Ok(())
                             }
 
                             Err(reason) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash: Ethereum::hash_bytes(payload.as_slice()), reason: reason });
-                                Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, reason));
+                                Self::deposit_event(Event::FailedProcessingEthEvent(payload, reason));
                                 Ok(())
                             }
                         }
@@ -412,13 +407,13 @@ decl_module! {
                     match core::apply_eth_event_internal::<T>(event) {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                            Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
+                            Self::deposit_event(Event::ProcessedEthEvent(payload));
                             Ok(())
                         }
 
                         Err(new_reason) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
-                            Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, new_reason));
+                            Self::deposit_event(Event::FailedProcessingEthEvent(payload, new_reason));
                             Ok(())
                         }
                     }
@@ -448,7 +443,7 @@ decl_module! {
                     // let signatures_new = {signature | signatures };
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
                            EthNoticeQueue::insert(notice_id, NoticeStatus::Done);
-                           Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice_id, notice.encode_ethereum_notice(), signatures)); // XXX generic
+                           Self::deposit_event(Event::SignedNotice(ChainId::Eth, notice_id, notice.encode_ethereum_notice(), signatures)); // XXX generic
                            Ok(())
                     // } else {
                     //     EthNoticeQueue::insert(event.id, NoticeStatus::Pending { signers: signers_new, signatures, notice});
@@ -912,8 +907,8 @@ pub fn magic_extract_internal<T: Config>(
     )?; // XXX
 
     // Emit an event or two.
-    <Module<T>>::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
-    <Module<T>>::deposit_event(RawEvent::SignedNotice(
+    <Module<T>>::deposit_event(Event::MagicExtract(amount, account, notice.clone()));
+    <Module<T>>::deposit_event(Event::SignedNotice(
         ChainId::Eth,
         notice_id,
         encoded_notice,
