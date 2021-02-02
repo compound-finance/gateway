@@ -1,7 +1,7 @@
+use crate::dev_keyring;
 use crate::no_std::*;
 use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
-use sp_core::Pair;
 use std::collections::hash_map::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -69,29 +69,46 @@ pub trait Keyring {
     /// the key at all.
     fn sign(
         self: &Self,
-        messages: Vec<Vec<u8>>,
+        messages: Vec<&[u8]>,
         key_id: &KeyId,
-    ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError>;
+    ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError>;
+
+    fn sign_one(self: &Self, message: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError>;
 
     /// Get the public key data for the key id provided.
     /// Fails whenever the key_id is not found in the keyring.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError>;
+    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError>;
+}
+
+pub(crate) fn combine_sig_and_recovery(
+    sig: SignatureBytesWithoutRecovery,
+    recovery_term: u8,
+) -> SignatureBytes {
+    match (sig, recovery_term) {
+        (
+            [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30, e31, e32, e33, e34, e35, e36, e37, e38, e39, e40, e41, e42, e43, e44, e45, e46, e47, e48, e49, e50, e51, e52, e53, e54, e55, e56, e57, e58, e59, e60, e61, e62, e63, e64],
+            rec,
+        ) => [
+            e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18, e19,
+            e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30, e31, e32, e33, e34, e35, e36,
+            e37, e38, e39, e40, e41, e42, e43, e44, e45, e46, e47, e48, e49, e50, e51, e52, e53,
+            e54, e55, e56, e57, e58, e59, e60, e61, e62, e63, e64, rec,
+        ],
+    }
 }
 
 /// A helper function to sign a message in the style of ethereum
 ///
 /// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
 /// This is called by web3.js https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/packages/web3-eth-accounts/package.json#L18
-fn eth_sign(message: &[u8], private_key: &SecretKey) -> Vec<u8> {
-    let hashed = eth_keccak_for_signature(message);
+fn eth_sign(message: &[u8], private_key: &SecretKey, prepend_preamble: bool) -> SignatureBytes {
+    let hashed = eth_keccak_for_signature(message, prepend_preamble);
     // todo: there is something in this function that says "it is ok for the message to overflow.." that seems bad.
     let message = secp256k1::Message::parse(&hashed);
     let (sig, recovery) = secp256k1::sign(&message, &private_key);
     let recovery_term = recovery.serialize() + ETH_ADD_TO_V;
-    let mut sig: Vec<u8> = sig.serialize().into();
-    sig.extend_from_slice(&[0; 31]); // need to pad out for eth_abi
-    sig.push(recovery_term);
-    sig
+    let sig = sig.serialize();
+    combine_sig_and_recovery(sig, recovery_term)
 }
 
 /// In memory keyring
@@ -120,12 +137,12 @@ impl InMemoryKeyring {
     }
 
     /// Get the keypair associated with the given key id
-    fn get_keypair(self: &Self, key_id: &KeyId) -> Result<&EcdsaPair, CryptoError> {
+    pub fn get_keypair(self: &Self, key_id: &KeyId) -> Result<&EcdsaPair, CryptoError> {
         self.keys.get(&key_id.data).ok_or(CryptoError::KeyNotFound)
     }
 
     /// Get the private key associated with the key ID (for signing)
-    fn get_private_key(self: &Self, key_id: &KeyId) -> Result<SecretKey, CryptoError> {
+    pub fn get_private_key(self: &Self, key_id: &KeyId) -> Result<SecretKey, CryptoError> {
         let keypair = self.get_keypair(key_id)?;
         // note - it seems to me that this method is misnamed and this actually provides
         // the private key
@@ -137,7 +154,7 @@ impl InMemoryKeyring {
     }
 
     /// Get the eth address (bytes) associated with the given key id.
-    fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+    pub fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<AddressBytes, CryptoError> {
         let public_key = self.get_public_key(key_id)?;
         Ok(public_key_bytes_to_eth_address(&public_key))
     }
@@ -149,21 +166,26 @@ impl Keyring for InMemoryKeyring {
     /// Sign the messages with the given Key ID
     fn sign(
         self: &Self,
-        messages: Vec<Vec<u8>>,
+        messages: Vec<&[u8]>,
         key_id: &KeyId,
-    ) -> Result<Vec<Result<Vec<u8>, CryptoError>>, CryptoError> {
+    ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError> {
         let private_key = self.get_private_key(key_id)?;
 
         let result = messages
             .iter()
-            .map(|message| Ok(eth_sign(message, &private_key)))
+            .map(|message| Ok(eth_sign(message, &private_key, false)))
             .collect();
 
         Ok(result)
     }
 
+    fn sign_one(self: &Self, message: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
+        let private_key = self.get_private_key(key_id)?;
+        Ok(eth_sign(message, &private_key, false))
+    }
+
     /// Get the public key associated with the given key id.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<Vec<u8>, CryptoError> {
+    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError> {
         let private = self.get_private_key(key_id)?;
         // could not call serialize from the keypair so I had to re-derive the public key here
         let public = secp256k1::PublicKey::from_secret_key(&private);
@@ -177,20 +199,13 @@ lazy_static::lazy_static! {
     pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = Mutex::new(Arc::new(dev_keyring()));
 }
 
-/// Sets up the development keyring, an in memory keyring loaded with the `//ALICE` key
-/// for signing messages headed to ethereum.
-pub fn dev_keyring() -> InMemoryKeyring {
-    let mut keyring = InMemoryKeyring::new();
-    let eth_key_id = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
-    let (pair, _) = EcdsaPair::from_string_with_seed("//ALICE", None).unwrap();
-    keyring.add(&eth_key_id, pair);
-
-    keyring
-}
+pub(crate) const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use our_std::convert::TryInto;
+    use sp_core::Pair;
 
     #[derive(Clone)]
     struct TestCase {
@@ -207,12 +222,12 @@ mod tests {
                 address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
                 private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
                 data: "Some data".into(),
-                signature: "0xa8037a6116c176a25e6fc224947fde9e79a2deaa0dd8b67b366fbdfdbffc01f953e41351267b20d4a89ebfe9c8f03c04de9b345add4a52f15bd026b63c8fb150000000000000000000000000000000000000000000000000000000000000001b".into(),
+                signature: "0xa8037a6116c176a25e6fc224947fde9e79a2deaa0dd8b67b366fbdfdbffc01f953e41351267b20d4a89ebfe9c8f03c04de9b345add4a52f15bd026b63c8fb1501b".into(),
             }, TestCase {
                 address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
                 private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
                 data: "Some data!%$$%&@*".into(),
-                signature: "0x05252412b097c5d080c994d1ea12abcee6f1cae23feb225517a0b691a66e12866b3f54292f9cfef98f390670b4d010fc4af7fcd46e41d72870602c117b14921c000000000000000000000000000000000000000000000000000000000000001c".into(),
+                signature: "0x05252412b097c5d080c994d1ea12abcee6f1cae23feb225517a0b691a66e12866b3f54292f9cfef98f390670b4d010fc4af7fcd46e41d72870602c117b14921c1c".into(),
             }, /* TestCase { // for now this test case is excluded because the data are encoded as binary
                 address: "0xEB014f8c8B418Db6b45774c326A0E64C78914dC0".into(),
                 private_key: "0xbe6383dad004f233317e46ddb46ad31b16064d14447a95cc1d8c8d4bc61c3728".into(),
@@ -223,18 +238,25 @@ mod tests {
     }
 
     /// Helper function to decode 0x... to bytes
-    fn eth_decode_hex(hex: String) -> Vec<u8> {
+    fn eth_decode_hex_unsafe(hex: String) -> Vec<u8> {
         let hex = hex.as_bytes();
         hex::decode(&hex[2..]).unwrap()
     }
 
+    fn eth_decode_hex_address_unsafe(hex: String) -> AddressBytes {
+        eth_decode_hex_unsafe(hex).try_into().unwrap()
+    }
+    fn eth_decode_hex_signature_unsafe(hex: String) -> SignatureBytes {
+        eth_decode_hex_unsafe(hex).try_into().unwrap()
+    }
+
     /// Test out eth signature function
     fn test_eth_sign_case(case: TestCase) {
-        let private_key = eth_decode_hex(case.private_key);
+        let private_key = eth_decode_hex_unsafe(case.private_key);
         let message: Vec<u8> = case.data.into();
         let secret_key = SecretKey::parse_slice(&private_key).unwrap();
-        let actual_sig = eth_sign(&message, &secret_key);
-        let expected_sig = eth_decode_hex(case.signature);
+        let actual_sig = eth_sign(&message, &secret_key, true);
+        let expected_sig = eth_decode_hex_signature_unsafe(case.signature);
         assert_eq!(actual_sig, expected_sig);
     }
 
@@ -248,9 +270,9 @@ mod tests {
     /// Test out eth recover function
     fn test_eth_recover_case(case: TestCase) {
         let message: Vec<u8> = case.data.into();
-        let sig = eth_decode_hex(case.signature);
-        let actual_address = eth_recover(&message, &sig).unwrap();
-        let expected_address = eth_decode_hex(case.address);
+        let sig = eth_decode_hex_signature_unsafe(case.signature);
+        let actual_address = eth_recover(&message, &sig, true).unwrap();
+        let expected_address = eth_decode_hex_address_unsafe(case.address);
         assert_eq!(actual_address, expected_address);
     }
 
@@ -270,7 +292,7 @@ mod tests {
             data: "hello".into(),
         };
         let mut keyring = InMemoryKeyring::new();
-        let private_key_bytes = eth_decode_hex(private_key.clone());
+        let private_key_bytes = eth_decode_hex_unsafe(private_key.clone());
         let pair = EcdsaPair::from_seed_slice(&private_key_bytes).unwrap();
         keyring.add(&key_id, pair);
 
@@ -279,12 +301,20 @@ mod tests {
 
     fn test_sign_case(case: TestCase) {
         let (key_id, keyring) = get_test_keyring_from_test_case(&case);
-        let message: Vec<u8> = case.data.into();
-        let messages = vec![message];
+        let message: Vec<u8> = format!(
+            "\x19Ethereum Signed Message:\n{}{}",
+            case.data.len(),
+            case.data
+        )
+        .as_bytes()
+        .into();
+        let messages: Vec<&[u8]> = vec![&message];
+        // Note: we need to manually prepend here since `keyring` doesn't, itself
+        // support prepending messages
         let sigs = keyring.sign(messages, &key_id).unwrap();
         assert_eq!(sigs.len(), 1);
         let actual_sig = sigs[0].as_ref().unwrap();
-        let expected_sig = &eth_decode_hex(case.signature);
+        let expected_sig = &eth_decode_hex_signature_unsafe(case.signature);
         assert_eq!(actual_sig, expected_sig);
     }
 
@@ -296,7 +326,7 @@ mod tests {
     fn test_public_key_case(case: TestCase) {
         let (key_id, keyring) = get_test_keyring_from_test_case(&case);
         let actual_address = keyring.get_eth_address(&key_id).unwrap();
-        let expected_address = eth_decode_hex(case.address);
+        let expected_address = eth_decode_hex_address_unsafe(case.address);
         assert_eq!(actual_address, expected_address);
     }
 

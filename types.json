@@ -1,37 +1,20 @@
 {
   "Source0": "TypesRS",
-  "APR": "u128",
+  "Bips": "u128",
   "Nonce": "u32",
   "Timestamp": "u128",
+  "Int": "i128",
   "Uint": "u128",
-  "EncodedNotice": "Vec<u8>",
-  "AssetPrice": "Uint",
   "AssetAmount": "Uint",
-  "CashAmount": "Uint",
-  "MaxAssetAmount": {
+  "AssetBalance": "Int",
+  "AssetPrice": "Uint",
+  "AssetQuantity": "Quantity",
+  "CashQuantity": "Quantity",
+  "USDQuantity": "Quantity",
+  "MaxableAssetAmount": {
     "_enum": {
       "Max": [],
       "Value": ["AssetAmount"]
-    }
-  },
-  "ChainSignature": {
-    "_enum": {
-      "Eth": ["[u8; 65]"]
-    }
-  },
-  "ChainSignatureList": {
-    "_enum": {
-      "Eth": ["Vec<[u8; 65]>"]
-    }
-  },
-  "ChainAccount": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
-    }
-  },
-  "ChainAsset": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
     }
   },
   "ReporterSet": "Vec<[u8; 20]>",
@@ -39,6 +22,10 @@
   "ValidatorSig": "[u8; 65]",
   "ValidatorKey": "[u8; 20]",
   "ValidatorSet": "Vec<ValidatorKey>",
+  "ConfigAsset": {
+    "symbol": "Symbol",
+    "asset": "ChainAsset"
+  },
   "ConfigSetString": "Vec<String>",
   "EventStatus": {
     "_enum": {
@@ -52,37 +39,63 @@
       "Done": {}
     }
   },
-  "NoticeStatusPending": {
-    "_enum": {
-      "signers": "ValidatorSet",
-      "signatures": "ChainSignatureList",
-      "notice": "Notice"
-    }
-  },
-  "NoticeStatus": {
-    "_enum": {
-      "Missing": [],
-      "Pending": "NoticeStatusPending",
-      "Notice": "Notice",
-      "Done": []
-    }
-  },
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
-  "MulIndex" : "Uint",
+  "CashPrincipal": ["Int"],
+  "CashIndex": ["Uint"],
+  "AssetIndex": ["Uint"],
 
   "Source1": "SymbolRS",
-  "Symbol": "[u32; 12]",
+  "Symbol": "([u8; 12], u8)",
 
   "Source2": "ChainsRS",
   "ChainId": {
-    "_enum": [
-      "Comp",
-      "Eth",
-      "Dot",
-      "Sol",
-      "Tez"
-    ]
+    "_enum": ["Comp", "Eth", "Dot", "Sol", "Tez"]
+  },
+  "ChainAccount": {
+    "_enum": {
+      "Comp": ["[u8; 20]"],
+      "Eth": ["[u8; 20]"],
+      "Dot": ["[u8; 20]"],
+      "Sol": ["[u8; 20]"],
+      "Tez": ["[u8; 20]"]
+    }
+  },
+  "ChainAsset": {
+    "_enum": {
+      "Comp": ["[u8; 20]"],
+      "Eth": ["[u8; 20]"],
+      "Dot": ["[u8; 20]"],
+      "Sol": ["[u8; 20]"],
+      "Tez": ["[u8; 20]"]
+    }
+  },
+  "ChainAssetAccount": {
+    "_enum": {
+      "Comp": "([u8; 20], [u8; 20])",
+      "Eth": "([u8; 20], [u8; 20])",
+      "Dot": "([u8; 20], [u8; 20])",
+      "Sol": "([u8; 20], [u8; 20])",
+      "Tez": "([u8; 20], [u8; 20])"
+    }
+  },
+  "ChainSignature": {
+    "_enum": {
+      "Comp": ["[u8; 65]"],
+      "Eth": ["[u8; 65]"],
+      "Dot": ["[u8; 65]"],
+      "Sol": ["[u8; 65]"],
+      "Tez": ["[u8; 65]"]
+    }
+  },
+  "ChainSignatureList": {
+    "_enum": {
+      "Comp": ["Vec<([u8; 20], [u8; 65])>"],
+      "Eth": ["Vec<([u8; 20], [u8; 65])>"],
+      "Dot": ["Vec<([u8; 20], [u8; 65])>"],
+      "Sol": ["Vec<([u8; 20], [u8; 65])>"],
+      "Tez": ["Vec<([u8; 20], [u8; 65])>"]
+    }
   },
   "Compound": {},
   "Ethereum": {},
@@ -91,6 +104,7 @@
   "Tezos": {},
 
   "Source3": "NoticesRS",
+  "EncodedNotice": "Vec<u8>",
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",
@@ -111,7 +125,7 @@
     "parent": "[u8; 32]",
     "account": "[u8; 20]",
     "amount": "u128",
-    "cash_yield_index": "u128"
+    "cash_index": "u128"
   },
   "CashExtractionNotice": {
     "_enum": {
@@ -123,7 +137,7 @@
     "parent": "[u8; 32]",
     "next_cash_yield": "u128",
     "next_cash_yield_start_at": "u128",
-    "next_cash_yield_index": "u128"
+    "next_cash_index": "u128"
   },
   "FutureYieldNotice": {
     "_enum": {
@@ -160,14 +174,99 @@
       "ChangeAuthorityNotice": "ChangeAuthorityNotice"
     }
   },
+  "NoticeStatus": {
+    "_enum": {
+      "Missing": [],
+      "Pending": "NoticeStatusPending",
+      "Notice": "Notice",
+      "Done": []
+    }
+  },
+  "NoticeStatusPending": {
+    "signature_pairs": "ChainSignatureList",
+    "notice": "Notice"
+  },
 
-  "Source4": "CoreRS",
-  "Reason": {
+  "Source4": "CompoundCrypto",
+  "CryptoError": {
     "_enum": [
-      "None",
-      "NotImplemented",
-      "MinTxValueNotMet",
-      "InvalidSymbol"
+      "Unknown",
+      "KeyNotFound",
+      "KeyringLock",
+      "InvalidKeyId",
+      "ParseError",
+      "RecoverError",
+      "HSMError",
+      "EnvironmentVariablePrivateKeyNotSet",
+      "HexDecodeFailed",
+      "EnvironmentVariableHexDecodeFailed",
+      "EnvironmentVariableInvalidSeed"
+    ]
+  },
+
+  "Source5": "RatesRS",
+  "RatesError": {
+    "_enum": [
+      "UtilizationZeroSupplyError",
+      "UtilizationBorrowedIsMoreThanSupplied",
+      "ModelNotIncreasingZeroRateAboveKinkRate",
+      "ModelNotIncreasingKinkRateAboveFullRate",
+      "ModelKinkUtilizationOver100Percent",
+      "ModelKinkUtilizationNotPositive",
+      "ModelRateOutOfBounds",
+      "Overflowed"
+    ]
+  },
+  "APR": ["Uint"],
+  "Utilization": ["Uint"],
+  "InterestRateModel": {
+    "_enum": {
+      "Kink": {
+        "zero_rate": "APR",
+        "kink_rate": "APR",
+        "kink_utilization": "Utilization",
+        "full_rate": "APR"
+      }
+    }
+  },
+
+  "Source6": "ReasonRS",
+  "Reason": {
+    "_enum": {
+      "AssetExtractionNotSupported": "",
+      "BadAccount": "",
+      "BadAddress": "",
+      "BadAsset": "",
+      "BadChainId": "",
+      "BadSymbol": "",
+      "ChainMismatch": "",
+      "CryptoError": "CryptoError",
+      "FailedToSubmitExtrinsic": "",
+      "InsufficientChainCash": "",
+      "InsufficientLiquidity": "",
+      "InsufficientTotalFunds": "",
+      "InvalidSignature": "",
+      "InvalidSymbol": "",
+      "KeyNotFound": "",
+      "MathError": "MathError",
+      "MinTxValueNotMet": "",
+      "None": "",
+      "NoSuchAsset": "",
+      "NoticeAlreadySigned": "",
+      "NotImplemented": "",
+      "ParseIntError": "",
+      "RepayTooMuch": "",
+      "SignatureMismatch": ""
+    }
+  },
+  "MathError": {
+    "_enum": [
+      "Overflow",
+      "Underflow",
+      "SignMismatch",
+      "SymbolMismatch",
+      "PriceNotUSD",
+      "DivisionByZero"
     ]
   }
 }

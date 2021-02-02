@@ -1,6 +1,6 @@
 //! Makes available the things we use from Substrate, no matter std or no-std.
 
-/// The ones substrate takes care of already.
+// The ones substrate takes care of already.
 pub use sp_std::alloc;
 pub use sp_std::any;
 pub use sp_std::borrow;
@@ -12,6 +12,7 @@ pub use sp_std::convert;
 pub use sp_std::default;
 pub use sp_std::fmt;
 pub use sp_std::hash;
+pub use sp_std::if_std;
 pub use sp_std::iter;
 pub use sp_std::marker;
 pub use sp_std::mem;
@@ -35,7 +36,7 @@ pub mod thread {
     pub use sp_std::thread::panicking;
 }
 
-/// The ones it doesn't.
+// The ones it doesn't.
 #[cfg(feature = "std")]
 include!("../with_std.rs");
 #[cfg(not(feature = "std"))]

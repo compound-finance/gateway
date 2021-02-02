@@ -1,9 +1,12 @@
 use crate::{
-    chains::{Chain, Ethereum},
-    EncodedNotice,
+    chains::{Chain, ChainAccount, ChainSignature, ChainSignatureList, Ethereum},
+    reason::Reason,
 };
 use codec::{Decode, Encode};
 use our_std::{vec::Vec, RuntimeDebug};
+
+/// Type for a generic encoded message, potentially for any chain.
+pub type EncodedNotice = Vec<u8>;
 
 pub type EraId = u32;
 pub type EraIndex = u32;
@@ -29,7 +32,7 @@ pub enum CashExtractionNotice {
         parent: <Ethereum as Chain>::Hash,
         account: <Ethereum as Chain>::Address,
         amount: <Ethereum as Chain>::Amount,
-        cash_yield_index: <Ethereum as Chain>::MulIndex,
+        cash_index: <Ethereum as Chain>::CashIndex,
     },
 }
 
@@ -40,7 +43,7 @@ pub enum FutureYieldNotice {
         parent: <Ethereum as Chain>::Hash,
         next_cash_yield: <Ethereum as Chain>::Rate,
         next_cash_yield_start_at: <Ethereum as Chain>::Timestamp,
-        next_cash_yield_index: <Ethereum as Chain>::MulIndex,
+        next_cash_index: <Ethereum as Chain>::CashIndex,
     },
 }
 
@@ -73,7 +76,7 @@ pub enum Notice {
 }
 
 pub trait EncodeNotice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice;
+    fn encode_notice(&self) -> EncodedNotice;
 }
 
 const ETH_CHAIN_IDENT: &'static [u8] = b"ETH";
@@ -98,7 +101,7 @@ fn encode_int128(raw: u128) -> Vec<u8> {
 }
 
 impl EncodeNotice for ExtractionNotice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice {
+    fn encode_notice(&self) -> EncodedNotice {
         match self {
             ExtractionNotice::Eth {
                 id,
@@ -129,14 +132,14 @@ impl EncodeNotice for ExtractionNotice {
 }
 
 impl EncodeNotice for CashExtractionNotice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice {
+    fn encode_notice(&self) -> EncodedNotice {
         match self {
             CashExtractionNotice::Eth {
                 id,
                 parent,
                 account,
                 amount,
-                cash_yield_index,
+                cash_index,
             } => {
                 let amount_encoded = encode_int128(*amount); // XXX cast more safely XXX JF: already converted I think
                 [
@@ -146,7 +149,7 @@ impl EncodeNotice for CashExtractionNotice {
                     parent.to_vec(),
                     encode_addr(account),
                     amount_encoded,
-                    encode_int128(*cash_yield_index),
+                    encode_int128(*cash_index),
                 ]
                 .concat()
             }
@@ -155,14 +158,14 @@ impl EncodeNotice for CashExtractionNotice {
 }
 
 impl EncodeNotice for FutureYieldNotice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice {
+    fn encode_notice(&self) -> EncodedNotice {
         match self {
             FutureYieldNotice::Eth {
                 id,
                 parent,
                 next_cash_yield,
                 next_cash_yield_start_at,
-                next_cash_yield_index,
+                next_cash_index,
             } => [
                 ETH_CHAIN_IDENT.to_vec(),
                 encode_int32(id.0),
@@ -170,7 +173,7 @@ impl EncodeNotice for FutureYieldNotice {
                 parent.to_vec(),
                 encode_int128(*next_cash_yield),
                 encode_int128(*next_cash_yield_start_at),
-                encode_int128(*next_cash_yield_index),
+                encode_int128(*next_cash_index),
             ]
             .concat(),
         }
@@ -178,7 +181,7 @@ impl EncodeNotice for FutureYieldNotice {
 }
 
 impl EncodeNotice for SetSupplyCapNotice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice {
+    fn encode_notice(&self) -> EncodedNotice {
         match self {
             SetSupplyCapNotice::Eth {
                 id,
@@ -202,7 +205,7 @@ impl EncodeNotice for SetSupplyCapNotice {
 }
 
 impl EncodeNotice for ChangeAuthorityNotice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice {
+    fn encode_notice(&self) -> EncodedNotice {
         match self {
             ChangeAuthorityNotice::Eth {
                 id,
@@ -226,14 +229,125 @@ impl EncodeNotice for ChangeAuthorityNotice {
 }
 
 impl EncodeNotice for Notice {
-    fn encode_ethereum_notice(&self) -> EncodedNotice {
+    fn encode_notice(&self) -> EncodedNotice {
         match self {
-            Notice::ExtractionNotice(n) => n.encode_ethereum_notice(),
-            Notice::CashExtractionNotice(n) => n.encode_ethereum_notice(),
-            Notice::FutureYieldNotice(n) => n.encode_ethereum_notice(),
-            Notice::SetSupplyCapNotice(n) => n.encode_ethereum_notice(),
-            Notice::ChangeAuthorityNotice(n) => n.encode_ethereum_notice(),
+            Notice::ExtractionNotice(n) => n.encode_notice(),
+            Notice::CashExtractionNotice(n) => n.encode_notice(),
+            Notice::FutureYieldNotice(n) => n.encode_notice(),
+            Notice::SetSupplyCapNotice(n) => n.encode_notice(),
+            Notice::ChangeAuthorityNotice(n) => n.encode_notice(),
         }
+    }
+}
+
+pub fn default_notice_signatures(notice: &Notice) -> ChainSignatureList {
+    match notice {
+        Notice::ExtractionNotice(n) => match n {
+            ExtractionNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+        },
+        Notice::CashExtractionNotice(n) => match n {
+            CashExtractionNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+        },
+        Notice::FutureYieldNotice(n) => match n {
+            FutureYieldNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+        },
+        Notice::SetSupplyCapNotice(n) => match n {
+            SetSupplyCapNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+        },
+        Notice::ChangeAuthorityNotice(n) => match n {
+            ChangeAuthorityNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+        },
+    }
+}
+
+// TODO: What's a better way to handle which chain to pull?
+pub fn sign_notice_chain(notice: &Notice) -> Result<ChainSignature, Reason> {
+    match notice {
+        Notice::ExtractionNotice(n) => match n {
+            ExtractionNotice::Eth { .. } => Ok(ChainSignature::Eth(
+                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
+            )),
+        },
+        Notice::CashExtractionNotice(n) => match n {
+            CashExtractionNotice::Eth { .. } => Ok(ChainSignature::Eth(
+                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
+            )),
+        },
+        Notice::FutureYieldNotice(n) => match n {
+            FutureYieldNotice::Eth { .. } => Ok(ChainSignature::Eth(
+                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
+            )),
+        },
+        Notice::SetSupplyCapNotice(n) => match n {
+            SetSupplyCapNotice::Eth { .. } => Ok(ChainSignature::Eth(
+                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
+            )),
+        },
+        Notice::ChangeAuthorityNotice(n) => match n {
+            ChangeAuthorityNotice::Eth { .. } => Ok(ChainSignature::Eth(
+                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
+            )),
+        },
+    }
+}
+
+// TODO: What's a better way to handle which chain to use?
+pub fn get_signer_key_for_notice(notice: &Notice) -> Result<ChainAccount, Reason> {
+    match notice {
+        Notice::ExtractionNotice(n) => match n {
+            ExtractionNotice::Eth { .. } => {
+                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
+            }
+        },
+        Notice::CashExtractionNotice(n) => match n {
+            CashExtractionNotice::Eth { .. } => {
+                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
+            }
+        },
+        Notice::FutureYieldNotice(n) => match n {
+            FutureYieldNotice::Eth { .. } => {
+                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
+            }
+        },
+        Notice::SetSupplyCapNotice(n) => match n {
+            SetSupplyCapNotice::Eth { .. } => {
+                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
+            }
+        },
+        Notice::ChangeAuthorityNotice(n) => match n {
+            ChangeAuthorityNotice::Eth { .. } => {
+                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
+            }
+        },
+    }
+}
+
+/// Type for the status of a notice on the queue.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum NoticeStatus {
+    Missing,
+    Pending {
+        signature_pairs: ChainSignatureList,
+        notice: Notice,
+    },
+    Done,
+}
+
+impl From<Notice> for NoticeStatus {
+    fn from(notice: Notice) -> Self {
+        NoticeStatus::Pending {
+            signature_pairs: default_notice_signatures(&notice),
+            notice,
+        }
+    }
+}
+
+pub fn has_signer(signature_pairs: &ChainSignatureList, signer: ChainAccount) -> bool {
+    match (signature_pairs, signer) {
+        (ChainSignatureList::Eth(eth_signature_pairs), ChainAccount::Eth(eth_account)) => {
+            eth_signature_pairs.iter().any(|(s, _)| s == &eth_account)
+        }
+        _ => false,
     }
 }
 
@@ -266,7 +380,7 @@ mod tests {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
             1, 1, 1, // account
         ];
-        let encoded = notice.encode_ethereum_notice();
+        let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
     }
 
@@ -277,7 +391,7 @@ mod tests {
             parent: [3u8; 32],
             account: [1u8; 20],
             amount: 55,
-            cash_yield_index: 75u128,
+            cash_index: 75u128,
         });
 
         let expected = [
@@ -296,7 +410,7 @@ mod tests {
             0, 0, 75, // cash yield index
         ];
 
-        let encoded = notice.encode_ethereum_notice();
+        let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
     }
 
@@ -307,7 +421,7 @@ mod tests {
             parent: [5u8; 32],
             next_cash_yield: 700u128,
             next_cash_yield_start_at: 200u128,
-            next_cash_yield_index: 400u128,
+            next_cash_index: 400u128,
         });
 
         let expected = [
@@ -326,7 +440,7 @@ mod tests {
             0, 1, 144, // next cash yield index
         ];
 
-        let encoded = notice.encode_ethereum_notice();
+        let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
     }
 
@@ -353,7 +467,7 @@ mod tests {
             0, 0, 60, // amount
         ];
 
-        let encoded = notice.encode_ethereum_notice();
+        let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
     }
 
@@ -381,7 +495,7 @@ mod tests {
             8, 8, 8, // third
         ];
 
-        let encoded = notice.encode_ethereum_notice();
+        let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
     }
 }

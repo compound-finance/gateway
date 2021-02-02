@@ -69,7 +69,7 @@ contract Starport {
 	// Make sure that the amount we ask for
 	function transferIn(address from, uint amount, IERC20 asset) internal returns (uint) {
 		uint balBefore = asset.balanceOf(address(this));
-		require(asset.transferFrom(from, address(this), amount) == true, "TransferIn");
+		require(asset.transferFrom(from, address(this), amount) == true, "TransferIn"); // TODO: Handle non-standard tokens
 		uint balAfter = asset.balanceOf(address(this));
 		return sub_(balAfter, balBefore);
 	}
@@ -92,13 +92,14 @@ contract Starport {
 
 		bytes calldata body = notice[HEAD_BYTES:];
 		// Decode the notice
-		address account = abi.decode(body[:32], (address));
+		address asset = abi.decode(body[:32], (address));
 		uint amount = abi.decode(body[32:64], (uint));
-		address asset = abi.decode(body[64:96], (address));
+		address account = abi.decode(body[64:96], (address));
 
 		isNoticeUsed[hash(notice)] = true;
 		emit Unlock(account, amount, asset);
-		// IERC20(asset).transfer(amount, account);
+
+		IERC20(asset).transfer(account, amount);
 	}
 
 	// @dev notice = (bytes3 chainIdent, uint256 eraId, uint256 eraIndex, address[] newAuths)

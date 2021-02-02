@@ -2,6 +2,8 @@ use compound_chain_runtime::{
     wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
     GrandpaConfig, Signature, SudoConfig, SystemConfig,
 };
+use our_std::str::FromStr;
+use pallet_cash::types::ConfigAsset;
 use sc_service::ChainType;
 use sp_consensus_babe::AuthorityId as BabeId;
 use sp_core::{sr25519, Pair, Public};
@@ -131,7 +133,57 @@ pub fn local_testnet_config() -> ChainSpec {
         // Telemetry
         None,
         // Protocol ID
+        Some("local"),
+        // Properties
+        Some(get_properties()),
+        // Extensions
         None,
+    )
+}
+
+fn staging_testnet_genesis() -> GenesisConfig {
+    testnet_genesis(
+        // Initial PoA authorities
+        vec![
+            authority_keys_from_seed("Alice"),
+            authority_keys_from_seed("Bob"),
+            authority_keys_from_seed("Charlie"),
+        ],
+        // Sudo account
+        get_account_id_from_seed::<sr25519::Public>("Alice"),
+        // Pre-funded accounts
+        vec![
+            get_account_id_from_seed::<sr25519::Public>("Alice"),
+            get_account_id_from_seed::<sr25519::Public>("Bob"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie"),
+            get_account_id_from_seed::<sr25519::Public>("Dave"),
+            get_account_id_from_seed::<sr25519::Public>("Eve"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+        ],
+        true,
+    )
+}
+
+pub fn staging_testnet_config() -> ChainSpec {
+    ChainSpec::from_genesis(
+        // Name
+        "Staging Testnet",
+        // ID
+        "staging_testnet",
+        ChainType::Live,
+        staging_testnet_genesis,
+        // Bootnodes
+        vec![],
+        // Telemetry
+        None,
+        // Protocol ID
+        Some("compound-chain-staging"),
         // Properties
         Some(get_properties()),
         // Extensions
@@ -181,21 +233,30 @@ fn testnet_genesis(
             last_block_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
-                .as_millis(), // XXX we prob need pallet_timestamp but doesn't cover genesis anyway
-            validators: vec![
-                "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),
-                "435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),
+                .as_millis(),
+
+            assets: vec![
+                ConfigAsset {
+                    symbol: FromStr::from_str("ETH/18").unwrap(),
+                    asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+                        .unwrap(),
+                },
+                ConfigAsset {
+                    symbol: FromStr::from_str("USDC/6").unwrap(),
+                    asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                        .unwrap(),
+                },
             ],
+
             reporters: vec![
                 "85615b076615317c80f14cbad6501eec031cd51c".into(),
                 "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
             ],
-            symbols: vec![
-                // XXX fixme + decimals
-                "ETH".into(),
-                "USDC".into(),
+
+            validators: vec![
+                "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),
+                "435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),
             ],
-            price_key_mapping: vec!["USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()],
         }),
     }
 }

@@ -1,6 +1,8 @@
 name: Test
 on: push
 
+# rustc version set with `rustup default` command in scripts/get_substrate.sh
+
 jobs:
   cargo-format:
     name: Cargo Format Check
@@ -14,30 +16,28 @@ jobs:
           cargo fmt -- --check
 
   substrate-tests:
-    name: Unit Tests
+    name: Substrate Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Test Note for ${{ github.ref }}
-        run: |
-          echo Testing ${GITHUB_REF}...
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: |
+          ${{ runner.os }}-cargo-
+         path: |
+          /usr/local/bin/rustup
+          ~/.cargo
+          target
 
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      # TODO: cache this step somehow if necessary?
-      #  could use parity/substrate image maybe but requires entrypoint on every step
-      - name: Substrate setup
+      - name: Test Setup
         run: |
           ./scripts/get_substrate.sh --fast
-
-      - name: Install cargo2junit
-        run: |
-          cargo +nightly install cargo2junit
+          cargo install cargo2junit
 
       - name: Cargo Test
         run: |
-          set -eo pipefail
-          cargo +nightly test -- -Z unstable-options --format json | tee unit-test-results.json
+          cargo test -- -Z unstable-options --format json | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
@@ -68,87 +68,47 @@ jobs:
           files: unit-test-results.xml
         continue-on-error: true
 
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
+  substrate-coverage:
+    name: Substrate Coverage
+    runs-on: ubuntu-20.04
     steps:
-      - name: Test Note for ${{ github.ref }}
-        run: |
-          echo Integration testing ${GITHUB_REF}...
-
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Use Node.js
-        uses: actions/setup-node@v1
-        with:
-          node-version: '12.x'
-
+      - uses: actions/checkout@v2
       - uses: actions/cache@v2
         with:
-          path: '**/node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: |
+          ${{ runner.os }}-cargo-
+         path: |
+          /usr/local/bin/rustup
+          ~/.cargo
+          target
 
-      # TODO: cache this step somehow if necessary?
-      #  could use parity/substrate image maybe but requires entrypoint on every step
-      - name: Substrate setup
+      - name: Test Setup
         run: |
           ./scripts/get_substrate.sh --fast
-    
-      - name: Install yarn ethereum dependencies
-        run: cd ethereum && yarn install
-      
-      - name: Install integration test ethereum dependencies
-        run: cd integration && yarn install
+          sudo apt-get update && sudo apt-get install -y lcov llvm-11
+          rustup component add llvm-tools-preview
 
-      - name: Install solc
+      - name: Cargo Test
         run: |
-          sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
-          sudo chmod +x /usr/local/bin/solc
+          PACKAGES="pallet-cash runtime-interfaces compound-crypto ethereum-client open-oracle-mock-reporter trx-request"
+          for PKG in $PACKAGES; do
+              RUSTFLAGS="-Z instrument-coverage" cargo test -p $PKG --no-run --message-format=json > messages
+              EXE=`scripts/list_executables.py < messages`
+              $EXE
+              llvm-profdata-11 merge -sparse default.profraw -o default.profdata
+              llvm-cov-11 export --instr-profile default.profdata $EXE --ignore-filename-regex="/(usr|rustc)/*" --format=lcov > $PKG.lcov.info
+          done
+          lcov $(printf " -a %q.lcov.info " $PACKAGES) -o lcov.info
+        id: cargo_test
 
-      - name: Compile Ethereum contracts
-        run: |
-          cd ethereum
-          yarn compile
-
-      - name: Build Compound Chain
-        run: |
-          cargo +nightly build --release
-
-      - name: Run Integration Test
-        run: |
-          cd integration
-          npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
-          test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
-          echo "::set-output name=test_url::$test_url"
-        id: int_test
-
-      - name: Link to Integration Results
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
         with:
-          msg: "🫖 [View Integration Test Results](${{steps.int_test.outputs.test_url}})"
-          check_for_duplicate_msg: false
-        continue-on-error: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: lcov.info
 
-      - name: Upload Integration Test Results
-        if: always()
-        uses: actions/upload-artifact@v2
-        with:
-          name: Integration Test Results
-          path: integration/junit.xml
-        continue-on-error: true
-
-      - name: Publish Integration Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1.6
-        if: always()
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          files: integration/junit.xml
-        continue-on-error: true
-
-  eth-tests:
+  ethereum-tests:
     name: Ethereum Tests
     runs-on: ubuntu-latest
     defaults:
@@ -182,3 +142,87 @@ jobs:
 
       - name: Run tests
         run: yarn test
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - uses: actions/cache@v2
+        with:
+         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: |
+          ${{ runner.os }}-cargo-
+         path: |
+          /usr/local/bin/rustup
+          ~/.cargo
+          target
+
+      - name: Substrate setup
+        run: |
+          ./scripts/get_substrate.sh --fast
+
+      - name: Install yarn ethereum dependencies
+        run: cd ethereum && yarn install
+
+      - name: Install integration test ethereum dependencies
+        run: cd integration && yarn install
+
+      - name: Install solc
+        run: |
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
+          sudo chmod +x /usr/local/bin/solc
+
+      - name: Compile Ethereum contracts
+        run: |
+          cd ethereum
+          yarn compile
+
+      - name: Build Compound Chain
+        run: |
+          cargo build --release
+
+      - name: Run Integration Test
+        run: |
+          cd integration
+          npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
+          test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
+          echo "::set-output name=test_url::$test_url"
+        id: int_test
+
+      - name: Link to Integration Results
+        uses: unsplash/comment-on-pr@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          msg: "🫖 [View Integration Test Results](${{steps.int_test.outputs.test_url}})"
+          check_for_duplicate_msg: false
+        continue-on-error: true
+
+      - name: Upload Integration Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Integration Test Results
+          path: integration/junit.xml
+        continue-on-error: true
+
+      - name: Publish Integration Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1.6
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: integration/junit.xml
+        continue-on-error: true

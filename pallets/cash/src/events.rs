@@ -1,6 +1,6 @@
 use crate::chains;
 use codec::alloc::string::String;
-use codec::{Decode, Encode};
+use codec::Encode;
 use frame_support::debug;
 use our_std::{vec::Vec, RuntimeDebug};
 
@@ -99,4 +99,139 @@ fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
         );
     })?;
     Ok(u32_data)
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use crate::mock::*;
+    use crate::*;
+    use sp_core::offchain::testing;
+
+    #[test]
+    fn test_hex_to_u32_success() {
+        let expected = 6008149;
+        let actual = events::hex_to_u32("0x5bad55".to_string()).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_hex_to_u32_fail() {
+        assert_eq!(events::hex_to_u32("".to_string()).is_err(), true)
+    }
+
+    #[test]
+    fn test_to_lock_event_payload_success() {
+        const DATA_FIELD: &str = r#"0x000000000000000000000000d87ba7a50b2e7e660f678a895e4b72e7cb4ccd9c000000000000000000000000b819706e897eacf235cdb5048962bd65873202c400000000000000000000000000000000000000000000000000000000018cba80"#;
+        let lock_event: ethereum_client::LockEvent =
+            ethereum_client::DecodableEvent::new(DATA_FIELD.to_string());
+
+        let event = ethereum_client::LogEvent {
+            block_hash: "0xc1c0eb37b56923ad9e20fdb31ca882988d5217f7ca24b6297ca6ed700811cf23"
+                .to_string(),
+            block_number: "0x3adf2f".to_string(),
+            transaction_index: "0x0".to_string(),
+            log_index: "0x0".to_string(),
+            event: lock_event,
+        };
+
+        let expected = [
+            47, 223, 58, 0, 0, 0, 0, 0, 0, 216, 123, 167, 165, 11, 46, 126, 102, 15, 103, 138, 137,
+            94, 75, 114, 231, 203, 76, 205, 156, 184, 25, 112, 110, 137, 126, 172, 242, 53, 205,
+            181, 4, 137, 98, 189, 101, 135, 50, 2, 196, 128, 186, 140, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ];
+        let actual = events::to_lock_event_payload(&event).unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    fn get_mockup_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
+        // Set up config values
+        let given_eth_starport_address: Vec<u8> =
+            "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
+        let given_eth_lock_event_topic: Vec<u8> =
+            "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3".into();
+        let config = runtime_interfaces::new_config(
+            given_eth_starport_address.clone(),
+            given_eth_lock_event_topic.clone(),
+        );
+        runtime_interfaces::config_interface::set(config);
+        runtime_interfaces::set_validator_config_dev_defaults();
+
+        let given_eth_rpc_url =
+            runtime_interfaces::validator_config_interface::get_eth_rpc_url().unwrap();
+        return vec![
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: String::from_utf8(given_eth_rpc_url.clone()).unwrap(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
+                response: Some(testdata::json_responses::BLOCK_NUMBER_RESPONSE.to_vec()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            },
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: String::from_utf8(given_eth_rpc_url.clone()).unwrap(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "earliest", "toBlock": "0xb27467", "topics":["0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"]}],"id":1}"#.to_vec(),
+                response: Some(events_response.clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            }
+        ];
+    }
+
+    #[test]
+    fn test_fetch_events_with_3_events() {
+        let calls: Vec<testing::PendingRequest> =
+            get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
+
+        new_test_ext_with_http_calls(calls).execute_with(|| {
+            let events_candidate = events::fetch_events("earliest".to_string());
+            assert!(events_candidate.is_ok());
+            let starport_info = events_candidate.unwrap();
+            let latest_eth_block = starport_info.latest_eth_block;
+            let lock_events = starport_info.lock_events;
+
+            assert_eq!(latest_eth_block, "0xb27467");
+            assert_eq!(lock_events.len(), 3);
+            assert_eq!(
+                lock_events[0].block_hash,
+                "0xc1c0eb37b56923ad9e20fdb31ca882988d5217f7ca24b6297ca6ed700811cf23"
+            );
+            assert_eq!(
+                lock_events[1].block_hash,
+                "0xa5c8024e699a5c30eb965e47b5157c06c76f3b726bff377a0a5333a561f25648"
+            );
+            assert_eq!(
+                lock_events[2].block_hash,
+                "0xa4a96e957718e3a30b77a667f93978d8f438bdcd56ff03545f08c833d9a26687"
+            );
+        });
+    }
+
+    #[test]
+    fn test_fetch_events_with_no_events() {
+        let calls: Vec<testing::PendingRequest> =
+            get_mockup_http_calls(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
+
+        new_test_ext_with_http_calls(calls).execute_with(|| {
+            let events_candidate = events::fetch_events("earliest".to_string());
+            assert!(events_candidate.is_ok());
+            let starport_info = events_candidate.unwrap();
+            let latest_eth_block = starport_info.latest_eth_block;
+            let lock_events = starport_info.lock_events;
+
+            assert_eq!(latest_eth_block, "0xb27467");
+            assert_eq!(lock_events.len(), 0);
+        });
+    }
+
+    #[test]
+    fn test_get_next_block_hex() {
+        let actual = events::get_next_block_hex("0xb27467".into());
+        assert!(actual.is_ok());
+        assert_eq!(actual.unwrap(), "0xB27468");
+    }
 }

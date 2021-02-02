@@ -5,7 +5,7 @@
 use sp_api::{impl_runtime_apis, Encode};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::traits::{
-    AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Saturating, Verify,
+    AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify,
 };
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
@@ -380,7 +380,7 @@ construct_runtime!(
         Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
         // Include the custom logic from the CASH pallet in the runtime.
-        Cash: pallet_cash::{Module, Call, Config, Storage, Event<T>, ValidateUnsigned},
+        Cash: pallet_cash::{Module, Call, Config, Storage, Event, ValidateUnsigned},
     }
 );
 

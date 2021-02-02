@@ -11,44 +11,47 @@ const {
 const { log, error } = require('../util/log');
 const { getEventValues } = require('../util/ethereum');
 
+/* This is probably going to be permanently skipped.
+   We might want to keep it since it shows the non-scenario
+   way to build an integration test.
+*/
 describe('magic extract and goldie unlocks', () => {
   let accounts,
-    alice,
+    ashley,
     api,
-    bob,
+    bert,
     contracts,
     ctx,
-    ganacheServer,
     keyring,
     provider,
-    ps,
-    starportTopics,
     web3;
 
   beforeEach(async () => {
-    ctx = await initialize();
     ({
       accounts,
-      alice,
+      ashley,
       api,
-      bob,
+      bert,
       contracts,
-      ganacheServer,
+      ctx,
       keyring,
       provider,
-      ps,
-      starportTopics,
-      web3
-    } = ctx);
+      web3,
+    } = await initialize());
   }, 600000 /* 10m */);
   afterEach(() => teardown(ctx));
 
-  test('magic extraction', async () => {
+  // There's now a lot wrong with this test (e.g. the Starport doesn't even
+  // have a cash token balance to extract out). It should be removed with magic
+  // extract in general.
+  test.skip('magic extraction', async () => {
     let trxReq = "(magic-extract 1000 eth:0xc00e94cb662c3520282e6f5717214004a7f26888)";
     let sig = { Eth: await web3.eth.sign(trxReq, accounts[0]) };
+    let cashBalancePrior = await api.query.cash.cashBalance({ Eth: "0xc00e94cb662c3520282e6f5717214004a7f26888" });
     let call = api.tx.cash.execTrxRequest(trxReq, sig);
 
-    let events = await sendAndWaitForEvents(call, false);
+    let events = await sendAndWaitForEvents(call, api, false);
+
     let magicExtractEvent = findEvent(events, 'cash', 'MagicExtract');
 
     expect(magicExtractEvent).toBeDefined();
@@ -64,11 +67,15 @@ describe('magic extract and goldie unlocks', () => {
             parent: "0x0000000000000000000000000000000000000000000000000000000000000000",
             account: "0xc00e94cb662c3520282e6f5717214004a7f26888",
             amount: 1000,
-            cash_yield_index: 1000
+            cash_index: 1000
           }
         }
       }
     });
+
+    let cashBalancePost = await api.query.cash.cashBalance({ Eth: "0xc00e94cb662c3520282e6f5717214004a7f26888" });
+
+    expect(cashBalancePost.unwrap() - cashBalancePrior.unwrapOr(0)).toEqual(1000);
 
     let signedNotice = findEvent(events, 'cash', 'SignedNotice');
 
@@ -83,7 +90,7 @@ describe('magic extract and goldie unlocks', () => {
     expect(noticeSigs).toHaveProperty('Eth');
 
     // TODO: This should probably be "unlockCash"
-    let tx = await contracts.starport.methods.unlock(notice, noticeSigs['Eth']).send({ from: accounts[0] });
+    let tx = await contracts.starport.methods.unlock(notice, noticeSigs['Eth'].map((x) => x[1])).send({ from: accounts[0] });
 
     let unlockEvent = tx.events['Unlock'];
     expect(notice).toBeDefined();
@@ -102,7 +109,7 @@ describe('magic extract and goldie unlocks', () => {
 
   test('lock asset', async () => {
     let tx = await contracts.starport.methods.lockETH().send({ value: 1e18, from: accounts[0] });
-    let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false);
+    let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false, ['cash', 'FailedProcessingEthEvent']);
 
     expect(getEventData(goldieLocksEvent)).toEqual({
       ChainAccount: {
@@ -119,7 +126,7 @@ describe('magic extract and goldie unlocks', () => {
 
   test('asset', async () => {
     let tx = await contracts.starport.methods.lockETH().send({ value: 1e18, from: accounts[0] });
-    let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false);
+    let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false, ['cash', 'FailedProcessingEthEvent']);
 
     expect(getEventData(goldieLocksEvent)).toEqual({
       ChainAccount: {

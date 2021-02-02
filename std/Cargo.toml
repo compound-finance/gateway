@@ -11,6 +11,7 @@ version = "0.0.1"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+serde = { version = "1.0.101", features = ["derive"], default-features = false }
 sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 
@@ -19,6 +20,7 @@ our-std-proc-macro = { path = "./proc-macro" }
 [features]
 default = ["std"]
 std = [
+    "serde/std",
     "sp-runtime/std",
     "sp-std/std",
 ]

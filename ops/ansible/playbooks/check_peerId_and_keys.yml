@@ -1,0 +1,57 @@
+---
+ - name: Show Facts
+   hosts: 
+      - authority_node
+   tasks:
+    - name: Show substrate facts
+      debug:
+        var: ansible_local.substrate
+
+    - name: check key
+      uri:
+        url: http://localhost:9933
+        method: "POST"
+        body_format: json
+        body: |
+            {
+              "jsonrpc":"2.0",
+              "id":1,
+              "method":"author_hasKey",
+              "params": [
+                  "{{ babe_public_key }}",
+                  "babe"
+              ]
+            }
+      register: has_key
+      until: has_key.status == 200
+      retries: 10
+      delay: 5
+
+    - name: Verdict babe is
+      debug:
+        var: has_key
+
+    
+    - name: check gran key
+      uri:
+        url: http://localhost:9933
+        method: "POST"
+        body_format: json
+        body: |
+            {
+              "jsonrpc":"2.0",
+              "id":1,
+              "method":"author_hasKey",
+              "params": [
+                  "{{ grandpa_public_key }}",
+                  "gran"
+              ]
+            }
+      register: has_gran_key
+      until: has_gran_key.status == 200
+      retries: 10
+      delay: 5
+
+    - name: Verdict gran is
+      debug:
+        var: has_gran_key

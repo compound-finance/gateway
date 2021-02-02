@@ -1,28 +1,79 @@
+use crate::reason::Reason;
+use crate::types::Uint;
 use codec::{Decode, Encode};
 use our_std::{convert::TryInto, RuntimeDebug};
 
+/// Fixed symbol width.
+pub const WIDTH: usize = 12;
+
 /// Type for the abstract symbol of an asset, not tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, RuntimeDebug)]
-pub struct Symbol(pub [char; 12], pub u8);
+pub struct Symbol(pub [char; WIDTH], pub u8);
 
 // Define symbols used directly by the chain itself
+
+/// Symbol for CASH.
+pub const CASH: Symbol = Symbol::new("CASH", 6);
+
+/// Symbol for USD.
+pub const USD: Symbol = Symbol::new("USD", 6);
+
+/// The non-character value.
 pub const NIL: char = 0 as char;
-pub const CASH: Symbol = Symbol(
-    ['C', 'A', 'S', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
-    6,
-);
-pub const USD: Symbol = Symbol(
-    ['U', 'S', 'D', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
-    6,
-);
+
+/// Get the Uint corresponding to some number of decimals.
+///
+/// Useful for writing human values in a const context.
+pub const fn static_pow10(decimals: u8) -> Uint {
+    let mut v: Uint = 10;
+    let mut i = 0;
+    loop {
+        i += 1;
+        if i >= decimals {
+            return v;
+        }
+        v *= 10;
+    }
+}
 
 impl Symbol {
-    pub const fn ticker(&self) -> &[char] {
+    pub const fn new(ticker: &str, decimals: u8) -> Self {
+        assert!(ticker.len() < WIDTH, "Too many chars");
+        let mut chars = [0 as char; WIDTH];
+        let mut i = 0;
+        let raw = ticker.as_bytes();
+        loop {
+            if i >= ticker.len() {
+                break;
+            }
+            chars[i] = raw[i] as char;
+            i += 1;
+        }
+        Symbol(chars, decimals)
+    }
+
+    pub const fn chars(&self) -> &[char] {
         &self.0
     }
 
     pub const fn decimals(&self) -> u8 {
         self.1
+    }
+
+    pub const fn one(&self) -> Uint {
+        static_pow10(self.decimals())
+    }
+
+    pub fn ticker(&self) -> String {
+        let mut s = String::with_capacity(WIDTH);
+        let chars = self.chars();
+        for i in 0..WIDTH {
+            if chars[i] == NIL {
+                break;
+            }
+            s.push(chars[i]);
+        }
+        s
     }
 }
 
@@ -41,7 +92,36 @@ impl Decode for Symbol {
         let mut bytes: Vec<u8> = Decode::decode(encoded)?;
         let decimals = bytes.pop().unwrap();
         let chars: Vec<char> = bytes.iter().map(|&b| b as char).collect();
-        let ticker: [char; 12] = chars.try_into().expect("wrong number of chars");
+        let ticker: [char; WIDTH] = chars.try_into().expect("wrong number of chars");
         Ok(Symbol(ticker, decimals))
+    }
+}
+
+// Implement deserialization for Symbols so we can use them in GenesisConfig / ChainSpec JSON.
+//  i.e. "TICKER" <> ["T", "I", "C", "K", "E", "R", NIL, NIL, NIL, NIL, NIL, NIL]
+impl our_std::str::FromStr for Symbol {
+    type Err = Reason;
+
+    fn from_str(ticker: &str) -> Result<Self, Self::Err> {
+        if let Some((ticker, decimal_str)) = String::from(ticker).split_once("/") {
+            let mut chars: Vec<char> = ticker.chars().collect();
+            if chars.len() > WIDTH {
+                Err(Reason::BadSymbol)
+            } else if let Ok(decimals) = decimal_str.parse::<u8>() {
+                chars.resize(WIDTH, NIL);
+                Ok(Symbol(chars.try_into().unwrap(), decimals))
+            } else {
+                Err(Reason::BadSymbol)
+            }
+        } else {
+            Err(Reason::BadSymbol)
+        }
+    }
+}
+
+// For serialize (which we don't use, but are required to implement)
+impl From<Symbol> for String {
+    fn from(symbol: Symbol) -> String {
+        format!("{}/{}", symbol.ticker(), symbol.decimals())
     }
 }
