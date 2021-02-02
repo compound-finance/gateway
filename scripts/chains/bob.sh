@@ -13,7 +13,7 @@ do
 done
 
 if [ "$purge" = true ] ; then
-./target/release/compound-chain purge-chain --base-path /tmp/chainz/bob --chain ./compoundChainSpecRaw.json --database paritydb -y
+./target/release/compound-chain purge-chain --base-path /tmp/chainz/bob --chain ./compoundChainSpec.json --database paritydb -y
 fi
 
 ./target/release/compound-chain \
@@ -26,4 +26,4 @@ fi
   --validator \
   --no-mdns \
   --rpc-methods Unsafe \
-  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWCc43v47Uv4AbPoPyoe5faLGnjXCDA3aDrwVaRauu9Zgf
+  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWLgyd1noEdNLkjGxh467nTfVf3jKLSYAy426QckBuZKLp

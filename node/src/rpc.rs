@@ -17,8 +17,6 @@ use std::sync::Arc;
 
 use compound_chain_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Index};
 use sc_client_api::AuxStore;
-use sc_consensus_babe::{Config, Epoch};
-use sc_consensus_babe_rpc::BabeRpcHandler;
 use sc_consensus_epochs::SharedEpochChanges;
 use sc_finality_grandpa::{
     FinalityProofProvider, GrandpaJustificationStream, SharedAuthoritySet, SharedVoterState,
@@ -30,7 +28,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_consensus::SelectChain;
-use sp_consensus_babe::BabeApi;
+use sp_consensus_aura::AuraApi;
 use sp_keystore::SyncCryptoStorePtr;
 use sp_transaction_pool::TransactionPool;
 
@@ -44,16 +42,6 @@ pub struct LightDeps<C, F, P> {
     pub remote_blockchain: Arc<dyn sc_client_api::light::RemoteBlockchain<Block>>,
     /// Fetcher instance.
     pub fetcher: Arc<F>,
-}
-
-/// Extra dependencies for BABE.
-pub struct BabeDeps {
-    /// BABE protocol config.
-    pub babe_config: Config,
-    /// BABE pending epoch changes.
-    pub shared_epoch_changes: SharedEpochChanges<Block, Epoch>,
-    /// The keystore that manages the keys of the node.
-    pub keystore: SyncCryptoStorePtr,
 }
 
 /// Extra dependencies for GRANDPA
@@ -82,8 +70,6 @@ pub struct FullDeps<C, P, SC, B> {
     pub chain_spec: Box<dyn sc_chain_spec::ChainSpec>,
     /// Whether to deny unsafe calls
     pub deny_unsafe: DenyUnsafe,
-    /// BABE specific dependencies.
-    pub babe: BabeDeps,
     /// GRANDPA specific dependencies.
     pub grandpa: GrandpaDeps<B>,
 }
@@ -105,7 +91,6 @@ where
         + 'static,
     C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
     C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
-    C::Api: BabeApi<Block>,
     C::Api: BlockBuilder<Block>,
     P: TransactionPool + 'static,
     SC: SelectChain<Block> + 'static,
@@ -122,15 +107,9 @@ where
         select_chain,
         chain_spec,
         deny_unsafe,
-        babe,
         grandpa,
     } = deps;
 
-    let BabeDeps {
-        keystore,
-        babe_config,
-        shared_epoch_changes,
-    } = babe;
     let GrandpaDeps {
         shared_voter_state,
         shared_authority_set,

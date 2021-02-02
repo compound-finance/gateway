@@ -1,11 +1,11 @@
 use compound_chain_runtime::{
-    opaque, wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
-    GrandpaConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
+    opaque, wasm_binary_unwrap, AccountId, AuraConfig, BalancesConfig, CashConfig, GenesisConfig,
+    GrandpaConfig, Signature, SudoConfig, SystemConfig,
 };
 use our_std::str::FromStr;
 use pallet_cash::types::ConfigAsset;
 use sc_service::ChainType;
-use sp_consensus_babe::AuthorityId as BabeId;
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
@@ -38,7 +38,7 @@ where
 pub fn authority_keys_from_seed(seed: &str) -> (AccountId, BabeId, GrandpaId) {
     (
         get_account_id_from_seed::<sr25519::Public>(seed),
-        get_from_seed::<BabeId>(seed),
+        get_from_seed::<AuraId>(seed),
         get_from_seed::<GrandpaId>(seed),
     )
 }
@@ -194,7 +194,7 @@ pub fn staging_testnet_config() -> ChainSpec {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-    initial_authorities: Vec<(AccountId, BabeId, GrandpaId)>,
+    initial_authorities: Vec<(AccountId, AuraId, GrandpaId)>,
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
@@ -213,7 +213,7 @@ fn testnet_genesis(
                 .map(|k| (k, 1 << 60))
                 .collect(),
         }),
-        pallet_babe: Some(BabeConfig {
+        pallet_aura: Some(AuraConfig {
             authorities: vec![],
         }),
         pallet_grandpa: Some(GrandpaConfig {

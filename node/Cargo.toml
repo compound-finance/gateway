@@ -36,9 +36,8 @@ sc-client-db = { version = "0.8.0", git = 'https://github.com/compound-finance/s
 sp-core = { version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 sc-consensus = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
 sp-consensus = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
-sc-consensus-babe = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
-sc-consensus-babe-rpc = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
-sp-consensus-babe = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sc-consensus-aura = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
+sp-consensus-aura = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
 sc-consensus-epochs = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
 sc-consensus-slots = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }
 sc-finality-grandpa = { version = '0.8.0', git = 'https://github.com/compound-finance/substrate.git' }

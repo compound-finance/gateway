@@ -7,7 +7,7 @@ curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d \
     "id":1,
     "method":"author_insertKey",
     "params": [
-      "babe",
+      "aura",
       "//Alice",
       "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
     ]
@@ -31,7 +31,7 @@ curl http://localhost:9934 -H "Content-Type:application/json;charset=utf-8" -d \
     "id":1,
     "method":"author_insertKey",
     "params": [
-      "babe",
+      "aura",
       "//Bob",
       "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48"
     ]
@@ -55,7 +55,7 @@ curl http://localhost:9935 -H "Content-Type:application/json;charset=utf-8" -d \
     "id":1,
     "method":"author_insertKey",
     "params": [
-      "babe",
+      "aura",
       "//Charlie",
       "0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22"
     ]

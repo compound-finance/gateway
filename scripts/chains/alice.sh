@@ -19,7 +19,7 @@ if [ "$build" = true ] ; then
 fi
 
 if [ "$purge" = true ] ; then
-  ./target/release/compound-chain purge-chain --base-path /tmp/chainz/alice --chain ./compoundChainSpecRaw.json --database paritydb -y
+  ./target/release/compound-chain purge-chain --base-path /tmp/chainz/alice --chain ./compoundChainSpec.json --database paritydb -y
 fi
 
 ./target/release/compound-chain \
@@ -28,7 +28,7 @@ fi
   --port 30333 \
   --ws-port 9944 \
   --rpc-port 9933 \
-  --rpc-methods Unsafe \
   --no-mdns \
+  --rpc-methods Unsafe \
   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
   --validator 
