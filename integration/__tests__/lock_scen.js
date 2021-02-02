@@ -16,7 +16,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       await ashley.lock(100, usdc, false);
       expect(await ashley.tokenBalance(usdc)).toEqual(900);
       await chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
-      expect(await ashley.chainBalance(usdc)).toEqual(100);
+      expect(await ashley.chainBalance(usdc)).toEqual(101);
     }
   },
   {
