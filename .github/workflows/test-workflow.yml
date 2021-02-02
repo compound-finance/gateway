@@ -1,6 +1,8 @@
 name: Test
 on: push
 
+// rustc version set with `rustup default` command in scripts/get_substrate.sh
+
 jobs:
   cargo-format:
     name: Cargo Format Check
@@ -190,7 +192,7 @@ jobs:
 
       - name: Build Compound Chain
         run: |
-          cargo +nightly-2020-11-15 build --release
+          cargo +nightly build --release
 
       - name: Run Integration Test
         run: |
