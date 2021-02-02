@@ -54,7 +54,7 @@ mod cash {
 
 impl_outer_event! {
     pub enum TestEvent for Test {
-        cash<T>,
+        cash,
         frame_system<T>,
     }
 }
