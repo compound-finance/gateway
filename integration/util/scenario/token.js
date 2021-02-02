@@ -61,7 +61,7 @@ class Token {
       throw new Error(`setBalance failed, unwilling to reduce balance for ${actor.name}: currentBalance=${currentBalance}, weiAmount=${weiAmount}`)
     }
 
-    await this.token.methods.transfer(actor.ethAddress(), weiAmount - currentBalance).send({from: this.owner});
+    await this.token.methods.transfer(actor.ethAddress(), weiAmount.minus(currentBalance)).send({from: this.owner});
 
     // Double check the balance is properly set now
     let newBalance = await this.getBalance(actor);

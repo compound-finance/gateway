@@ -2,9 +2,11 @@
 pub use our_std::vec::Vec;
 
 use crate::rates::APR;
-use crate::types::{AssetAmount, CashIndex, Reason, Timestamp};
+use crate::reason::Reason;
+use crate::types::{AssetAmount, CashIndex, Timestamp};
 
 use codec::{Decode, Encode};
+use compound_crypto::public_key_bytes_to_eth_address;
 use our_std::{convert::TryInto, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
 /// Type for representing the selection of a supported chain.
@@ -134,6 +136,16 @@ impl From<ChainAsset> for String {
     }
 }
 
+/// Type for chain assets paired with an account
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAssetAccount {
+    Comp(<Compound as Chain>::Address, <Compound as Chain>::Address),
+    Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Address),
+    Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Address),
+    Sol(<Solana as Chain>::Address, <Solana as Chain>::Address),
+    Tez(<Tezos as Chain>::Address, <Tezos as Chain>::Address),
+}
+
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
@@ -166,7 +178,11 @@ impl ChainSignature {
 /// Type for a list of chain signatures.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignatureList {
-    Eth(Vec<<Ethereum as Chain>::Signature>),
+    Comp(Vec<(<Compound as Chain>::Address, <Compound as Chain>::Signature)>),
+    Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
+    Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
+    Sol(Vec<(<Solana as Chain>::Address, <Solana as Chain>::Signature)>),
+    Tez(Vec<(<Tezos as Chain>::Address, <Tezos as Chain>::Signature)>),
 }
 
 // Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
@@ -200,6 +216,7 @@ pub trait Chain {
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
     fn to_address(addr: &str) -> Result<Self::Address, Reason>;
+    fn signer_address() -> Result<Self::Address, Reason>;
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -236,6 +253,10 @@ impl Chain for Compound {
     }
 
     fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 }
@@ -278,6 +299,14 @@ impl Chain for Ethereum {
         }
         return Err(Reason::BadAddress);
     }
+
+    fn signer_address() -> Result<Self::Address, Reason> {
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(Reason::KeyNotFound)?;
+        let pubk = runtime_interfaces::keyring_interface::get_public_key(eth_key_id)?;
+
+        Ok(public_key_bytes_to_eth_address(&pubk))
+    }
 }
 
 impl Chain for Polkadot {
@@ -299,6 +328,10 @@ impl Chain for Polkadot {
     }
 
     fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 }
@@ -324,6 +357,10 @@ impl Chain for Solana {
     fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
+
+    fn signer_address() -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
 }
 
 impl Chain for Tezos {
@@ -345,6 +382,10 @@ impl Chain for Tezos {
     }
 
     fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 }

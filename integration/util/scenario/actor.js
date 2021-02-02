@@ -1,7 +1,7 @@
 const { Keyring } = require('@polkadot/api');
 const { getInfoKey } = require('../util');
 const { instantiateInfo } = require('./scen_info');
-const { sendAndWaitForEvents} = require('../substrate');
+const { sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
 
 class Actor {
@@ -54,13 +54,19 @@ class Actor {
     return token.toTokenAmount(weiAmount);
   }
 
-  async lock(collateral, amount) {
-    return this.ctx.starport.lock(this, collateral, amount);
+  async lock(amount, collateral, awaitEvent = true) {
+    let lockRes = await this.ctx.starport.lock(this, amount, collateral);
+    if (awaitEvent) {
+      await this.ctx.chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
+    }
+    return lockRes;
   }
 
-  async extract(collateral, amount) {
+  async extract(amount, collateral, recipient = null) {
     let token = this.ctx.tokens.get(collateral);
-    let trxReq = this.ctx.generateTrxReq("extract", amount, token);
+    let weiAmount = token.toWeiAmount(amount);
+
+    let trxReq = this.ctx.generateTrxReq("extract", weiAmount, token, recipient || this);
 
     return await this.runTrxRequest(trxReq);
   }
@@ -100,7 +106,7 @@ function actorInfoMap(keyring) {
 }
 
 async function buildActor(actorName, actorInfo, keyring, index, ctx) {
-  let ethAddress = ctx.eth.accounts[index+1];
+  let ethAddress = ctx.eth.accounts[index + 1];
   let chainKey = keyring.addFromUri(getInfoKey(actorInfo, 'key_uri', `actor ${actorName}`))
 
   return new Actor(actorName, ethAddress, chainKey, ctx);

@@ -41,7 +41,10 @@ describe('magic extract and goldie unlocks', () => {
   }, 600000 /* 10m */);
   afterEach(() => teardown(ctx));
 
-  test('magic extraction', async () => {
+  // There's now a lot wrong with this test (e.g. the Starport doesn't even
+  // have a cash token balance to extract out). It should be removed with magic
+  // extract in general.
+  test.skip('magic extraction', async () => {
     let trxReq = "(magic-extract 1000 eth:0xc00e94cb662c3520282e6f5717214004a7f26888)";
     let sig = { Eth: await web3.eth.sign(trxReq, accounts[0]) };
     let cashBalancePrior = await api.query.cash.cashBalance({ Eth: "0xc00e94cb662c3520282e6f5717214004a7f26888" });
@@ -87,7 +90,7 @@ describe('magic extract and goldie unlocks', () => {
     expect(noticeSigs).toHaveProperty('Eth');
 
     // TODO: This should probably be "unlockCash"
-    let tx = await contracts.starport.methods.unlock(notice, noticeSigs['Eth']).send({ from: accounts[0] });
+    let tx = await contracts.starport.methods.unlock(notice, noticeSigs['Eth'].map((x) => x[1])).send({ from: accounts[0] });
 
     let unlockEvent = tx.events['Unlock'];
     expect(notice).toBeDefined();

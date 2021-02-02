@@ -13,7 +13,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Lock Collateral',
     scenario: async ({ ashley, usdc, chain }) => {
-      await ashley.lock(100, usdc);
+      await ashley.lock(100, usdc, false);
       expect(await ashley.tokenBalance(usdc)).toEqual(900);
       await chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
       expect(await ashley.chainBalance(usdc)).toEqual(100);
@@ -22,7 +22,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Lock Eth',
     scenario: async ({ ashley, chain, ether }) => {
-      await ashley.lock(0.01, ether);
+      await ashley.lock(0.01, ether, false);
       expect(await ashley.tokenBalance(ether)).toEqual(99.99);
       await chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
       expect(await ashley.chainBalance(ether)).toEqual(0.01);
@@ -32,7 +32,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
     skip: true,
     name: 'Lock Too Little Collateral',
     scenario: async ({ ashley, usdc, chain }) => {
-      await ashley.lock(0.1, usdc);
+      await ashley.lock(0.1, usdc, false);
       expect(await ashley.tokenBalance(usdc)).toEqual(999.9);
       let failure = await chain.waitForEthProcessFailure();
       expect(failure).toHaveReason('MinTxValueNotMet');

@@ -1,4 +1,5 @@
-use crate::types::{Reason, Uint};
+use crate::reason::Reason;
+use crate::types::Uint;
 use codec::{Decode, Encode};
 use our_std::{convert::TryInto, RuntimeDebug};
 

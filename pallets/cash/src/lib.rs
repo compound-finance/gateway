@@ -35,13 +35,14 @@ use sp_runtime::{
 use crate::chains::{
     Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
 };
-use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
+use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId, NoticeStatus};
 use crate::rates::{InterestRateModel, APR};
+use crate::reason::Reason;
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ConfigAsset,
-    ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, Nonce, NoticeStatus, Reason,
-    ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+    ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, Nonce, Quantity, ReporterSet,
+    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 
 use sp_runtime::print;
@@ -53,6 +54,7 @@ pub mod notices;
 pub mod oracle;
 pub mod params;
 pub mod rates;
+pub mod reason;
 pub mod symbol;
 pub mod trx_req;
 pub mod types;
@@ -146,7 +148,7 @@ decl_storage! {
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
         /// The mapping of (status of) notices to be signed for Ethereum, by notice id.
-        EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
+        NoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
 
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
@@ -197,6 +199,9 @@ decl_event!(
 
         /// Signed notice. [chain_id, notice_id, message, signatures]
         SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
+
+        /// When a new notice is generated
+        Notice(NoticeId, Notice, EncodedNotice),
     }
 );
 
@@ -280,6 +285,12 @@ decl_error! {
         /// Signature recovery errror
         InvalidSignature,
 
+        /// Error signing notice in off-chain worker
+        ProcessNoticeFailure,
+
+        /// Failed to publish signatures
+        PublishSignatureFailure,
+
         // XXX delete with magic extract
         /// Failure in internal logic
         Failed,
@@ -343,6 +354,18 @@ decl_module! {
                 trx_request::TrxRequest::MagicExtract(amount, account) => {
                     cash_err!(magic_extract_internal::<T>(sender, account.into(), amount.into()), Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
                     Ok(())
+                },
+                trx_request::TrxRequest::Extract(amount, asset, account) => {
+                    let chain_asset: ChainAsset = asset.into();
+                    let symbol = core::symbol::<T>(chain_asset).ok_or(<Error<T>>::AssetNotSupported)?; // TODO: Correct error? cash_err?
+                    let quantity = Quantity(symbol, amount.into());
+                    match core::extract_internal::<T>(chain_asset, sender, account.into(), quantity) {
+                        Ok(()) => Ok(()),
+                        Err(err) => {
+                            print(format!("TrxExtract Error: {:?}", err).as_str());
+                            Err(Error::<T>::Failed)?
+                        }
+                    }
                 }
             }
         }
@@ -431,35 +454,11 @@ decl_module! {
         }
 
         #[weight = 0] // XXX
-        pub fn publish_eth_signature(origin, notice_id: NoticeId, signature: ValidatorSig) -> dispatch::DispatchResult {
-            //let signer = recover(payload); // XXX
-            //require(signer == known validator); // XXX
+        pub fn publish_signature(origin, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
+            ensure_none(origin)?;
+            cash_err!(core::publish_signature_internal(notice_id, signature), Error::<T>::PublishSignatureFailure)?;
 
-            let status = <EthNoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::Missing);
-            match status {
-                NoticeStatus::Missing => {
-                    Ok(())
-                }
-
-                NoticeStatus::Pending { signers, signatures, notice } => {
-                    // XXX sets?
-                    // let signers_new = {signer | signers};
-                    // let signatures_new = {signature | signatures };
-                    // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                           EthNoticeQueue::insert(notice_id, NoticeStatus::Done);
-                           Self::deposit_event(Event::SignedNotice(ChainId::Eth, notice_id, notice.encode_ethereum_notice(), signatures)); // XXX generic
-                           Ok(())
-                    // } else {
-                    //     EthNoticeQueue::insert(event.id, NoticeStatus::Pending { signers: signers_new, signatures, notice});
-                    //     Ok(())
-                    // }
-                }
-
-                NoticeStatus::Done => {
-                    // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
-                    Ok(())
-                }
-            }
+            Ok(())
         }
 
         /// Offchain Worker entry point.
@@ -468,7 +467,10 @@ decl_module! {
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error during fetch events: {:?}", e);
             }
-            Self::process_eth_notices(block_number);
+
+            // TODO: What to do with res?
+            let _res = cash_err!(core::process_notices::<T>(block_number), Error::<T>::ProcessNoticeFailure);
+
             // todo: do this less often perhaps once a minute?
             // a really simple idea to do it once a minute on average is to just use probability
             // and only update the feed every now and then. It is a function of how many validators
@@ -561,10 +563,13 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidSymbol
         )?;
 
-        debug::native::info!(
-            "Parsed price from open price feed: {:?} is worth {:?}",
-            parsed.key,
-            (parsed.value as f64) / 1000000.0
+        print(
+            format!(
+                "Parsed price from open price feed: {:?} is worth {:?}",
+                parsed.key,
+                (parsed.value as f64) / 1000000.0
+            )
+            .as_str(),
         );
         // todo: more sanity checking on the value
         // note - the API for GET does not return an Option but if the value is not present it
@@ -735,21 +740,6 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
-    pub fn process_eth_notices(block_number: T::BlockNumber) {
-        for notice in EthNoticeQueue::iter_values() {
-            // find parent
-            // id = notice.gen_id(parent)
-
-            // XXX
-            // submit onchain call for aggregating the price
-            // let payload = notices::to_payload(notice);
-            // let call = Call::publish_eth_signature(payload);
-
-            // Unsigned tx
-            // SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
-        }
-    }
-
     // XXX disambiguate whats for ethereum vs not
     fn fetch_events_with_lock() -> Result<(), Error<T>> {
         // Create a reference to Local Storage value.
@@ -851,7 +841,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::process_eth_event(payload, signature) => {
+            Call::process_eth_event(payload, _signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .priority(100)
                     // The transaction is only valid for next 10 blocks. After that it's
@@ -866,7 +856,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
-            Call::exec_trx_request(request, signature) => {
+            Call::exec_trx_request(request, _signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
                     .and_provides(request)
@@ -874,6 +864,11 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .build()
             }
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .and_provides(sig)
+                .propagate(true)
+                .build(),
+            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)
                 .propagate(true)
@@ -917,16 +912,15 @@ pub fn magic_extract_internal<T: Config>(
     });
 
     // TODO: Why is this Eth notice queue? Should this be specific to Eth?
-    EthNoticeQueue::insert(
+    NoticeQueue::insert(
         notice_id,
         NoticeStatus::Pending {
-            signers: vec![],
-            signatures: ChainSignatureList::Eth(vec![]),
+            signature_pairs: ChainSignatureList::Eth(vec![]),
             notice: notice.clone(),
         },
     );
 
-    let encoded_notice = notice.encode_ethereum_notice();
+    let encoded_notice = notice.encode_notice();
     let signature = cash_err!(
         <Ethereum as Chain>::sign_message(&encoded_notice[..]),
         Error::<T>::InvalidSignature
@@ -938,7 +932,7 @@ pub fn magic_extract_internal<T: Config>(
         ChainId::Eth,
         notice_id,
         encoded_notice,
-        ChainSignatureList::Eth(vec![signature]),
+        ChainSignatureList::Eth(vec![([0; 20], signature)]),
     )); // XXX signatures
 
     // Return a successful DispatchResult

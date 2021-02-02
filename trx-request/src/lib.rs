@@ -23,6 +23,11 @@ pub enum Chain {
 }
 
 #[derive(PartialEq, Eq, Debug)]
+pub enum Asset {
+    Eth([u8; 20]),
+}
+
+#[derive(PartialEq, Eq, Debug)]
 pub enum Account {
     Eth([u8; 20]),
 }
@@ -30,14 +35,16 @@ pub enum Account {
 #[derive(PartialEq, Eq, Debug)]
 pub enum TrxRequest {
     MagicExtract(MaxAmount, Account),
+    Extract(Amount, Asset, Account),
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ParseError<'a> {
     NotImplemented,
     LexError(&'a str),
+    InvalidAmount,
     InvalidMaxAmount,
-    InvalidAccount,
+    InvalidAddress,
     InvalidArgs(&'static str, usize, usize),
     UnknownFunction(&'a str),
     InvalidExpression,
@@ -56,6 +63,14 @@ fn parse_max_amount<'a>(t: &Token) -> Result<MaxAmount, ParseError<'a>> {
     }
 }
 
+fn parse_amount<'a>(t: &Token) -> Result<Amount, ParseError<'a>> {
+    match t {
+        Token::Integer(Some(v)) => Ok(*v),
+        Token::Hex(Some(v)) => Ok(hex_util::hex_to_u128(v).ok_or(ParseError::InvalidAmount)?),
+        _ => Err(ParseError::InvalidAmount), // TODO: Debug here?
+    }
+}
+
 // TODO: How do handle casing here? For now, let's just assume all lower-case, which maybe we can enforce?
 fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     match chain {
@@ -64,16 +79,25 @@ fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     }
 }
 
-fn parse_chain_account<'a>(chain: Chain, account: &'a str) -> Result<Account, ParseError<'a>> {
+fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
+    let account_vec: Vec<u8> =
+        hex::decode(&account[2..]).map_err(|_| ParseError::InvalidChainAccount(Chain::Eth))?;
+    let chain_account: [u8; 20] = account_vec
+        .try_into()
+        .map_err(|_| ParseError::InvalidChainAccount(Chain::Eth))?;
+
+    Ok(chain_account)
+}
+
+fn parse_chain_account<'a>(chain: Chain, address: &'a str) -> Result<Account, ParseError<'a>> {
     match chain {
-        Chain::Eth => {
-            let account_vec: Vec<u8> =
-                hex::decode(&account[2..]).map_err(|_| ParseError::InvalidChainAccount(chain))?;
-            let chain_account: [u8; 20] = account_vec
-                .try_into()
-                .map_err(|_| ParseError::InvalidChainAccount(Chain::Eth))?;
-            Ok(Account::Eth(chain_account))
-        }
+        Chain::Eth => Ok(Account::Eth(parse_eth_address(address)?)),
+    }
+}
+
+fn parse_chain_asset<'a>(chain: Chain, address: &'a str) -> Result<Asset, ParseError<'a>> {
+    match chain {
+        Chain::Eth => Ok(Asset::Eth(parse_eth_address(address)?)),
     }
 }
 
@@ -83,7 +107,17 @@ fn parse_account<'a>(t: &Token<'a>) -> Result<Account, ParseError<'a>> {
             let chain = parse_chain(chain_str)?;
             Ok(parse_chain_account(chain, account_str)?)
         }
-        _ => Err(ParseError::InvalidAccount),
+        _ => Err(ParseError::InvalidAddress),
+    }
+}
+
+fn parse_asset<'a>(t: &Token<'a>) -> Result<Asset, ParseError<'a>> {
+    match t {
+        Token::Pair(Some((chain_str, account_str))) => {
+            let chain = parse_chain(chain_str)?;
+            Ok(parse_chain_asset(chain, account_str)?)
+        }
+        _ => Err(ParseError::InvalidAddress),
     }
 }
 
@@ -96,6 +130,19 @@ fn parse_magic_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<
             Ok(TrxRequest::MagicExtract(amount, account))
         }
         _ => Err(ParseError::InvalidArgs("magic-extract", 2, args.len())),
+    }
+}
+
+fn parse_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
+    match args {
+        [amount_token, asset_token, account_token] => {
+            let amount = parse_amount(amount_token)?;
+            let asset = parse_asset(asset_token)?;
+            let account = parse_account(account_token)?;
+
+            Ok(TrxRequest::Extract(amount, asset, account))
+        }
+        _ => Err(ParseError::InvalidArgs("extract", 2, args.len())),
     }
 }
 
@@ -118,6 +165,9 @@ fn parse<'a>(tokens: Lexer<'a, Token<'a>>) -> Result<TrxRequest, ParseError<'a>>
         [Token::LeftDelim, Token::Identifier("magic-extract"), args @ .., Token::RightDelim] => {
             parse_magic_extract(args)
         }
+        [Token::LeftDelim, Token::Identifier("extract"), args @ .., Token::RightDelim] => {
+            parse_extract(args)
+        }
         [Token::LeftDelim, Token::Identifier(fun), .., Token::RightDelim] => {
             Err(ParseError::UnknownFunction(fun))
         }
@@ -134,6 +184,10 @@ mod tests {
     use crate::*;
 
     const ALAN: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    const ETH: [u8; 20] = [
+        238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
+        238, 238,
+    ];
 
     macro_rules! parse_tests {
     ($($name:ident: $input:expr => $exp:expr,)*) => {
@@ -167,14 +221,26 @@ mod tests {
           MaxAmount::Amt(3),
           Account::Eth(ALAN)
         )),
-      parse_simple_hex_max:
+      parse_simple_magic_extract_hex:
         "(magic-extract 0x0100 eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::MagicExtract(
           MaxAmount::Amt(256),
           Account::Eth(ALAN)
         )),
-      parse_simple_max_max:
+      parse_simple_magic_extract_max:
         "(magic-extract max eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::MagicExtract(
           MaxAmount::Max,
+          Account::Eth(ALAN)
+        )),
+      parse_extract:
+        "(extract 3 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+          3,
+          Asset::Eth(ETH),
+          Account::Eth(ALAN)
+        )),
+      parse_extract_hex:
+        "(extract 0x0100 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+          256,
+          Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
     }

@@ -17,13 +17,17 @@ class Eth {
   async __deployContract(contractsFile, contractName, contractArgs, opts = {}) {
     let contracts = await readContractsFile(contractsFile);
 
-    return await deployContract(
+    let contract = await deployContract(
       this.web3,
       opts.from || this.defaultFrom,
       contracts,
       contractName,
       contractArgs
     );
+
+    this.ctx.log(`${contractName} deployed to ${contract._address}`);
+
+    return contract;
   }
 
   async sign(data, actorLookup) {

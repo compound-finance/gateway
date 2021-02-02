@@ -380,7 +380,7 @@ construct_runtime!(
         Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
         // Include the custom logic from the CASH pallet in the runtime.
-        Cash: pallet_cash::{Module, Call, Config, Storage, Event<T>, ValidateUnsigned},
+        Cash: pallet_cash::{Module, Call, Config, Storage, Event, ValidateUnsigned},
     }
 );
 
