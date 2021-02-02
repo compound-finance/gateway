@@ -212,6 +212,7 @@ impl OpenPriceFeedApiResponse {
             res.push((msg, sig));
         }
 
+        // XXX possibly introduce a struct here
         Ok((res, self.timestamp))
     }
 }
