@@ -10,22 +10,23 @@ pub use our_std::{
 use frame_support::storage::{StorageDoubleMap, StorageMap, StorageValue};
 
 use crate::{
-    chains::eth,     // XXX event ADTs?
-    notices::Notice, // XXX move here, encoding to chains
+    chains::{eth, ChainAccount, ChainAsset}, // XXX event ADTs?
+    notices::Notice,                         // XXX move here, encoding to chains
     params::MIN_TX_VALUE,
-    symbol::{Symbol, CASH, NIL}, // XXX NIL tmp
+    symbol::{Symbol, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, ChainAccount,
-        ChainAsset, Int, MathError, Price, Quantity, Reason, SafeMul, USDQuantity,
+        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, MathError,
+        Price, Quantity, Reason, SafeMul, USDQuantity,
     },
     AssetBalances,
+    AssetSymbols,
     CashPrincipals,
     ChainCashPrincipals,
     Config,
+    Event::GoldieLocks, // XXX
     GlobalCashIndex,
     Module,
     Prices,
-    RawEvent::GoldieLocks, // XXX
     TotalBorrowAssets,
     TotalCashPrincipal,
     TotalSupplyAssets,
@@ -47,13 +48,8 @@ macro_rules! require_min_tx_value {
 
 // Public helper functions //
 
-pub fn symbol<T: Config>(asset: ChainAsset) -> Symbol {
-    // XXX lookup in storage
-    //  need to initialize with decimals first
-    Symbol(
-        ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
-        18,
-    )
+pub fn symbol<T: Config>(asset: ChainAsset) -> Option<Symbol> {
+    AssetSymbols::get(asset)
 }
 
 pub fn price<T: Config>(symbol: Symbol) -> Price {
@@ -197,7 +193,7 @@ pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reas
         } => lock_internal::<T>(
             ChainAsset::Eth(asset),
             ChainAccount::Eth(holder),
-            Quantity(symbol::<T>(ChainAsset::Eth(asset)), amount),
+            Quantity(symbol::<T>(ChainAsset::Eth(asset)).ok_or(Reason::NoSuchAsset)?, amount),
         ),
 
         eth::EventData::LockCash {
@@ -221,8 +217,6 @@ pub fn lock_internal<T: Config>(
     holder: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    // require_min_tx_value!(value::<T>(amount)?);
-
     let holder_asset = AssetBalances::get(asset, holder);
     let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
 
@@ -247,8 +241,6 @@ pub fn lock_cash_internal<T: Config>(
     holder: ChainAccount,
     amount: CashQuantity,
 ) -> Result<(), Reason> {
-    require_min_tx_value!(value::<T>(amount)?);
-
     let index = GlobalCashIndex::get();
     let principal = index.as_hold_principal(amount)?;
     let holder_cash_principal = CashPrincipals::get(holder);

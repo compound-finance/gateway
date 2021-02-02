@@ -830,6 +830,8 @@ dependencies = [
  "frame-system",
  "futures 0.3.8",
  "jsonrpc-core",
+ "our-std",
+ "pallet-cash",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
  "parity-scale-codec",
@@ -4259,6 +4261,7 @@ name = "our-std"
 version = "0.0.1"
 dependencies = [
  "our-std-proc-macro",
+ "serde",
  "sp-runtime",
  "sp-std",
 ]

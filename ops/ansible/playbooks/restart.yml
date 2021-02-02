@@ -1,0 +1,17 @@
+
+- hosts:
+    - full_node
+    - authority_node
+  tasks:
+    - name: stop compound chain service
+      become: true
+      systemd:
+        name: compound-chain.service
+        state: stopped
+
+    - name: start compound chain service
+      become: true
+      systemd:
+        name: compound-chain.service
+        state: started
+        daemon_reload: yes

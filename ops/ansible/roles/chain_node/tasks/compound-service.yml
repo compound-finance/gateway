@@ -4,7 +4,7 @@
   become: true
   when: "'authority_node' in group_names"
   vars:
-    peers: "{{ groups['authority_node'] | union(groups['full_node']) | difference([inventory_hostname]) }}"
+    peers: "{{ vars.bootnodes }}"
   tags:
     compound-service
 
@@ -13,7 +13,7 @@
   become: true
   when: "'full_node' in group_names"
   vars:
-    peers: "{{ groups['authority_node'] | union(groups['full_node']) | difference([inventory_hostname]) }}"
+    peers: "{{ groups['authority_node'] }}"
   tags:
     compound-service
 

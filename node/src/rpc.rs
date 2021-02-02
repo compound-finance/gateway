@@ -151,6 +151,7 @@ where
     io.extend_with(TransactionPaymentApi::to_delegate(TransactionPayment::new(
         client.clone(),
     )));
+
     io.extend_with(sc_consensus_babe_rpc::BabeApi::to_delegate(
         BabeRpcHandler::new(
             client.clone(),
@@ -180,6 +181,8 @@ where
             deny_unsafe,
         ),
     ));
+
+    // XXX extend with our custom rpc calls (getPrice(String), getLiquidity(ChainAccount), etc.)
 
     io
 }

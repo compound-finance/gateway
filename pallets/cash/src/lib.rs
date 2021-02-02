@@ -2,6 +2,8 @@
 #![feature(array_methods)]
 #![feature(associated_type_defaults)]
 #![feature(const_fn_floating_point_arithmetic)]
+#![feature(const_panic)]
+#![feature(str_split_once)]
 
 #[macro_use]
 extern crate alloc;
@@ -30,36 +32,39 @@ use sp_runtime::{
     SaturatedConversion,
 };
 
-use crate::chains::{Chain, ChainId, Ethereum};
+use crate::chains::{
+    Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
+};
 use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId};
 use crate::rates::{InterestRateModel, APR};
 use crate::symbol::Symbol;
 use crate::types::{
-    AssetAmount, AssetBalance, AssetIndex, AssetPrice, CashIndex, CashPrincipal, ChainAccount,
-    ChainAsset, ChainSignature, ChainSignatureList, ConfigSet, ConfigSetString, EncodedNotice,
-    EventStatus, Fraction, MaxableAssetAmount, Nonce, NoticeStatus, Reason, ReporterSet,
-    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+    AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ConfigAsset,
+    ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, Nonce, NoticeStatus, Reason,
+    ReporterSet, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 
 use sp_runtime::print;
 
-mod chains;
-mod core;
-mod events;
-mod notices;
-mod oracle;
-mod params;
-mod rates;
-mod symbol;
-mod testdata;
-mod trx_req;
-mod types;
+pub mod chains;
+pub mod core;
+pub mod events;
+pub mod notices;
+pub mod oracle;
+pub mod params;
+pub mod rates;
+pub mod symbol;
+pub mod trx_req;
+pub mod types;
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod testdata;
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
@@ -72,7 +77,7 @@ pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_ope
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+    type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
 
     /// The overarching dispatch call type.
     type Call: From<Call<Self>>;
@@ -99,8 +104,11 @@ decl_storage! {
         /// The current APR on CASH held, and the base rate paid by borrowers.
         CashYield get(fn cash_yield): APR;
 
-        /// The fraction of borrower interest that is paid to the protocol.
-        Spreads get(fn spread): map hasher(blake2_128_concat) ChainAsset => Fraction;
+        /// The liquidation incentive on seized collateral (e.g. 8% = 800 bips).
+        GlobalLiquidationIncentive get(fn liquidation_incentive): Bips;
+
+        /// The fraction of borrower interest that is paid to the protocol (e.g. 1/10th = 1000 bips).
+        Spreads get(fn spread): map hasher(blake2_128_concat) ChainAsset => Bips;
 
         /// The mapping of indices to track interest owed by asset borrowers, by asset.
         BorrowIndices get(fn borrow_index): map hasher(blake2_128_concat) ChainAsset => AssetIndex;
@@ -126,10 +134,13 @@ decl_storage! {
         /// The mapping of asset balances, by chain and account.
         AssetBalances get(fn asset_balance): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetBalance;
 
-        RateModels get(fn model): map hasher(blake2_128_concat) ChainAsset => InterestRateModel;
+        // XXX break into separate storage
+        //  liquidity factor, supply cap, etc.
+        /// The asset metadata to be synced with the starports.
+        AssetMetadata get (fn asset_metadata): map hasher(blake2_128_concat) ChainAsset => ();
 
-        /// The last used nonce for each account, initialized at zero.
-        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
+        /// Mapping of assets to symbols, which determines if an asset is supported.
+        AssetSymbols get(fn asset_symbol): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
 
         /// The mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
@@ -137,15 +148,11 @@ decl_storage! {
         /// The mapping of (status of) notices to be signed for Ethereum, by notice id.
         EthNoticeQueue get(fn eth_notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
 
-        // XXX
-        // AssetInfo[asset];
-        // LiquidationIncentive;
+        /// The last used nonce for each account, initialized at zero.
+        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
-        /// Mapping of assets to symbols.
-        AssetSymbols get(fn asset_symbol): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
-
-        /// Mapping of strings to symbols.
-        Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
+        /// The mapping of interest rate models, by asset.
+        RateModels get(fn model): map hasher(blake2_128_concat) ChainAsset => InterestRateModel;
 
         /// Mapping of latest prices for each asset symbol.
         Prices get(fn price): map hasher(blake2_128_concat) Symbol => AssetPrice;
@@ -156,30 +163,26 @@ decl_storage! {
         /// Ethereum addresses of open oracle price reporters.
         PriceReporters get(fn reporters): ReporterSet; // XXX if > 1, how are we combining?
 
+        /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
+        Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
+
         // XXX delete me (part of magic extract)
         pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
         config(validators): ConfigSetString;
         config(reporters): ConfigSetString;
-        config(symbols): ConfigSet<(String, u8)>; // XXX initialize symbol from string: (ticker, decimals)
-        config(asset_symbol): ConfigSetString;
+        config(assets): Vec<ConfigAsset>;
         build(|config| {
-            Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_symbols(config.symbols.clone());
-            Module::<T>::initialize_asset_maps(config.asset_symbol.clone());
+            Module::<T>::initialize_validators(config.validators.clone());
         })
     }
 }
 
 decl_event!(
-    pub enum Event<T>
-    where
-        AccountId = <T as frame_system::Config>::AccountId, //XXX seems to require a where clause with reference to T to compile
-    {
-        XXXPhantomFakeEvent(AccountId), // XXX
-
+    pub enum Event {
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
@@ -382,17 +385,17 @@ decl_module! {
                     // XXX
                     // let signers_new = {signer | signers};
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                    if signers_new.len() > validators.len() * 2 / 3 {
+                    if signers_new.len() > validators.len() * 2 / 3 { // XXX note this needs to be & Validators, so we need a set
                         match core::apply_eth_event_internal::<T>(event) {
                             Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                                Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
+                                Self::deposit_event(Event::ProcessedEthEvent(payload));
                                 Ok(())
                             }
 
                             Err(reason) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash: Ethereum::hash_bytes(payload.as_slice()), reason: reason });
-                                Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, reason));
+                                Self::deposit_event(Event::FailedProcessingEthEvent(payload, reason));
                                 Ok(())
                             }
                         }
@@ -401,19 +404,20 @@ decl_module! {
                         Ok(())
                     }
                 }
-                // XXX potential retry logic to allow retrying Failures
+
+                // Retry logic to allow retrying Failures (which should never happen, but theoretically can)
                 EventStatus::<Ethereum>::Failed { hash, .. } => {
                     // XXX require(compute_hash(payload) == hash, "event data differs from failure");
                     match core::apply_eth_event_internal::<T>(event) {
                         Ok(_) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                            Self::deposit_event(RawEvent::ProcessedEthEvent(payload));
+                            Self::deposit_event(Event::ProcessedEthEvent(payload));
                             Ok(())
                         }
 
                         Err(new_reason) => {
                             EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
-                            Self::deposit_event(RawEvent::FailedProcessingEthEvent(payload, new_reason));
+                            Self::deposit_event(Event::FailedProcessingEthEvent(payload, new_reason));
                             Ok(())
                         }
                     }
@@ -443,7 +447,7 @@ decl_module! {
                     // let signatures_new = {signature | signatures };
                     // if len(signers_new & Validators) > 2/3 * len(Validators) {
                            EthNoticeQueue::insert(notice_id, NoticeStatus::Done);
-                           Self::deposit_event(RawEvent::SignedNotice(ChainId::Eth, notice_id, notice.encode_ethereum_notice(), signatures)); // XXX generic
+                           Self::deposit_event(Event::SignedNotice(ChainId::Eth, notice_id, notice.encode_ethereum_notice(), signatures)); // XXX generic
                            Ok(())
                     // } else {
                     //     EthNoticeQueue::insert(event.id, NoticeStatus::Pending { signers: signers_new, signatures, notice});
@@ -460,8 +464,6 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            debug::native::info!("Hello World from offchain workers from block {} !", block_number);
-
             let result = Self::fetch_events_with_lock();
             if let Err(e) = result {
                 debug::native::error!("offchain_worker error during fetch events: {:?}", e);
@@ -613,35 +615,27 @@ impl<T: Config> Module<T> {
         Ok(converted)
     }
 
-    /// Set the initial set of validators from the genesis config
-    fn initialize_validators(validators: ConfigSetString) {
-        assert!(
-            !validators.is_empty(),
-            "Validators must be set in the genesis config"
-        );
-        assert!(
-            Validators::get().is_empty(),
-            "Validators are already set but they should only be set in the genesis config."
-        );
-        let converted: ValidatorSet = Self::hex_string_vec_to_binary_vec(validators)
-            .expect("Could not deserialize validators from genesis config");
-        Validators::put(converted);
-    }
+    // XXX expose price(String) fn
 
-    // XXX actually symbols is a map with decimals
-    /// Set the initial set of supported symbols from the genesis config
-    fn initialize_symbols(symbols: ConfigSet<(String, u8)>) {
-        assert!(
-            !symbols.is_empty(),
-            "Symbols must be set in the genesis config"
-        );
+    /// Initializes a set of assets from a config value.
+    ///
+    /// * AssetMetadata // XXX set directly to liquidity factors, supply caps, etc.
+    /// * AssetSymbols
+    /// * RateModels
+    /// * Symbols
+    ///
+    fn initialize_assets(assets: Vec<ConfigAsset>) {
+        for asset in assets {
+            let ticker = asset.symbol.ticker();
+            if let Some(symbol) = Symbols::get(&ticker) {
+                assert!(symbol == asset.symbol, "Different symbols for same ticker");
+            } else {
+                Symbols::insert(ticker, asset.symbol);
+            }
 
-        for (ticker, decimals) in symbols {
-            // XXX
-            let mut chars: Vec<char> = ticker.chars().collect();
-            chars.resize(12, 0 as char);
-            let raw: [char; 12] = chars.try_into().expect("bad ticker");
-            Symbols::insert(ticker, Symbol(raw, decimals));
+            // TODO: specify rate model in ConfigAsset
+            RateModels::insert(&asset.asset, InterestRateModel::default());
+            AssetSymbols::insert(&asset.asset, asset.symbol);
         }
     }
 
@@ -660,42 +654,19 @@ impl<T: Config> Module<T> {
         PriceReporters::put(converted);
     }
 
-    /// Initializes several maps that use asset as their key to sane default values explicitly
-    ///
-    /// Maps initialized by this function
-    ///
-    /// * RateModels
-    /// * AssetSymbols
-    ///
-    fn initialize_asset_maps(asset_symbols: ConfigSetString) {
+    /// Set the initial set of validators from the genesis config
+    fn initialize_validators(validators: ConfigSetString) {
         assert!(
-            !asset_symbols.is_empty(),
-            "asset_symbols must be set in the genesis config"
+            !validators.is_empty(),
+            "Validators must be set in the genesis config"
         );
-
-        for record in asset_symbols {
-            let mut tokens = record.split(":");
-            let ticker = tokens.next().expect("No ticker present");
-            let symbol = Symbols::get(ticker).expect("Ticker not a valid symbol");
-            let chain = tokens.next().expect("No blockchain present");
-            let address = tokens.next().expect("No address present");
-            assert!(
-                tokens.next().is_none(),
-                "Too many colons in price key mapping element"
-            );
-            assert!(chain == "ETH", "Invalid blockchain");
-
-            let decoded = hex::decode(&address).expect("Address is not in hex format");
-            let decoded_arr: <Ethereum as Chain>::Address =
-                decoded.try_into().expect("Invalid Ethereum address");
-
-            let chain_asset: ChainAsset = ChainAsset::Eth(decoded_arr);
-
-            // XXX
-            // todo: we may want to do better with genesis having configurable initial interest rate models
-            RateModels::insert(&chain_asset, InterestRateModel::default());
-            AssetSymbols::insert(&chain_asset, symbol);
-        }
+        assert!(
+            Validators::get().is_empty(),
+            "Validators are already set but they should only be set in the genesis config."
+        );
+        let converted: ValidatorSet = Self::hex_string_vec_to_binary_vec(validators)
+            .expect("Could not deserialize validators from genesis config");
+        Validators::put(converted);
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed
@@ -941,6 +912,8 @@ pub fn magic_extract_internal<T: Config>(
             amount,
             cash_index: 1000,
         },
+
+        _ => panic!("XXX not implemented"),
     });
 
     // TODO: Why is this Eth notice queue? Should this be specific to Eth?
@@ -960,8 +933,8 @@ pub fn magic_extract_internal<T: Config>(
     )?; // XXX
 
     // Emit an event or two.
-    <Module<T>>::deposit_event(RawEvent::MagicExtract(amount, account, notice.clone()));
-    <Module<T>>::deposit_event(RawEvent::SignedNotice(
+    <Module<T>>::deposit_event(Event::MagicExtract(amount, account, notice.clone()));
+    <Module<T>>::deposit_event(Event::SignedNotice(
         ChainId::Eth,
         notice_id,
         encoded_notice,

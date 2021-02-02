@@ -18,26 +18,6 @@
       "Value": ["AssetAmount"]
     }
   },
-  "ChainAccount": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
-    }
-  },
-  "ChainAsset": {
-    "_enum": {
-      "Eth": ["[u8; 20]"]
-    }
-  },
-  "ChainSignature": {
-    "_enum": {
-      "Eth": ["[u8; 65]"]
-    }
-  },
-  "ChainSignatureList": {
-    "_enum": {
-      "Eth": ["Vec<[u8; 65]>"]
-    }
-  },
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
@@ -74,21 +54,35 @@
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
   "CashPrincipal": ["Int"],
-  "CashIndex" : ["Uint"],
+  "CashIndex": ["Uint"],
   "AssetIndex": ["Uint"],
 
   "Source1": "SymbolRS",
-  "Symbol": ["[u8; 12]", "u8"],
+  "Symbol": "([u8; 12], u8)",
 
   "Source2": "ChainsRS",
   "ChainId": {
-    "_enum": [
-      "Comp",
-      "Eth",
-      "Dot",
-      "Sol",
-      "Tez"
-    ]
+    "_enum": ["Comp", "Eth", "Dot", "Sol", "Tez"]
+  },
+  "ChainAccount": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainAsset": {
+    "_enum": {
+      "Eth": ["[u8; 20]"]
+    }
+  },
+  "ChainSignature": {
+    "_enum": {
+      "Eth": ["[u8; 65]"]
+    }
+  },
+  "ChainSignatureList": {
+    "_enum": {
+      "Eth": ["Vec<[u8; 65]>"]
+    }
   },
   "Compound": {},
   "Ethereum": {},
@@ -201,14 +195,7 @@
     }
   },
   "MathError": {
-    "_enum": [
-      "Overflow",
-      "Underflow",
-      "SignMismatch",
-      "SymbolMismatch",
-      "PriceNotUSD",
-      "DivisionByZero"
-    ]
+    "_enum": ["Overflow", "Underflow", "SignMismatch", "SymbolMismatch", "PriceNotUSD", "DivisionByZero"]
   },
 
   "Source5": "RatesRS",

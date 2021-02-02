@@ -7,14 +7,15 @@ Group=compound
 WorkingDirectory={{ compound_user_home }}
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
-  --chain local \
-  --{{ authority }} \
+  --chain "{{ compound_user_home }}/chainSpec.json" \
   --port 30333 \
   --ws-port 9944 \
   --rpc-port 9933 \
+  --rpc-methods Unsafe \
+  --no-mdns \
   --node-key-file {{ node_key_priv_file }} \
   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-  {% for peer in peers -%}
-  --bootnodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
+  {% for bootnode_multi_addr in peers -%}
+  --bootnodes {{ bootnode_multi_addr }} \
   {% endfor -%}
   --validator

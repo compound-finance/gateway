@@ -1,11 +1,9 @@
 use crate::{chains::*, core::*, mock::*, rates::*, symbol::*, *};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
+use our_std::str::FromStr;
 use sp_core::offchain::testing;
 
-const ETH: Symbol = Symbol(
-    ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
-    18,
-); // XXX macro?
+const ETH: Symbol = Symbol::new("ETH", 18);
 
 fn andrew() -> ChainAccount {
     ChainAccount::Eth([123; 20])
@@ -54,6 +52,16 @@ fn it_magically_extracts() {
 
 fn initialize_storage() {
     runtime_interfaces::set_validator_config_dev_defaults();
+    CashModule::initialize_assets(vec![
+        ConfigAsset {
+            symbol: FromStr::from_str("ETH/18").unwrap(),
+            asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
+        },
+        ConfigAsset {
+            symbol: FromStr::from_str("USDC/6").unwrap(),
+            asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
+        },
+    ]);
     CashModule::initialize_validators(vec![
         "6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
         "8ad1b2918c34ee5d3e881a57c68574ea9dbecb81".into(), // pk: 6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d
@@ -61,10 +69,6 @@ fn initialize_storage() {
     CashModule::initialize_reporters(vec![
         "85615b076615317c80f14cbad6501eec031cd51c".into(),
         "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
-    ]);
-    CashModule::initialize_symbols(vec![("USDC".into(), 6), ("ETH".into(), 18)]); // XXX fixme
-    CashModule::initialize_asset_maps(vec![
-        "USDC:ETH:EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".into()
     ]);
 }
 
@@ -106,7 +110,7 @@ fn process_eth_event_happy_path() {
                         if let TestEvent::cash(inner) = e { Some(inner) } else { None }
                     })
                     .collect::<Vec<_>>();
-                let expected_event = RawEvent::ProcessedEthEvent(checked_payload);
+                let expected_event = Event::ProcessedEthEvent(checked_payload);
                 assert_eq!(our_events[1], expected_event);
             }
 
