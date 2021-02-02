@@ -201,7 +201,9 @@ fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), 
 impl OpenPriceFeedApiResponse {
     /// This is provided for convenience making the processing of API messages as extrinsics
     /// more straightforward.
-    pub fn to_message_signature_pairs(self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, OracleError> {
+    pub fn to_message_signature_pairs(
+        self,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, String), OracleError> {
         let mut res = Vec::new();
         // didn't use map here so that we can bail out early using `?` operator
         for (msg, sig) in self.messages.iter().zip(self.signatures) {
@@ -210,7 +212,8 @@ impl OpenPriceFeedApiResponse {
             res.push((msg, sig));
         }
 
-        Ok(res)
+        // XXX possibly introduce a struct here
+        Ok((res, self.timestamp))
     }
 }
 
