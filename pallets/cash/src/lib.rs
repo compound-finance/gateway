@@ -32,7 +32,6 @@ use frame_system::{
 use our_std::{
     convert::{TryFrom, TryInto},
     str,
-    str::FromStr,
     vec::Vec,
 };
 use sp_core::crypto::AccountId32;
@@ -41,7 +40,6 @@ use sp_runtime::{
         storage::StorageValueRef,
         storage_lock::{StorageLock, Time},
     },
-    traits::IdentifyAccount,
     transaction_validity::{
         InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
     },
@@ -332,14 +330,12 @@ impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
         if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
             // delete existing validators
             for kv in <Validators>::iter() {
-                <Validators>::take(&kv.0);
+                <NextValidators>::take(&kv.0);
             }
             // push next validators into current validators
-            for kv in <NextValidators>::iter() {
-                let id: AccountId32 = kv.0;
-                let chain_keys: ChainKeys = kv.1;
+            for (id, chain_keys) in <NextValidators>::iter() {
+                <NextValidators>::take(&id);
                 <Validators>::insert(&id, chain_keys);
-                <NextValidators>::take(&id); //query and return
             }
         } else {
             ()
@@ -499,10 +495,13 @@ decl_module! {
         #[weight = 0] // XXX
         pub fn change_authorities(origin, keys: Vec<(AccountId32, ChainKeys)>) -> dispatch::DispatchResult {
             // TODO: assert root only
-            for k in &keys {
-                let id: &AccountId32 = &k.0;
-                let chain_keys: &ChainKeys = &k.1;
-                <NextValidators>::take(id); // XXX: actually delete previous nextValidators?
+
+            for (id, _chain_keys) in <NextValidators>::iter() {
+                <NextValidators>::take(id);
+            }
+
+            for (id, chain_keys) in &keys {
+                <NextValidators>::take(id);
                 <NextValidators>::insert(&id, chain_keys);
             }
 
