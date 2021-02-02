@@ -198,7 +198,7 @@ jobs:
         run: |
           set -eo pipefail
           cd integration
-          sudo npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
+          npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
           test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
         id: int_test
