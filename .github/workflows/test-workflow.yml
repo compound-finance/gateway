@@ -197,9 +197,14 @@ jobs:
       - name: Run Integration Test
         run: |
           cd integration
-          sudo npx jest --ci --reporters=default --reporters=jest-junit || echo "tests failed"
-          test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
+          sudo npx jest --ci --reporters=default --reporters=jest-junit
+
+      - name: Publish Integration Test Results
+        run: |
+          sudo test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
+          echo "The test_url is ${{ test_url }}"
+        continue-on-error: true
         id: int_test
 
       - name: Link to Integration Results
