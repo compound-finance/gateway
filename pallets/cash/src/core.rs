@@ -169,9 +169,9 @@ fn compute_cash_principal_per_internal(
 ) -> Option<Uint> {
     let unscaled = asset_rate
         .checked_mul(dt)?
-        .checked_div(SECONDS_PER_YEAR)?
         .checked_mul(price_asset)?
-        .checked_div(cash_index)?;
+        .checked_div(cash_index)?
+        .checked_div(SECONDS_PER_YEAR)?;
 
     scale_multiple_terms(
         unscaled,
@@ -588,6 +588,15 @@ pub fn on_initialize_with_error() -> Result<frame_support::weights::Weight, Reas
         .checked_sub(previous)
         .ok_or(Reason::TimeTravelNotAllowed)?;
 
+    let weight = on_initialize(change_in_time)?;
+
+    LastBlockTimestamp::put(now);
+
+    Ok(weight)
+}
+
+/// Block initialization step that can fail
+pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights::Weight, Reason> {
     let mut cash_principal_supply_increase = CashPrincipal::ZERO;
     let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
 
@@ -602,12 +611,12 @@ pub fn on_initialize_with_error() -> Result<frame_support::weights::Weight, Reas
 
         let cash_borrow_principal_per =
             compute_cash_principal_per(asset_cost, change_in_time, cash_index, asset_price)?;
-        let cash_supply_principal_per =
+        let cash_hold_principal_per =
             compute_cash_principal_per(asset_yield, change_in_time, cash_index, asset_price)?;
 
         let current_supply_index = SupplyIndices::get(&asset);
         let current_borrow_index = BorrowIndices::get(&asset);
-        let new_supply_index = increment_index(current_supply_index, cash_supply_principal_per)?;
+        let new_supply_index = increment_index(current_supply_index, cash_hold_principal_per)?;
         let new_borrow_index = increment_index(current_borrow_index, cash_borrow_principal_per)?;
 
         let supply_asset = get_total_supply_assets(&asset)?;
@@ -616,7 +625,7 @@ pub fn on_initialize_with_error() -> Result<frame_support::weights::Weight, Reas
         // CashPrincipal__Increase = CashPrincipal__Increase + ___Asset * Cash__PrincipalPer
 
         cash_principal_supply_increase = cash_principal_supply_increase
-            .add(supply_asset.as_cash_principal(cash_supply_principal_per)?)?;
+            .add(supply_asset.as_cash_principal(cash_hold_principal_per)?)?;
 
         cash_principal_borrow_increase = cash_principal_borrow_increase
             .add(borrow_asset.as_cash_principal(cash_borrow_principal_per)?)?;
@@ -645,7 +654,6 @@ pub fn on_initialize_with_error() -> Result<frame_support::weights::Weight, Reas
         BorrowIndices::insert(asset, new_borrow_index);
     }
 
-    LastBlockTimestamp::put(now);
     GlobalCashIndex::put(cash_index_new);
     TotalCashPrincipal::put(total_cash_principal_new);
     CashPrincipals::insert(miner, miner_cash_principal_new);
@@ -1013,6 +1021,20 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_cash_principal_per_specific_case() {
+        // a unit test related to previous unexpected larger scope test of on_initialize
+        // this showed that we should divide by SECONDS_PER_YEAR last te prevent un-necessary truncation
+        let asset_rate = APR::from_nominal("0.1225");
+        let dt = SECONDS_PER_YEAR / 4;
+        let cash_index = CashIndex::from_nominal("1.123");
+        let price_asset: AssetPrice = 1450_000000;
+
+        let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
+        let expected = CashPrincipal::from_nominal("39.542520"); // from hand calc
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn test_scale_multiple_terms() {
         let n1 = 56_789u128; // 3 decimals 56.789
         let n2 = 12_3456; // 4 decimals 12.3456
@@ -1062,6 +1084,56 @@ mod tests {
             assert_eq!(borrow_rate, kink_rate.into());
             // 50% utilization and 50% reserve factor
             assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
+        });
+    }
+
+    #[test]
+    fn test_on_initialize() {
+        new_test_ext().execute_with(|| {
+            let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
+            let asset = get_eth();
+            let symbol = Symbol::new("ETH", 18);
+            let change_in_time = SECONDS_PER_YEAR / 4; // 3 months go by
+            let model = InterestRateModel::new_kink(0, 2500, 5000, 5000);
+
+            ReserveFactor::insert(
+                asset.clone(),
+                crate::rates::ReserveFactor::from_nominal("0.02"),
+            );
+            RateModels::insert(asset.clone(), model);
+            GlobalCashIndex::put(CashIndex::from_nominal("1.123"));
+            AssetSymbols::insert(asset.clone(), symbol);
+            SupplyIndices::insert(asset.clone(), AssetIndex::from_nominal("1234"));
+            BorrowIndices::insert(asset.clone(), AssetIndex::from_nominal("1345"));
+            TotalSupplyAssets::insert(asset.clone(), AssetQuantity::from_nominal(symbol, "300").1);
+            TotalBorrowAssets::insert(asset.clone(), AssetQuantity::from_nominal(symbol, "150").1);
+            CashYield::put(APR::from_nominal("0.24")); // 24% APR big number for easy to see interest
+            TotalCashPrincipal::put(CashPrincipal::from_nominal("450000")); // 450k cash principal
+            CashPrincipals::insert(miner.clone(), CashPrincipal::from_nominal("1"));
+            Prices::insert(symbol, 1450_000000 as AssetPrice); // $1450 eth
+
+            let result = on_initialize(change_in_time);
+            assert_eq!(result, Ok(0u64));
+
+            assert_eq!(
+                SupplyIndices::get(&asset),
+                AssetIndex::from_nominal("1273.542520")
+            );
+            assert_eq!(
+                BorrowIndices::get(&asset),
+                AssetIndex::from_nominal("1425.699020")
+            );
+            assert_eq!(GlobalCashIndex::get(), CashIndex::from_nominal("1.1924"));
+            // todo: it looks like some precision is getting lost should be 462104.853072
+            assert_eq!(
+                TotalCashPrincipal::get(),
+                CashPrincipal::from_nominal("462104.853000")
+            );
+            // todo: same here, should be 243.097061
+            assert_eq!(
+                CashPrincipals::get(&miner),
+                CashPrincipal::from_nominal("243.097000")
+            );
         });
     }
 }

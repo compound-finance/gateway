@@ -142,7 +142,7 @@ pub struct ChainKeys {
 pub struct CashIndex(pub Uint);
 
 impl CashPrincipal {
-    pub const DECIMALS: u8 = 18;
+    pub const DECIMALS: u8 = 6;
 
     /// Get a CASH index from a string.
     pub const fn from_nominal(s: &'static str) -> Self {
