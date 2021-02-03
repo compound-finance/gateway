@@ -11,7 +11,8 @@ extern crate ethereum_client;
 extern crate trx_request;
 
 use crate::chains::{
-    Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
+    Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainId, ChainSignature,
+    ChainSignatureList, Ethereum,
 };
 use crate::notices::{Notice, NoticeId, NoticeStatus};
 use crate::rates::{InterestRateModel, APR};
@@ -19,8 +20,8 @@ use crate::reason::Reason;
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
-    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, Nonce, Quantity,
-    ReporterSet, SessionIndex, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, Nonce, ReporterSet,
+    SessionIndex, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 use codec::{alloc::string::String, Decode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
@@ -257,9 +258,6 @@ decl_error! {
         /// An error related to the chain_spec file contents
         GenesisConfigError,
 
-        /// Trx request parsing error
-        TrxRequestParseError,
-
         /// Invalid parameters to a provided interest rate model
         InterestRateModelInvalidParameters,
 
@@ -367,32 +365,13 @@ decl_module! {
             Ok(())
         }
 
-        // TODO
+        /// Execute a transaction request on behalf of a user
         #[weight = 1]
-        pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainSignature) -> dispatch::DispatchResult {
+        pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
 
-            // // TODO: Add more error information here
-            let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
-
-            // // TODO: Add more error information here
-            let sender = cash_err!(signature.recover(&request), <Error<T>>::InvalidSignature)?; // XXX error from reason?
-            let trx_request = cash_err!(trx_request::parse_request(request_str), <Error<T>>::TrxRequestParseError)?;
-
-            match trx_request {
-                trx_request::TrxRequest::Extract(amount, asset, account) => {
-                    let chain_asset: ChainAsset = asset.into();
-                    let symbol = core::symbol::<T>(chain_asset).ok_or(<Error<T>>::AssetNotSupported)?; // TODO: Correct error? cash_err?
-                    let quantity = Quantity(symbol, amount.into());
-                    match core::extract_internal::<T>(chain_asset, sender, account.into(), quantity) {
-                        Ok(()) => Ok(()),
-                        Err(err) => {
-                            log!("TrxExtract Error: {:?}", err);
-                            Err(Error::<T>::TrxRequestError)?
-                        }
-                    }
-                }
-            }
+            cash_err!(core::exec_trx_request_internal::<T>(request, signature, nonce), Error::<T>::TrxRequestError)?;
+            Ok(())
         }
 
         #[weight = 1] // XXX how are we doing weights?
@@ -918,12 +897,26 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     .propagate(true)
                     .build()
             }
-            Call::exec_trx_request(request, _signature) => {
-                ValidTransaction::with_tag_prefix("CashPallet")
-                    .longevity(10)
-                    .and_provides(request)
-                    .propagate(true)
-                    .build()
+            Call::exec_trx_request(request, signature, nonce) => {
+                let signer_res =
+                    signature.recover_account(&core::prepend_nonce(request, *nonce)[..]);
+
+                log!("signer_res={:?}", signer_res);
+
+                match (signer_res, nonce) {
+                    (Err(_e), _) => InvalidTransaction::Call.into(),
+                    (Ok(sender), 0) => ValidTransaction::with_tag_prefix("CashPallet")
+                        .longevity(10)
+                        .and_provides((sender, nonce))
+                        .propagate(true)
+                        .build(),
+                    (Ok(sender), _) => ValidTransaction::with_tag_prefix("CashPallet")
+                        .longevity(10)
+                        .and_requires((sender, nonce - 1))
+                        .and_provides((sender, nonce))
+                        .propagate(true)
+                        .build(),
+                }
             }
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)

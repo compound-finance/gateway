@@ -28,13 +28,24 @@ class Actor {
     return `eth:${this.ethAddress()}`;
   }
 
+  async nonce() {
+    return await this.ctx.api().query.cash.nonces(this.toChainAccount());
+  }
+
   async sign(data) {
     return await this.ctx.eth.sign(data, this);
   }
 
+  async signWithNonce(data) {
+    let currentNonce = await this.nonce();
+    let signature = await this.sign(`${currentNonce}:${data}`);
+
+    return [ { Eth: [ this.ethAddress(), signature ] }, currentNonce ];
+  }
+
   async runTrxRequest(trxReq) {
-    let sig = { Eth: await this.sign(trxReq) };
-    let call = this.ctx.api().tx.cash.execTrxRequest(trxReq, sig);
+    let [sig, currentNonce] = await this.signWithNonce(trxReq);
+    let call = this.ctx.api().tx.cash.execTrxRequest(trxReq, sig, currentNonce);
 
     return await sendAndWaitForEvents(call, this.ctx.api(), false);
   }
