@@ -12,7 +12,7 @@ use crate::{
     chains::{
         eth, ChainAccount, ChainAsset, ChainAssetAccount, ChainSignature, ChainSignatureList,
     },
-    notices,
+    log, notices,
     notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeStatus},
     params::MIN_TX_VALUE,
     reason::{MathError, Reason},
@@ -26,8 +26,6 @@ use crate::{
     TotalCashPrincipal, TotalSupplyAssets,
 };
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
-
-use sp_runtime::print;
 
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
@@ -470,9 +468,7 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), R
                     // submit onchain call for aggregating the price
                     let signature: ChainSignature = notices::sign_notice_chain(&notice)?;
 
-                    print(
-                        format!("Posting Signature for [{},{}]", notice_id.0, notice_id.1).as_str(),
-                    );
+                    log!("Posting Signature for [{},{}]", notice_id.0, notice_id.1);
 
                     let call = <Call<T>>::publish_signature(notice_id, signature);
 
@@ -495,7 +491,7 @@ pub fn publish_signature_internal(
     notice_id: NoticeId,
     signature: ChainSignature,
 ) -> Result<(), Reason> {
-    print(format!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1).as_str());
+    log!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1);
     let status = <NoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::Missing);
 
     match status {

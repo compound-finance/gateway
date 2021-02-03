@@ -24,7 +24,7 @@ use crate::types::{
     ValidatorSig,
 };
 use codec::{alloc::string::String, Decode};
-use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch};
+use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{
     ensure_none, ensure_root,
     offchain::{CreateSignedTransaction, SubmitTransaction},
@@ -47,11 +47,11 @@ use sp_runtime::{
 };
 
 use pallet_session;
-use sp_runtime::print;
 
 pub mod chains;
 pub mod core;
 pub mod events;
+pub mod log;
 pub mod notices;
 pub mod oracle;
 pub mod params;
@@ -306,8 +306,7 @@ macro_rules! r#cash_err {
         match $expr {
             core::result::Result::Ok(val) => Ok(val),
             core::result::Result::Err(err) => {
-                print(format!("Error {:#?}", err).as_str());
-                debug::native::error!("Error {:#?}", err);
+                log!("Error {:#?}", err);
                 Err($new_err)
             }
         }
@@ -380,9 +379,8 @@ decl_module! {
             ensure_none(origin)?;
 
             // // TODO: Add more error information here
-            print("submit_trx_request");
             let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
-            print(request_str);
+
             // // TODO: Add more error information here
             let sender = cash_err!(signature.recover(&request), <Error<T>>::InvalidSignature)?; // XXX error from reason?
             let trx_request = cash_err!(trx_request::parse_request(request_str), <Error<T>>::TrxRequestParseError)?;
@@ -399,7 +397,7 @@ decl_module! {
                     match core::extract_internal::<T>(chain_asset, sender, account.into(), quantity) {
                         Ok(()) => Ok(()),
                         Err(err) => {
-                            print(format!("TrxExtract Error: {:?}", err).as_str());
+                            log!("TrxExtract Error: {:?}", err);
                             Err(Error::<T>::Failed)?
                         }
                     }
@@ -409,7 +407,7 @@ decl_module! {
 
         #[weight = 1] // XXX how are we doing weights?
         pub fn process_eth_event(origin, payload: SignedPayload, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            print(format!("process_eth_event(origin,payload,sig): {} {}", hex::encode(&payload), hex::encode(&signature)).as_str());
+            log!("process_eth_event(origin,payload,sig): {} {}", hex::encode(&payload), hex::encode(&signature));
             ensure_none(origin)?;
 
             // XXX do we want to store/check hash to allow replaying?
@@ -421,7 +419,7 @@ decl_module! {
             let validators: Vec<EthAddress> = <Validators>::iter().map(|v| v.1.eth_address).collect();
 
             if !validators.contains(&signer) {
-                print(format!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators).as_str());
+                log!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
                 return Err(Error::<T>::UnknownValidator)?
             }
 
@@ -431,7 +429,7 @@ decl_module! {
                 EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
                     if signers.contains(&signer) {
-                        print(format!("Validator has already signed this payload {:?}", signer).as_str());
+                        log!("Validator has already signed this payload {:?}", signer);
                         return Err(Error::<T>::AlreadySigned)?
                     }
 
@@ -512,7 +510,7 @@ decl_module! {
         fn offchain_worker(block_number: T::BlockNumber) {
             let result = Self::fetch_events_with_lock();
             if let Err(e) = result {
-                debug::native::error!("offchain_worker error during fetch events: {:?}", e);
+                log!("offchain_worker error during fetch events: {:?}", e);
             }
 
             // TODO: What to do with res?
@@ -524,7 +522,7 @@ decl_module! {
             // are running.
             let result = Self::process_open_price_feed(block_number);
             if let Err(e) = result {
-                debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
+                log!("offchain_worker error during open price feed processing: {:?}", e);
             }
         }
     }
@@ -610,13 +608,10 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidSymbol
         )?;
 
-        print(
-            format!(
-                "Parsed price from open price feed: {:?} is worth {:?}",
-                parsed.key,
-                (parsed.value as f64) / 1000000.0
-            )
-            .as_str(),
+        log!(
+            "Parsed price from open price feed: {:?} is worth {:?}",
+            parsed.key,
+            (parsed.value as f64) / 1000000.0
         );
         // todo: more sanity checking on the value
         // note - the API for GET does not return an Option but if the value is not present it
@@ -704,7 +699,7 @@ impl<T: Config> Module<T> {
             "Validators are already set but they should only be set in the genesis config."
         );
         for (acc_id_bytes, key_tuple) in ids.iter().zip(keys.iter()) {
-            print(format!("Error {:#?}", acc_id_bytes).as_str());
+            log!("Error {:#?}", acc_id_bytes);
             let acc_id: AccountId32 = AccountId32::new(*acc_id_bytes);
 
             let eth_address: [u8; 20] = hex::decode(&key_tuple.0)
@@ -773,12 +768,9 @@ impl<T: Config> Module<T> {
             latest_price_feed_timestamp_storage.get::<String>()
         {
             if latest_price_feed_timestamp == timestamp {
-                print(
-                    format!(
-                        "Open oracle prices for timestamp {:?} has been already posted",
-                        timestamp
-                    )
-                    .as_str(),
+                log!(
+                    "Open oracle prices for timestamp {:?} has been already posted",
+                    timestamp
                 );
                 return Ok(());
             }
@@ -823,12 +815,12 @@ impl<T: Config> Module<T> {
         let from_block: String;
         if let Some(Some(cached_block_num)) = s_info.get::<String>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
-            debug::native::info!("Last cached block number: {:?}", cached_block_num);
+            log!("Last cached block number: {:?}", cached_block_num);
             from_block = events::get_next_block_hex(cached_block_num)
                 .map_err(|_| <Error<T>>::HttpFetchingError)?;
         } else {
             // Validator's cache is empty, fetch events from the earliest available block
-            debug::native::info!("Block number has not been cached yet");
+            log!("Block number has not been cached yet");
             from_block = String::from("earliest");
         }
 
@@ -850,7 +842,7 @@ impl<T: Config> Module<T> {
         if let Ok(_guard) = lock.try_lock() {
             match events::fetch_events(from_block) {
                 Ok(starport_info) => {
-                    debug::native::info!("Result: {:?}", starport_info);
+                    log!("Result: {:?}", starport_info);
 
                     // Send extrinsics for all events
                     let _ = Self::process_lock_events(starport_info.lock_events)?;
@@ -859,7 +851,7 @@ impl<T: Config> Module<T> {
                     s_info.set(&starport_info.latest_eth_block);
                 }
                 Err(err) => {
-                    debug::native::info!("Error while fetching events: {:?}", err);
+                    log!("Error while fetching events: {:?}", err);
                     return Err(Error::<T>::HttpFetchingError);
                 }
             }
@@ -871,7 +863,7 @@ impl<T: Config> Module<T> {
         events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
     ) -> Result<(), Error<T>> {
         for event in events.iter() {
-            debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
+            log!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
             // XXX
             let payload =
@@ -883,7 +875,7 @@ impl<T: Config> Module<T> {
             // XXX Unsigned tx for now
             let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
             if res.is_err() {
-                debug::native::error!("Error while sending `Lock` event extrinsic");
+                log!("Error while sending `Lock` event extrinsic");
                 return Err(Error::<T>::OffchainUnsignedLockTxError);
             }
         }
