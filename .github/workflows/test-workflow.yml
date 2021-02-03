@@ -199,10 +199,14 @@ jobs:
           set -eo pipefail
           cd integration
           sudo npx jest --ci --reporters=default --reporters=jest-junit
+        id: int_test
+      
+      - name: Publish Integration Test Results
+        run: |
           test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
-        id: int_test
-
+        continue-on-error: true
+          
       - name: Link to Integration Results
         uses: unsplash/comment-on-pr@master
         env:
