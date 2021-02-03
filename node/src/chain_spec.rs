@@ -1,6 +1,6 @@
 use compound_chain_runtime::{
-    wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
-    GrandpaConfig, Signature, SudoConfig, SystemConfig,
+    opaque, wasm_binary_unwrap, AccountId, BabeConfig, BalancesConfig, CashConfig, GenesisConfig,
+    GrandpaConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
 };
 use our_std::str::FromStr;
 use pallet_cash::types::ConfigAsset;
@@ -35,8 +35,9 @@ where
 }
 
 /// Generate various keys from seed
-pub fn authority_keys_from_seed(seed: &str) -> (BabeId, GrandpaId) {
+pub fn authority_keys_from_seed(seed: &str) -> (AccountId, BabeId, GrandpaId) {
     (
+        get_account_id_from_seed::<sr25519::Public>(seed),
         get_from_seed::<BabeId>(seed),
         get_from_seed::<GrandpaId>(seed),
     )
@@ -193,7 +194,7 @@ pub fn staging_testnet_config() -> ChainSpec {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-    initial_authorities: Vec<(BabeId, GrandpaId)>,
+    initial_authorities: Vec<(AccountId, BabeId, GrandpaId)>,
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
@@ -213,20 +214,30 @@ fn testnet_genesis(
                 .collect(),
         }),
         pallet_babe: Some(BabeConfig {
-            authorities: initial_authorities
-                .iter()
-                .map(|x| (x.0.clone(), 1))
-                .collect(),
+            authorities: vec![],
         }),
         pallet_grandpa: Some(GrandpaConfig {
-            authorities: initial_authorities
-                .iter()
-                .map(|x| (x.1.clone(), 1))
-                .collect(),
+            authorities: vec![],
         }),
         pallet_sudo: Some(SudoConfig {
             // Assign network admin rights.
             key: root_key,
+        }),
+
+        pallet_session: Some(SessionConfig {
+            keys: initial_authorities
+                .iter()
+                .map(|x| {
+                    (
+                        x.0.clone(),
+                        x.0.clone(),
+                        opaque::SessionKeys {
+                            babe: x.1.clone(),
+                            grandpa: x.2.clone(),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>(),
         }),
 
         pallet_cash: Some(CashConfig {
@@ -248,14 +259,21 @@ fn testnet_genesis(
                 },
             ],
 
+            // turn account_id of ss58 to [u8 32]s
+            validator_ids: initial_authorities
+                .iter()
+                .map(|x| <[u8; 32]>::from(x.0.clone()))
+                .collect::<Vec<_>>(),
+
+            // tuple representation of ChainKeys struct (substrate doesnt know how to decode the struct representation). just eth addrs
+            validator_keys: vec![
+                ("c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),),
+                ("435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),),
+            ],
+
             reporters: vec![
                 "85615b076615317c80f14cbad6501eec031cd51c".into(),
                 "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
-            ],
-
-            validators: vec![
-                "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),
-                "435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),
             ],
         }),
     }
