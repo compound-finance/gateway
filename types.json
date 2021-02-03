@@ -76,6 +76,15 @@
       "Tez": "([u8; 20], [u8; 20])"
     }
   },
+  "ChainAccountSignature": {
+    "_enum": {
+      "Comp": "([u8; 20], [u8; 65])",
+      "Eth": "([u8; 20], [u8; 65])",
+      "Dot": "([u8; 20], [u8; 65])",
+      "Sol": "([u8; 20], [u8; 65])",
+      "Tez": "([u8; 20], [u8; 65])"
+    }
+  },
   "ChainSignature": {
     "_enum": {
       "Comp": ["[u8; 65]"],
@@ -231,6 +240,19 @@
   },
 
   "Source6": "ReasonRS",
+  "TrxReqParseError": {
+    "_enum": [
+      "NotImplemented",
+      "LexError",
+      "InvalidAmount",
+      "InvalidAddress",
+      "InvalidArgs",
+      "UnknownFunction",
+      "InvalidExpression",
+      "InvalidChain",
+      "InvalidChainAccount"
+    ]
+  },
   "Reason": {
     "_enum": {
       "AssetExtractionNotSupported": "",
@@ -256,7 +278,12 @@
       "NotImplemented": "",
       "ParseIntError": "",
       "RepayTooMuch": "",
-      "SignatureMismatch": ""
+      "SignatureMismatch": "",
+      "AssetNotSupported": "",
+      "TrxRequestParseError": "TrxReqParseError",
+      "InvalidUTF8": "",
+      "SignatureAccountMismatch": "",
+      "IncorrectNonce": "(Nonce, Nonce)"
     }
   },
   "MathError": {

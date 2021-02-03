@@ -18,7 +18,8 @@ fn it_fails_exec_trx_request_signed() {
             CashModule::exec_trx_request(
                 Origin::signed(Default::default()),
                 vec![],
-                ChainSignature::Eth([0; 65])
+                ChainAccountSignature::Eth([0; 20], [0; 65]),
+                0
             ),
             DispatchError::BadOrigin
         );

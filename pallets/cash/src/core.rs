@@ -5,24 +5,27 @@ pub use our_std::{
     convert::TryFrom,
     fmt, result,
     result::Result,
+    str,
 };
 
 // Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::{
-        eth, ChainAccount, ChainAsset, ChainAssetAccount, ChainSignature, ChainSignatureList,
+        eth, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainSignature,
+        ChainSignatureList,
     },
     log, notices,
     notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeStatus},
     params::MIN_TX_VALUE,
+    reason,
     reason::{MathError, Reason},
     symbol::{Symbol, CASH},
     types::{
         AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, EthAddress, Int,
-        Price, Quantity, SafeMul, USDQuantity,
+        Nonce, Price, Quantity, SafeMul, USDQuantity,
     },
     AssetBalances, AssetSymbols, Call, CashPrincipals, ChainCashPrincipals, Config, Event,
-    GlobalCashIndex, Module, NoticeQueue, Prices, SubmitTransaction, TotalBorrowAssets,
+    GlobalCashIndex, Module, Nonces, NoticeQueue, Prices, SubmitTransaction, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets,
 };
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
@@ -547,6 +550,52 @@ pub fn publish_signature_internal(
             Ok(())
         }
     }
+}
+
+pub fn prepend_nonce(payload: &Vec<u8>, nonce: Nonce) -> Vec<u8> {
+    let mut result: Vec<u8> = Vec::new();
+    result.extend_from_slice(nonce.to_string().as_bytes());
+    result.extend_from_slice(b":");
+    result.extend_from_slice(&payload[..]);
+    result
+}
+
+// TODO: Unit tests!!
+pub fn exec_trx_request_internal<T: Config>(
+    request: Vec<u8>,
+    signature: ChainAccountSignature,
+    nonce: Nonce,
+) -> Result<(), Reason> {
+    let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
+
+    // Build Account=(Chain, Recover(Chain, Signature, NoncedRequest))
+    let sender = signature.recover_account(&prepend_nonce(&request, nonce)[..])?;
+
+    // Match TrxReqagainst known Transaction Requests
+    let trx_request = trx_request::parse_request(request_str)
+        .map_err(|e| Reason::TrxRequestParseError(reason::to_parse_error(e)))?;
+
+    // Read Require Nonce=NonceAccount+1
+    let current_nonce = Nonces::get(sender);
+    require!(
+        nonce == current_nonce,
+        Reason::IncorrectNonce(nonce, current_nonce)
+    );
+
+    match trx_request {
+        trx_request::TrxRequest::Extract(amount, asset, account) => {
+            let chain_asset: ChainAsset = asset.into();
+            let symbol = symbol::<T>(chain_asset).ok_or(Reason::AssetNotSupported)?;
+            let quantity = Quantity(symbol, amount.into());
+
+            extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
+        }
+    }
+
+    // Update user nonce
+    Nonces::insert(sender, current_nonce + 1);
+
+    Ok(())
 }
 
 #[cfg(test)]

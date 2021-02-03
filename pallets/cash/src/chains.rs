@@ -146,6 +146,42 @@ pub enum ChainAssetAccount {
     Tez(<Tezos as Chain>::Address, <Tezos as Chain>::Address),
 }
 
+/// Type for a signature and account tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainAccountSignature {
+    Comp(<Compound as Chain>::Address, <Compound as Chain>::Signature),
+    Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
+    Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature),
+    Sol(<Solana as Chain>::Address, <Solana as Chain>::Signature),
+    Tez(<Tezos as Chain>::Address, <Tezos as Chain>::Signature),
+}
+
+impl ChainAccountSignature {
+    pub fn to_chain_signature(self) -> ChainSignature {
+        match self {
+            ChainAccountSignature::Comp(_, sig) => ChainSignature::Comp(sig),
+            ChainAccountSignature::Eth(_, sig) => ChainSignature::Eth(sig),
+            ChainAccountSignature::Dot(_, sig) => ChainSignature::Dot(sig),
+            ChainAccountSignature::Sol(_, sig) => ChainSignature::Sol(sig),
+            ChainAccountSignature::Tez(_, sig) => ChainSignature::Tez(sig),
+        }
+    }
+
+    pub fn recover_account(self, message: &[u8]) -> Result<ChainAccount, Reason> {
+        match self {
+            ChainAccountSignature::Eth(eth_account, eth_sig) => {
+                let recovered = <Ethereum as Chain>::recover_address(message, eth_sig)?;
+                if eth_account == recovered {
+                    Ok(ChainAccount::Eth(recovered))
+                } else {
+                    Err(Reason::SignatureAccountMismatch)
+                }
+            }
+            _ => panic!("XXX not implemented"),
+        }
+    }
+}
+
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
