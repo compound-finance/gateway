@@ -199,9 +199,14 @@ jobs:
           set -eo pipefail
           cd integration
           sudo npx jest --ci --reporters=default --reporters=jest-junit
-          test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
+        
+      - name: Prepublish results
+        if: always()
+        run: |
+          test_url="$(curl -X POST --data-binary @integration/junit.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
         id: int_test
+        continue-on-error: true
 
       - name: Link to Integration Results
         if: always()
