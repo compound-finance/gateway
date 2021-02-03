@@ -9,7 +9,6 @@ pub use our_std::{
 };
 
 // Import these traits so we can interact with the substrate storage modules.
-use crate::params::PRICE_DECIMALS;
 use crate::rates::APR;
 use crate::types::{AssetIndex, AssetPrice, CashIndex, Timestamp, Uint, SECONDS_PER_YEAR};
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
@@ -175,7 +174,7 @@ fn compute_cash_principal_per_internal(
 
     scale_multiple_terms(
         unscaled,
-        APR::DECIMALS + PRICE_DECIMALS,
+        APR::DECIMALS + Price::DECIMALS,
         CashIndex::DECIMALS,
         AssetIndex::DECIMALS,
     )

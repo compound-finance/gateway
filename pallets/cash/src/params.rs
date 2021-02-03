@@ -12,8 +12,6 @@ pub const MIN_NEXT_SYNC_TIME: u32 = 24 * 60 * 60 * 1000; // XXX
 
 pub const MIN_VALIDATOR_COUNT: u32 = 4; // XXX needed? in the way of dev?
 
-pub const PRICE_DECIMALS: u8 = 6;
-
 /// Minimum value (USD) required across all protocol interactions.
 pub const MIN_TX_VALUE: Quantity = Quantity::from_nominal(USD, "1");
 
