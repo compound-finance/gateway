@@ -200,7 +200,7 @@ jobs:
           cd integration
           sudo npx jest --ci --reporters=default --reporters=jest-junit
         
-      - name: Prepublish results
+      - name: Prepublish Integration results
         if: always()
         run: |
           test_url="$(curl -X POST --data-binary @integration/junit.xml https://test.compound.finance/test)"
