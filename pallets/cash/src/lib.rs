@@ -358,10 +358,6 @@ decl_module! {
             Self::on_initialize_internal(block)
         }
 
-        fn on_finalize(block_number: T::BlockNumber) {
-            Self::on_finalize_internal(block_number);
-        }
-
         /// Set the price using the open price feed.
         #[weight = 0]
         pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> dispatch::DispatchResult {
@@ -516,7 +512,7 @@ impl<T: Config> Module<T> {
     /// but the function signature does not allow us to express that to the substrate system.
     /// This is our final stand
     fn on_initialize_internal(block: T::BlockNumber) -> frame_support::weights::Weight {
-        match crate::core::on_initialize_with_error() {
+        match crate::core::on_initialize_core() {
             Ok(weight) => weight,
             Err(err) => {
                 // todo: something is going very wrong here..... we need to take some very serious
@@ -525,32 +521,6 @@ impl<T: Config> Module<T> {
                 0
             }
         }
-    }
-
-    /// Called by substrate on block finalization. Note, this can fail under various scenarios
-    /// but the function signature does not allow us to express that to the substrate system.
-    /// This is our final stand
-    fn on_finalize_internal(block: T::BlockNumber) {
-        if let Err(err) = Self::on_finalize_with_error(block) {
-            error!("Could not finalize block! {:#?} {:#?}", block, err);
-        } else {
-            log!("Finalized {:#?}", block);
-        }
-    }
-
-    /// Called by substrate on block initialization. Note, this can fail under various scenarios
-    /// but the function signature does not allow us to express that to the substrate system.
-    /// This is our final stand
-    fn on_finalize_with_error(_block: T::BlockNumber) -> Result<(), Error<T>> {
-        let now: Timestamp = cash_err!(
-            runtime_interfaces::time_interface::now_utc(),
-            <Error<T>>::OnInitializeInvalidTimestamp
-        )?;
-
-        // Warning - begin write
-
-        LastBlockTimestamp::put(now);
-        Ok(())
     }
 
     /// Update the interest rate model

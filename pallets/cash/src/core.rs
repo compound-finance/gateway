@@ -580,7 +580,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
 }
 
 /// Block initialization step that can fail
-pub fn on_initialize_with_error() -> Result<frame_support::weights::Weight, Reason> {
+pub fn on_initialize_core() -> Result<frame_support::weights::Weight, Reason> {
     let now: Timestamp = runtime_interfaces::time_interface::now_utc()?;
     let previous: Timestamp = LastBlockTimestamp::get();
 
