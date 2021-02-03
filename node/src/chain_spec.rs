@@ -244,7 +244,7 @@ fn testnet_genesis(
             last_block_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
-                .as_millis(), // XXX we prob need pallet_timestamp but doesn't cover genesis anyway
+                .as_millis(),
 
             assets: vec![
                 ConfigAsset {
@@ -262,10 +262,7 @@ fn testnet_genesis(
             // turn account_id of ss58 to [u8 32]s
             validator_ids: initial_authorities
                 .iter()
-                .map(|x| {
-                    let a: [u8; 32] = x.0.clone().into();
-                    a
-                })
+                .map(|x| <[u8; 32]>::from(x.0.clone()))
                 .collect::<Vec<_>>(),
 
             // tuple representation of ChainKeys struct (substrate doesnt know how to decode the struct representation). just eth addrs

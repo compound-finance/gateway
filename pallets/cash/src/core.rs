@@ -1,14 +1,13 @@
 // Note: The substrate build requires these be re-exported.
 pub use our_std::{
     cmp::{max, min},
+    collections::btree_set::BTreeSet,
     convert::TryFrom,
     fmt, result,
     result::Result,
 };
 
 // Import these traits so we can interact with the substrate storage modules.
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
-
 use crate::{
     chains::{
         eth, ChainAccount, ChainAsset, ChainAssetAccount, ChainSignature, ChainSignatureList,
@@ -19,13 +18,14 @@ use crate::{
     reason::{MathError, Reason},
     symbol::{Symbol, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, Price,
-        Quantity, SafeMul, USDQuantity,
+        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, EthAddress, Int,
+        Price, Quantity, SafeMul, USDQuantity,
     },
     AssetBalances, AssetSymbols, Call, CashPrincipals, ChainCashPrincipals, Config, Event,
     GlobalCashIndex, Module, NoticeQueue, Prices, SubmitTransaction, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets,
 };
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
 
 use sp_runtime::print;
 
@@ -81,10 +81,22 @@ pub fn value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, MathError>
     amount.mul(price::<T>(amount.symbol()))
 }
 
-// Internal helpers //
+// Internal helpers
 
-pub fn passes_validation_threshold(signers_len: u8, validators_len: u8) -> bool {
-    signers_len > validators_len * 2 / 3
+pub fn passes_validation_threshold(
+    signers: &Vec<EthAddress>,
+    validators: &Vec<EthAddress>,
+) -> bool {
+    let mut signer_set = BTreeSet::<EthAddress>::new();
+    for v in signers {
+        signer_set.insert(*v);
+    }
+
+    let mut validator_set = BTreeSet::<EthAddress>::new();
+    for v in validators {
+        validator_set.insert(*v);
+    }
+    signer_set.len() > validator_set.len() * 2 / 3
 }
 
 fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {

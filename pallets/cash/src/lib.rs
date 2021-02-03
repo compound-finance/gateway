@@ -180,9 +180,9 @@ decl_storage! {
         config(reporters): ConfigSetString;
         config(assets): Vec<ConfigAsset>;
         build(|config| {
-            Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
-            Module::<T>::initialize_reporters(config.reporters.clone());
             Module::<T>::initialize_assets(config.assets.clone());
+            Module::<T>::initialize_reporters(config.reporters.clone());
+            Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
         })
     }
 }
@@ -418,11 +418,10 @@ decl_module! {
                 compound_crypto::eth_recover(&payload[..], &signature, false),  // XXX why is this using eth for validator sig though?
                 Error::<T>::InvalidSignature)?;
 
-            let validators: Vec<EthAddress> = <Validators>::iter().map(|v| v.1.eth_addr).collect();
+            let validators: Vec<EthAddress> = <Validators>::iter().map(|v| v.1.eth_address).collect();
 
             if !validators.contains(&signer) {
                 print(format!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators).as_str());
-                debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
                 return Err(Error::<T>::UnknownValidator)?
             }
 
@@ -440,7 +439,7 @@ decl_module! {
                     let mut signers_new = signers.clone();
                     signers_new.push(signer.clone()); // XXX unique add to set?
 
-                    if core::passes_validation_threshold(signers_new.len() as u8, validators.len() as u8) {
+                    if core::passes_validation_threshold(&signers_new, &validators) {
                         match core::apply_eth_event_internal::<T>(event) {
                             Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
@@ -708,7 +707,7 @@ impl<T: Config> Module<T> {
             print(format!("Error {:#?}", acc_id_bytes).as_str());
             let acc_id: AccountId32 = AccountId32::new(*acc_id_bytes);
 
-            let eth_addr: [u8; 20] = hex::decode(&key_tuple.0)
+            let eth_address: [u8; 20] = hex::decode(&key_tuple.0)
                 .unwrap_or_else(|_| panic!("Ecsda key could not be decoded"))
                 .try_into()
                 .expect("Ecsda public key not 20 bytes");
@@ -716,7 +715,7 @@ impl<T: Config> Module<T> {
                 <Validators>::get(&acc_id) == None,
                 "Duplicate validator keys in genesis config"
             );
-            <Validators>::insert(acc_id, ChainKeys { eth_addr });
+            <Validators>::insert(acc_id, ChainKeys { eth_address });
         }
     }
 

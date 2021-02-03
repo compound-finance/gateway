@@ -156,7 +156,7 @@ pub struct CashPrincipal(pub Int);
 /// Type for representing the keys to sign notices
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct ChainKeys {
-    pub eth_addr: ValidatorKey,
+    pub eth_address: ValidatorKey,
 }
 
 /// Type for representing a multiplicative index on Compound Chain.
