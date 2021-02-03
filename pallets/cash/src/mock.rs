@@ -115,7 +115,7 @@ pub fn new_test_ext_with_http_calls(
     Arc<RwLock<OffchainState>>,
 ) {
     let (offchain, offchain_state) = testing::TestOffchainExt::new();
-    let (pool, pool_state) = testing::TestTransactionPoolExt::new();
+    let (pool, _) = testing::TestTransactionPoolExt::new();
 
     // let mut test_externalities: sp_io::TestExternalities = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
     let mut test_externalities = sp_io::TestExternalities::default();

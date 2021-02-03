@@ -3,6 +3,7 @@ use sp_runtime_interface::pass_by::PassByCodec;
 #[macro_use]
 extern crate lazy_static;
 use compound_crypto::CryptoError;
+use our_std::Debuggable;
 use std::sync::Mutex;
 
 #[derive(Clone, PassByCodec, codec::Encode, codec::Decode)]
@@ -124,6 +125,29 @@ pub trait KeyringInterface {
             .map_err(|_| CryptoError::KeyringLock)?;
         let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
         keyring.get_public_key(&key_id)
+    }
+}
+
+#[derive(codec::Encode, codec::Decode, Debuggable, PartialEq, Eq, Copy, Clone)]
+pub enum TimestampError {
+    ExtremelyOldTimestamp,
+}
+
+const VERY_OLD: i64 = 1609477200; // 2021-01-01
+
+#[sp_runtime_interface::runtime_interface]
+pub trait TimeInterface {
+    /// Get the current time as unix time UTC
+    ///
+    /// * Fails whenever the timestamp is "very old" by our standards
+    fn now_utc() -> Result<u128, TimestampError> {
+        let now = chrono::Utc::now().timestamp();
+
+        if now <= VERY_OLD {
+            Err(TimestampError::ExtremelyOldTimestamp)
+        } else {
+            Ok(now as u128)
+        }
     }
 }
 

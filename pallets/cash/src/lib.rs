@@ -169,6 +169,14 @@ decl_storage! {
 
         /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
         Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
+
+        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
+        ReserveFactor get(fn reserve_factors): map hasher(blake2_128_concat) ChainAsset => crate::rates::ReserveFactor;
+
+        // PriceReporter;
+        // PriceKeyMapping;
+        // XXX delete me (part of magic extract)
+        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
         config(validator_ids): Vec<[u8;32]>;
@@ -273,9 +281,6 @@ decl_error! {
         /// Could not get the utilization ratio
         InterestRateModelGetUtilizationFailed,
 
-        /// Notice issue
-        InvalidNoticeParams,
-
         /// Signature recovery errror
         InvalidSignature,
 
@@ -348,6 +353,14 @@ decl_module! {
 
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
+
+        fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
+            Self::on_initialize_internal(block)
+        }
+
+        fn on_finalize(block_number: T::BlockNumber) {
+            Self::on_finalize_internal(block_number);
+        }
 
         /// Set the price using the open price feed.
         #[weight = 0]
@@ -499,13 +512,44 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
-    /// Check to make sure an asset is supported. Only returns Err when the asset is not supported
-    /// by compound chain.
-    fn check_asset_supported(asset: &ChainAsset) -> Result<(), Error<T>> {
-        if !AssetSymbols::contains_key(&asset) {
-            return Err(<Error<T>>::AssetNotSupported);
+    /// Called by substrate on block initialization. Note, this can fail under various scenarios
+    /// but the function signature does not allow us to express that to the substrate system.
+    /// This is our final stand
+    fn on_initialize_internal(block: T::BlockNumber) -> frame_support::weights::Weight {
+        match crate::core::on_initialize_with_error() {
+            Ok(weight) => weight,
+            Err(err) => {
+                // todo: something is going very wrong here..... we need to take some very serious
+                // action like invalidating the block if possible.
+                error!("Could not initialize block! {:#?} {:#?}", block, err);
+                0
+            }
         }
+    }
 
+    /// Called by substrate on block finalization. Note, this can fail under various scenarios
+    /// but the function signature does not allow us to express that to the substrate system.
+    /// This is our final stand
+    fn on_finalize_internal(block: T::BlockNumber) {
+        if let Err(err) = Self::on_finalize_with_error(block) {
+            error!("Could not finalize block! {:#?} {:#?}", block, err);
+        } else {
+            log!("Finalized {:#?}", block);
+        }
+    }
+
+    /// Called by substrate on block initialization. Note, this can fail under various scenarios
+    /// but the function signature does not allow us to express that to the substrate system.
+    /// This is our final stand
+    fn on_finalize_with_error(_block: T::BlockNumber) -> Result<(), Error<T>> {
+        let now: Timestamp = cash_err!(
+            runtime_interfaces::time_interface::now_utc(),
+            <Error<T>>::OnInitializeInvalidTimestamp
+        )?;
+
+        // Warning - begin write
+
+        LastBlockTimestamp::put(now);
         Ok(())
     }
 
@@ -514,28 +558,16 @@ impl<T: Config> Module<T> {
         asset: ChainAsset,
         model: InterestRateModel,
     ) -> Result<(), Error<T>> {
-        Self::check_asset_supported(&asset)?;
+        cash_err!(
+            crate::core::check_asset_supported(&asset),
+            <Error<T>>::AssetNotSupported
+        )?;
         cash_err!(
             model.check_parameters(),
             <Error<T>>::InterestRateModelInvalidParameters
         )?;
         RateModels::insert(&asset, model);
         Ok(())
-    }
-
-    /// Get the borrow rate for the given asset
-    pub fn get_borrow_rate(asset: &ChainAsset) -> Result<APR, Error<T>> {
-        if !RateModels::contains_key(asset) {
-            // XXX we should just make this part of the model getter
-            return Err(<Error<T>>::InterestRateModelNotSet);
-        }
-        let model = RateModels::get(asset);
-        let utilization = Self::get_utilization(asset)?;
-        let rate = cash_err!(
-            model.get_borrow_rate(utilization, 0),
-            <Error<T>>::InterestRateModelGetBorrowRateFailed
-        )?;
-        Ok(rate)
     }
 
     /// Body of the post_price extrinsic
@@ -602,18 +634,6 @@ impl<T: Config> Module<T> {
 
         // todo: update storage
         Ok(())
-    }
-
-    /// Get the utilization in the provided asset.
-    pub fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Error<T>> {
-        Self::check_asset_supported(asset)?;
-        let total_supply = TotalSupplyAssets::get(asset);
-        let total_borrow = TotalBorrowAssets::get(asset);
-        let utilization = cash_err!(
-            rates::get_utilization(total_supply, total_borrow),
-            <Error<T>>::InterestRateModelGetUtilizationFailed
-        )?;
-        Ok(utilization)
     }
 
     /// Convert from the chain spec file format hex encoded strings into the local storage format, binary blob
@@ -919,6 +939,11 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 }
             }
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .and_provides(sig)
+                .propagate(true)
+                .build(),
+            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)
                 .propagate(true)

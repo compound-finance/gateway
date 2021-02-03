@@ -1,3 +1,4 @@
+use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
 use our_std::{Debuggable, RuntimeDebug};
@@ -30,7 +31,10 @@ pub enum Reason {
     ParseIntError,
     RepayTooMuch,
     SignatureMismatch,
+    RatesError(RatesError),
     AssetNotSupported,
+    TimeTravelNotAllowed,
+    AssetSymbolNotFound,
     TrxRequestParseError(TrxReqParseError),
     InvalidUTF8,
     SignatureAccountMismatch,
@@ -49,6 +53,18 @@ impl From<compound_crypto::CryptoError> for Reason {
     }
 }
 
+impl From<RatesError> for Reason {
+    fn from(err: RatesError) -> Self {
+        Reason::RatesError(err)
+    }
+}
+
+impl From<TimestampError> for Reason {
+    fn from(err: TimestampError) -> Self {
+        Reason::TimestampError(err)
+    }
+}
+
 impl our_std::fmt::Display for Reason {
     fn fmt(&self, f: &mut our_std::fmt::Formatter) -> our_std::fmt::Result {
         write!(f, "{:?}", self)
@@ -64,6 +80,7 @@ pub enum MathError {
     SymbolMismatch,
     PriceNotUSD,
     DivisionByZero,
+    AbnormalFloatingPointResult,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]

@@ -28,6 +28,7 @@ native_executor_instance!(
         runtime_interfaces::config_interface::HostFunctions,
         runtime_interfaces::validator_config_interface::HostFunctions,
         runtime_interfaces::keyring_interface::HostFunctions,
+        runtime_interfaces::time_interface::HostFunctions,
     ),
 );
 

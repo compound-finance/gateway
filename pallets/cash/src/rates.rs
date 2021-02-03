@@ -1,10 +1,13 @@
+use crate::reason::MathError;
 /// Interest rate related calculations and utilities are concentrated here
-use crate::types::{uint_from_string_with_decimals, AssetAmount, Uint};
+use crate::types::{
+    uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint, SECONDS_PER_YEAR,
+};
 use codec::{Decode, Encode};
 use our_std::Debuggable;
 
 /// Error enum for interest rates
-#[derive(Debuggable, PartialEq, Eq, Encode, Decode)]
+#[derive(Debuggable, PartialEq, Eq, Encode, Decode, Copy, Clone)]
 pub enum RatesError {
     UtilizationZeroSupplyError,
     UtilizationBorrowedIsMoreThanSupplied,
@@ -14,11 +17,12 @@ pub enum RatesError {
     ModelKinkUtilizationNotPositive,
     ModelRateOutOfBounds,
     Overflowed,
+    ReserveFactorOver100Percent,
 }
 
 /// Annualized interest rate
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
-pub struct APR(Uint);
+pub struct APR(pub Uint);
 
 impl From<Uint> for APR {
     fn from(x: u128) -> Self {
@@ -34,7 +38,28 @@ impl APR {
         APR(amount)
     }
 
+    pub const ZERO: APR = APR::from_nominal("0");
+
     const MAX: APR = APR::from_nominal("0.35"); // 35%
+
+    fn as_f64(self) -> f64 {
+        (self.0 as f64) / 10f64.powf(Self::DECIMALS as f64)
+    }
+
+    /// exp{r * dt} where dt is change in time in seconds
+    pub fn over_time(self, dt: Timestamp) -> Result<CashIndex, MathError> {
+        let increment = (self.as_f64() * (dt as f64) / (SECONDS_PER_YEAR as f64)).exp()
+            * 10f64.powf(CashIndex::DECIMALS as f64);
+        if !increment.is_normal() {
+            // this can happen when increment is + infinity for example
+            return Err(MathError::AbnormalFloatingPointResult);
+        }
+        if increment > (Uint::max_value() as f64) {
+            return Err(MathError::Overflow);
+        }
+
+        Ok(CashIndex(increment as Uint))
+    }
 }
 
 impl Default for APR {
@@ -64,6 +89,34 @@ impl Utilization {
     const ONE: Utilization = Utilization::from_nominal("1");
 
     const ZERO: Utilization = Utilization::from_nominal("0");
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
+pub struct ReserveFactor(Uint);
+
+impl From<Uint> for ReserveFactor {
+    fn from(x: u128) -> Self {
+        ReserveFactor(x)
+    }
+}
+
+impl ReserveFactor {
+    pub const DECIMALS: u8 = 4;
+
+    pub(crate) const fn from_nominal(s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
+        ReserveFactor(amount)
+    }
+
+    const DEFAULT: ReserveFactor = ReserveFactor::from_nominal("0.02");
+
+    const ONE: ReserveFactor = ReserveFactor::from_nominal("1");
+}
+
+impl Default for ReserveFactor {
+    fn default() -> Self {
+        ReserveFactor::DEFAULT
+    }
 }
 
 /// Internal function for getting a raw utilization. Used so that we can use ? operator with options
@@ -246,6 +299,66 @@ impl InterestRateModel {
                 }
             }
         };
+    }
+
+    fn borrow_rate_to_supply_rate(
+        borrow_rate: Uint,
+        reserve_factor: Uint,
+        utilization: Uint,
+    ) -> Option<Uint> {
+        // Borrow Rate * (1-reserve factor) * utilization
+
+        // (1-reserve factor)
+        let reserve_multiplier = ReserveFactor::ONE.0.checked_sub(reserve_factor)?;
+
+        // Borrow Rate * (1-reserve factor)
+        let acc = crate::types::mul(
+            borrow_rate,
+            APR::DECIMALS,
+            reserve_multiplier,
+            ReserveFactor::DECIMALS,
+            APR::DECIMALS,
+        )?;
+
+        // Borrow Rate * (1-reserve factor) * utilization
+        let acc = crate::types::mul(
+            acc,
+            APR::DECIMALS,
+            utilization,
+            Utilization::DECIMALS,
+            APR::DECIMALS,
+        )?;
+
+        Some(acc)
+    }
+
+    /// Get the (borrow_rate, supply_rate) pair, they're often needed at the same time.
+    pub fn get_rates(
+        self: &Self,
+        utilization: Utilization,
+        current_rate: APR,
+        reserve_factor: ReserveFactor,
+    ) -> Result<(APR, APR), RatesError> {
+        let borrow_rate = self.get_borrow_rate(utilization, current_rate)?;
+        // unsafe version Borrow Rate * (1-reserve factor) * utilization
+        let supply_rate =
+            Self::borrow_rate_to_supply_rate(borrow_rate.0, reserve_factor.0, utilization.0)
+                .ok_or(RatesError::Overflowed)?;
+
+        Ok((borrow_rate, APR(supply_rate)))
+    }
+
+    /// Get the supply rate
+    ///
+    /// always Borrow Rate * (1-reserve factor) * utilization
+    pub fn get_supply_rate(
+        self: &Self,
+        utilization: Utilization,
+        current_rate: APR,
+        reserve_factor: ReserveFactor,
+    ) -> Result<APR, RatesError> {
+        let (_, supply_rate) = self.get_rates(utilization, current_rate, reserve_factor)?;
+        Ok(supply_rate)
     }
 }
 
@@ -524,5 +637,14 @@ mod test {
         get_get_borrow_rate_test_cases()
             .drain(..)
             .for_each(test_get_borrow_rate_case)
+    }
+
+    #[test]
+    fn test_over_time() {
+        let r = APR::from_nominal("0.2"); // 20% per year
+        let dt = SECONDS_PER_YEAR / 2; // for 6 months
+        let actual = r.over_time(dt).unwrap(); // compounded continuously
+        let expected = CashIndex::from_nominal("1.1051"); // from google sheets
+        assert_eq!(actual, expected);
     }
 }

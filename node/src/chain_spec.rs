@@ -241,11 +241,8 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
-            last_block_timestamp: wasm_timer::SystemTime::now()
-                .duration_since(wasm_timer::UNIX_EPOCH)
-                .expect("cannot get system time for genesis")
-                .as_millis(),
-
+            last_block_timestamp: runtime_interfaces::time_interface::now_utc()
+                .expect("could not get initial block time"),
             assets: vec![
                 ConfigAsset {
                     symbol: FromStr::from_str("ETH/18").unwrap(),
@@ -258,7 +255,6 @@ fn testnet_genesis(
                         .unwrap(),
                 },
             ],
-
             // turn account_id of ss58 to [u8 32]s
             validator_ids: initial_authorities
                 .iter()
