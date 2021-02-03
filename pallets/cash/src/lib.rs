@@ -13,15 +13,14 @@ extern crate trx_request;
 use crate::chains::{
     Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
 };
-use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId, NoticeStatus};
+use crate::notices::{Notice, NoticeId, NoticeStatus};
 use crate::rates::{InterestRateModel, APR};
 use crate::reason::Reason;
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
-    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, MaxableAssetAmount,
-    Nonce, Quantity, ReporterSet, SessionIndex, SignedPayload, Timestamp, ValidatorSet,
-    ValidatorSig,
+    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, Nonce, Quantity,
+    ReporterSet, SessionIndex, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 use codec::{alloc::string::String, Decode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
@@ -43,7 +42,6 @@ use sp_runtime::{
     transaction_validity::{
         InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
     },
-    SaturatedConversion,
 };
 
 use pallet_session;
@@ -170,9 +168,6 @@ decl_storage! {
 
         /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
         Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
-
-        // XXX delete me (part of magic extract)
-        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
         config(validator_ids): Vec<[u8;32]>;
@@ -191,9 +186,6 @@ decl_event!(
     pub enum Event {
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
-
-        /// XXX
-        MagicExtract(AssetAmount, ChainAccount, Notice),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -295,9 +287,8 @@ decl_error! {
         /// Failed to publish signatures
         PublishSignatureFailure,
 
-        // XXX delete with magic extract
-        /// Failure in internal logic
-        Failed,
+        /// Error processing trx request
+        TrxRequestError,
     }
 }
 
@@ -386,10 +377,6 @@ decl_module! {
             let trx_request = cash_err!(trx_request::parse_request(request_str), <Error<T>>::TrxRequestParseError)?;
 
             match trx_request {
-                trx_request::TrxRequest::MagicExtract(amount, account) => {
-                    cash_err!(magic_extract_internal::<T>(sender, account.into(), amount.into()), Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
-                    Ok(())
-                },
                 trx_request::TrxRequest::Extract(amount, asset, account) => {
                     let chain_asset: ChainAsset = asset.into();
                     let symbol = core::symbol::<T>(chain_asset).ok_or(<Error<T>>::AssetNotSupported)?; // TODO: Correct error? cash_err?
@@ -398,7 +385,7 @@ decl_module! {
                         Ok(()) => Ok(()),
                         Err(err) => {
                             log!("TrxExtract Error: {:?}", err);
-                            Err(Error::<T>::Failed)?
+                            Err(Error::<T>::TrxRequestError)?
                         }
                     }
                 }
@@ -699,7 +686,7 @@ impl<T: Config> Module<T> {
             "Validators are already set but they should only be set in the genesis config."
         );
         for (acc_id_bytes, key_tuple) in ids.iter().zip(keys.iter()) {
-            log!("Error {:#?}", acc_id_bytes);
+            log!("Adding Validator {}", hex::encode(acc_id_bytes));
             let acc_id: AccountId32 = AccountId32::new(*acc_id_bytes);
 
             let eth_address: [u8; 20] = hex::decode(&key_tuple.0)
@@ -928,65 +915,4 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             _ => InvalidTransaction::Call.into(),
         }
     }
-}
-
-// XXX this function is temporary and will be deleted after we reach a certain point
-pub fn magic_extract_internal<T: Config>(
-    _sender: ChainAccount,
-    account: ChainAccount,
-    max_amount: MaxableAssetAmount,
-) -> Result<(), Error<T>> {
-    let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
-
-    let amount = max_amount.get_max_value(&|| 5);
-
-    // Update storage -- TODO: increment this-- sure why not?
-    let curr_cash_balance: AssetAmount = <CashBalance>::get(&account).unwrap_or_default();
-    let next_cash_balance: AssetAmount = curr_cash_balance + amount;
-    <CashBalance>::insert(&account, next_cash_balance);
-
-    let _now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
-    // Add to Notice Queue
-    // Note: we need to generalize this since it's not guaranteed to be Eth
-    let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
-                                    // TODO: This asset needs to match the chain-- which for Cash, there might be different
-                                    //       versions of a given asset per chain
-    let notice = Notice::CashExtractionNotice(match account {
-        ChainAccount::Eth(eth_account) => CashExtractionNotice::Eth {
-            id: notice_id,
-            parent: [0u8; 32],
-            account: eth_account,
-            amount,
-            cash_index: 1000,
-        },
-
-        _ => panic!("XXX not implemented"),
-    });
-
-    // TODO: Why is this Eth notice queue? Should this be specific to Eth?
-    NoticeQueue::insert(
-        notice_id,
-        NoticeStatus::Pending {
-            signature_pairs: ChainSignatureList::Eth(vec![]),
-            notice: notice.clone(),
-        },
-    );
-
-    let encoded_notice = notice.encode_notice();
-    let signature = cash_err!(
-        <Ethereum as Chain>::sign_message(&encoded_notice[..]),
-        Error::<T>::InvalidSignature
-    )?; // XXX
-
-    // Emit an event or two.
-    <Module<T>>::deposit_event(Event::MagicExtract(amount, account, notice.clone()));
-    <Module<T>>::deposit_event(Event::SignedNotice(
-        ChainId::Eth,
-        notice_id,
-        encoded_notice,
-        ChainSignatureList::Eth(vec![([0; 20], signature)]),
-    )); // XXX signatures
-
-    // Return a successful DispatchResult
-    Ok(())
 }

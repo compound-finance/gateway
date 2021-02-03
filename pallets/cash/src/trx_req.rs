@@ -1,20 +1,5 @@
-extern crate trx_request; // XXX why extern not use?
-
 use crate::chains::{ChainAccount, ChainAsset};
-use crate::types::{Maxable, MaxableAssetAmount};
-use trx_request::*;
-
-// XXX why are these the only things needed here?
-//  kind of hidden conversion
-//   can trx_request return real types?
-impl From<trx_request::MaxAmount> for MaxableAssetAmount {
-    fn from(amount: MaxAmount) -> Self {
-        match amount {
-            MaxAmount::Max => Maxable::Max,
-            MaxAmount::Amt(amt) => Maxable::Value(amt),
-        }
-    }
-}
+use trx_request;
 
 impl From<trx_request::Account> for ChainAccount {
     fn from(account: trx_request::Account) -> Self {
@@ -35,11 +20,27 @@ impl From<trx_request::Asset> for ChainAsset {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::*;
+    use trx_request;
+
+    const ALAN: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    const ETH: [u8; 20] = [
+        238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
+        238, 238,
+    ];
 
     #[test]
-    fn test_max_amount_to_generic() {
-        assert_eq!(Maxable::from(MaxAmount::Amt(5)), Maxable::Value(5));
-        assert_eq!(Maxable::<AssetAmount>::from(MaxAmount::Max), Maxable::Max);
+    fn test_account_to_chain_account() {
+        assert_eq!(
+            ChainAccount::from(trx_request::Account::Eth(ALAN)),
+            ChainAccount::Eth(ALAN)
+        );
+    }
+
+    #[test]
+    fn test_asset_to_chain_asset() {
+        assert_eq!(
+            ChainAsset::from(trx_request::Asset::Eth(ETH)),
+            ChainAsset::Eth(ETH)
+        );
     }
 }

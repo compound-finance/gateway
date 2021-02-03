@@ -6,7 +6,7 @@ use sp_core::offchain::testing;
 
 const ETH: Symbol = Symbol::new("ETH", 18);
 
-fn andrew() -> ChainAccount {
+fn _andrew() -> ChainAccount {
     ChainAccount::Eth([123; 20])
 }
 
@@ -22,32 +22,6 @@ fn it_fails_exec_trx_request_signed() {
             ),
             DispatchError::BadOrigin
         );
-        // Read pallet storage and assert an expected result.
-        assert_eq!(CashModule::cash_balance(andrew()), None);
-    });
-}
-
-#[test]
-fn it_magically_extracts() {
-    new_test_ext().execute_with(|| {
-        runtime_interfaces::set_validator_config_dev_defaults();
-        // Dispatch a signed extrinsic.
-        assert_ok!(magic_extract_internal::<Test>(
-            andrew(),
-            andrew(),
-            42u128.into()
-        ));
-        // Read pallet storage and assert an expected result.
-        assert_eq!(CashModule::cash_balance(andrew()), Some(42u128.into()));
-
-        // Dispatch a second extrinsic.
-        assert_ok!(magic_extract_internal::<Test>(
-            andrew(),
-            andrew(),
-            42u128.into()
-        ));
-        // Read pallet storage and assert an expected result.
-        assert_eq!(CashModule::cash_balance(andrew()), Some(84u128.into()));
     });
 }
 

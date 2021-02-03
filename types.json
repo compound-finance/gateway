@@ -11,12 +11,6 @@
   "AssetQuantity": "Quantity",
   "CashQuantity": "Quantity",
   "USDQuantity": "Quantity",
-  "MaxableAssetAmount": {
-    "_enum": {
-      "Max": [],
-      "Value": ["AssetAmount"]
-    }
-  },
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
