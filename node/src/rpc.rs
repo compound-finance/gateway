@@ -17,7 +17,6 @@ use std::sync::Arc;
 
 use compound_chain_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Index};
 use sc_client_api::AuxStore;
-use sc_consensus_epochs::SharedEpochChanges;
 use sc_finality_grandpa::{
     FinalityProofProvider, GrandpaJustificationStream, SharedAuthoritySet, SharedVoterState,
 };
@@ -131,16 +130,6 @@ where
         client.clone(),
     )));
 
-    io.extend_with(sc_consensus_babe_rpc::BabeApi::to_delegate(
-        BabeRpcHandler::new(
-            client.clone(),
-            shared_epoch_changes.clone(),
-            keystore,
-            babe_config,
-            select_chain,
-            deny_unsafe,
-        ),
-    ));
     io.extend_with(sc_finality_grandpa_rpc::GrandpaApi::to_delegate(
         GrandpaRpcHandler::new(
             shared_authority_set.clone(),
@@ -148,16 +137,6 @@ where
             justification_stream,
             subscription_executor,
             finality_provider,
-        ),
-    ));
-
-    io.extend_with(sc_sync_state_rpc::SyncStateRpcApi::to_delegate(
-        sc_sync_state_rpc::SyncStateRpcHandler::new(
-            chain_spec,
-            client,
-            shared_authority_set,
-            shared_epoch_changes,
-            deny_unsafe,
         ),
     ));
 

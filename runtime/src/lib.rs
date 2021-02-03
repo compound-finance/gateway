@@ -152,6 +152,8 @@ parameter_types! {
     pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
         ::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
     pub const SS58Prefix: u8 = 42;
+    pub const Period: BlockNumber = 10000;
+    pub const Offset: BlockNumber = 0;
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -294,8 +296,8 @@ impl pallet_session::Config for Runtime {
     type Event = Event;
     type ValidatorId = <Self as frame_system::Config>::AccountId;
     type ValidatorIdOf = IdConverter<Self>;
-    type ShouldEndSession = Babe;
-    type NextSessionRotation = Babe;
+    type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
+    type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
     type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
     type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: babe and grandpa
     type Keys = opaque::SessionKeys;

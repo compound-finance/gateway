@@ -1,6 +1,6 @@
 use compound_chain_runtime::{
     opaque, wasm_binary_unwrap, AccountId, AuraConfig, BalancesConfig, CashConfig, GenesisConfig,
-    GrandpaConfig, Signature, SudoConfig, SystemConfig,
+    GrandpaConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
 };
 use our_std::str::FromStr;
 use pallet_cash::types::ConfigAsset;
@@ -35,7 +35,7 @@ where
 }
 
 /// Generate various keys from seed
-pub fn authority_keys_from_seed(seed: &str) -> (AccountId, BabeId, GrandpaId) {
+pub fn authority_keys_from_seed(seed: &str) -> (AccountId, AuraId, GrandpaId) {
     (
         get_account_id_from_seed::<sr25519::Public>(seed),
         get_from_seed::<AuraId>(seed),
@@ -232,7 +232,7 @@ fn testnet_genesis(
                         x.0.clone(),
                         x.0.clone(),
                         opaque::SessionKeys {
-                            babe: x.1.clone(),
+                            aura: x.1.clone(),
                             grandpa: x.2.clone(),
                         },
                     )
