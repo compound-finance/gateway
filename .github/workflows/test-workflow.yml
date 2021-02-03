@@ -201,6 +201,7 @@ jobs:
           sudo npx jest --ci --reporters=default --reporters=jest-junit
 
       - name: Prepublish Integration Test Results
+        if: always()
         run: |
           test_url="$(curl -X POST --data-binary @junit.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
@@ -208,6 +209,7 @@ jobs:
         id: int_test
 
       - name: Link to Integration Results
+        if: always()
         uses: unsplash/comment-on-pr@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
