@@ -155,8 +155,8 @@ describe('magic extract and goldie unlocks', () => {
     const val_0 = toSS58(val_id_0.args[0]);
     expect(val_0).toEqual(alice_init_id);
     
-    const eth_addr = u8aToHex(chainKeys_0.unwrap().eth_addr);
-    expect(eth_addr).toEqual(alice_init_eth_key);
+    const eth_address = u8aToHex(chainKeys_0.unwrap().eth_address);
+    expect(eth_address).toEqual(alice_init_eth_key);
 
     const [auths] = await api.query.babe.authorities();
     const babe_id_0 = toSS58(auths[0]);
