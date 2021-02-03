@@ -45,31 +45,6 @@ pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 /// Type for representing an amount of USD.
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
-/// Type for representing a quantity, potentially of any symbol.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum Maxable<T> {
-    Max,
-    Value(T),
-}
-
-impl<T> Maxable<T> {
-    pub fn get_max_value(self, when_max: &dyn Fn() -> T) -> T {
-        match self {
-            Maxable::Max => when_max(),
-            Maxable::Value(t) => t,
-        }
-    }
-}
-
-impl<T> From<T> for Maxable<T> {
-    fn from(t: T) -> Self {
-        Maxable::Value(t)
-    }
-}
-
-/// Either an AssetAmount or max
-pub type MaxableAssetAmount = Maxable<AssetAmount>; // XXX now just used by magic
-
 /// Type for a set of open price feed reporters.
 pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
 
