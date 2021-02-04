@@ -810,7 +810,7 @@ impl<T: Config> Module<T> {
                 .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
         } else {
             // Validator's cache is empty, fetch events from the earliest block with pending events
-            debug::native::info!("Block number has not been cached yet");
+            log!("Block number has not been cached yet");
             let block_numbers: Vec<u32> = EthEventQueue::iter()
                 .filter_map(|((block_number, log_index), status)| {
                     if match status {
@@ -832,7 +832,7 @@ impl<T: Config> Module<T> {
                 from_block = String::from("earliest");
             }
         }
-        debug::native::info!("Fetching events starting from block {:?}", from_block);
+        log!("Fetching events starting from block {:?}", from_block);
 
         // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
         //   it before doing heavy computations or write operations.
