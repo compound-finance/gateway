@@ -26,7 +26,7 @@ frame-system-rpc-runtime-api = { version = '2.0.0', default-features = false, gi
 
 sp-api = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 sp-block-builder = { git = 'https://github.com/compound-finance/substrate.git', default-features = false, version = '2.0.0'}
-sp-consensus-babe = { version = '0.8.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+sp-consensus-aura = { version = '0.8.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 sp-core = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 sp-inherents = { git = 'https://github.com/compound-finance/substrate.git', default-features = false, version = '2.0.0'}
 sp-offchain = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
@@ -41,7 +41,7 @@ frame-benchmarking = { version = '2.0.0', default-features = false, git = 'https
 frame-system-benchmarking = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git', optional = true }
 
 # Other pallets
-pallet-babe = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+pallet-aura = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 pallet-balances = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 pallet-grandpa = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 pallet-randomness-collective-flip = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
@@ -72,7 +72,7 @@ std = [
     'frame-support/std',
     'frame-system-rpc-runtime-api/std',
     'frame-system/std',
-    'pallet-babe/std',
+    'pallet-aura/std',
     'pallet-balances/std',
     'pallet-cash/std',
     'pallet-grandpa/std',
@@ -85,7 +85,7 @@ std = [
     'serde',
     'sp-api/std',
     'sp-block-builder/std',
-    'sp-consensus-babe/std',
+    'sp-consensus-aura/std',
     'sp-core/std',
     'sp-inherents/std',
     'sp-offchain/std',

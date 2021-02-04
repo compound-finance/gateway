@@ -27,11 +27,11 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
 
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
 
-  // babekey == validator id, account id
-  let session_args = validatorsInfo.map(([_, el]) => [el.babe_key, el.babe_key, {babe: el.babe_key, grandpa: el.grandpa_key}]);
+  // aurakey == validator id, account id
+  let session_args = validatorsInfo.map(([_, el]) => [el.aura_key, el.aura_key, {aura: el.aura_key, grandpa: el.grandpa_key}]);
 
   let validatorIds = validatorsInfo.map(([_, el]) =>
-    Array.from(ctx.actors.keyring.decodeAddress(el.babe_key))// from ss58 str => byte array
+    Array.from(ctx.actors.keyring.decodeAddress(el.aura_key))// from ss58 str => byte array
   );
 
   let chain_keys = validatorsInfo.map(([_, validator]) =>

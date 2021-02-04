@@ -18,8 +18,8 @@
               "id":1,
               "method":"author_hasKey",
               "params": [
-                  "{{ babe_public_key }}",
-                  "babe"
+                  "{{ aura_public_key }}",
+                  "aura"
               ]
             }
       register: has_key
@@ -27,7 +27,7 @@
       retries: 10
       delay: 5
 
-    - name: Verdict babe is
+    - name: Verdict aura is
       debug:
         var: has_key
 

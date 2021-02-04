@@ -2,7 +2,7 @@
 - hosts:
     - authority_node
   tasks:
-    - name: add babe author key to keystore
+    - name: add aura author key to keystore
       uri:
         url: http://localhost:9933
         method: "POST"
@@ -13,19 +13,19 @@
                 "id":1,
                 "method":"author_insertKey",
                 "params": [
-                    "babe",
+                    "aura",
                     "{{ mnemonic }}",
-                    "{{ babe_public_key }}"
+                    "{{ aura_public_key }}"
                 ]
             }
-      register: babe_insertion
-      until: babe_insertion.status == 200
+      register: aura_insertion
+      until: aura_insertion.status == 200
       retries: 10
       delay: 5
 
-    - name: show babe response
+    - name: show aura response
       debug:
-        var: babe_insertion
+        var: aura_insertion
 
     - name: add grandpa author key to keystore
       uri:
