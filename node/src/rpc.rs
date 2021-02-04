@@ -27,7 +27,6 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_consensus::SelectChain;
-use sp_consensus_aura::AuraApi;
 use sp_transaction_pool::TransactionPool;
 
 /// Light client extra dependencies.

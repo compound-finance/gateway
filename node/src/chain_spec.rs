@@ -203,11 +203,13 @@ fn testnet_genesis(
                     symbol: FromStr::from_str("ETH/18").unwrap(),
                     asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
                         .unwrap(),
+                    liquidity_factor: FromStr::from_str("6789").unwrap(),
                 },
                 ConfigAsset {
                     symbol: FromStr::from_str("USDC/6").unwrap(),
                     asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
                         .unwrap(),
+                    liquidity_factor: FromStr::from_str("6789").unwrap(),
                 },
             ],
             // turn account_id of ss58 to [u8 32]s

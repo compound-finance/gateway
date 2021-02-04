@@ -33,6 +33,9 @@ pub type EncodedNotice = Vec<u8>;
 /// Type for representing an amount, potentially of any symbol.
 pub type AssetAmount = Uint;
 
+/// Type for representing an amount of CASH
+pub type CashAmount = Uint;
+
 /// Type for representing a balance of a specific asset.
 pub type AssetBalance = Int;
 
@@ -68,6 +71,51 @@ pub type SessionIndex = u32;
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorIdentity>; // XXX whats our set type? ordered Vec?
 
+/// LiquidationFactor for a given market.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct LiquidityFactor(pub Uint);
+
+impl From<Uint> for LiquidityFactor {
+    fn from(x: u128) -> Self {
+        LiquidityFactor(x)
+    }
+}
+
+impl LiquidityFactor {
+    pub const DECIMALS: u8 = 4;
+
+    pub(crate) const fn from_nominal(s: &'static str) -> Self {
+        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
+        LiquidityFactor(amount)
+    }
+
+    pub const ZERO: LiquidityFactor = LiquidityFactor::from_nominal("0");
+
+    const ONE: LiquidityFactor = LiquidityFactor::from_nominal("1");
+}
+
+impl Default for LiquidityFactor {
+    fn default() -> Self {
+        LiquidityFactor::ZERO
+    }
+}
+
+impl our_std::str::FromStr for LiquidityFactor {
+    type Err = Reason;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        Ok(LiquidityFactor(
+            u128::from_str(string).map_err(|_| Reason::InvalidLiquidityFactor)?,
+        ))
+    }
+}
+
+impl From<LiquidityFactor> for String {
+    fn from(string: LiquidityFactor) -> Self {
+        format!("{}", string.0)
+    }
+}
+
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ConfigAsset {
@@ -78,6 +126,10 @@ pub struct ConfigAsset {
     #[serde(deserialize_with = "deserialize_from_str")]
     #[serde(serialize_with = "serialize_into_str")]
     pub asset: ChainAsset,
+
+    #[serde(deserialize_with = "deserialize_from_str")]
+    #[serde(serialize_with = "serialize_into_str")]
+    pub liquidity_factor: LiquidityFactor,
 }
 
 // For using in GenesisConfig / ChainSpec JSON.
@@ -144,6 +196,10 @@ impl CashPrincipal {
         Ok(CashPrincipal(
             self.0.checked_sub(rhs.0).ok_or(MathError::Underflow)?,
         ))
+    }
+
+    pub fn negate(self) -> Self {
+        CashPrincipal(self.0 * -1)
     }
 }
 
@@ -264,18 +320,33 @@ impl Default for AssetIndex {
 ///
 /// Only for use in const contexts.
 pub const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
+    let int_version = int_from_string_with_decimals(decimals, s);
+    int_version as Uint
+}
+
+pub const fn int_from_string_with_decimals(decimals: u8, s: &'static str) -> Int {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
     let mut provided_fractional_digits = 0;
     let mut past_decimal = false;
-    let mut tenpow: Uint = 1;
-    let mut qty: Uint = 0;
+    let mut tenpow: Int = 1;
+    let mut qty: Int = 0;
 
     // note - for loop is not allowed in `const` context
     // going from the right of the string
     loop {
         i -= 1;
         let byte = bytes[i];
+        if byte == b'-' {
+            if i != 0 {
+                // quit, a dash somewhere it should not be
+                let _should_overflow = byte + u8::max_value();
+            }
+            // negate
+            qty *= -1;
+            break;
+        }
+
         if byte == b'.' {
             if past_decimal {
                 // multiple radix - quit.
@@ -293,7 +364,7 @@ pub const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Ui
         // will overflow whenever byte > b'9'
         let _should_overflow = byte + (u8::max_value() - b'9');
 
-        qty += (byte_as_num as Uint) * tenpow;
+        qty += (byte_as_num as Int) * tenpow;
 
         tenpow *= 10;
         if i == 0 {
@@ -317,15 +388,9 @@ pub const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Ui
         return qty;
     }
 
-    let scalar = static_pow10(number_of_zeros_to_scale_up);
+    let scalar = static_pow10(number_of_zeros_to_scale_up) as i128;
 
     qty * scalar
-}
-
-pub const fn int_from_string_with_decimals(decimals: u8, s: &'static str) -> Int {
-    let uint_response = uint_from_string_with_decimals(decimals, s);
-    // note - only for use in const contexts - if uint_response > int_max then this line will overflow and stop compilation as expected
-    uint_response as Int
 }
 
 impl Price {
@@ -418,6 +483,26 @@ pub fn mul(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -
     }
 }
 
+/// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
+/// the output number of decimals.
+///
+/// Not recommended to use directly, to be used in SafeMath implementations.
+pub fn mul_int(a: Int, a_decimals: u8, b: Int, b_decimals: u8, out_decimals: u8) -> Option<Int> {
+    let all_numerator_decimals = a_decimals.checked_add(b_decimals)?;
+
+    if all_numerator_decimals > out_decimals {
+        // scale down
+        let scale_decimals = all_numerator_decimals.checked_sub(out_decimals)?;
+        let scale = 10i128.checked_pow(scale_decimals as u32)?;
+        a.checked_mul(b)?.checked_div(scale)
+    } else {
+        // scale up
+        let scale_decimals = out_decimals.checked_sub(all_numerator_decimals)?;
+        let scale = 10i128.checked_pow(scale_decimals as u32)?;
+        a.checked_mul(b)?.checked_mul(scale)
+    }
+}
+
 /// Divide floating point numbers represented by a (value, number_of_decimals) pair and specify
 /// the output number of decimals.
 ///
@@ -433,6 +518,25 @@ pub fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -
         // scale down
         let scale_decimals = a_decimals.checked_sub(denom_decimals)?;
         let scale = 10u128.checked_pow(scale_decimals as u32)?;
+        a.checked_div(b)?.checked_div(scale)
+    }
+}
+
+/// Divide floating point numbers represented by a (value, number_of_decimals) pair and specify
+/// the output number of decimals.
+///
+/// Not recommended to use directly, to be used in SafeMath implementations.
+pub fn div_int(a: Int, a_decimals: u8, b: Int, b_decimals: u8, out_decimals: u8) -> Option<Int> {
+    let denom_decimals = b_decimals.checked_add(out_decimals)?;
+    if denom_decimals > a_decimals {
+        // scale up
+        let scale_decimals = denom_decimals.checked_sub(a_decimals)?;
+        let scale = 10i128.checked_pow(scale_decimals as u32)?;
+        a.checked_mul(scale)?.checked_div(b)
+    } else {
+        // scale down
+        let scale_decimals = a_decimals.checked_sub(denom_decimals)?;
+        let scale = 10i128.checked_pow(scale_decimals as u32)?;
         a.checked_div(b)?.checked_div(scale)
     }
 }
@@ -698,6 +802,12 @@ mod tests {
         let actual = old_index.increment(increment).unwrap();
         let expected = CashIndex::from_nominal("1.1110");
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_int_from_string_with_decimals() {
+        let x = int_from_string_with_decimals(3, "-12.345");
+        assert_eq!(x, -12345);
     }
 
     #[test]
