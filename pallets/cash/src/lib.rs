@@ -177,7 +177,7 @@ decl_storage! {
         /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
         Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
 
-        /// Mapping from exchange ticker ("USDC") to AssetID - note this changes based on testnet/mainnet
+        /// XXX Consider renaming this, this is more like a miner fee now
         ReserveFactor get(fn reserve_factors): map hasher(blake2_128_concat) ChainAsset => crate::rates::ReserveFactor;
 
         // PriceReporter;

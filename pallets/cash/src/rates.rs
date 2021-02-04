@@ -91,6 +91,7 @@ impl Utilization {
     const ZERO: Utilization = Utilization::from_nominal("0");
 }
 
+/// XXX consider renaming, it is now more like a miner fee
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct ReserveFactor(Uint);
 
