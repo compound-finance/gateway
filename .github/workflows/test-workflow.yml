@@ -199,7 +199,8 @@ jobs:
           set -eo pipefail
           cd integration
           sudo npx jest --ci --reporters=default --reporters=jest-junit
-        
+          timeout-minutes: 20
+
       - name: Prepublish Integration results
         if: always()
         run: |
