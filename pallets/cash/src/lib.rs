@@ -289,6 +289,7 @@ decl_error! {
 
         /// Invalid events block number
         EventsBlockNumberError,
+
         /// Error processing trx request
         TrxRequestError,
     }

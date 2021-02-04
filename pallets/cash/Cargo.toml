@@ -36,11 +36,8 @@ runtime-interfaces = { path = '../runtime-interfaces', default-features = false 
 ethereum-client = { path = "../../ethereum-client", default-features = false }
 compound-crypto = { path = '../../compound-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
-<<<<<<< HEAD
-parking_lot = "0.11.1"
-=======
 our-std = { path = "../../std", default-features = false }
->>>>>>> master
+parking_lot = "0.11.1"
 
 [features]
 default = ['std']
