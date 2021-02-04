@@ -10,7 +10,7 @@ pub use our_std::{
 
 // Import these traits so we can interact with the substrate storage modules.
 use crate::rates::APR;
-use crate::types::{AssetIndex, AssetPrice, CashIndex, Timestamp, Uint, SECONDS_PER_YEAR};
+use crate::types::{AssetIndex, AssetPrice, CashIndex, Timestamp, Uint, MILLISECONDS_PER_YEAR};
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
 
 use crate::chains::{
@@ -53,6 +53,7 @@ use crate::{
     TotalCashPrincipal,
     TotalSupplyAssets,
 };
+use frame_support::sp_runtime::traits::Convert;
 use our_std::convert::TryInto;
 
 macro_rules! require {
@@ -93,6 +94,11 @@ pub fn try_chain_asset_account(
         }
         _ => None,
     }
+}
+
+fn now<T: Config>() -> Timestamp {
+    let now = <pallet_timestamp::Module<T>>::get();
+    T::TimeConverter::convert(now)
 }
 
 pub fn price<T: Config>(symbol: Symbol) -> Price {
@@ -170,7 +176,7 @@ fn compute_cash_principal_per_internal(
         .checked_mul(dt)?
         .checked_mul(price_asset)?
         .checked_div(cash_index)?
-        .checked_div(SECONDS_PER_YEAR)?;
+        .checked_div(MILLISECONDS_PER_YEAR)?;
 
     scale_multiple_terms(
         unscaled,
@@ -579,8 +585,8 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
 }
 
 /// Block initialization step that can fail
-pub fn on_initialize_core() -> Result<frame_support::weights::Weight, Reason> {
-    let now: Timestamp = runtime_interfaces::time_interface::now_utc()?;
+pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
+    let now: Timestamp = now::<T>();
     let previous: Timestamp = LastBlockTimestamp::get();
 
     let change_in_time = now
@@ -1010,7 +1016,7 @@ mod tests {
     fn test_compute_cash_principal_per() {
         // round numbers (unrealistic but very easy to check)
         let asset_rate = APR::from_nominal("0.30"); // 30% per year
-        let dt = SECONDS_PER_YEAR / 2; // for 6 months
+        let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
         let cash_index = CashIndex::from_nominal("1.5"); // current index value 1.5
         let price_asset: AssetPrice = 1500_000000; // $1,500
 
@@ -1024,7 +1030,7 @@ mod tests {
         // a unit test related to previous unexpected larger scope test of on_initialize
         // this showed that we should divide by SECONDS_PER_YEAR last te prevent un-necessary truncation
         let asset_rate = APR::from_nominal("0.1225");
-        let dt = SECONDS_PER_YEAR / 4;
+        let dt = MILLISECONDS_PER_YEAR / 4;
         let cash_index = CashIndex::from_nominal("1.123");
         let price_asset: AssetPrice = 1450_000000;
 
@@ -1092,7 +1098,7 @@ mod tests {
             let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
             let asset = get_eth();
             let symbol = Symbol::new("ETH", 18);
-            let change_in_time = SECONDS_PER_YEAR / 4; // 3 months go by
+            let change_in_time = MILLISECONDS_PER_YEAR / 4; // 3 months go by
             let model = InterestRateModel::new_kink(0, 2500, 5000, 5000);
 
             ReserveFactor::insert(
@@ -1133,6 +1139,16 @@ mod tests {
                 CashPrincipals::get(&miner),
                 CashPrincipal::from_nominal("243.097000")
             );
+        });
+    }
+
+    #[test]
+    fn test_now() {
+        new_test_ext().execute_with(|| {
+            let expected = 123;
+            <pallet_timestamp::Module<Test>>::set_timestamp(expected);
+            let actual = now::<Test>();
+            assert_eq!(actual, expected);
         });
     }
 }

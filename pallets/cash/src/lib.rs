@@ -45,9 +45,12 @@ use sp_runtime::{
     },
 };
 
+use frame_support::sp_runtime::traits::Convert;
 use pallet_session;
+use pallet_timestamp;
 
 pub mod chains;
+pub mod converters;
 pub mod core;
 pub mod events;
 pub mod log;
@@ -78,12 +81,16 @@ pub const OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER: &[u8; 41] =
 pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+pub trait Config:
+    frame_system::Config + CreateSignedTransaction<Call<Self>> + pallet_timestamp::Config
+{
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
 
     /// The overarching dispatch call type.
     type Call: From<Call<Self>>;
+
+    type TimeConverter: Convert<<Self as pallet_timestamp::Config>::Moment, Timestamp>;
 }
 
 decl_storage! {
@@ -512,7 +519,7 @@ impl<T: Config> Module<T> {
     /// but the function signature does not allow us to express that to the substrate system.
     /// This is our final stand
     fn on_initialize_internal(block: T::BlockNumber) -> frame_support::weights::Weight {
-        match crate::core::on_initialize_core() {
+        match crate::core::on_initialize_core::<T>() {
             Ok(weight) => weight,
             Err(err) => {
                 // todo: something is going very wrong here..... we need to take some very serious

@@ -16,7 +16,6 @@ sp-io = { version = '2.0.0', default-features = false, git = 'https://github.com
 codec = { package = 'parity-scale-codec', version = '1.3.4', default-features = false, features = ['derive'] }
 lazy_static = '1.4.0'
 compound-crypto = { path = "../../compound-crypto", version = "1.0.0", default-features=false }
-chrono = { version = "0.4.19", optional = true}
 our-std = { path = "../../std", default-features = false }
 
 [features]
@@ -27,6 +26,5 @@ std = [
     'sp-io/std',
     'sp-runtime-interface/std',
     'compound-crypto/std',
-    'chrono',
     'our-std/std'
 ]

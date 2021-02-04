@@ -133,24 +133,6 @@ pub enum TimestampError {
     ExtremelyOldTimestamp,
 }
 
-const VERY_OLD: i64 = 1609477200; // 2021-01-01
-
-#[sp_runtime_interface::runtime_interface]
-pub trait TimeInterface {
-    /// Get the current time as unix time UTC
-    ///
-    /// * Fails whenever the timestamp is "very old" by our standards
-    fn now_utc() -> Result<u128, TimestampError> {
-        let now = chrono::Utc::now().timestamp();
-
-        if now <= VERY_OLD {
-            Err(TimestampError::ExtremelyOldTimestamp)
-        } else {
-            Ok(now as u128)
-        }
-    }
-}
-
 /// Set an environment variable to a value if it is not already set to an existing value.
 fn set_validator_config_dev_default(key: &str, value: &str) {
     let existing = std::env::var(key);

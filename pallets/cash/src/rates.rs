@@ -1,7 +1,7 @@
 use crate::reason::MathError;
 /// Interest rate related calculations and utilities are concentrated here
 use crate::types::{
-    uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint, SECONDS_PER_YEAR,
+    uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint, MILLISECONDS_PER_YEAR,
 };
 use codec::{Decode, Encode};
 use our_std::Debuggable;
@@ -48,7 +48,7 @@ impl APR {
 
     /// exp{r * dt} where dt is change in time in seconds
     pub fn over_time(self, dt: Timestamp) -> Result<CashIndex, MathError> {
-        let increment = (self.as_f64() * (dt as f64) / (SECONDS_PER_YEAR as f64)).exp()
+        let increment = (self.as_f64() * (dt as f64) / (MILLISECONDS_PER_YEAR as f64)).exp()
             * 10f64.powf(CashIndex::DECIMALS as f64);
         if !increment.is_normal() {
             // this can happen when increment is + infinity for example
@@ -642,7 +642,7 @@ mod test {
     #[test]
     fn test_over_time() {
         let r = APR::from_nominal("0.2"); // 20% per year
-        let dt = SECONDS_PER_YEAR / 2; // for 6 months
+        let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
         let actual = r.over_time(dt).unwrap(); // compounded continuously
         let expected = CashIndex::from_nominal("1.1051"); // from google sheets
         assert_eq!(actual, expected);

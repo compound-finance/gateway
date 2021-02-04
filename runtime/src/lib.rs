@@ -61,6 +61,9 @@ pub fn wasm_binary_unwrap() -> &'static [u8] {
 /// An index to a block.
 pub type BlockNumber = u32;
 
+/// An instant or duration in time.
+pub type Moment = pallet_cash::types::Timestamp;
+
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
 
@@ -124,9 +127,9 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// up by `pallet_aura` to implement `fn slot_duration()`.
 ///
 /// Change this to adjust the block time.
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
+pub const MILLISECS_PER_BLOCK: u128 = 6000;
 
-pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
+pub const SLOT_DURATION: u128 = MILLISECS_PER_BLOCK;
 
 // Time is measured by number of blocks.
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
@@ -231,7 +234,7 @@ impl pallet_grandpa::Config for Runtime {
 }
 
 parameter_types! {
-    pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
+    pub const MinimumPeriod: u128 = SLOT_DURATION / 2;
 }
 
 impl pallet_timestamp::Config for Runtime {
@@ -309,6 +312,7 @@ impl pallet_session::Config for Runtime {
 impl pallet_cash::Config for Runtime {
     type Event = Event;
     type Call = Call;
+    type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------
@@ -496,7 +500,7 @@ impl_runtime_apis! {
 
     impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
         fn slot_duration() -> u64 {
-            Aura::slot_duration()
+            Aura::slot_duration() as u64
         }
 
         fn authorities() -> Vec<AuraId> {

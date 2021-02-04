@@ -19,7 +19,7 @@ pub type Nonce = u32;
 pub type Timestamp = u128; // XXX u64?
 
 /// Number of seconds in a year
-pub const SECONDS_PER_YEAR: Timestamp = 31557600; // todo: finalize this number
+pub const MILLISECONDS_PER_YEAR: Timestamp = 31557600000; // todo: xxx finalize this number
 
 /// Type of the largest possible signed integer.
 pub type Int = i128;
