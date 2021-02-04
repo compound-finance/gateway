@@ -195,11 +195,12 @@ jobs:
           cargo build --release
 
       - name: Run Integration Test
+        timeout-minutes: 20
         run: |
           set -eo pipefail
           cd integration
           sudo npx jest --ci --reporters=default --reporters=jest-junit
-        
+
       - name: Prepublish Integration results
         if: always()
         run: |

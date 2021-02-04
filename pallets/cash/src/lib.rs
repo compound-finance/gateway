@@ -287,6 +287,9 @@ decl_error! {
         /// Failed to publish signatures
         PublishSignatureFailure,
 
+        /// Invalid events block number
+        EventsBlockNumberError,
+
         /// Error processing trx request
         TrxRequestError,
     }
@@ -804,12 +807,32 @@ impl<T: Config> Module<T> {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
             log!("Last cached block number: {:?}", cached_block_num);
             from_block = events::get_next_block_hex(cached_block_num)
-                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+                .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
         } else {
-            // Validator's cache is empty, fetch events from the earliest available block
+            // Validator's cache is empty, fetch events from the earliest block with pending events
             log!("Block number has not been cached yet");
-            from_block = String::from("earliest");
+            let block_numbers: Vec<u32> = EthEventQueue::iter()
+                .filter_map(|((block_number, log_index), status)| {
+                    if match status {
+                        EventStatus::<Ethereum>::Pending { signers } => true,
+                        _ => false,
+                    } {
+                        Some(block_number)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let pending_events_block = block_numbers.iter().min();
+            if (pending_events_block.is_some()) {
+                let events_block: u32 = *pending_events_block.unwrap();
+                from_block = events::get_next_block_hex(events_block.to_string())
+                    .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
+            } else {
+                from_block = String::from("earliest");
+            }
         }
+        log!("Fetching events starting from block {:?}", from_block);
 
         // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
         //   it before doing heavy computations or write operations.

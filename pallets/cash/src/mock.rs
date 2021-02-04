@@ -1,7 +1,12 @@
 use crate::{Call, Config, Module};
-use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
+use codec::alloc::sync::Arc;
+use frame_support::{impl_outer_dispatch, impl_outer_event, impl_outer_origin, parameter_types};
+use parking_lot::RwLock;
 use sp_core::{
-    offchain::{testing, OffchainExt, TransactionPoolExt},
+    offchain::{
+        testing::{self, OffchainState, PoolState},
+        OffchainExt, TransactionPoolExt,
+    },
     sr25519::Signature,
     H256,
 };
@@ -10,14 +15,30 @@ use sp_runtime::{
     traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
 };
 
+pub type Extrinsic = TestXt<Call<Test>, ()>;
+pub type CashModule = Module<Test>;
+pub type System = frame_system::Module<Test>;
+pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+
 impl_outer_origin! {
     pub enum Origin for Test {}
 }
 
-// Configure a mock runtime to test the pallet.
+mod cash {
+    pub use crate::Event;
+}
 
+impl_outer_event! {
+    pub enum TestEvent for Test {
+        cash,
+        frame_system<T>,
+    }
+}
+
+// Configure a mock runtime to test the pallet.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Test;
+
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
@@ -48,26 +69,10 @@ impl frame_system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
-mod cash {
-    pub use crate::Event;
-}
-
-impl_outer_event! {
-    pub enum TestEvent for Test {
-        cash,
-        frame_system<T>,
-    }
-}
-
-type Extrinsic = TestXt<Call<Test>, ()>;
-type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-
 impl frame_system::offchain::SigningTypes for Test {
     type Public = <Signature as Verify>::Signer;
     type Signature = Signature;
 }
-
-pub type System = frame_system::Module<Test>;
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
 where
@@ -96,32 +101,34 @@ impl Config for Test {
     type Call = Call<Test>;
 }
 
-pub type CashModule = Module<Test>;
-
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    new_test_ext_with_http_calls(vec![])
+    let (t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(vec![]);
+    t
 }
 
 pub fn new_test_ext_with_http_calls(
     mut calls: Vec<testing::PendingRequest>,
-) -> sp_io::TestExternalities {
-    let (offchain, state) = testing::TestOffchainExt::new();
+) -> (
+    sp_io::TestExternalities,
+    Arc<RwLock<PoolState>>,
+    Arc<RwLock<OffchainState>>,
+) {
+    let (offchain, offchain_state) = testing::TestOffchainExt::new();
     let (pool, pool_state) = testing::TestTransactionPoolExt::new();
 
     // let mut test_externalities: sp_io::TestExternalities = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
-
     let mut test_externalities = sp_io::TestExternalities::default();
     test_externalities.register_extension(OffchainExt::new(offchain));
     test_externalities.register_extension(TransactionPoolExt::new(pool));
 
     {
-        let mut state = state.write();
+        let mut state = offchain_state.write();
         for call in calls.drain(0..calls.len()) {
             state.expect_request(call);
         }
     }
 
     test_externalities.execute_with(|| System::set_block_number(1));
-    test_externalities
+    (test_externalities, pool_state, offchain_state)
 }

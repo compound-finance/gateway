@@ -4356,6 +4356,7 @@ dependencies = [
  "our-std",
  "pallet-session",
  "parity-scale-codec",
+ "parking_lot 0.11.1",
  "runtime-interfaces",
  "serde",
  "serde_json",
