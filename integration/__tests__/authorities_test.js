@@ -22,7 +22,9 @@ describe('authorities tests', () => {
     web3;
     
   let alice_init_id = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+  let bob_init_id = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty";
   let alice_init_eth_key = "0x6a72a2f14577d9cd0167801efdd54a07b40d2b61";
+  let bob_init_eth_key = "0x8ad1b2918c34ee5d3e881a57c68574ea9dbecb81";
   
   beforeEach(async () => {
     ({
@@ -42,17 +44,18 @@ describe('authorities tests', () => {
   const toSS58 = (arr) => keyring.encodeAddress(new Uint8Array(arr.buffer));
 
   test('authorities', async () => {
-    const [[val_id_0, chainKeys_0]] = await api.query.cash.validators.entries();
+    const auths = await api.query.cash.validators.entries();
     
-    const val_0 = toSS58(val_id_0.args[0]);
-    expect(val_0).toEqual(alice_init_id);
-    
-    const eth_address = u8aToHex(chainKeys_0.unwrap().eth_address);
-    expect(eth_address).toEqual(alice_init_eth_key);
-
-    const [auths] = await api.query.babe.authorities();
-    const babe_id_0 = toSS58(auths[0]);
-    expect(babe_id_0).toEqual(alice_init_id);
+    // array of [valIdss58, ethAddress]
+    const auth_data = auths.map(([valIdRaw, chainKeys]) => 
+      [
+        toSS58(valIdRaw.args[0]),
+        u8aToHex(chainKeys.unwrap().eth_address)
+      ]
+    );
+    expect(auth_data).toEqual(
+      [[bob_init_id, bob_init_eth_key], [alice_init_id, alice_init_eth_key]]
+    );
 
     // todo: query and assert grandpa state via the GRANDPA_AUTHORITIES_KEY https://www.shawntabrizi.com/substrate/querying-substrate-storage-via-rpc/
 
