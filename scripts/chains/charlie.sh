@@ -26,4 +26,4 @@ fi
   --validator \
   --no-mdns \
   --rpc-methods Unsafe \
-  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWLgyd1noEdNLkjGxh467nTfVf3jKLSYAy426QckBuZKLp
+  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooW9qtwBHeQryg9mXBVMkz4YivUsj62g1tYBACUukKToKof

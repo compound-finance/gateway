@@ -14,7 +14,7 @@ done
 
 if [ "$build" = true ] ; then
   cargo build --release
-  ./target/release/compound-chain build-spec --disable-default-bootnode --chain local > compoundChainSpec.json
+  ./target/release/compound-chain build-spec --disable-default-bootnode --chain staging > compoundChainSpec.json
   ./target/release/compound-chain purge-chain --base-path /tmp/chainz/alice --chain compoundChainSpec.json --database paritydb -y
 fi
 
@@ -31,4 +31,4 @@ fi
   --no-mdns \
   --rpc-methods Unsafe \
   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-  --validator 
+  --validator
