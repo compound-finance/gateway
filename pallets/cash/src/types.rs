@@ -361,7 +361,7 @@ impl Quantity {
         Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
     }
 
-    /// Quantity * cash principal (per unit quantity) -> cash principal
+    /// Quantity * CashPrincipal (per unit quantity) -> CashPrincipal (total)
     /// used for computing interest on interest during on_initialize
     pub fn as_cash_principal(
         self,
