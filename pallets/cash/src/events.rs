@@ -145,7 +145,7 @@ pub mod tests {
         assert_eq!(actual, expected);
     }
 
-    fn get_mockup_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
+    pub fn get_mockup_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
         // Set up config values
         let given_eth_starport_address: Vec<u8> =
             "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
@@ -187,7 +187,8 @@ pub mod tests {
         let calls: Vec<testing::PendingRequest> =
             get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
 
-        new_test_ext_with_http_calls(calls).execute_with(|| {
+        let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
+        t.execute_with(|| {
             let events_candidate = events::fetch_events("earliest".to_string());
             assert!(events_candidate.is_ok());
             let starport_info = events_candidate.unwrap();
@@ -216,7 +217,8 @@ pub mod tests {
         let calls: Vec<testing::PendingRequest> =
             get_mockup_http_calls(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
 
-        new_test_ext_with_http_calls(calls).execute_with(|| {
+        let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
+        t.execute_with(|| {
             let events_candidate = events::fetch_events("earliest".to_string());
             assert!(events_candidate.is_ok());
             let starport_info = events_candidate.unwrap();

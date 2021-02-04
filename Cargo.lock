@@ -4354,6 +4354,7 @@ dependencies = [
  "num-traits",
  "our-std",
  "parity-scale-codec",
+ "parking_lot 0.11.1",
  "runtime-interfaces",
  "serde",
  "serde_json",
