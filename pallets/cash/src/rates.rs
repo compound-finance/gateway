@@ -108,9 +108,11 @@ impl ReserveFactor {
         ReserveFactor(amount)
     }
 
-    const DEFAULT: ReserveFactor = ReserveFactor::from_nominal("0.02");
+    const ZERO: ReserveFactor = ReserveFactor::from_nominal("0");
 
     const ONE: ReserveFactor = ReserveFactor::from_nominal("1");
+
+    const DEFAULT: ReserveFactor = Self::ZERO;
 }
 
 impl Default for ReserveFactor {
