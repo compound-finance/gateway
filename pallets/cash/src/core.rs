@@ -1,33 +1,31 @@
 // Note: The substrate build requires these be re-exported.
 pub use our_std::{
     cmp::{max, min},
+    collections::btree_set::BTreeSet,
     convert::TryFrom,
     fmt, result,
     result::Result,
 };
 
 // Import these traits so we can interact with the substrate storage modules.
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
-
 use crate::{
     chains::{
         eth, ChainAccount, ChainAsset, ChainAssetAccount, ChainSignature, ChainSignatureList,
     },
-    notices,
+    log, notices,
     notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeStatus},
     params::MIN_TX_VALUE,
     reason::{MathError, Reason},
     symbol::{Symbol, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, Price,
-        Quantity, SafeMul, USDQuantity,
+        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, EthAddress, Int,
+        Price, Quantity, SafeMul, USDQuantity,
     },
     AssetBalances, AssetSymbols, Call, CashPrincipals, ChainCashPrincipals, Config, Event,
     GlobalCashIndex, Module, NoticeQueue, Prices, SubmitTransaction, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets,
 };
-
-use sp_runtime::print;
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
 
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
@@ -81,7 +79,23 @@ pub fn value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, MathError>
     amount.mul(price::<T>(amount.symbol()))
 }
 
-// Internal helpers //
+// Internal helpers
+
+pub fn passes_validation_threshold(
+    signers: &Vec<EthAddress>,
+    validators: &Vec<EthAddress>,
+) -> bool {
+    let mut signer_set = BTreeSet::<EthAddress>::new();
+    for v in signers {
+        signer_set.insert(*v);
+    }
+
+    let mut validator_set = BTreeSet::<EthAddress>::new();
+    for v in validators {
+        validator_set.insert(*v);
+    }
+    signer_set.len() > validator_set.len() * 2 / 3
+}
 
 fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
     Ok(a.checked_add(b.value()).ok_or(MathError::Overflow)?)
@@ -454,9 +468,7 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), R
                     // submit onchain call for aggregating the price
                     let signature: ChainSignature = notices::sign_notice_chain(&notice)?;
 
-                    print(
-                        format!("Posting Signature for [{},{}]", notice_id.0, notice_id.1).as_str(),
-                    );
+                    log!("Posting Signature for [{},{}]", notice_id.0, notice_id.1);
 
                     let call = <Call<T>>::publish_signature(notice_id, signature);
 
@@ -479,7 +491,7 @@ pub fn publish_signature_internal(
     notice_id: NoticeId,
     signature: ChainSignature,
 ) -> Result<(), Reason> {
-    print(format!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1).as_str());
+    log!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1);
     let status = <NoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::Missing);
 
     match status {

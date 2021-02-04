@@ -34,7 +34,6 @@ pub enum Account {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum TrxRequest {
-    MagicExtract(MaxAmount, Account),
     Extract(Amount, Asset, Account),
 }
 
@@ -43,24 +42,12 @@ pub enum ParseError<'a> {
     NotImplemented,
     LexError(&'a str),
     InvalidAmount,
-    InvalidMaxAmount,
     InvalidAddress,
     InvalidArgs(&'static str, usize, usize),
     UnknownFunction(&'a str),
     InvalidExpression,
     InvalidChain(&'a str),
     InvalidChainAccount(Chain),
-}
-
-fn parse_max_amount<'a>(t: &Token) -> Result<MaxAmount, ParseError<'a>> {
-    match t {
-        Token::Integer(Some(v)) => Ok(MaxAmount::Amt(*v)),
-        Token::Hex(Some(v)) => Ok(MaxAmount::Amt(
-            hex_util::hex_to_u128(v).ok_or(ParseError::InvalidMaxAmount)?,
-        )),
-        Token::Identifier("max") => Ok(MaxAmount::Max),
-        _ => Err(ParseError::InvalidMaxAmount), // TODO: Debug here?
-    }
 }
 
 fn parse_amount<'a>(t: &Token) -> Result<Amount, ParseError<'a>> {
@@ -121,18 +108,6 @@ fn parse_asset<'a>(t: &Token<'a>) -> Result<Asset, ParseError<'a>> {
     }
 }
 
-fn parse_magic_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
-    match args {
-        [amount_token, account_token] => {
-            let amount = parse_max_amount(amount_token)?;
-            let account = parse_account(account_token)?;
-
-            Ok(TrxRequest::MagicExtract(amount, account))
-        }
-        _ => Err(ParseError::InvalidArgs("magic-extract", 2, args.len())),
-    }
-}
-
 fn parse_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
     match args {
         [amount_token, asset_token, account_token] => {
@@ -162,9 +137,6 @@ fn parse<'a>(tokens: Lexer<'a, Token<'a>>) -> Result<TrxRequest, ParseError<'a>>
     let token_vec = tokens.collect::<Vec<Token<'a>>>();
 
     match &token_vec[..] {
-        [Token::LeftDelim, Token::Identifier("magic-extract"), args @ .., Token::RightDelim] => {
-            parse_magic_extract(args)
-        }
         [Token::LeftDelim, Token::Identifier("extract"), args @ .., Token::RightDelim] => {
             parse_extract(args)
         }
@@ -210,27 +182,6 @@ mod tests {
         "hello" => Err(ParseError::InvalidExpression),
       parse_fail_unknown_function:
         "(my-fun 3 eth:0x55)" => Err(ParseError::UnknownFunction("my-fun")),
-      parse_fail_invalid_max:
-        "(magic-extract mux eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidMaxAmount),
-      parse_fail_invalid_max_too_large_int:
-        "(magic-extract 340282366920938463463374607431768211456 eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidMaxAmount),
-      parse_fail_invalid_max_too_large_hex:
-        "(magic-extract 0xffffffffffffffffffffffffffffffff00 eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidMaxAmount),
-      parse_simple_magic_extract:
-        "(magic-extract 3 eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::MagicExtract(
-          MaxAmount::Amt(3),
-          Account::Eth(ALAN)
-        )),
-      parse_simple_magic_extract_hex:
-        "(magic-extract 0x0100 eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::MagicExtract(
-          MaxAmount::Amt(256),
-          Account::Eth(ALAN)
-        )),
-      parse_simple_magic_extract_max:
-        "(magic-extract max eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::MagicExtract(
-          MaxAmount::Max,
-          Account::Eth(ALAN)
-        )),
       parse_extract:
         "(extract 3 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
           3,
@@ -243,5 +194,15 @@ mod tests {
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
+      parse_fail_invalid_amount_invalid:
+        "(extract hi eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
+      parse_fail_invalid_amount_too_large_int:
+        "(extract 340282366920938463463374607431768211456 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
+      parse_fail_invalid_amount_too_large_hex:
+        "(extract 0xffffffffffffffffffffffffffffffff00 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
+      parse_fail_invalid_asset:
+        "(extract 5 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeff eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
+      parse_fail_invalid_recipient:
+        "(extract 5 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101ff)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
     }
 }

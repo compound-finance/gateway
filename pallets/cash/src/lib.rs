@@ -10,8 +10,20 @@ extern crate alloc;
 extern crate ethereum_client;
 extern crate trx_request;
 
+use crate::chains::{
+    Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
+};
+use crate::notices::{Notice, NoticeId, NoticeStatus};
+use crate::rates::{InterestRateModel, APR};
+use crate::reason::Reason;
+use crate::symbol::Symbol;
+use crate::types::{
+    AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
+    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, Nonce, Quantity,
+    ReporterSet, SessionIndex, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+};
 use codec::{alloc::string::String, Decode};
-use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch};
+use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_system::{
     ensure_none, ensure_root,
     offchain::{CreateSignedTransaction, SubmitTransaction},
@@ -21,6 +33,7 @@ use our_std::{
     str,
     vec::Vec,
 };
+use sp_core::crypto::AccountId32;
 use sp_runtime::{
     offchain::{
         storage::StorageValueRef,
@@ -29,27 +42,14 @@ use sp_runtime::{
     transaction_validity::{
         InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
     },
-    SaturatedConversion,
 };
 
-use crate::chains::{
-    Chain, ChainAccount, ChainAsset, ChainId, ChainSignature, ChainSignatureList, Ethereum,
-};
-use crate::notices::{CashExtractionNotice, EncodeNotice, Notice, NoticeId, NoticeStatus};
-use crate::rates::{InterestRateModel, APR};
-use crate::reason::Reason;
-use crate::symbol::Symbol;
-use crate::types::{
-    AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ConfigAsset,
-    ConfigSetString, EncodedNotice, EventStatus, MaxableAssetAmount, Nonce, Quantity, ReporterSet,
-    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
-};
-
-use sp_runtime::print;
+use pallet_session;
 
 pub mod chains;
 pub mod core;
 pub mod events;
+pub mod log;
 pub mod notices;
 pub mod oracle;
 pub mod params;
@@ -71,6 +71,7 @@ mod testdata;
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
 pub const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
+pub const OCW_LATEST_PRICE_FEED_TIMESTAMP: &[u8; 33] = b"cash::latest_price_feed_timestamp";
 pub const OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER: &[u8; 41] =
     b"cash::latest_price_feed_poll_block_number";
 pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_open_price_feed";
@@ -89,12 +90,13 @@ decl_storage! {
         /// The timestamp of the previous block (or defaults to timestamp of the genesis block).
         LastBlockTimestamp get(fn last_block_timestamp) config(): Timestamp;
 
-        // XXX we also need mapping of public (identity, babe) key to other keys
-        /// The current set of allowed validators, and their associated keys.
-        Validators get(fn validators): ValidatorSet; // XXX
+        NextSessionIndex get(fn get_next_session_index): SessionIndex;
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
-        NextValidators get(fn next_validators): Option<ValidatorSet>; // XXX
+        NextValidators get(fn next_validators) : map hasher(blake2_128_concat) AccountId32 => Option<ChainKeys>;
+
+        /// The current set of allowed validators, and their associated keys.
+        Validators get(fn validators) : map hasher(blake2_128_concat) AccountId32 => Option<ChainKeys>;
 
         /// An index to track interest earned by CASH holders and owed by CASH borrowers.
         GlobalCashIndex get(fn cash_index): CashIndex;
@@ -166,18 +168,16 @@ decl_storage! {
 
         /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
         Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
-
-        // XXX delete me (part of magic extract)
-        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
-        config(validators): ConfigSetString;
+        config(validator_ids): Vec<[u8;32]>;
+        config(validator_keys): Vec<(String,)>;
         config(reporters): ConfigSetString;
         config(assets): Vec<ConfigAsset>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
         })
     }
 }
@@ -186,9 +186,6 @@ decl_event!(
     pub enum Event {
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
-
-        /// XXX
-        MagicExtract(AssetAmount, ChainAccount, Notice),
 
         /// An Ethereum event was successfully processed. [payload]
         ProcessedEthEvent(SignedPayload),
@@ -290,12 +287,10 @@ decl_error! {
         /// Failed to publish signatures
         PublishSignatureFailure,
 
-        // XXX delete with magic extract
-        /// Failure in internal logic
-        Failed,
-
         /// Invalid events block number
         EventsBlockNumberError,
+        /// Error processing trx request
+        TrxRequestError,
     }
 }
 
@@ -304,12 +299,44 @@ macro_rules! r#cash_err {
         match $expr {
             core::result::Result::Ok(val) => Ok(val),
             core::result::Result::Err(err) => {
-                print(format!("Error {:#?}", err).as_str());
-                debug::native::error!("Error {:#?}", err);
+                log!("Error {:#?}", err);
                 Err($new_err)
             }
         }
     };
+}
+
+impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
+    // return validator set to use in the next session (babe and grandpa also stage new auths associated w these accountIds)
+    fn new_session(session_index: SessionIndex) -> Option<Vec<AccountId32>> {
+        if NextValidators::iter().count() != 0 {
+            NextSessionIndex::put(session_index);
+            Some(NextValidators::iter().map(|x| x.0).collect::<Vec<_>>())
+        } else {
+            Some(Validators::iter().map(|x| x.0).collect::<Vec<_>>())
+        }
+    }
+
+    fn start_session(index: SessionIndex) {
+        // if changes have been queued
+        // if starting the queued session
+        if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
+            // delete existing validators
+            for kv in <Validators>::iter() {
+                <NextValidators>::take(&kv.0);
+            }
+            // push next validators into current validators
+            for (id, chain_keys) in <NextValidators>::iter() {
+                <NextValidators>::take(&id);
+                <Validators>::insert(&id, chain_keys);
+            }
+        } else {
+            ()
+        }
+    }
+    fn end_session(_: SessionIndex) {
+        ()
+    }
 }
 
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -345,18 +372,13 @@ decl_module! {
             ensure_none(origin)?;
 
             // // TODO: Add more error information here
-            print("submit_trx_request");
             let request_str: &str = str::from_utf8(&request[..]).map_err(|_| <Error<T>>::TrxRequestParseError)?;
-            print(request_str);
+
             // // TODO: Add more error information here
             let sender = cash_err!(signature.recover(&request), <Error<T>>::InvalidSignature)?; // XXX error from reason?
             let trx_request = cash_err!(trx_request::parse_request(request_str), <Error<T>>::TrxRequestParseError)?;
 
             match trx_request {
-                trx_request::TrxRequest::MagicExtract(amount, account) => {
-                    cash_err!(magic_extract_internal::<T>(sender, account.into(), amount.into()), Error::<T>::Failed)?; // TODO: How to handle wrapped errors?
-                    Ok(())
-                },
                 trx_request::TrxRequest::Extract(amount, asset, account) => {
                     let chain_asset: ChainAsset = asset.into();
                     let symbol = core::symbol::<T>(chain_asset).ok_or(<Error<T>>::AssetNotSupported)?; // TODO: Correct error? cash_err?
@@ -364,8 +386,8 @@ decl_module! {
                     match core::extract_internal::<T>(chain_asset, sender, account.into(), quantity) {
                         Ok(()) => Ok(()),
                         Err(err) => {
-                            print(format!("TrxExtract Error: {:?}", err).as_str());
-                            Err(Error::<T>::Failed)?
+                            log!("TrxExtract Error: {:?}", err);
+                            Err(Error::<T>::TrxRequestError)?
                         }
                     }
                 }
@@ -374,7 +396,7 @@ decl_module! {
 
         #[weight = 1] // XXX how are we doing weights?
         pub fn process_eth_event(origin, payload: SignedPayload, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            print(format!("process_eth_event(origin,payload,sig): {} {}", hex::encode(&payload), hex::encode(&signature)).as_str());
+            log!("process_eth_event(origin,payload,sig): {} {}", hex::encode(&payload), hex::encode(&signature));
             ensure_none(origin)?;
 
             // XXX do we want to store/check hash to allow replaying?
@@ -383,13 +405,10 @@ decl_module! {
                 compound_crypto::eth_recover(&payload[..], &signature, false),  // XXX why is this using eth for validator sig though?
                 Error::<T>::InvalidSignature)?;
 
-            print(format!("signer: {}", hex::encode(&signer[..])).as_str());
-            // XXX
-            // XXX require(signer == known validator); // XXX
-            // Check that signer is a known validator, otherwise throw an error
-            let validators = <Validators>::get();
+            let validators: Vec<EthAddress> = <Validators>::iter().map(|v| v.1.eth_address).collect();
+
             if !validators.contains(&signer) {
-                debug::native::error!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
+                log!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
                 return Err(Error::<T>::UnknownValidator)?
             }
 
@@ -399,7 +418,7 @@ decl_module! {
                 EventStatus::<Ethereum>::Pending { signers } => {
                     // XXX sets?
                     if signers.contains(&signer) {
-                        debug::native::error!("Validator has already signed this payload {:?}", signer);
+                        log!("Validator has already signed this payload {:?}", signer);
                         return Err(Error::<T>::AlreadySigned)?
                     }
 
@@ -407,10 +426,7 @@ decl_module! {
                     let mut signers_new = signers.clone();
                     signers_new.push(signer.clone()); // XXX unique add to set?
 
-                    // XXX
-                    // let signers_new = {signer | signers};
-                    // if len(signers_new & Validators) > 2/3 * len(Validators) {
-                    if signers_new.len() > validators.len() * 2 / 3 { // XXX note this needs to be & Validators, so we need a set
+                    if core::passes_validation_threshold(&signers_new, &validators) {
                         match core::apply_eth_event_internal::<T>(event) {
                             Ok(()) => {
                                 EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
@@ -463,11 +479,27 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = 0] // XXX
+        pub fn change_authorities(origin, keys: Vec<(AccountId32, ChainKeys)>) -> dispatch::DispatchResult {
+            // TODO: assert root only
+
+            for (id, _chain_keys) in <NextValidators>::iter() {
+                <NextValidators>::take(id);
+            }
+
+            for (id, chain_keys) in &keys {
+                <NextValidators>::take(id);
+                <NextValidators>::insert(&id, chain_keys);
+            }
+
+            Ok(())
+        }
+
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
             let result = Self::fetch_events_with_lock();
             if let Err(e) = result {
-                debug::native::error!("offchain_worker error during fetch events: {:?}", e);
+                log!("offchain_worker error during fetch events: {:?}", e);
             }
 
             // TODO: What to do with res?
@@ -479,7 +511,7 @@ decl_module! {
             // are running.
             let result = Self::process_open_price_feed(block_number);
             if let Err(e) = result {
-                debug::native::error!("offchain_worker error during open price feed processing: {:?}", e);
+                log!("offchain_worker error during open price feed processing: {:?}", e);
             }
         }
     }
@@ -565,13 +597,10 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidSymbol
         )?;
 
-        print(
-            format!(
-                "Parsed price from open price feed: {:?} is worth {:?}",
-                parsed.key,
-                (parsed.value as f64) / 1000000.0
-            )
-            .as_str(),
+        log!(
+            "Parsed price from open price feed: {:?} is worth {:?}",
+            parsed.key,
+            (parsed.value as f64) / 1000000.0
         );
         // todo: more sanity checking on the value
         // note - the API for GET does not return an Option but if the value is not present it
@@ -646,6 +675,34 @@ impl<T: Config> Module<T> {
         }
     }
 
+    /// Set the initial set of validators from the genesis config
+    /// Set next validators, bc they will become "current validators" upon session 0 start
+    fn initialize_validators(ids: Vec<[u8; 32]>, keys: Vec<(String,)>) {
+        assert!(
+            !ids.is_empty(),
+            "Validators must be set in the genesis config"
+        );
+
+        assert!(
+            <NextValidators>::iter().count() == 0 || <Validators>::iter().count() == 0,
+            "Validators are already set but they should only be set in the genesis config."
+        );
+        for (acc_id_bytes, key_tuple) in ids.iter().zip(keys.iter()) {
+            log!("Adding Validator {}", hex::encode(acc_id_bytes));
+            let acc_id: AccountId32 = AccountId32::new(*acc_id_bytes);
+
+            let eth_address: [u8; 20] = hex::decode(&key_tuple.0)
+                .unwrap_or_else(|_| panic!("Ecsda key could not be decoded"))
+                .try_into()
+                .expect("Ecsda public key not 20 bytes");
+            assert!(
+                <Validators>::get(&acc_id) == None,
+                "Duplicate validator keys in genesis config"
+            );
+            <Validators>::insert(acc_id, ChainKeys { eth_address });
+        }
+    }
+
     /// Set the initial set of open price feed price reporters from the genesis config
     fn initialize_reporters(reporters: ConfigSetString) {
         assert!(
@@ -659,21 +716,6 @@ impl<T: Config> Module<T> {
         let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
             .expect("Could not deserialize validators from genesis config");
         PriceReporters::put(converted);
-    }
-
-    /// Set the initial set of validators from the genesis config
-    fn initialize_validators(validators: ConfigSetString) {
-        assert!(
-            !validators.is_empty(),
-            "Validators must be set in the genesis config"
-        );
-        assert!(
-            Validators::get().is_empty(),
-            "Validators are already set but they should only be set in the genesis config."
-        );
-        let converted: ValidatorSet = Self::hex_string_vec_to_binary_vec(validators)
-            .expect("Could not deserialize validators from genesis config");
-        Validators::put(converted);
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed
@@ -701,10 +743,28 @@ impl<T: Config> Module<T> {
             crate::oracle::open_price_feed_request_okex(),
             <Error<T>>::OpenOracleHttpFetchError
         )?;
-        let messages_and_signatures = cash_err!(
+
+        let messages_and_signatures_and_timestamp = cash_err!(
             api_response.to_message_signature_pairs(),
             <Error<T>>::OpenOracleApiResponseHexError
         )?;
+        let (messages_and_signatures, timestamp) = messages_and_signatures_and_timestamp;
+
+        // Check to see if Coinbase api prices were updated or not
+        let latest_price_feed_timestamp_storage =
+            StorageValueRef::persistent(OCW_LATEST_PRICE_FEED_TIMESTAMP);
+        if let Some(Some(latest_price_feed_timestamp)) =
+            latest_price_feed_timestamp_storage.get::<String>()
+        {
+            if latest_price_feed_timestamp == timestamp {
+                log!(
+                    "Open oracle prices for timestamp {:?} has been already posted",
+                    timestamp
+                );
+                return Ok(());
+            }
+        }
+
         for (msg, sig) in messages_and_signatures {
             // adding some debug info in here, this will become very chatty
             let call = <Call<T>>::post_price(msg, sig);
@@ -717,6 +777,7 @@ impl<T: Config> Module<T> {
             // is ignored and we continue in this loop
         }
         latest_price_feed_poll_block_number_storage.set(&block_number);
+        latest_price_feed_timestamp_storage.set(&timestamp);
         Ok(())
     }
 
@@ -743,7 +804,7 @@ impl<T: Config> Module<T> {
         let from_block: String;
         if let Some(Some(cached_block_num)) = s_info.get::<String>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
-            debug::native::info!("Last cached block number: {:?}", cached_block_num);
+            log!("Last cached block number: {:?}", cached_block_num);
             from_block = events::get_next_block_hex(cached_block_num)
                 .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
         } else {
@@ -790,7 +851,7 @@ impl<T: Config> Module<T> {
         if let Ok(_guard) = lock.try_lock() {
             match events::fetch_events(from_block) {
                 Ok(starport_info) => {
-                    debug::native::info!("Result: {:?}", starport_info);
+                    log!("Result: {:?}", starport_info);
 
                     // Send extrinsics for all events
                     let _ = Self::process_lock_events(starport_info.lock_events)?;
@@ -799,7 +860,7 @@ impl<T: Config> Module<T> {
                     s_info.set(&starport_info.latest_eth_block);
                 }
                 Err(err) => {
-                    debug::native::info!("Error while fetching events: {:?}", err);
+                    log!("Error while fetching events: {:?}", err);
                     return Err(Error::<T>::HttpFetchingError);
                 }
             }
@@ -811,7 +872,7 @@ impl<T: Config> Module<T> {
         events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
     ) -> Result<(), Error<T>> {
         for event in events.iter() {
-            debug::native::info!("Processing `Lock` event and sending extrinsic: {:?}", event);
+            log!("Processing `Lock` event and sending extrinsic: {:?}", event);
 
             // XXX
             let payload =
@@ -823,7 +884,7 @@ impl<T: Config> Module<T> {
             // XXX Unsigned tx for now
             let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
             if res.is_err() {
-                debug::native::error!("Error while sending `Lock` event extrinsic");
+                log!("Error while sending `Lock` event extrinsic");
                 return Err(Error::<T>::OffchainUnsignedLockTxError);
             }
         }
@@ -876,65 +937,4 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             _ => InvalidTransaction::Call.into(),
         }
     }
-}
-
-// XXX this function is temporary and will be deleted after we reach a certain point
-pub fn magic_extract_internal<T: Config>(
-    _sender: ChainAccount,
-    account: ChainAccount,
-    max_amount: MaxableAssetAmount,
-) -> Result<(), Error<T>> {
-    let _ = runtime_interfaces::config_interface::get(); // XXX where are we actually using this?
-
-    let amount = max_amount.get_max_value(&|| 5);
-
-    // Update storage -- TODO: increment this-- sure why not?
-    let curr_cash_balance: AssetAmount = <CashBalance>::get(&account).unwrap_or_default();
-    let next_cash_balance: AssetAmount = curr_cash_balance + amount;
-    <CashBalance>::insert(&account, next_cash_balance);
-
-    let _now = <frame_system::Module<T>>::block_number().saturated_into::<u8>();
-    // Add to Notice Queue
-    // Note: we need to generalize this since it's not guaranteed to be Eth
-    let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
-                                    // TODO: This asset needs to match the chain-- which for Cash, there might be different
-                                    //       versions of a given asset per chain
-    let notice = Notice::CashExtractionNotice(match account {
-        ChainAccount::Eth(eth_account) => CashExtractionNotice::Eth {
-            id: notice_id,
-            parent: [0u8; 32],
-            account: eth_account,
-            amount,
-            cash_index: 1000,
-        },
-
-        _ => panic!("XXX not implemented"),
-    });
-
-    // TODO: Why is this Eth notice queue? Should this be specific to Eth?
-    NoticeQueue::insert(
-        notice_id,
-        NoticeStatus::Pending {
-            signature_pairs: ChainSignatureList::Eth(vec![]),
-            notice: notice.clone(),
-        },
-    );
-
-    let encoded_notice = notice.encode_notice();
-    let signature = cash_err!(
-        <Ethereum as Chain>::sign_message(&encoded_notice[..]),
-        Error::<T>::InvalidSignature
-    )?; // XXX
-
-    // Emit an event or two.
-    <Module<T>>::deposit_event(Event::MagicExtract(amount, account, notice.clone()));
-    <Module<T>>::deposit_event(Event::SignedNotice(
-        ChainId::Eth,
-        notice_id,
-        encoded_notice,
-        ChainSignatureList::Eth(vec![([0; 20], signature)]),
-    )); // XXX signatures
-
-    // Return a successful DispatchResult
-    Ok(())
 }

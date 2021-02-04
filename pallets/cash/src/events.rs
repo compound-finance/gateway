@@ -1,7 +1,6 @@
-use crate::chains;
+use crate::{chains, error, log};
 use codec::alloc::string::String;
 use codec::Encode;
-use frame_support::debug;
 use our_std::{vec::Vec, RuntimeDebug};
 
 extern crate ethereum_client;
@@ -27,7 +26,7 @@ pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
     let eth_lock_event_topic = String::from_utf8(config.get_eth_lock_event_topic())
         .map_err(|e| anyhow::anyhow!("Error reading `eth_lock_event_topic` from config {:?}", e))?;
 
-    debug::native::print!(
+    log!(
         "eth_rpc_url={}, starport_address={}, lock_event_topic={}",
         eth_rpc_url,
         eth_starport_address,
@@ -36,7 +35,7 @@ pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
 
     // Fetch the latest available ethereum block number
     let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url).map_err(|e| {
-        debug::native::error!("fetch_events error: {:?}", e);
+        error!("fetch_events error: {:?}", e);
         return anyhow::anyhow!("Fetching latest eth block failed: {:?}", e);
     })?;
 
@@ -50,7 +49,7 @@ pub fn fetch_events(from_block: String) -> anyhow::Result<StarportInfo> {
     let lock_events =
         ethereum_client::fetch_and_decode_events(&eth_rpc_url, vec![&fetch_events_request])
             .map_err(|e| {
-                debug::native::error!("fetch_and_decode_events error: {:?}", e);
+                error!("fetch_and_decode_events error: {:?}", e);
                 return anyhow::anyhow!("Fetching and/or decoding starport events failed: {:?}", e);
             })?;
 
@@ -91,7 +90,7 @@ pub fn to_lock_event_payload(
 fn hex_to_u32(hex_data: String) -> anyhow::Result<u32> {
     let without_prefix = hex_data.trim_start_matches("0x");
     let u32_data = u32::from_str_radix(without_prefix, 16).map_err(|e| {
-        debug::native::error!("hex_to_u32 error {:?}", e);
+        error!("hex_to_u32 error {:?}", e);
         return anyhow::anyhow!(
             "Error decoding number in hex format {:?}: {:?}",
             without_prefix,

@@ -26,17 +26,21 @@ hex = { version = "0.4.2", default-features = false }
 hex-literal = {version = "0.3.1", default-features = false}
 libsecp256k1 = { version = "0.3.2", default-features = false, features = ["hmac"] }
 tiny-keccak = { version = "2.0.0", features = ["keccak"], default-features = false }
+pallet-session = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 
 num-bigint = { default-features = false, version = "0.3" }
 num-traits = { default-features = false, version = "0.2" }
 anyhow = { version = "1.0", default-features = false }
 
-our-std = { path = "../../std", default-features = false }
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
 ethereum-client = { path = "../../ethereum-client", default-features = false }
 compound-crypto = { path = '../../compound-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
+<<<<<<< HEAD
 parking_lot = "0.11.1"
+=======
+our-std = { path = "../../std", default-features = false }
+>>>>>>> master
 
 [features]
 default = ['std']
@@ -46,6 +50,7 @@ std = [
     'frame-system/std',
     'runtime-interfaces/std',
     'compound-crypto/std',
+    'pallet-session/std',
     'sp-io/std',
     'sp-core/std',
     'sp-runtime/std',

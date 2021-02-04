@@ -11,12 +11,6 @@
   "AssetQuantity": "Quantity",
   "CashQuantity": "Quantity",
   "USDQuantity": "Quantity",
-  "MaxableAssetAmount": {
-    "_enum": {
-      "Max": [],
-      "Value": ["AssetAmount"]
-    }
-  },
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
@@ -44,6 +38,9 @@
   "CashPrincipal": ["Int"],
   "CashIndex": ["Uint"],
   "AssetIndex": ["Uint"],
+  "SessionIndex": "u32",
+  "AccountId32": "[u8;32]",
+  "AccountId": "AccountId32",
 
   "Source1": "SymbolRS",
   "Symbol": "([u8; 12], u8)",
@@ -105,6 +102,9 @@
 
   "Source3": "NoticesRS",
   "EncodedNotice": "Vec<u8>",
+  "ChainKeys": {
+    "eth_address": "ValidatorKey"
+  },
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",

@@ -5,7 +5,8 @@
 use sp_api::{impl_runtime_apis, Encode};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::traits::{
-    AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify,
+    AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, IdentifyAccount, NumberFor, OpaqueKeys,
+    Saturating, Verify,
 };
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
@@ -37,6 +38,7 @@ pub use frame_support::{
 };
 
 pub use pallet_balances::Call as BalancesCall;
+use pallet_cash;
 pub use pallet_grandpa::fg_primitives;
 pub use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 pub use pallet_timestamp::Call as TimestampCall;
@@ -66,7 +68,7 @@ pub type Signature = MultiSignature;
 
 /// Some way of identifying an account on the chain. We intentionally make it equivalent
 /// to the public key of our transaction signing scheme.
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId; // actually a AccountId32
 
 /// The type for looking up accounts. We don't expect more than 4 billion of them, but you
 /// never know...
@@ -292,6 +294,36 @@ impl pallet_sudo::Config for Runtime {
     type Call = Call;
 }
 
+parameter_types! {
+    pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
+}
+
+/// A `Convert` implementation that finds the stash of the given controller account,
+/// if any.
+pub struct IdConverter<T>(sp_std::marker::PhantomData<T>);
+
+impl<T: pallet_session::Config> Convert<T::AccountId, Option<T::ValidatorId>> for IdConverter<T>
+where
+    T: pallet_session::Config<ValidatorId = <T as frame_system::Config>::AccountId>,
+{
+    fn convert(controller: T::AccountId) -> Option<T::ValidatorId> {
+        Some(controller.into())
+    }
+}
+
+impl pallet_session::Config for Runtime {
+    type Event = Event;
+    type ValidatorId = <Self as frame_system::Config>::AccountId;
+    type ValidatorIdOf = IdConverter<Self>;
+    type ShouldEndSession = Babe;
+    type NextSessionRotation = Babe;
+    type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
+    type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: babe and grandpa
+    type Keys = opaque::SessionKeys;
+    type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+    type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
+}
+
 /// Configure the CASH pallet in pallets/cash.
 impl pallet_cash::Config for Runtime {
     type Event = Event;
@@ -381,6 +413,9 @@ construct_runtime!(
 
         // Include the custom logic from the CASH pallet in the runtime.
         Cash: pallet_cash::{Module, Call, Config, Storage, Event, ValidateUnsigned},
+
+        // comes after CASH pallet bc it asks CASH for validators during initialization
+        Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
     }
 );
 

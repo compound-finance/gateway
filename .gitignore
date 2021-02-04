@@ -33,3 +33,4 @@ ethereum/.build/contracts.json
 *.profdata
 *.profraw
 lcov.info
+.vscode

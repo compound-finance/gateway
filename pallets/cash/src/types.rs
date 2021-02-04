@@ -45,31 +45,6 @@ pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 /// Type for representing an amount of USD.
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
-/// Type for representing a quantity, potentially of any symbol.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum Maxable<T> {
-    Max,
-    Value(T),
-}
-
-impl<T> Maxable<T> {
-    pub fn get_max_value(self, when_max: &dyn Fn() -> T) -> T {
-        match self {
-            Maxable::Max => when_max(),
-            Maxable::Value(t) => t,
-        }
-    }
-}
-
-impl<T> From<T> for Maxable<T> {
-    fn from(t: T) -> Self {
-        Maxable::Value(t)
-    }
-}
-
-/// Either an AssetAmount or max
-pub type MaxableAssetAmount = Maxable<AssetAmount>; // XXX now just used by magic
-
 /// Type for a set of open price feed reporters.
 pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
 
@@ -81,6 +56,10 @@ pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
 
 /// Type for an address used to identify a validator.
 pub type ValidatorKey = [u8; 20]; // XXX secp256k1 public key, but why secp256k1?
+
+pub type EthAddress = ValidatorKey;
+
+pub type SessionIndex = u32;
 
 /// Type for a set of validator identities.
 pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
@@ -149,7 +128,13 @@ pub struct Quantity(pub Symbol, pub AssetAmount);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
 pub struct CashPrincipal(pub Int);
 
-/// Type for representing the multiplicative CASH index.
+/// Type for representing the keys to sign notices
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct ChainKeys {
+    pub eth_address: ValidatorKey,
+}
+
+/// Type for representing a multiplicative index on Compound Chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct CashIndex(pub Uint);
 
