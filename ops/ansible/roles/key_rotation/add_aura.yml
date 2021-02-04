@@ -1,5 +1,5 @@
 
-- name: add babe author key to keystore
+- name: add aura author key to keystore
   uri:
     url: http://localhost:9933
     method: "POST"
@@ -10,9 +10,9 @@
             "id":1,
             "method":"author_insertKey",
             "params": [
-                "babe",
+                "aura",
                 "{{ mnemonic }}",
-                "{{ babe_public_key }}"
+                "{{ aura_public_key }}"
             ]
         }
   register: insertion
@@ -20,6 +20,6 @@
   retries: 10
   delay: 5
 
-- name: show erpsonse
+- name: show repsonse
     debug:
         var: insertion

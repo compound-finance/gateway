@@ -299,7 +299,7 @@ impl pallet_session::Config for Runtime {
     type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
     type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
     type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
-    type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: babe and grandpa
+    type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: aura and grandpa
     type Keys = opaque::SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
     type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;

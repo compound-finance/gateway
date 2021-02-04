@@ -305,7 +305,7 @@ macro_rules! r#cash_err {
 }
 
 impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
-    // return validator set to use in the next session (babe and grandpa also stage new auths associated w these accountIds)
+    // return validator set to use in the next session (aura and grandpa also stage new auths associated w these accountIds)
     fn new_session(session_index: SessionIndex) -> Option<Vec<AccountId32>> {
         if NextValidators::iter().count() != 0 {
             NextSessionIndex::put(session_index);
