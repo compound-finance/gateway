@@ -5,6 +5,8 @@ Description=Compound Chain Validator Node
 User=compound
 Group=compound
 WorkingDirectory={{ compound_user_home }}
+Environment="ETH_RPC_URL=https://goerli-eth.compound.finance"
+Environment="ETH_KEY_ID=my_eth_key_id"
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
   --chain "{{ compound_user_home }}/chainSpec.json" \
@@ -14,7 +16,6 @@ ExecStart={{ compound_chain_bin }} \
   --rpc-methods Unsafe \
   --no-mdns \
   --node-key-file {{ node_key_priv_file }} \
-  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
   {% for bootnode_multi_addr in peers -%}
   --bootnodes {{ bootnode_multi_addr }} \
   {% endfor -%}

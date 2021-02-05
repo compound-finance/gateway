@@ -65,7 +65,7 @@ const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
 const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = compound_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str =
-    "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27";
+    "https://goerli-eth.compound.finance";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set

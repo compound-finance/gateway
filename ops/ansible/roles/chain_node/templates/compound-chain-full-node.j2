@@ -18,6 +18,5 @@ ExecStart={{ compound_chain_bin }} \
   {% for peer in peers -%}
   --bootnodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
   {% endfor -%}
-  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
   --ws-max-connections 1000 \
   --rpc-cors=all

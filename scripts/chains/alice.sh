@@ -21,7 +21,8 @@ fi
 if [ "$purge" = true ] ; then
   ./target/release/compound-chain purge-chain --base-path /tmp/chainz/alice --chain ./compoundChainSpec.json --database paritydb -y
 fi
-
+export ETH_KEY_ID=my_eth_key_id
+export ETH_RPC_URL=https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27
 ./target/release/compound-chain \
   --base-path /tmp/chainz/alice \
   --chain ./compoundChainSpec.json \
