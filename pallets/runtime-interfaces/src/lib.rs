@@ -128,11 +128,6 @@ pub trait KeyringInterface {
     }
 }
 
-#[derive(codec::Encode, codec::Decode, Debuggable, PartialEq, Eq, Copy, Clone)]
-pub enum TimestampError {
-    ExtremelyOldTimestamp,
-}
-
 /// Set an environment variable to a value if it is not already set to an existing value.
 fn set_validator_config_dev_default(key: &str, value: &str) {
     let existing = std::env::var(key);
