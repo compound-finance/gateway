@@ -44,11 +44,10 @@ pub const MILLISECS_PER_BLOCK: u128 = 6000;
 
 pub const SLOT_DURATION: u128 = MILLISECS_PER_BLOCK;
 
-
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
-    pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
+    pub const MinimumPeriod: u128 = SLOT_DURATION / 2;
 }
 
 impl frame_system::Config for Test {
@@ -75,7 +74,6 @@ impl frame_system::Config for Test {
     type SystemWeightInfo = ();
     type SS58Prefix = SS58Prefix;
 }
-
 
 impl pallet_timestamp::Config for Test {
     /// A timestamp: milliseconds since the unix epoch.
@@ -132,7 +130,7 @@ pub fn new_test_ext_with_http_calls(
     Arc<RwLock<OffchainState>>,
 ) {
     let (offchain, offchain_state) = testing::TestOffchainExt::new();
-    let (pool, _) = testing::TestTransactionPoolExt::new();
+    let (pool, pool_state) = testing::TestTransactionPoolExt::new();
 
     // let mut test_externalities: sp_io::TestExternalities = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
     let mut test_externalities = sp_io::TestExternalities::default();

@@ -59,12 +59,6 @@ impl From<RatesError> for Reason {
     }
 }
 
-impl From<TimestampError> for Reason {
-    fn from(err: TimestampError) -> Self {
-        Reason::TimestampError(err)
-    }
-}
-
 impl our_std::fmt::Display for Reason {
     fn fmt(&self, f: &mut our_std::fmt::Formatter) -> our_std::fmt::Result {
         write!(f, "{:?}", self)

@@ -930,6 +930,11 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .and_provides(sig)
                 .propagate(true)
                 .build(),
+            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .and_provides(sig)
+                .propagate(true)
+                .build(),
             _ => InvalidTransaction::Call.into(),
         }
     }
