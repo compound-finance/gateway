@@ -159,6 +159,9 @@ decl_storage! {
         /// The mapping of (status of) notices to be signed for Ethereum, by notice id.
         NoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
 
+        /// The next notice id that will be generated
+        NextNoticeId get(fn next_notice_id): NoticeId;
+
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 

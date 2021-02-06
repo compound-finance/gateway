@@ -14,6 +14,18 @@ pub type EraIndex = u32;
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct NoticeId(pub EraId, pub EraIndex);
 
+impl Default for NoticeId {
+    fn default() -> NoticeId {
+        NoticeId(0, 0)
+    }
+}
+
+impl NoticeId {
+    pub fn seq(&self) -> NoticeId {
+        NoticeId(self.0, self.1 + 1)
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ExtractionNotice {
     Eth {

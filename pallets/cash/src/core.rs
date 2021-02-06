@@ -29,8 +29,8 @@ use crate::{
         Nonce, Price, Quantity, SafeMul, USDQuantity,
     },
     AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
-    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, Module, Nonces,
-    NoticeQueue, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
+    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, Module, NextNoticeId,
+    Nonces, NoticeQueue, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
     TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 use frame_support::sp_runtime::traits::Convert;
@@ -456,7 +456,7 @@ pub fn extract_internal<T: Config>(
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
     // TODO: Significantly improve this
-    let notice_id = next_notice_id()?;
+    let notice_id = NextNoticeId::get();
     let notice = Notice::ExtractionNotice(match chain_asset_account {
         ChainAssetAccount::Eth(eth_asset, eth_account) => Ok(ExtractionNotice::Eth {
             id: notice_id,
@@ -471,6 +471,9 @@ pub fn extract_internal<T: Config>(
 
     // Add to Notice Queue
     NoticeQueue::insert(notice_id, NoticeStatus::from(notice.clone()));
+
+    // Set next notice id
+    NextNoticeId::put(notice_id.seq());
 
     // Deposit Notice Event
     Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
