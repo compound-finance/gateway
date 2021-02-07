@@ -22,6 +22,10 @@ contract Starport {
 
 	address constant public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 	bytes32 constant public ETH_CHAIN_IDENT = keccak256(abi.encodePacked("ETH"));
+	byte constant MAGIC_HEADER_0 = 0x45;
+	byte constant MAGIC_HEADER_1 = 0x54;
+	byte constant MAGIC_HEADER_2 = 0x48;
+	byte constant MAGIC_HEADER_3 = 0x3a;
 	uint constant HEAD_BYTES = 99; // bytes3 chainIdent, uint256 eraId, uint256 eraIndex, bytes32 parent
 	address[] public authorities;
 
@@ -83,20 +87,37 @@ contract Starport {
 	}
 
 	// ** L2 Message Ports **
-	
-	// @dev notice = (bytes3 chainIdent, uint generationId, uint interGenerationId, address asset, address account, uint amount)
-	function unlock(bytes calldata notice, bytes[] calldata signatures) external {
-		require(notice.length == 195, "Invalid unlock length"); // 99 + 96
 
-		assertNoticeAuthorized(notice, authorities, signatures, false);
+	// TODO: Really consider what to do with eraId, eraIndex and parent
+	function invoke(bytes calldata notice, bytes[] calldata signatures) external returns (bytes memory) {
+		assertNoticeAuthorized(notice, authorities, signatures, false); // TODO: Clean up signature
 
-		bytes calldata body = notice[HEAD_BYTES:];
-		// Decode the notice
-		address asset = abi.decode(body[:32], (address));
-		uint amount = abi.decode(body[32:64], (uint));
-		address account = abi.decode(body[64:96], (address));
-
+		// TODO: By hash or by (eraId, eraIndex)?
+		// TODO: Should eraId, eraIndex and parent be handled specially?
 		isNoticeUsed[hash(notice)] = true;
+
+		require(notice.length >= 100, "Must have full header"); // 4 + 3 * 32
+		require(notice[0] == MAGIC_HEADER_0, "Invalid header[0]");
+		require(notice[1] == MAGIC_HEADER_1, "Invalid header[1]");
+		require(notice[2] == MAGIC_HEADER_2, "Invalid header[2]");
+		require(notice[3] == MAGIC_HEADER_3, "Invalid header[3]");
+		(uint noticeEraId, uint noticeEraIndex, bytes32 noticeParent) =
+			abi.decode(notice[4:100], (uint, uint, bytes32));
+
+		(noticeEraId, noticeEraIndex, noticeParent); // unused
+
+		require(noticeEraId == eraId, "Notice must use current era"); // TODO: Admin notice
+
+		bytes memory calldata_ = bytes(notice[100:]);
+		(bool success, bytes memory callResult) = address(this).call(calldata_);
+		require(success, "Call failed");
+
+		return callResult;
+	}
+
+	function unlock(address asset, uint amount, address account) external {
+		require(msg.sender == address(this), "Call must originate locally");
+
 		emit Unlock(account, amount, asset);
 
 		IERC20(asset).transfer(account, amount);
@@ -141,23 +162,12 @@ contract Starport {
 		bytes[] calldata signatures,
 		bool isAdminNotice
 	) public view {
-		bytes calldata chainIdent = message[0:3];
-		require(hash(chainIdent) == ETH_CHAIN_IDENT, "Invalid Chain Type");
-		require(message.length >= 35, "Messsage too short");
-
-		uint noticeEraId = abi.decode(message[3:35], (uint));
-		if (isAdminNotice) {
-			require(noticeEraId == add_(eraId, 1), "Admin notice must increment era");
-		} else {
-			require(noticeEraId == eraId, "Notice must use current era");
-		}
-
 		bytes32 noticeHash = hash(message);
 		require(isNoticeUsed[noticeHash] == false, "Notice can not be reused");
 
 		address[] memory sigs = new address[](signatures.length);
 		for (uint i = 0; i < signatures.length; i++) {
-			address signer = recover(keccak256(message), signatures[i]);
+			address signer = recover(noticeHash, signatures[i]);
 			require(contains(sigs, signer) == false, "Duplicated sig");
 			require(contains(authorities_, signer) == true, "Unauthorized signer");
 			sigs[i] = signer;

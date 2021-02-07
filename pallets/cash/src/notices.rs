@@ -3,6 +3,7 @@ use crate::{
     reason::Reason,
 };
 use codec::{Decode, Encode};
+use ethabi::Token;
 use our_std::{vec::Vec, RuntimeDebug};
 
 /// Type for a generic encoded message, potentially for any chain.
@@ -24,6 +25,21 @@ impl NoticeId {
     pub fn seq(&self) -> NoticeId {
         NoticeId(self.0, self.1 + 1)
     }
+}
+
+impl NoticeId {
+    pub fn era_id(&self) -> u32 {
+        self.0
+    }
+
+    pub fn era_index(&self) -> u32 {
+        self.1
+    }
+}
+
+lazy_static! {
+    static ref UNLOCK_SIG: <Ethereum as Chain>::Hash =
+        <Ethereum as Chain>::hash_bytes(b"unlock(address,uint256,address)");
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -91,7 +107,7 @@ pub trait EncodeNotice {
     fn encode_notice(&self) -> EncodedNotice;
 }
 
-const ETH_CHAIN_IDENT: &'static [u8] = b"ETH";
+const ETH_CHAIN_IDENT: &'static [u8] = b"ETH:";
 
 // TODO: We might want to make these slightly more efficient
 fn encode_addr(raw: &[u8; 20]) -> Vec<u8> {
@@ -112,6 +128,26 @@ fn encode_int128(raw: u128) -> Vec<u8> {
     res.to_vec()
 }
 
+fn encode_notice_params(
+    id: &NoticeId,
+    parent: &<Ethereum as Chain>::Hash,
+    signature: <Ethereum as Chain>::Hash,
+    tokens: &[ethabi::Token],
+) -> Vec<u8> {
+    let mut result: Vec<u8> = ETH_CHAIN_IDENT.to_vec();
+    let header_encoded = ethabi::encode(&[
+        Token::Uint(id.era_id().into()),
+        Token::Uint(id.era_index().into()),
+        Token::Uint(parent.into()),
+    ]);
+    let abi_encoded = ethabi::encode(tokens);
+
+    result.extend_from_slice(&header_encoded[..]);
+    result.extend_from_slice(&signature[0..4]);
+    result.extend_from_slice(&abi_encoded[..]);
+    result
+}
+
 impl EncodeNotice for ExtractionNotice {
     fn encode_notice(&self) -> EncodedNotice {
         match self {
@@ -121,24 +157,16 @@ impl EncodeNotice for ExtractionNotice {
                 asset,
                 account,
                 amount,
-            } => {
-                let era_id: Vec<u8> = encode_int32(id.0);
-                let era_index: Vec<u8> = encode_int32(id.1);
-                let asset_encoded = encode_addr(asset);
-                let amount_encoded = encode_int128(*amount);
-                let account_encoded = encode_addr(account);
-
-                [
-                    ETH_CHAIN_IDENT.to_vec(),
-                    era_id,
-                    era_index,
-                    parent.to_vec(),
-                    asset_encoded,
-                    amount_encoded,
-                    account_encoded,
-                ]
-                .concat()
-            }
+            } => encode_notice_params(
+                id,
+                parent,
+                *UNLOCK_SIG,
+                &[
+                    Token::Address(asset.into()),
+                    Token::Uint((*amount).into()),
+                    Token::Address(account.into()),
+                ],
+            ),
         }
     }
 }
@@ -378,13 +406,14 @@ mod tests {
         });
 
         let expected = [
-            69, 84, 72, // chainType::ETH
+            69, 84, 72, 58, // ETH:
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 80, // eraID
+            0, 0, 80, // eraId
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
+            139, 195, 146, 7, // Function Signature (0x8bc39207)
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
             2, 2, 2, // asset
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
