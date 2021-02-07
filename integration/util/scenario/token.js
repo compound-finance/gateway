@@ -79,6 +79,20 @@ class Token {
       await this.token.methods.approve(spender, weiAmount).send({from: actor.ethAddress()});
     }
   }
+
+  async getSymbol() {
+    return (await this.ctx.api().query.cash.assetSymbols(this.toChainAsset())).unwrap();
+  }
+
+  async getPrice() {
+    // Debugging things
+    let keys = await this.ctx.api().query.cash.prices.keys();
+    console.log({keys});
+    console.log(keys[0]);
+    console.log({symbol: await this.getSymbol()});
+
+    return await this.ctx.api().query.cash.prices(await this.getSymbol());
+  }
 }
 
 class EtherToken extends Token {
