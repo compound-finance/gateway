@@ -7,8 +7,8 @@ use our_std::{convert::TryInto, RuntimeDebug};
 pub const WIDTH: usize = 12;
 
 /// Type for the abstract symbol of an asset, not tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, RuntimeDebug)]
-pub struct Symbol(pub [char; WIDTH], pub u8);
+#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
+pub struct Symbol(pub [u8; WIDTH], pub u8);
 
 // Define symbols used directly by the chain itself
 
@@ -39,21 +39,21 @@ pub const fn static_pow10(decimals: u8) -> Uint {
 impl Symbol {
     pub const fn new(ticker: &str, decimals: u8) -> Self {
         assert!(ticker.len() < WIDTH, "Too many chars");
-        let mut chars = [0 as char; WIDTH];
+        let mut chars = [0 as u8; WIDTH];
         let mut i = 0;
         let raw = ticker.as_bytes();
         loop {
             if i >= ticker.len() {
                 break;
             }
-            chars[i] = raw[i] as char;
+            chars[i] = raw[i];
             i += 1;
         }
         Symbol(chars, decimals)
     }
 
-    pub const fn chars(&self) -> &[char] {
-        &self.0
+    pub fn bytes(&self) -> &[u8] {
+        &self.0[..]
     }
 
     pub const fn decimals(&self) -> u8 {
@@ -66,34 +66,14 @@ impl Symbol {
 
     pub fn ticker(&self) -> String {
         let mut s = String::with_capacity(WIDTH);
-        let chars = self.chars();
+        let chars = self.bytes();
         for i in 0..WIDTH {
-            if chars[i] == NIL {
+            if chars[i] == 0 {
                 break;
             }
-            s.push(chars[i]);
+            s.push(chars[i] as char);
         }
         s
-    }
-}
-
-impl Encode for Symbol {
-    fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
-        let mut bytes: Vec<u8> = self.0.to_vec().iter().map(|&c| c as u8).collect();
-        bytes.push(self.1);
-        bytes.using_encoded(f)
-    }
-}
-
-impl codec::EncodeLike for Symbol {}
-
-impl Decode for Symbol {
-    fn decode<I: codec::Input>(encoded: &mut I) -> Result<Self, codec::Error> {
-        let mut bytes: Vec<u8> = Decode::decode(encoded)?;
-        let decimals = bytes.pop().unwrap();
-        let chars: Vec<char> = bytes.iter().map(|&b| b as char).collect();
-        let ticker: [char; WIDTH] = chars.try_into().expect("wrong number of chars");
-        Ok(Symbol(ticker, decimals))
     }
 }
 
@@ -104,11 +84,11 @@ impl our_std::str::FromStr for Symbol {
 
     fn from_str(ticker: &str) -> Result<Self, Self::Err> {
         if let Some((ticker, decimal_str)) = String::from(ticker).split_once("/") {
-            let mut chars: Vec<char> = ticker.chars().collect();
+            let mut chars: Vec<u8> = ticker.as_bytes().into();
             if chars.len() > WIDTH {
                 Err(Reason::BadSymbol)
             } else if let Ok(decimals) = decimal_str.parse::<u8>() {
-                chars.resize(WIDTH, NIL);
+                chars.resize(WIDTH, 0);
                 Ok(Symbol(chars.try_into().unwrap(), decimals))
             } else {
                 Err(Reason::BadSymbol)

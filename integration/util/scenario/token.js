@@ -85,13 +85,7 @@ class Token {
   }
 
   async getPrice() {
-    // Debugging things
-    let keys = await this.ctx.api().query.cash.prices.keys();
-    console.log({keys});
-    console.log(keys[0]);
-    console.log({symbol: await this.getSymbol()});
-
-    return await this.ctx.api().query.cash.prices(await this.getSymbol());
+    return Number(await this.ctx.api().query.cash.prices(await this.getSymbol()));
   }
 }
 

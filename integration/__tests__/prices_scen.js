@@ -16,12 +16,14 @@ let pricePayloads = {
   }
 };
 
+// TODO: Make sure OCW aren't trying to pull in real prices
+
 buildScenarios('Prices Scenarios', prices_scen_info, [
   {
     name: "Prices from Storage",
     scenario: async ({ chain, zrx }) => {
-      await chain.postPrice(pricePayloads.ZRX.payload, pricePayloads.ZRX.signature);
-      expect(await zrx.getPrice()).toEqual(5);
+      await chain.postPrice(pricePayloads.ZRX.payload, pricePayloads.ZRX.signature, false);
+      expect(await zrx.getPrice()).toEqual(599453);
     }
   },
   {

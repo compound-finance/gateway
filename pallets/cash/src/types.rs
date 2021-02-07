@@ -503,7 +503,7 @@ mod tests {
     use crate::symbol::*;
 
     const ETH: Symbol = Symbol(
-        ['E', 'T', 'H', NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+        ['E' as u8, 'T' as u8, 'H' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         18,
     );
 
