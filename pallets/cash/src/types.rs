@@ -18,6 +18,9 @@ pub type Nonce = u32;
 /// Type for representing time.
 pub type Timestamp = u128; // XXX u64?
 
+/// Number of seconds in a year
+pub const MILLISECONDS_PER_YEAR: Timestamp = 31557600000; // todo: xxx finalize this number
+
 /// Type of the largest possible signed integer.
 pub type Int = i128;
 
@@ -138,6 +141,29 @@ pub struct ChainKeys {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct CashIndex(pub Uint);
 
+impl CashPrincipal {
+    pub const DECIMALS: u8 = 6;
+
+    /// Get a CASH index from a string.
+    pub const fn from_nominal(s: &'static str) -> Self {
+        CashPrincipal(int_from_string_with_decimals(Self::DECIMALS, s))
+    }
+
+    pub const ZERO: CashPrincipal = CashPrincipal(0);
+
+    pub fn add(self: Self, rhs: Self) -> Result<Self, MathError> {
+        Ok(CashPrincipal(
+            self.0.checked_add(rhs.0).ok_or(MathError::Overflow)?,
+        ))
+    }
+
+    pub fn sub(self, rhs: Self) -> Result<Self, MathError> {
+        Ok(CashPrincipal(
+            self.0.checked_sub(rhs.0).ok_or(MathError::Underflow)?,
+        ))
+    }
+}
+
 impl CashIndex {
     pub const DECIMALS: u8 = 4;
 
@@ -185,6 +211,19 @@ impl CashIndex {
         let signed = Int::try_from(amount).or(Err(MathError::Overflow))?;
         Ok(CashPrincipal(signed))
     }
+
+    /// Push the index forward by an index increment, multiplicative in the case of CashIndex
+    /// New index = Old index * increment
+    pub fn increment(self, rhs: CashIndex) -> Result<CashIndex, MathError> {
+        let raw = self
+            .0
+            .checked_mul(rhs.0)
+            .ok_or(MathError::Overflow)?
+            .checked_div(Self::ONE.0)
+            .ok_or(MathError::DivisionByZero)?;
+
+        Ok(CashIndex(raw))
+    }
 }
 
 impl Default for CashIndex {
@@ -207,7 +246,7 @@ where
 pub struct AssetIndex(pub Uint);
 
 impl AssetIndex {
-    pub const DECIMALS: u8 = 4; // XXX needed for this one?
+    pub const DECIMALS: u8 = CashPrincipal::DECIMALS;
 
     /// Get an asset index from a string.
     pub const fn from_nominal(s: &'static str) -> Self {
@@ -283,6 +322,12 @@ pub const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Ui
     qty * scalar
 }
 
+pub const fn int_from_string_with_decimals(decimals: u8, s: &'static str) -> Int {
+    let uint_response = uint_from_string_with_decimals(decimals, s);
+    // note - only for use in const contexts - if uint_response > int_max then this line will overflow and stop compilation as expected
+    uint_response as Int
+}
+
 impl Price {
     pub const DECIMALS: u8 = USD.decimals(); // Note: must be >= USD.decimals()
 
@@ -298,6 +343,8 @@ impl Price {
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         Price(symbol, uint_from_string_with_decimals(Self::DECIMALS, s))
     }
+
+    pub const CASH_ONE: Price = Price::from_nominal(crate::symbol::CASH, "1");
 }
 
 impl Quantity {
@@ -313,13 +360,36 @@ impl Quantity {
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
     }
+
+    /// Quantity * CashPrincipal (per unit quantity) -> CashPrincipal (total)
+    /// used for computing interest on interest during on_initialize
+    pub fn as_cash_principal(
+        self,
+        cash_principal_per: CashPrincipal,
+    ) -> Result<CashPrincipal, MathError> {
+        let converted_cash_principal_per =
+            Uint::try_from(cash_principal_per.0).map_err(|_| MathError::Overflow)?;
+
+        let raw = mul(
+            converted_cash_principal_per,
+            CashPrincipal::DECIMALS,
+            self.value(),
+            self.symbol().decimals(),
+            CashPrincipal::DECIMALS,
+        )
+        .ok_or(MathError::Overflow)?;
+
+        let converted_raw = Int::try_from(raw).map_err(|_| MathError::Overflow)?;
+
+        Ok(CashPrincipal(converted_raw))
+    }
 }
 
 /// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
 /// the output number of decimals.
 ///
 /// Not recommended to use directly, to be used in SafeMath implementations.
-fn mul(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
+pub fn mul(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
     let all_numerator_decimals = a_decimals.checked_add(b_decimals)?;
 
     if all_numerator_decimals > out_decimals {
@@ -339,7 +409,7 @@ fn mul(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Op
 /// the output number of decimals.
 ///
 /// Not recommended to use directly, to be used in SafeMath implementations.
-fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
+pub fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
     let denom_decimals = b_decimals.checked_add(out_decimals)?;
     if denom_decimals > a_decimals {
         // scale up
@@ -606,5 +676,14 @@ mod tests {
     fn test_div_overflow_decimals_2() {
         let result = div(1, u8::max_value(), 1, 0, 0);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_cash_index_increment() {
+        let old_index = CashIndex::from_nominal("1.1"); // current 10%
+        let increment = CashIndex::from_nominal("1.01"); // increment by 1%
+        let actual = old_index.increment(increment).unwrap();
+        let expected = CashIndex::from_nominal("1.1110");
+        assert_eq!(actual, expected);
     }
 }

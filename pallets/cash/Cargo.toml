@@ -27,6 +27,7 @@ hex-literal = {version = "0.3.1", default-features = false}
 libsecp256k1 = { version = "0.3.2", default-features = false, features = ["hmac"] }
 tiny-keccak = { version = "2.0.0", features = ["keccak"], default-features = false }
 pallet-session = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+pallet-timestamp = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 
 num-bigint = { default-features = false, version = "0.3" }
 num-traits = { default-features = false, version = "0.2" }

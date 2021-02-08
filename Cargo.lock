@@ -4373,6 +4373,7 @@ dependencies = [
  "num-traits",
  "our-std",
  "pallet-session",
+ "pallet-timestamp",
  "parity-scale-codec",
  "parking_lot 0.11.1",
  "runtime-interfaces",
@@ -5625,6 +5626,7 @@ version = "1.0.0"
 dependencies = [
  "compound-crypto",
  "lazy_static",
+ "our-std",
  "parity-scale-codec",
  "sp-externalities",
  "sp-io",

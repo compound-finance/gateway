@@ -245,7 +245,6 @@ fn testnet_genesis(
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
                 .as_millis(),
-
             assets: vec![
                 ConfigAsset {
                     symbol: FromStr::from_str("ETH/18").unwrap(),
@@ -258,7 +257,6 @@ fn testnet_genesis(
                         .unwrap(),
                 },
             ],
-
             // turn account_id of ss58 to [u8 32]s
             validator_ids: initial_authorities
                 .iter()

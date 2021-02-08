@@ -30,7 +30,7 @@ fn it_fails_exec_trx_request_signed() {
     });
 }
 
-fn initialize_storage() {
+pub fn initialize_storage() {
     runtime_interfaces::set_validator_config_dev_defaults();
     CashModule::initialize_assets(vec![
         ConfigAsset {
@@ -236,7 +236,7 @@ fn test_post_price_stale_price() {
     });
 }
 
-fn get_eth() -> ChainAsset {
+pub fn get_eth() -> ChainAsset {
     ChainAsset::Eth(
         <[u8; 20]>::try_from(hex::decode("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap())
             .unwrap(),
@@ -253,34 +253,6 @@ fn test_set_interest_rate_model() {
             .unwrap();
         let actual_model = CashModule::model(asset);
         assert_eq!(actual_model, expected_model);
-    });
-}
-
-#[test]
-fn test_get_utilization() {
-    new_test_ext().execute_with(|| {
-        initialize_storage();
-        let asset = get_eth();
-        TotalSupplyAssets::insert(&asset, 100);
-        TotalBorrowAssets::insert(&asset, 50);
-        let utilization = CashModule::get_utilization(&asset).unwrap();
-        assert_eq!(utilization, Utilization::from_nominal("0.5"));
-    });
-}
-
-#[test]
-fn test_get_borrow_rate() {
-    new_test_ext().execute_with(|| {
-        initialize_storage();
-        let asset = get_eth();
-        let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
-        TotalSupplyAssets::insert(&asset, 100);
-        TotalBorrowAssets::insert(&asset, 50);
-
-        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
-            .unwrap();
-        let borrow_rate = CashModule::get_borrow_rate(&asset).unwrap();
-        assert_eq!(borrow_rate, 101.into());
     });
 }
 

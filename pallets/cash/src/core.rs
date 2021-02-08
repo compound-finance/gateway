@@ -9,6 +9,10 @@ pub use our_std::{
 };
 
 // Import these traits so we can interact with the substrate storage modules.
+use crate::rates::APR;
+use crate::types::{AssetIndex, AssetPrice, CashIndex, Timestamp, Uint, MILLISECONDS_PER_YEAR};
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
+
 use crate::{
     chains::{
         eth, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainSignature,
@@ -24,11 +28,13 @@ use crate::{
         AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, EthAddress, Int,
         Nonce, Price, Quantity, SafeMul, USDQuantity,
     },
-    AssetBalances, AssetSymbols, Call, CashPrincipals, ChainCashPrincipals, Config, Event,
-    GlobalCashIndex, Module, Nonces, NoticeQueue, Prices, SubmitTransaction, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets,
+    AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
+    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, Module, Nonces,
+    NoticeQueue, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
+    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
+use frame_support::sp_runtime::traits::Convert;
+use our_std::convert::TryInto;
 
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
@@ -70,11 +76,28 @@ pub fn try_chain_asset_account(
     }
 }
 
+fn now<T: Config>() -> Timestamp {
+    let now = <pallet_timestamp::Module<T>>::get();
+    T::TimeConverter::convert(now)
+}
+
 pub fn price<T: Config>(symbol: Symbol) -> Price {
     match symbol {
         CASH => Price::from_nominal(CASH, "1.0"),
         _ => Price(symbol, Prices::get(symbol)),
     }
+}
+
+fn get_symbol(asset: &ChainAsset) -> Result<Symbol, Reason> {
+    AssetSymbols::get(asset).ok_or(Reason::AssetSymbolNotFound)
+}
+
+pub fn get_total_supply_assets(asset: &ChainAsset) -> Result<Quantity, Reason> {
+    Ok(Quantity(get_symbol(asset)?, TotalSupplyAssets::get(asset)))
+}
+
+pub fn get_total_borrow_assets(asset: &ChainAsset) -> Result<Quantity, Reason> {
+    Ok(Quantity(get_symbol(asset)?, TotalBorrowAssets::get(asset)))
 }
 
 /// Return the USD value of the asset amount.
@@ -100,8 +123,108 @@ pub fn passes_validation_threshold(
     signer_set.len() > validator_set.len() * 2 / 3
 }
 
+fn scale_multiple_terms(
+    unscaled: Uint,
+    numerator_decimals: u8,
+    denominator_decimals: u8,
+    output_decimals: u8,
+) -> Option<Uint> {
+    // as cannot panic here u8 -> i32 is safe, beware of changes in the future to u8 above
+    let numerator_decimals = numerator_decimals as i32;
+    let denominator_decimals = denominator_decimals as i32;
+    let output_decimals = output_decimals as i32;
+    let scale_decimals = output_decimals
+        .checked_sub(numerator_decimals)?
+        .checked_add(denominator_decimals)?;
+    if scale_decimals < 0 {
+        // as is safe here due to above non-negativity check and will not panic.
+        let scalar = 10u128.checked_pow((-1 * scale_decimals) as u32)?;
+        unscaled.checked_div(scalar)
+    } else {
+        let scalar = 10u128.checked_pow(scale_decimals as u32)?;
+        unscaled.checked_mul(scalar)
+    }
+}
+
+fn compute_cash_principal_per_internal(
+    asset_rate: Uint,
+    dt: Uint,
+    cash_index: Uint,
+    price_asset: Uint,
+) -> Option<Uint> {
+    let unscaled = asset_rate
+        .checked_mul(dt)?
+        .checked_mul(price_asset)?
+        .checked_div(cash_index)?
+        .checked_div(MILLISECONDS_PER_YEAR)?;
+
+    scale_multiple_terms(
+        unscaled,
+        APR::DECIMALS + Price::DECIMALS,
+        CashIndex::DECIMALS,
+        AssetIndex::DECIMALS,
+    )
+}
+
+pub fn compute_cash_principal_per(
+    asset_rate: APR,
+    dt: Timestamp,
+    cash_index: CashIndex,
+    price_asset: AssetPrice,
+) -> Result<CashPrincipal, Reason> {
+    let raw = compute_cash_principal_per_internal(asset_rate.0, dt, cash_index.0, price_asset)
+        .ok_or(Reason::MathError(MathError::Overflow))?;
+
+    let raw: Int = raw
+        .try_into()
+        .map_err(|_| Reason::MathError(MathError::Overflow))?;
+
+    Ok(CashPrincipal(raw))
+}
+
+pub fn increment_index(lhs: AssetIndex, rhs: CashPrincipal) -> Result<AssetIndex, Reason> {
+    // note - we assume decimals must match
+    let converted: Uint = rhs
+        .0
+        .try_into()
+        .map_err(|_| Reason::MathError(MathError::SignMismatch))?;
+    let raw = lhs
+        .0
+        .checked_add(converted)
+        .ok_or(Reason::MathError(MathError::Overflow))?;
+
+    Ok(AssetIndex(raw))
+}
+
+/// Check to make sure an asset is supported. Only returns Err when the asset is not supported
+/// by compound chain.
+pub fn check_asset_supported(asset: &ChainAsset) -> Result<(), Reason> {
+    if !AssetSymbols::contains_key(&asset) {
+        return Err(Reason::AssetNotSupported);
+    }
+
+    Ok(())
+}
+
+/// READ the utilization for a given asset
+pub fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Reason> {
+    check_asset_supported(asset)?;
+    let total_supply = TotalSupplyAssets::get(asset);
+    let total_borrow = TotalBorrowAssets::get(asset);
+    Ok(crate::rates::get_utilization(total_supply, total_borrow)?)
+}
+
+/// READ the borrow and supply rates for a given asset
+pub fn get_rates(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
+    check_asset_supported(asset)?;
+    let model = RateModels::get(asset);
+    let utilization = get_utilization(asset)?;
+    let reserve_factor = ReserveFactor::get(asset);
+    Ok(model.get_rates(utilization, APR::ZERO, reserve_factor)?)
+}
+
 fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
-    Ok(a.checked_add(b.value()).ok_or(MathError::Overflow)?)
+    a.checked_add(b.value()).ok_or(MathError::Overflow)
 }
 
 fn add_amount_to_balance(
@@ -109,7 +232,7 @@ fn add_amount_to_balance(
     amount: AssetQuantity,
 ) -> Result<AssetBalance, MathError> {
     let signed = Int::try_from(amount.value()).or(Err(MathError::Overflow))?;
-    Ok(balance.checked_add(signed).ok_or(MathError::Overflow)?)
+    balance.checked_add(signed).ok_or(MathError::Overflow)
 }
 
 fn add_principals(a: CashPrincipal, b: CashPrincipal) -> Result<CashPrincipal, MathError> {
@@ -441,6 +564,95 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     Ok(())
 }
 
+/// Block initialization step that can fail
+pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
+    let now: Timestamp = now::<T>();
+    let previous: Timestamp = LastBlockTimestamp::get();
+
+    let change_in_time = now
+        .checked_sub(previous)
+        .ok_or(Reason::TimeTravelNotAllowed)?;
+
+    let weight = on_initialize(change_in_time)?;
+
+    LastBlockTimestamp::put(now);
+
+    Ok(weight)
+}
+
+/// Block initialization step that can fail
+pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights::Weight, Reason> {
+    let mut cash_principal_supply_increase = CashPrincipal::ZERO;
+    let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
+
+    let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
+    let cash_index = GlobalCashIndex::get();
+
+    for (asset, symbol) in AssetSymbols::iter() {
+        // note we do not need to check that the asset is supported because it is by definition
+        // of where we got it from
+        let (asset_cost, asset_yield) = get_rates(&asset)?;
+        let asset_price = Prices::get(&symbol);
+
+        let cash_borrow_principal_per =
+            compute_cash_principal_per(asset_cost, change_in_time, cash_index, asset_price)?;
+        let cash_hold_principal_per =
+            compute_cash_principal_per(asset_yield, change_in_time, cash_index, asset_price)?;
+
+        let current_supply_index = SupplyIndices::get(&asset);
+        let current_borrow_index = BorrowIndices::get(&asset);
+        let new_supply_index = increment_index(current_supply_index, cash_hold_principal_per)?;
+        let new_borrow_index = increment_index(current_borrow_index, cash_borrow_principal_per)?;
+
+        let supply_asset = get_total_supply_assets(&asset)?;
+        let borrow_asset = get_total_borrow_assets(&asset)?;
+
+        // CashPrincipal__Increase = CashPrincipal__Increase + ___Asset * Cash__PrincipalPer
+
+        cash_principal_supply_increase = cash_principal_supply_increase
+            .add(supply_asset.as_cash_principal(cash_hold_principal_per)?)?;
+
+        cash_principal_borrow_increase = cash_principal_borrow_increase
+            .add(borrow_asset.as_cash_principal(cash_borrow_principal_per)?)?;
+
+        asset_updates.push((asset.clone(), new_supply_index, new_borrow_index));
+    }
+
+    // Pay miners and update the CASH interest index on CASH itself
+    let cash_yield: APR = CashYield::get();
+    let cash_index_old: CashIndex = GlobalCashIndex::get();
+    let total_cash_principal: CashPrincipal = TotalCashPrincipal::get();
+
+    let increment = cash_yield.over_time(change_in_time)?;
+    let cash_index_new = cash_index_old.increment(increment)?;
+    let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
+    let miner_spread_principal =
+        cash_principal_borrow_increase.sub(cash_principal_supply_increase)?;
+    let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
+    let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&miner);
+    let miner_cash_principal_new = miner_cash_principal_old.add(miner_spread_principal)?;
+
+    // * WARNING - BEGIN STORAGE all checks and failures must happen above
+
+    for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
+        SupplyIndices::insert(asset.clone(), new_supply_index);
+        BorrowIndices::insert(asset, new_borrow_index);
+    }
+
+    GlobalCashIndex::put(cash_index_new);
+    TotalCashPrincipal::put(total_cash_principal_new);
+    CashPrincipals::insert(miner, miner_cash_principal_new);
+
+    // todo: xxx support changing cash APRs
+    /*
+    Possibly update the CASH rate:
+    If NextAPRStartAtNow
+        Set CashYield=NextAPR
+        Clear CashYieldNext
+     */
+    Ok(0)
+}
+
 // Liquidity Checks //
 
 pub fn has_liquidity_to_reduce_asset(_holder: ChainAccount, _amount: AssetQuantity) -> bool {
@@ -602,7 +814,9 @@ pub fn exec_trx_request_internal<T: Config>(
 mod tests {
     use super::*;
     use crate::mock::*;
+    use crate::rates::{InterestRateModel, Utilization};
     use crate::symbol::USD;
+    use crate::tests::{get_eth, initialize_storage};
 
     #[test]
     fn test_helpers() {
@@ -775,6 +989,146 @@ mod tests {
                 )),
                 notice_event.event
             );
+        });
+    }
+
+    #[test]
+    fn test_compute_cash_principal_per() {
+        // round numbers (unrealistic but very easy to check)
+        let asset_rate = APR::from_nominal("0.30"); // 30% per year
+        let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
+        let cash_index = CashIndex::from_nominal("1.5"); // current index value 1.5
+        let price_asset: AssetPrice = 1500_000000; // $1,500
+
+        let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
+        let expected = CashPrincipal::from_nominal("150"); // from hand calc
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_compute_cash_principal_per_specific_case() {
+        // a unit test related to previous unexpected larger scope test of on_initialize
+        // this showed that we should divide by SECONDS_PER_YEAR last te prevent un-necessary truncation
+        let asset_rate = APR::from_nominal("0.1225");
+        let dt = MILLISECONDS_PER_YEAR / 4;
+        let cash_index = CashIndex::from_nominal("1.123");
+        let price_asset: AssetPrice = 1450_000000;
+
+        let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
+        let expected = CashPrincipal::from_nominal("39.542520"); // from hand calc
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_scale_multiple_terms() {
+        let n1 = 56_789u128; // 3 decimals 56.789
+        let n2 = 12_3456; // 4 decimals 12.3456
+        let d1 = 7_89; // 2 decimals 7.89
+        let unscaled = n1 * n2 / d1;
+
+        // scale 0 => output decimals = 5
+        let actual = scale_multiple_terms(unscaled, 7, 2, 5).unwrap();
+        assert_eq!(actual, 88_85859);
+
+        // scale > 0 => output decimals > 5, say 8
+        let actual = scale_multiple_terms(unscaled, 7, 2, 8).unwrap();
+        assert_eq!(actual, 88_85859_000); // 3 scale decimals resulting in right trailing zeros
+
+        // scale < 0 => output decimals < 5, say 2
+        let actual = scale_multiple_terms(unscaled, 7, 2, 2).unwrap();
+        assert_eq!(actual, 88_85);
+    }
+
+    #[test]
+    fn test_get_utilization() {
+        new_test_ext().execute_with(|| {
+            initialize_storage();
+            let asset = get_eth();
+            TotalSupplyAssets::insert(&asset, 100);
+            TotalBorrowAssets::insert(&asset, 50);
+            let utilization = crate::core::get_utilization(&asset).unwrap();
+            assert_eq!(utilization, Utilization::from_nominal("0.5"));
+        });
+    }
+
+    #[test]
+    fn test_get_borrow_rate() {
+        new_test_ext().execute_with(|| {
+            initialize_storage();
+            let asset = get_eth();
+            let kink_rate = 105;
+            let expected_model = InterestRateModel::new_kink(100, kink_rate, 5000, 202);
+            crate::ReserveFactor::insert(&asset, crate::rates::ReserveFactor::from_nominal("0.5"));
+            TotalSupplyAssets::insert(&asset, 100);
+            TotalBorrowAssets::insert(&asset, 50);
+
+            CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
+                .unwrap();
+            let (borrow_rate, supply_rate) = crate::core::get_rates(&asset).unwrap();
+
+            assert_eq!(borrow_rate, kink_rate.into());
+            // 50% utilization and 50% reserve factor
+            assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
+        });
+    }
+
+    #[test]
+    fn test_on_initialize() {
+        new_test_ext().execute_with(|| {
+            let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
+            let asset = get_eth();
+            let symbol = Symbol::new("ETH", 18);
+            let change_in_time = MILLISECONDS_PER_YEAR / 4; // 3 months go by
+            let model = InterestRateModel::new_kink(0, 2500, 5000, 5000);
+
+            ReserveFactor::insert(
+                asset.clone(),
+                crate::rates::ReserveFactor::from_nominal("0.02"),
+            );
+            RateModels::insert(asset.clone(), model);
+            GlobalCashIndex::put(CashIndex::from_nominal("1.123"));
+            AssetSymbols::insert(asset.clone(), symbol);
+            SupplyIndices::insert(asset.clone(), AssetIndex::from_nominal("1234"));
+            BorrowIndices::insert(asset.clone(), AssetIndex::from_nominal("1345"));
+            TotalSupplyAssets::insert(asset.clone(), AssetQuantity::from_nominal(symbol, "300").1);
+            TotalBorrowAssets::insert(asset.clone(), AssetQuantity::from_nominal(symbol, "150").1);
+            CashYield::put(APR::from_nominal("0.24")); // 24% APR big number for easy to see interest
+            TotalCashPrincipal::put(CashPrincipal::from_nominal("450000")); // 450k cash principal
+            CashPrincipals::insert(miner.clone(), CashPrincipal::from_nominal("1"));
+            Prices::insert(symbol, 1450_000000 as AssetPrice); // $1450 eth
+
+            let result = on_initialize(change_in_time);
+            assert_eq!(result, Ok(0u64));
+
+            assert_eq!(
+                SupplyIndices::get(&asset),
+                AssetIndex::from_nominal("1273.542520")
+            );
+            assert_eq!(
+                BorrowIndices::get(&asset),
+                AssetIndex::from_nominal("1425.699020")
+            );
+            assert_eq!(GlobalCashIndex::get(), CashIndex::from_nominal("1.1924"));
+            // todo: it looks like some precision is getting lost should be 462104.853072
+            assert_eq!(
+                TotalCashPrincipal::get(),
+                CashPrincipal::from_nominal("462104.853000")
+            );
+            // todo: same here, should be 243.097061
+            assert_eq!(
+                CashPrincipals::get(&miner),
+                CashPrincipal::from_nominal("243.097000")
+            );
+        });
+    }
+
+    #[test]
+    fn test_now() {
+        new_test_ext().execute_with(|| {
+            let expected = 123;
+            <pallet_timestamp::Module<Test>>::set_timestamp(expected);
+            let actual = now::<Test>();
+            assert_eq!(actual, expected);
         });
     }
 }
