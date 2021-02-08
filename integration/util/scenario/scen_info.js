@@ -28,7 +28,7 @@ const baseScenInfo = {
   contracts_dir: null, // [env=BUILD_DIR]
   log_level: 'info', // [env=LOG]
   link_validator: true, // abort if validator panics [env=LINK_VALIDATOR]
-  profile: 'release', // or debug [env=PROFILE]
+  profile: 'debug', // or debug [env=PROFILE]
   target: null, // compound-chain binary [env=CHAIN_BIN]
   types_file: null, // types.json file [env=TYPES_FILE]
 };

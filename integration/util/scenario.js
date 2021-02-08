@@ -48,7 +48,7 @@ function buildScenariosInternal(name, baseScenInfo, opts, scenarios, testFn) {
         } finally {
           await ctx.teardown();
         }
-      }, scenario.timeout || 60000 /* 1m */);
+      }, scenario.timeout || 600000 /* 10m */);
     });
   });
 }
