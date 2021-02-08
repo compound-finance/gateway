@@ -152,6 +152,10 @@ async function buildValidator(validatorName, validatorInfo, ctx) {
     }
   });
 
+  process.on('exit', () => {
+    ps.kill('SIGTERM'); // No matter what, always kill compound-chain node
+  });
+
   ps.on('error', (err) => {
     ctx.__abort(`Failed to spawn validator: ${err}`);
   });

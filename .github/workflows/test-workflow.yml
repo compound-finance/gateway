@@ -192,7 +192,7 @@ jobs:
 
       - name: Build Compound Chain
         run: |
-          cargo build --release
+          cargo build
 
       - name: Run Integration Test
         timeout-minutes: 10
