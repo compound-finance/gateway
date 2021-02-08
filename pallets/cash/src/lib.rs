@@ -802,8 +802,9 @@ impl<T: Config> Module<T> {
             let pending_events_block = block_numbers.iter().min();
             if (pending_events_block.is_some()) {
                 let events_block: u32 = *pending_events_block.unwrap();
-                from_block = events::get_next_block_hex(events_block.to_string())
-                    .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
+                // from_block = events::get_next_block_hex(events_block.to_string())
+                //     .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
+                from_block = String::from("earliest");
             } else {
                 from_block = String::from("earliest");
             }
