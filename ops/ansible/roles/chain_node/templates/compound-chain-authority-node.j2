@@ -7,6 +7,7 @@ Group=compound
 WorkingDirectory={{ compound_user_home }}
 Environment="ETH_RPC_URL=https://goerli-eth.compound.finance"
 Environment="ETH_KEY_ID=my_eth_key_id"
+Environment="ETH_KEY={{ eth_private_key }}"
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
   --chain "{{ compound_user_home }}/chainSpec.json" \
