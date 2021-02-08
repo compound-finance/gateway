@@ -226,6 +226,7 @@
       "Overflowed"
     ]
   },
+  "ReserveFactor": ["Uint"],
   "APR": ["Uint"],
   "Utilization": ["Uint"],
   "InterestRateModel": {
