@@ -996,6 +996,83 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_internal_notice_ids() {
+        let eth_asset = [238; 20];
+        let asset = ChainAsset::Eth(eth_asset);
+        let eth_holder = [0; 20];
+        let eth_recipient = [0; 20];
+        let holder = ChainAccount::Eth(eth_holder);
+        let recipient = ChainAccount::Eth(eth_recipient);
+
+        new_test_ext().execute_with(|| {
+            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
+            let symbol = symbol::<Test>(asset).expect("asset not found");
+            let quantity = Quantity::from_nominal(symbol, "50.0");
+            Prices::insert(symbol, 100_000); // $0.10
+
+            assert_eq!(NextNoticeId::get(), NoticeId(0, 0));
+            assert_eq!(
+                extract_internal::<Test>(asset, holder, recipient, quantity),
+                Ok(())
+            );
+
+            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_status = notice_queue_post.into_iter().next().unwrap();
+
+            let expected_notice_id = NoticeId(0, 0);
+            let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: expected_notice_id,
+                parent: [0u8; 32],
+                asset: eth_asset,
+                account: eth_recipient,
+                amount: 50000000000000000000,
+            });
+
+            assert_eq!(
+                (
+                    expected_notice_id,
+                    NoticeStatus::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![]),
+                        notice: expected_notice.clone()
+                    }
+                ),
+                notice_status
+            );
+
+            assert_eq!(NextNoticeId::get(), NoticeId(0, 1));
+            assert_eq!(
+                extract_internal::<Test>(asset, holder, recipient, quantity),
+                Ok(())
+            );
+
+            let notice_queue_post_2: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_status_2 = notice_queue_post_2.into_iter().next().unwrap();
+
+            let expected_notice_id_2 = NoticeId(0, 1);
+            let expected_notice_2 = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: expected_notice_id_2,
+                parent: [0u8; 32],
+                asset: eth_asset,
+                account: eth_recipient,
+                amount: 50000000000000000000,
+            });
+
+            assert_eq!(
+                (
+                    expected_notice_id_2,
+                    NoticeStatus::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![]),
+                        notice: expected_notice_2.clone()
+                    }
+                ),
+                notice_status_2
+            );
+
+            assert_eq!(NextNoticeId::get(), NoticeId(0, 2));
+        });
+    }
+
+    #[test]
     fn test_compute_cash_principal_per() {
         // round numbers (unrealistic but very easy to check)
         let asset_rate = APR::from_nominal("0.30"); // 30% per year
