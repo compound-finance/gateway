@@ -27,7 +27,7 @@ class Chain {
     opts = {
       sleep: 3000,
       retries: 10,
-      signatures: 1, // TODO: How many signatures do we want? We should ask the validator count? Or wait for Done?
+      signatures: 2, // TODO: How many signatures do we want? We should ask the validator count? Or wait for Done?
       ...opts
     };
 
