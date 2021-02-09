@@ -152,11 +152,14 @@ fn correct_error_for_none_value() {
     // });
 }
 
+const TEST_OPF_URL: &str = "http://localhost/";
+
 #[test]
 fn test_process_open_price_feed_happy_path_makes_required_http_call() {
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
     let calls: Vec<testing::PendingRequest> = vec![testing::PendingRequest {
         method: "GET".into(),
-        uri: crate::oracle::OKEX_OPEN_PRICE_FEED_URL.into(),
+        uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
             crate::oracle::tests::API_RESPONSE_TEST_DATA
@@ -259,12 +262,12 @@ fn test_set_interest_rate_model() {
 #[test]
 fn offchain_worker_test() {
     use frame_support::traits::OffchainWorker;
-
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
     let mut calls: Vec<testing::PendingRequest> =
         events::tests::get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
     let price_call = testing::PendingRequest {
         method: "GET".into(),
-        uri: crate::oracle::OKEX_OPEN_PRICE_FEED_URL.into(),
+        uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
             crate::oracle::tests::API_RESPONSE_TEST_DATA
