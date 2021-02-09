@@ -119,20 +119,16 @@ fn parse_open_price_feed_api_response(
     serde_json::from_slice(response).map_err(|_| OracleError::JsonParseError)
 }
 
-pub const OKEX_OPEN_PRICE_FEED_URL: &str = "https://www.okex.com/api/market/v3/oracle";
-
-/// Make the open price feed API request to OKEx.
-pub fn open_price_feed_request_okex() -> Result<OpenPriceFeedApiResponse, OracleError> {
-    let response = open_price_feed_request_unauthenticated(OKEX_OPEN_PRICE_FEED_URL)?;
+/// Make the open price feed API request to an unauthenticated http endpoint
+pub fn open_price_feed_request(url: &str) -> Result<OpenPriceFeedApiResponse, OracleError> {
+    let response = open_price_feed_request_unchecked(url)?;
     sanity_check_messages(&response)?;
 
     Ok(response)
 }
 
 /// Make the open price feed HTTP API request to an unauthenticated endpoint using HTTP GET.
-fn open_price_feed_request_unauthenticated(
-    url: &str,
-) -> Result<OpenPriceFeedApiResponse, OracleError> {
+fn open_price_feed_request_unchecked(url: &str) -> Result<OpenPriceFeedApiResponse, OracleError> {
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
     let request = http::Request::get(url);
     let pending = request

@@ -246,6 +246,9 @@ decl_error! {
         /// Open oracle cannot fetch price due to an http error
         OpenOracleHttpFetchError,
 
+        /// Open oracle cannot fetch price due to an http error
+        OpenOracleBadUrl,
+
         /// Open oracle cannot deserialize the messages and/or signatures from eth encoded hex to binary
         OpenOracleApiResponseHexError,
 
@@ -705,6 +708,13 @@ impl<T: Config> Module<T> {
             // working in another thread, no big deal
             return Ok(());
         }
+
+        // get the URL to poll, just return if there is no URL set up
+        let url = runtime_interfaces::validator_config_interface::get_opf_url().unwrap_or(vec![]);
+        if url.len() == 0 {
+            return Ok(());
+        }
+
         // check to see if it is time to poll or not
         let latest_price_feed_poll_block_number_storage =
             StorageValueRef::persistent(OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER);
@@ -718,9 +728,11 @@ impl<T: Config> Module<T> {
                 return Ok(());
             }
         }
+        let url = cash_err!(String::from_utf8(url), <Error<T>>::OpenOracleBadUrl)?;
+
         // poll
         let api_response = cash_err!(
-            crate::oracle::open_price_feed_request_okex(),
+            crate::oracle::open_price_feed_request(&url),
             <Error<T>>::OpenOracleHttpFetchError
         )?;
 

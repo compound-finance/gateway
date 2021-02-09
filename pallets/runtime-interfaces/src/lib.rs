@@ -65,6 +65,8 @@ const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = compound_crypto::ETH_KEY_ID_ENV_VAR
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str =
     "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27";
+const OPF_URL_ENV_VAR: &str = "OPF_URL";
+const OPF_URL_ENV_VAR_DEFAULT: &str = "";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set
@@ -89,6 +91,11 @@ pub trait ValidatorConfigInterface {
     /// Get the Ethereum node RPC URL
     fn get_eth_rpc_url() -> Option<Vec<u8>> {
         std::env::var(ETH_RPC_URL_ENV_VAR).ok().map(Into::into)
+    }
+
+    /// Get the open price feed URLs
+    fn get_opf_url() -> Option<Vec<u8>> {
+        std::env::var(OPF_URL_ENV_VAR).ok().map(Into::into)
     }
 }
 
@@ -145,6 +152,7 @@ fn set_validator_config_dev_default(key: &str, value: &str) {
 pub fn set_validator_config_dev_defaults() {
     set_validator_config_dev_default(ETH_KEY_ID_ENV_VAR, ETH_KEY_ID_ENV_VAR_DEV_DEFAULT);
     set_validator_config_dev_default(ETH_RPC_URL_ENV_VAR, ETH_RPC_URL_ENV_VAR_DEV_DEFAULT);
+    set_validator_config_dev_default(OPF_URL_ENV_VAR, OPF_URL_ENV_VAR_DEFAULT);
 }
 
 #[cfg(test)]
