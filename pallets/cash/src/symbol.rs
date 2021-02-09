@@ -18,9 +18,6 @@ pub const CASH: Symbol = Symbol::new("CASH", 6);
 /// Symbol for USD.
 pub const USD: Symbol = Symbol::new("USD", 6);
 
-/// The non-character value.
-pub const NIL: char = 0 as char;
-
 /// Get the Uint corresponding to some number of decimals.
 ///
 /// Useful for writing human values in a const context.
@@ -39,17 +36,17 @@ pub const fn static_pow10(decimals: u8) -> Uint {
 impl Symbol {
     pub const fn new(ticker: &str, decimals: u8) -> Self {
         assert!(ticker.len() < WIDTH, "Too many chars");
-        let mut chars = [0 as u8; WIDTH];
+        let mut bytes = [0u8; WIDTH];
         let mut i = 0;
         let raw = ticker.as_bytes();
         loop {
             if i >= ticker.len() {
                 break;
             }
-            chars[i] = raw[i];
+            bytes[i] = raw[i];
             i += 1;
         }
-        Symbol(chars, decimals)
+        Symbol(bytes, decimals)
     }
 
     pub fn bytes(&self) -> &[u8] {
@@ -66,19 +63,19 @@ impl Symbol {
 
     pub fn ticker(&self) -> String {
         let mut s = String::with_capacity(WIDTH);
-        let chars = self.bytes();
+        let bytes = self.bytes();
         for i in 0..WIDTH {
-            if chars[i] == 0 {
+            if bytes[i] == 0 {
                 break;
             }
-            s.push(chars[i] as char);
+            s.push(bytes[i] as char);
         }
         s
     }
 }
 
 // Implement deserialization for Symbols so we can use them in GenesisConfig / ChainSpec JSON.
-//  i.e. "TICKER" <> ["T", "I", "C", "K", "E", "R", NIL, NIL, NIL, NIL, NIL, NIL]
+//  i.e. "TICKER" <> ["T", "I", "C", "K", "E", "R", 0, 0, 0, 0, 0, 0]
 impl our_std::str::FromStr for Symbol {
     type Err = Reason;
 
