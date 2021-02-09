@@ -1,7 +1,9 @@
-pragma solidity ^0.7.5;
+// SPDX-License-Identifier: GPL-3.0
+
+pragma solidity ^0.8.1;
 pragma abicoder v2;
 
-import "./IERC20.sol";
+import "./ICash.sol";
 
 // via https://github.com/dapphub/ds-math/blob/master/src/math.sol
 function add_(uint x, uint y) pure returns (uint z) {
@@ -55,7 +57,7 @@ contract Starport {
 
 	function lockCashInternal(uint amount, address sender) internal {
 		// cash.burn(amount);
-		uint yieldIndex = cash.fetchHypotheticalIndex();
+		uint yieldIndex = cash.fetchCashIndex();
 		transferInCash(sender, amount);
 		emit LockCash(sender, amount, yieldIndex);
 	}

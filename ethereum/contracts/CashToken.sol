@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0
+
 pragma solidity ^0.8.1;
 
 import "./ICash.sol";
@@ -18,13 +20,11 @@ contract CashToken is ICash {
     uint nextCashYieldStartAt;
     NextCashYieldAndIndex nextCashYieldAndIndex;
 
-    uint constant exponent = 271828;
-
 	constructor(address starport) {
 		admin = starport;
 	}
 
-    function mint(address account, uint amountPrincipal) external {
+    function mint(address account, uint amountPrincipal) external override {
         require(msg.sender == admin, "Sender is not an admin");
         uint amount = amountPrincipal * fetchCashIndex();
         cashPrincipal[account] = cashPrincipal[account] + amount;
@@ -32,7 +32,7 @@ contract CashToken is ICash {
         emit Transfer(address(0), account, amount);
     }
 
-    function burn(address account, uint amountPrincipal) external {
+    function burn(address account, uint amountPrincipal) external override {
         require(msg.sender == admin, "Sender is not an admin");
         uint amount = amountPrincipal * fetchCashIndex();
         cashPrincipal[account] = cashPrincipal[account] - amount;
@@ -40,33 +40,33 @@ contract CashToken is ICash {
         emit Transfer(account, address(0), amount);
     }
 
-    function setFutureYield(uint128 nextYield, uint nextYieldStartAt, uint128 nextIndex) external {
+    function setFutureYield(uint128 nextYield, uint nextYieldStartAt, uint128 nextIndex) external override {
         require(msg.sender == admin, "Sender is not an admin");
         nextCashYieldStartAt = nextYieldStartAt;
         nextCashYieldAndIndex = NextCashYieldAndIndex(nextYield, nextIndex);
     }
 
-    function fetchCashIndex() public returns (uint) {
+    function fetchCashIndex() public virtual override returns (uint) {
         uint nextAt = nextCashYieldStartAt;
-        if (now > nextAt) {
+        if (block.timestamp > nextAt) {
             cashYieldStartAt = nextAt;
             cashYield = nextCashYieldAndIndex.yield;
             cashIndex = nextCashYieldAndIndex.index;
             nextCashYieldStartAt = 0;
         }
         // TODO work more on this formula
-        return cashIndex * (271828 ** cashYield * (now - cashYieldStartAt)) / 100000;
+        return cashIndex * (271828 ** cashYield * (block.timestamp - cashYieldStartAt)) / 100000;
     }
 
-    function totalSupply() public returns (uint) {
+    function totalSupply() external override returns (uint) {
         return totalCashPrincipal * fetchCashIndex();
     }
 
-    function balanceOf(address account) public returns (uint) {
+    function balanceOf(address account) external override returns (uint) {
         return cashPrincipal[account] * fetchCashIndex();
     }
 
-    function transfer(address recipient, uint amount) public returns (bool) {
+    function transfer(address recipient, uint amount) external override returns (bool) {
         require(msg.sender != recipient, "Invalid recipient");
         uint principal = amount / fetchCashIndex();
         cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
@@ -75,17 +75,17 @@ contract CashToken is ICash {
         return true;
     }
 
-    function allowance(address owner, address spender) public view returns (uint256) {
+    function allowance(address owner, address spender) external view override returns (uint256) {
         return allowances[owner][spender];
     }
 
-    function approve(address spender, uint amount) public view returns (bool) {
+    function approve(address spender, uint amount) external override returns (bool) {
         allowances[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
-    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
         require(sender != recipient, "Invalid recipient");
         address spender = msg.sender;
         uint principal = amount / fetchCashIndex();
@@ -99,7 +99,7 @@ contract CashToken is ICash {
     /**
      * @dev Returns the name of the token.
      */
-    function name() public view virtual returns (string memory) {
+    function name() external pure returns (string memory) {
         return "SECRET, change";
     }
 
@@ -107,11 +107,11 @@ contract CashToken is ICash {
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
      */
-    function symbol() public view virtual returns (string memory) {
+    function symbol() external pure returns (string memory) {
         return "SECRET";
     }
 
-    function decimals() public view virtual returns (uint8) {
+    function decimals() external pure returns (uint8) {
         return 6;
     }
 }
