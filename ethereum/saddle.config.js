@@ -10,13 +10,13 @@ module.exports = {
   coverage_dir: "coverage",                             // Directory to place coverage files
   coverage_ignore: [],                                  // List of files to ignore for coverage
   contracts: "contracts/*.sol contracts/test/*.sol",    // Glob to match contract files
-  tests: ['**/tests/*Test.js'],
+  tests: ['**/tests/*test.js'],
   trace: false,                                         // Compile with debug artifacts
   networks: {                                           // Define configuration for each network
     goerli: {
       providers: [
         {env: "PROVIDER"},
-        {file: "~/.ethereum/goerli-url"},              // Load from given file with contents as the URL (e.g. https://infura.io/api-key)
+        {file: "~/.ethereum/goerli-url"},               // Load from given file with contents as the URL (e.g. https://infura.io/api-key)
         {http: "https://goerli.infura.io"}
       ],
       web3: {
@@ -35,11 +35,11 @@ module.exports = {
       },
       accounts: [
         {env: "ACCOUNT"},
-        {file: "~/.ethereum/goerli"}                   // Load from given file with contents as the private key (e.g. 0x...)
+        {file: "~/.ethereum/goerli"}                    // Load from given file with contents as the private key (e.g. 0x...)
       ]
     }
   },
   scripts: {
     "deploy": "deploy.js"
-  }                                           // Aliases for scripts
+  }                                                     // Aliases for scripts
 }

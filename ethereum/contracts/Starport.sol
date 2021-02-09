@@ -33,7 +33,7 @@ contract Starport {
     }
 
     /**
-     * Ethereum Asset Interface
+     * Section: Ethereum Asset Interface
      */
 
     /**
@@ -100,7 +100,7 @@ contract Starport {
     }
 
     /**
-     * L2 Message Ports
+     * Section: L2 Message Ports
      **/
 
     /**
@@ -111,7 +111,7 @@ contract Starport {
      * @return The result of the invokation of the action of the notice.
      */
     function invoke(bytes calldata notice, bytes[] calldata signatures) external returns (bytes memory) {
-        assertNoticeAuthorized(notice, authorities, signatures); // TODO: Clean up signature of this function
+        checkNoticeAuthorized(notice, authorities, signatures);
 
         // XXX Really consider what to do with eraId, eraIndex and parent
         // TODO: By hash or by (eraId, eraIndex)?
@@ -175,9 +175,16 @@ contract Starport {
     }
 
     /**
-     * View Helpers
+     * Section: View Helpers
      */
 
+    /**
+     * @notice Returns the current authority nodes
+     * @return The current authority node addresses
+     */
+    function getAuthorities() public view returns (address[] memory) {
+        return authorities;
+    }
 
     /**
      * @notice Checks that the given notice is authorized
@@ -188,26 +195,27 @@ contract Starport {
      * @param authorities_ A set of authorities to check the notice against? TODO: Why pass this in?
      * @param signatures The signatures to verify
      */
-    function assertNoticeAuthorized(
+    function checkNoticeAuthorized(
         bytes calldata notice,
         address[] memory authorities_,
         bytes[] calldata signatures
-    ) public view {
+    ) internal view {
         bytes32 noticeHash = hashNotice(notice);
         require(isNoticeUsed[noticeHash] == false, "Notice can not be reused");
 
         address[] memory sigs = new address[](signatures.length);
         for (uint i = 0; i < signatures.length; i++) {
             address signer = recover(noticeHash, signatures[i]);
-            require(contains(sigs, signer) == false, "Duplicated sig");
-            require(contains(authorities_, signer) == true, "Unauthorized signer");
+            require(contains(sigs, signer) == false, "Duplicated authority signer");
+            require(contains(authorities_, signer) == true, "Unauthorized authority signer");
             sigs[i] = signer;
         }
+
         require(sigs.length >= getQuorum(authorities_.length), "Below quorum threshold");
     }
 
     /**
-     * Pure Helpers
+     * Section: Pure Function Helpers
      */
 
     // Helper function to hash a notice
@@ -225,15 +233,13 @@ contract Starport {
         return false;
     }
 
-    // Quorum is >1/3 authorities approving (TODO: 1/3??)
-    // TODO: Test this function out more?
-    // TODO: internal?
+    // Quorum is >1/3 authorities approving (XXX TODO: 1/3??)
     function getQuorum(uint authorityCount) internal pure returns (uint) {
         return (authorityCount / 3) + 1;
     }
 
     // Adapted from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/cryptography/ECDSA.sol
-    function recover(bytes32 hashedMsg, bytes memory signature) internal pure returns (address) {
+    function recover(bytes32 digest, bytes memory signature) internal pure returns (address) {
         // Check the signature length
         if (signature.length != 65) {
             revert("ECDSA: invalid signature length");
@@ -257,7 +263,7 @@ contract Starport {
         require(v == 27 || v == 28, "ECDSA: invalid signature 'v' value");
 
         // If the signature is valid (and not malleable), return the signer address
-        address signer = ecrecover(hashedMsg, v, r, s);
+        address signer = ecrecover(digest, v, r, s);
         require(signer != address(0), "ECDSA: invalid signature");
 
         return signer;
