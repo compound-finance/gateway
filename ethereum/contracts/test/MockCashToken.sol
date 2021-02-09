@@ -1,11 +1,9 @@
-pragma solidity ^0.7.5;
-
-
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.1;
 
 import "../CashToken.sol";
 
 contract MockCashToken is CashToken {
-
 	constructor(address admin_, uint initialSupply_, address holder_) CashToken(admin_) {
 		balances[holder_] = initialSupply_;
 		totalSupply = initialSupply_;

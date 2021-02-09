@@ -2,7 +2,7 @@
   "name": "starport",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "dependencies": {
     "@ethersproject/wallet": "^5.0.9",
     "eth-saddle": "^0.1.21"

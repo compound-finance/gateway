@@ -1,7 +1,12 @@
-pragma solidity ^0.7.5;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.1;
 
-
-// TODO: finish implementing ERC20
+/**
+ * @title Compound Cash Token
+ * @author Compound Finance
+ * @notice The Compound Cash Token for Ethereum
+ * @dev XXX Finish implementing ERC-20 features
+ */
 contract CashToken {
 
     /// @notice EIP-20 token name for this token
@@ -26,11 +31,11 @@ contract CashToken {
     /// @notice The standard EIP-20 approval event
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-	address immutable public admin;
+    address immutable public admin;
 
-	constructor(address admin_) {
-		admin = admin_;
-	}
+    constructor(address admin_) {
+        admin = admin_;
+    }
 
     /**
      * @notice Get the number of tokens `spender` is approved to spend on behalf of `account`
@@ -57,8 +62,8 @@ contract CashToken {
         return true;
     }
 
-	// TODO: implement
-	// function getHypotheticalIndex() public view returns (uint)
+    // TODO: implement
+    // function getHypotheticalIndex() public view returns (uint)
 
     /**
      * @notice Get the number of tokens held by the `account`

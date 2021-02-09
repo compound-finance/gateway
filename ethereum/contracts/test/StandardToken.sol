@@ -1,9 +1,5 @@
-pragma solidity ^0.7.5;
-
-
-
-import "./SafeMath.sol";
-
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.1;
 
 /**
  * @title ERC20 interface
@@ -29,9 +25,6 @@ abstract contract ERC20  {
  * Based on code by FirstBlood: https://github.com/Firstbloodio/token/blob/master/smart_contract/FirstBloodToken.sol
  */
 contract StandardToken is ERC20 {
-    using SafeMath for uint256;
-
-
     uint256 totalSupply_;
 
     string public name;
@@ -59,8 +52,8 @@ contract StandardToken is ERC20 {
         require(_to != address(0));
         require(_value <= balances[msg.sender], "Transfer: insufficient balance");
 
-        balances[msg.sender] = balances[msg.sender].sub(_value);
-        balances[_to] = balances[_to].add(_value);
+        balances[msg.sender] = balances[msg.sender] - _value;
+        balances[_to] = balances[_to] + _value;
         emit Transfer(msg.sender, _to, _value);
         return true;
     }
@@ -82,9 +75,9 @@ contract StandardToken is ERC20 {
         require(_value <= balances[_from], "TransferFrom: Inadequate balance");
         require(_value <= allowed[_from][msg.sender], "TransferFrom: Inadequate allowance");
 
-        balances[_from] = balances[_from].sub(_value);
-        balances[_to] = balances[_to].add(_value);
-        allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
+        balances[_from] = balances[_from] - _value;
+        balances[_to] = balances[_to] + _value;
+        allowed[_from][msg.sender] = allowed[_from][msg.sender] - _value;
         emit Transfer(_from, _to, _value);
         return true;
     }
