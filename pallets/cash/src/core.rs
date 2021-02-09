@@ -56,14 +56,6 @@ pub fn symbol<T: Config>(asset: ChainAsset) -> Option<Symbol> {
     AssetSymbols::get(asset)
 }
 
-pub fn next_notice_id() -> Result<NoticeId, Reason> {
-    let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
-                                    // TODO: This asset needs to match the chain-- which for Cash, there might be different
-                                    //       versions of a given asset per chain
-
-    Ok(notice_id)
-}
-
 pub fn try_chain_asset_account(
     asset: ChainAsset,
     account: ChainAccount,
@@ -879,11 +871,6 @@ mod tests {
             withdraw_and_borrow_principal(CashPrincipal(100), principal),
             (principal, CashPrincipal(0))
         );
-    }
-
-    #[test]
-    fn test_next_notice_id() {
-        assert_eq!(next_notice_id(), Ok(NoticeId(0, 0)));
     }
 
     #[test]
