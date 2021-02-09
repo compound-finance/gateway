@@ -1,7 +1,7 @@
 const ABICoder = require("web3-eth-abi");
 const {
   bigInt,
-  mantissa,
+  e18,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,
@@ -17,6 +17,8 @@ describe('Starport', () => {
   let starport;
   let cash;
   let tokenA;
+  let tokenFee;
+  let tokenNS;
   let [root, account1, account2] = saddle.accounts;
 
   const authorityWallets = nRandomWallets(3);
@@ -27,11 +29,16 @@ describe('Starport', () => {
   let parentHash;
 
   function buildNotice(call, opts = {}) {
-    // Set new era
-    eraIndex += 1;
+    if (opts.newEra) {
+      eraId++;
+      eraIndex = 0;
+    } else {
+      // Set new era index
+      eraIndex += 1;
+    }
 
     const eraHeader = ABICoder.encodeParameters(['uint256', 'uint256', 'bytes32'], [opts.eraId || eraId, opts.eraIndex || eraIndex, opts.parentHash || parentHash]);
-    const encodedCall = call.encodeABI();;
+    const encodedCall = typeof(call) === 'string' ? call : call.encodeABI();;
 
     let encoded = `${ETH_HEADER}${eraHeader.slice(2)}${encodedCall.slice(2)}`;
 
@@ -49,11 +56,11 @@ describe('Starport', () => {
     const cashAddress = getNextContractAddress(root, rootNonce + 1);
 
     starport = await deploy('StarportHarness', [cashAddress, authorityAddresses]);
-    cash = await deploy('MockCashToken', [starport._address, mantissa(100), account1]);
+    cash = await deploy('MockCashToken', [starport._address, e18(100), account1]);
 
-    tokenA = await deploy('FaucetToken', [mantissa(100), "tokenA", 18, "TKNA"]);
-    await send(tokenA, "allocateTo", [account1, mantissa(10)]);
-    await send(tokenA, "approve", [starport._address, mantissa(10)], { from: account1 });
+    tokenA = await deploy('FaucetToken', [e18(100), "tokenA", 18, "TKNA"]);
+    tokenFee = await deploy('FeeToken', [e18(100), "tokenFee", 18, "TFEE"]);
+    tokenNS = await deploy('NonStandardToken', [e18(100), "tokenNS", 18, "TNS"]);
 
     eraId = 0;
     eraIndex = 0;
@@ -96,7 +103,10 @@ describe('Starport', () => {
 
   describe('#lock', () => {
     it('should lock an asset', async () => {
-      const lockAmount = mantissa(1);
+      await send(tokenA, "allocateTo", [account1, e18(10)]);
+      await send(tokenA, "approve", [starport._address, e18(10)], { from: account1 });
+
+      const lockAmount = e18(1);
       const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
       const tx = await send(starport, 'lock', [lockAmount, tokenA._address], { from: account1 });
       const balancePost = bigInt(await call(tokenA, 'balanceOf', [account1]));
@@ -111,8 +121,47 @@ describe('Starport', () => {
       });
     });
 
-    it('should lock Cash', async () => {
-      const lockAmount = mantissa(1);
+    it('should lock a non-standard asset', async () => {
+      await send(tokenNS, "transfer", [account1, e18(10)], { from: root });
+      await send(tokenNS, "approve", [starport._address, e18(10)], { from: account1 });
+
+      const lockAmount = e18(1);
+      const balancePre = bigInt(await call(tokenNS, 'balanceOf', [account1]));
+      const tx = await send(starport, 'lock', [lockAmount, tokenNS._address], { from: account1 });
+      const balancePost = bigInt(await call(tokenNS, 'balanceOf', [account1]));
+
+      expect(balancePre - balancePost).toEqualNumber(lockAmount);
+      expect(await call(tokenNS, 'balanceOf', [starport._address])).toEqualNumber(lockAmount);
+
+      expect(tx.events.Lock.returnValues).toMatchObject({
+        asset: tokenNS._address,
+        amount: lockAmount.toString(),
+        holder: account1
+      });
+    });
+
+    it('should lock a fee token', async () => {
+      await send(tokenFee, "transfer", [account1, e18(10)], { from: root });
+      await send(tokenFee, "approve", [starport._address, e18(10)], { from: account1 });
+
+      const lockAmount = e18(1);
+      const lockReceiptAmount = e18(1) / 2n;
+      const balancePre = bigInt(await call(tokenFee, 'balanceOf', [account1]));
+      const tx = await send(starport, 'lock', [lockAmount, tokenFee._address], { from: account1 });
+      const balancePost = bigInt(await call(tokenFee, 'balanceOf', [account1]));
+
+      expect(balancePre - balancePost).toEqualNumber(lockAmount);
+      expect(await call(tokenFee, 'balanceOf', [starport._address])).toEqualNumber(lockReceiptAmount);
+
+      expect(tx.events.Lock.returnValues).toMatchObject({
+        asset: tokenFee._address,
+        amount: lockReceiptAmount.toString(),
+        holder: account1
+      });
+    });
+
+    it('should lock cash', async () => {
+      const lockAmount = e18(1);
       const balancePre = bigInt(await call(cash, 'balanceOf', [account1]));
       const tx = await send(starport, 'lock', [lockAmount, cash._address], { from: account1 });
       const balancePost = bigInt(await call(cash, 'balanceOf', [account1]));
@@ -128,8 +177,8 @@ describe('Starport', () => {
       });
     });
 
-    it('should lock Eth', async () => {
-      const lockAmount = mantissa(1);
+    it('should lock eth', async () => {
+      const lockAmount = e18(1);
       const starportEthPre = await web3.eth.getBalance(starport._address);
 
       expect(starportEthPre).toEqualNumber(0);
@@ -146,7 +195,7 @@ describe('Starport', () => {
     });
 
     it('fallback lock Eth', async () => {
-      const lockAmount = mantissa(1);
+      const lockAmount = e18(1);
       const starportEthPre = await web3.eth.getBalance(starport._address);
 
       expect(starportEthPre).toEqualNumber(0);
@@ -191,13 +240,51 @@ describe('Starport', () => {
   });
 
   describe('#invoke', () => {
-    it('should invoke simple signed message', async () => {
+    it('should invoke simple signed message of current era', async () => {
       let notice = buildNotice(starport.methods.count_());
       let signatures = signAll(notice, authorityWallets);
 
       expect(await call(starport, 'invoke', [notice, signatures])).toEqual(
         '0x0000000000000000000000000000000000000000000000000000000000000001'
       );
+    });
+
+    it('should invoke simple signed message to start next era', async () => {
+      let notice = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures = signAll(notice, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice, signatures])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+    });
+
+    it('should correctly increment eras', async () => {
+      let notice0 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures0 = signAll(notice0, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice0, signatures0])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice0, signatures0]);
+      expect(await call(starport, 'eraId', [])).toEqualNumber(1);
+
+      let notice1 = buildNotice(starport.methods.count_());
+      let signatures1 = signAll(notice1, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice1, signatures1])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+      await send(starport, 'invoke', [notice1, signatures1]);
+      expect(await call(starport, 'eraId', [])).toEqualNumber(1);
+
+      let notice2 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures2 = signAll(notice2, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice2, signatures2])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000003'
+      );
+      await send(starport, 'invoke', [notice2, signatures2]);
+      expect(await call(starport, 'eraId', [])).toEqualNumber(2);
     });
 
     it('should invoke multiple notices', async () => {
@@ -221,7 +308,7 @@ describe('Starport', () => {
       let notice = buildNotice(starport.methods.count_(), { eraId: 1 });
       let signatures = signAll(notice, authorityWallets);
 
-      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Notice must use current era');
+      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Notice must use existing era or start next era');
     });
 
     it('should not authorize message without missing signatures', async () => {
@@ -258,7 +345,7 @@ describe('Starport', () => {
       await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Invalid header[3]');
     });
 
-    it('fail when passed twice', async () => {
+    it('should fail when passed twice', async () => {
       let notice = buildNotice(starport.methods.count_());
       let signatures = signAll(notice, authorityWallets);
 
@@ -266,21 +353,52 @@ describe('Starport', () => {
       await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Notice can not be reused');
     });
 
-    it('fail when passed twice', async () => {
+    it('should fail with shortened header', async () => {
       let notice = buildNotice(starport.methods.count_()).slice(0, 99);
       let signatures = signAll(notice, authorityWallets);
 
       await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Must have full header');
     });
 
-    it.todo('invalid call');
-    it.todo('call reverts');
+    it('should fail with future era id and non-zero index', async () => {
+      let notice = buildNotice(starport.methods.count_(), { newEra: true, eraIndex: 1 });
+      let signatures = signAll(notice, authorityWallets);
+
+      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Notice must use existing era or start next era');
+    });
+
+    it('should fail with future further era id', async () => {
+      let notice = buildNotice(starport.methods.count_(), { eraId: 9999, eraIndex: 0 });
+      let signatures = signAll(notice, authorityWallets);
+
+      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Notice must use existing era or start next era');
+    });
+
+    it('should fail with an invalid call', async () => {
+      let notice = buildNotice('0x4554483a');
+      let signatures = signAll(notice, authorityWallets);
+
+      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Call failed');
+    });
+
+    it('should fail with a call which reverts', async () => {
+      let notice = buildNotice(starport.methods.revert_());
+      let signatures = signAll(notice, authorityWallets);
+
+      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Call failed');
+    });
+
+    it('should pass correct inputs and outputs', async () => {
+      let notice = buildNotice(starport.methods.math_(5, 6));
+      let signatures = signAll(notice, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice, signatures])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000041'
+      );
+    });
   });
 
   describe('#unlock', () => {
-    // TODO: Check external caller
-    // TODO: Check insufficient token balance, etc
-
     it('should unlock asset', async () => {
       await tokenA.methods.transfer(starport._address, 1500).send({ from: root });
 
@@ -297,6 +415,42 @@ describe('Starport', () => {
 
       expect(Number(await tokenA.methods.balanceOf(starport._address).call())).toEqual(500);
       expect(Number(await tokenA.methods.balanceOf(account2).call())).toEqual(1000);
+    });
+
+    it('should unlock fee token', async () => {
+      await tokenFee.methods.transfer(starport._address, 3000).send({ from: root });
+
+      expect(Number(await tokenFee.methods.balanceOf(starport._address).call())).toEqual(1500);
+      expect(Number(await tokenFee.methods.balanceOf(account2).call())).toEqual(0);
+
+      const tx = await send(starport, 'unlock_', [tokenFee._address, 1000, account2]);
+
+      expect(tx.events.Unlock.returnValues).toMatchObject({
+        asset: tokenFee._address,
+        account: account2,
+        amount: '1000' /* I believe this is right (incl fee), but we should agree here that 500 isn't the right number */
+      });
+
+      expect(Number(await tokenFee.methods.balanceOf(starport._address).call())).toEqual(500);
+      expect(Number(await tokenFee.methods.balanceOf(account2).call())).toEqual(500);
+    });
+
+    it('should unlock non-standard token', async () => {
+      await tokenNS.methods.transfer(starport._address, 1500).send({ from: root });
+
+      expect(Number(await tokenNS.methods.balanceOf(starport._address).call())).toEqual(1500);
+      expect(Number(await tokenNS.methods.balanceOf(account2).call())).toEqual(0);
+
+      const tx = await send(starport, 'unlock_', [tokenNS._address, 1000, account2]);
+
+      expect(tx.events.Unlock.returnValues).toMatchObject({
+        asset: tokenNS._address,
+        account: account2,
+        amount: '1000'
+      });
+
+      expect(Number(await tokenNS.methods.balanceOf(starport._address).call())).toEqual(500);
+      expect(Number(await tokenNS.methods.balanceOf(account2).call())).toEqual(1000);
     });
 
     it('should unlock via #invoke', async () => {
@@ -339,12 +493,17 @@ describe('Starport', () => {
       expect(Number(
         await tokenA.methods.balanceOf("0x00000000000000000000000000000000000000FF").call())).toEqual(1);
     });
+
+    it('should fail when not called by self', async () => {
+      await expect(call(starport, 'unlock', [tokenA._address, 1000, account1])).rejects.toRevert('revert Call must originate locally');
+    });
+
+    it('should fail when insufficient token balance', async () => {
+      await expect(call(starport, 'unlock_', [tokenA._address, 1000, account1])).rejects.toRevert('revert Transfer: insufficient balance');
+    });
   });
 
   describe('#changeAuthorities', () => {
-    // TODO: Check external caller
-    // TODO: Check authorities length == 0
-
     it('should change authorities', async () => {
       const nextAuthorities = nRandomWallets(5).map(acct => acct.address);
 
@@ -357,14 +516,11 @@ describe('Starport', () => {
       const authoritiesAfter = await call(starport, 'getAuthorities');
       expect(authoritiesAfter).toEqual(nextAuthorities);
 
-      expect(await call(starport, 'eraId')).toEqualNumber(1);
+      expect(await call(starport, 'eraId')).toEqualNumber(0);
 
       expect(tx.events.ChangeAuthorities.returnValues).toMatchObject({
         newAuthorities: nextAuthorities
       });
-
-      // TODO: Must increment era?
-      // await expect(send(starport, 'changeAuthorities', [notice, sigs])).rejects.toRevert('revert Admin notice must increment era');
     });
 
     it('should change authorities via #invoke', async () => {
@@ -374,7 +530,7 @@ describe('Starport', () => {
       const authoritiesBefore = await call(starport, 'getAuthorities');
       expect(authoritiesBefore).toEqual(authorityAddresses);
 
-      let changeAuthoritiesNotice = buildNotice(starport.methods.changeAuthorities(nextAuthorities));
+      let changeAuthoritiesNotice = buildNotice(starport.methods.changeAuthorities(nextAuthorities), { newEra: true });
       let signatures = signAll(changeAuthoritiesNotice, authorityWallets);
 
       const tx = await send(starport, 'invoke', [changeAuthoritiesNotice, signatures], { from: account1 });
@@ -387,9 +543,6 @@ describe('Starport', () => {
       expect(tx.events.ChangeAuthorities.returnValues).toMatchObject({
         newAuthorities: nextAuthorities
       });
-
-      // TODO: Must increment era?
-      // await expect(send(starport, 'changeAuthorities', [notice, sigs])).rejects.toRevert('revert Admin notice must increment era');
     });
 
     it('should change authorities via hand-coded notice', async () => {
@@ -409,6 +562,14 @@ describe('Starport', () => {
       expect(tx.events.ChangeAuthorities.returnValues).toMatchObject({
         newAuthorities: ["0x2020202020202020202020202020202020202020"]
       });
+    });
+
+    it('should fail when not called by self', async () => {
+      await expect(call(starport, 'changeAuthorities', [[]])).rejects.toRevert('revert Call must originate locally');
+    });
+
+    it('should fail when no authorities are passed in', async () => {
+      await expect(call(starport, 'changeAuthorities_', [[]])).rejects.toRevert('revert New authority set can not be empty');
     });
   });
 });

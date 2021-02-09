@@ -20,9 +20,9 @@ contract Starport {
     uint public eraId; // TODO: could bitpack here and use uint32
     mapping(bytes32 => bool) public isNoticeUsed;
 
-    event Lock(address asset, address holder, uint amount);
+    event Lock(IERC20 asset, address holder, uint amount);
     event LockCash(address holder, uint amount, uint yieldIndex);
-    event Unlock(address account, uint amount, address asset);
+    event Unlock(address account, uint amount, IERC20 asset);
     event ChangeAuthorities(address[] newAuthorities);
 
     constructor(ICash cash_, address[] memory authorities_) {
@@ -42,9 +42,9 @@ contract Starport {
      * @param amount The amount (in the asset's native wei) to lock
      * @param asset The asset to lock in the Starport
      */
-    function lock(uint amount, address asset) public {
+    function lock(uint amount, IERC20 asset) public {
         // TODO: Check Supply Cap
-        if (asset == address(cash)) {
+        if (asset == cash) {
             lockCashInternal(amount, msg.sender);
         } else {
             lockInternal(amount, asset, msg.sender);
@@ -57,7 +57,7 @@ contract Starport {
      */
     function lockEth() public payable {
         // TODO: Check Supply Cap
-        emit Lock(ETH_ADDRESS, msg.sender, msg.value);
+        emit Lock(IERC20(ETH_ADDRESS), msg.sender, msg.value);
     }
 
     // Internal function for locking CASH (as opposed to collateral assets)
@@ -70,9 +70,9 @@ contract Starport {
     }
 
     // Internal function for locking non-ETH collateral assets
-    function lockInternal(uint amount, address asset, address sender) internal {
+    function lockInternal(uint amount, IERC20 asset, address sender) internal {
         // TODO: Check Supply Cap
-        uint amountTransferred = transferIn(sender, amount, IERC20(asset));
+        uint amountTransferred = transferIn(sender, amount, asset);
 
         emit Lock(asset, sender, amountTransferred);
     }
@@ -80,10 +80,49 @@ contract Starport {
     // Transfer in an asset, returning the balance actually accrued (i.e. less token fees)
     // Note: do not use for Ether or CASH (XXX: Why not CASH?)
     function transferIn(address from, uint amount, IERC20 asset) internal returns (uint) {
-        uint balBefore = asset.balanceOf(address(this));
-        require(asset.transferFrom(from, address(this), amount) == true, "TransferIn"); // TODO: Handle non-standard tokens
-        uint balAfter = asset.balanceOf(address(this));
-        return balAfter - balBefore;
+        uint balanceBefore = asset.balanceOf(address(this));
+        INonStandardERC20(address(asset)).transferFrom(from, address(this), amount);
+
+        bool success;
+        assembly {
+            switch returndatasize()
+                case 0 {                       // This is a non-standard ERC-20
+                    success := not(0)          // set success to true
+                }
+                case 32 {                      // This is a compliant ERC-20
+                    returndatacopy(0, 0, 32)
+                    success := mload(0)        // Set `success = returndata` of external call
+                }
+                default {                      // This is an excessively non-compliant ERC-20, revert.
+                    revert(0, 0)
+                }
+        }
+        require(success, "transferIn failed");
+
+        uint balanceAfter = asset.balanceOf(address(this));
+        return balanceAfter - balanceBefore;
+    }
+
+    // Transfer out an asset
+    // Note: we do not check fees here, since we do not account for them
+    function transferOut(address to, uint amount, IERC20 asset) internal {
+        INonStandardERC20(address(asset)).transfer(to, amount);
+
+        bool success;
+        assembly {
+            switch returndatasize()
+                case 0 {                       // This is a non-standard ERC-20
+                    success := not(0)          // set success to true
+                }
+                case 32 {                      // This is a complaint ERC-20
+                    returndatacopy(0, 0, 32)
+                    success := mload(0)        // Set `success = returndata` of external call
+                }
+                default {                      // This is an excessively non-compliant ERC-20, revert.
+                    revert(0, 0)
+                }
+        }
+        require(success, "transferOut failed");
     }
 
     // TODO: Why not just use `transferIn`?
@@ -113,6 +152,11 @@ contract Starport {
     function invoke(bytes calldata notice, bytes[] calldata signatures) external returns (bytes memory) {
         checkNoticeAuthorized(notice, authorities, signatures);
 
+        return invokeNoticeInternal(notice);
+    }
+
+    // Invoke without authorization checks used by external functions
+    function invokeNoticeInternal(bytes calldata notice) internal returns (bytes memory) {
         // XXX Really consider what to do with eraId, eraIndex and parent
         // TODO: By hash or by (eraId, eraIndex)?
         // TODO: Should eraId, eraIndex and parent be handled specially?
@@ -127,9 +171,14 @@ contract Starport {
         (uint noticeEraId, uint noticeEraIndex, bytes32 noticeParent) =
             abi.decode(notice[4:100], (uint, uint, bytes32));
 
-        (noticeEraIndex, noticeParent); // XXX currently unused
+        noticeParent; // unused
 
-        require(noticeEraId == eraId, "Notice must use current era"); // TODO: Admin notice
+        require(
+            noticeEraId <= eraId || (noticeEraId == eraId + 1 && noticeEraIndex == 0),
+            "Notice must use existing era or start next era"
+        );
+
+        eraId = noticeEraId; // This is either a no-op or the transition to next era
 
         bytes memory calldata_ = bytes(notice[100:]);
         (bool success, bytes memory callResult) = address(this).call(calldata_);
@@ -145,13 +194,13 @@ contract Starport {
      * @param amount The amount of the asset to unlock in its native token units
      * @param account The account to transfer the asset to
      */
-    function unlock(address asset, uint amount, address account) external {
+    function unlock(IERC20 asset, uint amount, address account) external {
         require(msg.sender == address(this), "Call must originate locally");
 
         // XXX TODO: This needs to handle Ether, Cash and collateral tokens
         emit Unlock(account, amount, asset);
 
-        IERC20(asset).transfer(account, amount);
+        transferOut(account, amount, asset);
     }
 
     /**
@@ -164,14 +213,11 @@ contract Starport {
         require(newAuthorities.length > 0, "New authority set can not be empty");
 
         // XXX TODO: min authorities length?
-        // XXX TODO: when does the new era start
-        // XXX TODO: set `eraId`?
         // XXX TODO: check for repeats in the authorities list?
 
         emit ChangeAuthorities(newAuthorities);
-        authorities = newAuthorities;
 
-        eraId = eraId + 1; // Is this true? Does changeover happen automatically?
+        authorities = newAuthorities;
     }
 
     /**

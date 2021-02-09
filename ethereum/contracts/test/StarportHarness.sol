@@ -30,7 +30,7 @@ contract StarportHarness is Starport {
 	}
 
 	/// Harness to call `unlock`
-	function unlock_(address asset, uint amount, address account) external {
+	function unlock_(IERC20 asset, uint amount, address account) external {
 		Starport(this).unlock(asset, amount, account);
 	}
 
@@ -42,5 +42,15 @@ contract StarportHarness is Starport {
 	/// Simple function to test notices
 	function count_() public returns (uint) {
 		return counter += 1;
+	}
+
+	/// Simple function to test notices
+	function revert_() pure public {
+		require(false, "harness reversion");
+	}
+
+	/// Simple function to test notices
+	function math_(uint a, uint8 b) pure public returns (uint) {
+		return a + b * 10;
 	}
 }

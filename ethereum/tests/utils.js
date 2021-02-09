@@ -6,7 +6,7 @@ const bigInt = num => {
   return BigInt(num);
 };
 
-const mantissa = num => {
+const e18 = num => {
   return bigInt(num) * bigInt(1e18);
 };
 
@@ -54,7 +54,7 @@ const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
 module.exports = {
   bigInt,
-  mantissa,
+  e18,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,
