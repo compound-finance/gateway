@@ -29,8 +29,8 @@ use crate::{
         Nonce, Price, Quantity, SafeMul, USDQuantity,
     },
     AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
-    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, Module, Nonces,
-    NoticeQueue, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
+    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, Module, NextNoticeId,
+    Nonces, NoticeQueue, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
     TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 use frame_support::sp_runtime::traits::Convert;
@@ -54,14 +54,6 @@ macro_rules! require_min_tx_value {
 
 pub fn symbol<T: Config>(asset: ChainAsset) -> Option<Symbol> {
     AssetSymbols::get(asset)
-}
-
-pub fn next_notice_id() -> Result<NoticeId, Reason> {
-    let notice_id = NoticeId(0, 0); // XXX need to keep state of current gen/within gen for each, also parent
-                                    // TODO: This asset needs to match the chain-- which for Cash, there might be different
-                                    //       versions of a given asset per chain
-
-    Ok(notice_id)
 }
 
 pub fn try_chain_asset_account(
@@ -456,7 +448,7 @@ pub fn extract_internal<T: Config>(
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
     // TODO: Significantly improve this
-    let notice_id = next_notice_id()?;
+    let notice_id = NextNoticeId::get();
     let notice = Notice::ExtractionNotice(match chain_asset_account {
         ChainAssetAccount::Eth(eth_asset, eth_account) => Ok(ExtractionNotice::Eth {
             id: notice_id,
@@ -471,6 +463,9 @@ pub fn extract_internal<T: Config>(
 
     // Add to Notice Queue
     NoticeQueue::insert(notice_id, NoticeStatus::from(notice.clone()));
+
+    // Set next notice id
+    NextNoticeId::put(notice_id.seq());
 
     // Deposit Notice Event
     Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
@@ -879,11 +874,6 @@ mod tests {
     }
 
     #[test]
-    fn test_next_notice_id() {
-        assert_eq!(next_notice_id(), Ok(NoticeId(0, 0)));
-    }
-
-    #[test]
     fn test_extract_internal_min_value() {
         let asset = ChainAsset::Eth([238; 20]);
         let holder = ChainAccount::Eth([0; 20]);
@@ -989,6 +979,83 @@ mod tests {
                 )),
                 notice_event.event
             );
+        });
+    }
+
+    #[test]
+    fn test_extract_internal_notice_ids() {
+        let eth_asset = [238; 20];
+        let asset = ChainAsset::Eth(eth_asset);
+        let eth_holder = [0; 20];
+        let eth_recipient = [0; 20];
+        let holder = ChainAccount::Eth(eth_holder);
+        let recipient = ChainAccount::Eth(eth_recipient);
+
+        new_test_ext().execute_with(|| {
+            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
+            let symbol = symbol::<Test>(asset).expect("asset not found");
+            let quantity = Quantity::from_nominal(symbol, "50.0");
+            Prices::insert(symbol, 100_000); // $0.10
+
+            assert_eq!(NextNoticeId::get(), NoticeId(0, 0));
+            assert_eq!(
+                extract_internal::<Test>(asset, holder, recipient, quantity),
+                Ok(())
+            );
+
+            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_status = notice_queue_post.into_iter().next().unwrap();
+
+            let expected_notice_id = NoticeId(0, 0);
+            let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: expected_notice_id,
+                parent: [0u8; 32],
+                asset: eth_asset,
+                account: eth_recipient,
+                amount: 50000000000000000000,
+            });
+
+            assert_eq!(
+                (
+                    expected_notice_id,
+                    NoticeStatus::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![]),
+                        notice: expected_notice.clone()
+                    }
+                ),
+                notice_status
+            );
+
+            assert_eq!(NextNoticeId::get(), NoticeId(0, 1));
+            assert_eq!(
+                extract_internal::<Test>(asset, holder, recipient, quantity),
+                Ok(())
+            );
+
+            let notice_queue_post_2: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_status_2 = notice_queue_post_2.into_iter().next().unwrap();
+
+            let expected_notice_id_2 = NoticeId(0, 1);
+            let expected_notice_2 = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: expected_notice_id_2,
+                parent: [0u8; 32],
+                asset: eth_asset,
+                account: eth_recipient,
+                amount: 50000000000000000000,
+            });
+
+            assert_eq!(
+                (
+                    expected_notice_id_2,
+                    NoticeStatus::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![]),
+                        notice: expected_notice_2.clone()
+                    }
+                ),
+                notice_status_2
+            );
+
+            assert_eq!(NextNoticeId::get(), NoticeId(0, 2));
         });
     }
 
