@@ -1,4 +1,4 @@
-const { waitForEvent } = require('../substrate');
+const { sendAndWaitForEvents, waitForEvent } = require('../substrate');
 const { sleep } = require('../util');
 
 class Chain {
@@ -58,6 +58,10 @@ class Chain {
     } else {
       return pairs;
     }
+  }
+
+  async postPrice(payload, signature, onFinalize = true) {
+    return await sendAndWaitForEvents(this.api().tx.cash.postPrice(payload, signature), this.api(), onFinalize);
   }
 }
 
