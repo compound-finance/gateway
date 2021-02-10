@@ -42,8 +42,8 @@ contract CashToken is ICash {
     function burn(address account, uint amountPrincipal) external override {
         require(msg.sender == admin, "Sender is not an admin");
         uint amount = amountPrincipal * getCashIndex();
-        cashPrincipal[account] = cashPrincipal[account] - amount;
-        totalCashPrincipal = totalCashPrincipal - amount;
+        cashPrincipal[account] = cashPrincipal[account] - amountPrincipal;
+        totalCashPrincipal = totalCashPrincipal - amountPrincipal;
         emit Transfer(account, address(0), amount);
     }
 
