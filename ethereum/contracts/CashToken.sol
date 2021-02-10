@@ -12,29 +12,32 @@ contract CashToken is ICash {
 
     address immutable public admin;
     mapping (address => mapping (address => uint)) internal allowances;
-    uint public totalCashPrincipal;
+    uint internal totalCashPrincipal;
     mapping (address => uint256) internal cashPrincipal;
-    uint cashYieldStartAt;
-    uint128 cashYield;
-    uint128 cashIndex;
-    uint nextCashYieldStartAt;
-    NextCashYieldAndIndex nextCashYieldAndIndex;
+    uint public cashYieldStartAt;
+    uint128 public cashYield;
+    uint128 public cashIndex;
+    uint public nextCashYieldStartAt;
+    NextCashYieldAndIndex public nextCashYieldAndIndex;
 
 	constructor(address starport) {
 		admin = starport;
+        cashYieldStartAt = block.timestamp;
+        cashYield = 43628;
+        cashIndex = 1e6;
 	}
 
     function mint(address account, uint amountPrincipal) external override {
         require(msg.sender == admin, "Sender is not an admin");
-        uint amount = amountPrincipal * fetchCashIndex();
-        cashPrincipal[account] = cashPrincipal[account] + amount;
-        totalCashPrincipal = totalCashPrincipal + amount;
+        uint amount = amountPrincipal * getCashIndex();
+        cashPrincipal[account] = cashPrincipal[account] + amountPrincipal;
+        totalCashPrincipal = totalCashPrincipal + amountPrincipal;
         emit Transfer(address(0), account, amount);
     }
 
     function burn(address account, uint amountPrincipal) external override {
         require(msg.sender == admin, "Sender is not an admin");
-        uint amount = amountPrincipal * fetchCashIndex();
+        uint amount = amountPrincipal * getCashIndex();
         cashPrincipal[account] = cashPrincipal[account] - amount;
         totalCashPrincipal = totalCashPrincipal - amount;
         emit Transfer(account, address(0), amount);
@@ -42,33 +45,45 @@ contract CashToken is ICash {
 
     function setFutureYield(uint128 nextYield, uint nextYieldStartAt, uint128 nextIndex) external override {
         require(msg.sender == admin, "Sender is not an admin");
+        uint nextAt = nextCashYieldStartAt;
+
+        //@dev Cash yield is not set yet, first call of this method
+        if (nextAt == 0) {
+            cashYieldStartAt = nextYieldStartAt;
+            cashYield = nextYield;
+            cashIndex = nextIndex;
+        } else if (block.timestamp > nextAt) {
+            cashYieldStartAt = nextAt;
+            cashYield = nextCashYieldAndIndex.yield;
+            cashIndex = nextCashYieldAndIndex.index;
+        }
+
         nextCashYieldStartAt = nextYieldStartAt;
         nextCashYieldAndIndex = NextCashYieldAndIndex(nextYield, nextIndex);
     }
 
-    function fetchCashIndex() public virtual override returns (uint) {
+    function getCashIndex() public view virtual override returns (uint) {
         uint nextAt = nextCashYieldStartAt;
-        if (block.timestamp > nextAt) {
-            cashYieldStartAt = nextAt;
-            cashYield = nextCashYieldAndIndex.yield;
-            cashIndex = nextCashYieldAndIndex.index;
-            nextCashYieldStartAt = 0;
+        if (nextAt == 0) {
+            return 1e6;
         }
-        // TODO work more on this formula
-        return cashIndex * (271828 ** cashYield * (block.timestamp - cashYieldStartAt)) / 100000;
+        if (block.timestamp > nextAt) {
+            return calculateIndex(nextCashYieldAndIndex.index, nextCashYieldAndIndex.yield, nextAt);
+        }
+        return calculateIndex(cashIndex, cashYield, cashYieldStartAt);
     }
 
-    function totalSupply() external override returns (uint) {
-        return totalCashPrincipal * fetchCashIndex();
+    function totalSupply() external view override returns (uint) {
+        return totalCashPrincipal * getCashIndex();
     }
 
-    function balanceOf(address account) external override returns (uint) {
-        return cashPrincipal[account] * fetchCashIndex();
+    function balanceOf(address account) external view override returns (uint) {
+        return cashPrincipal[account] * getCashIndex();
     }
 
     function transfer(address recipient, uint amount) external override returns (bool) {
         require(msg.sender != recipient, "Invalid recipient");
-        uint principal = amount / fetchCashIndex();
+        uint principal = amount / getCashIndex();
         cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
         cashPrincipal[msg.sender] = cashPrincipal[msg.sender] - principal;
         emit Transfer(msg.sender, recipient, principal);
@@ -88,7 +103,7 @@ contract CashToken is ICash {
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
         require(sender != recipient, "Invalid recipient");
         address spender = msg.sender;
-        uint principal = amount / fetchCashIndex();
+        uint principal = amount / getCashIndex();
         allowances[sender][spender] = allowances[sender][spender] - amount;
         cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
         cashPrincipal[sender] = cashPrincipal[sender] - principal;
@@ -113,5 +128,10 @@ contract CashToken is ICash {
 
     function decimals() external pure returns (uint8) {
         return 6;
+    }
+
+    function calculateIndex(uint index, uint yield, uint startAt) internal view returns (uint) {
+         // TODO work more on this formula
+        return index * (271828 ** yield * (block.timestamp - startAt)) / 100000;
     }
 }

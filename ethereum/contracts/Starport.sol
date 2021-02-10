@@ -57,7 +57,7 @@ contract Starport {
 
 	function lockCashInternal(uint amount, address sender) internal {
 		// cash.burn(amount);
-		uint yieldIndex = cash.fetchCashIndex();
+		uint yieldIndex = cash.getCashIndex();
 		transferInCash(sender, amount);
 		emit LockCash(sender, amount, yieldIndex);
 	}

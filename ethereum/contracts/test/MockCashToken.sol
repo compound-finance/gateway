@@ -11,7 +11,7 @@ contract MockCashToken is CashToken {
 		totalCashPrincipal = initialSupply_;
 	}
 
-	function fetchCashIndex() public pure override returns (uint) {
+	function getCashIndex() public pure override returns (uint) {
 		return 1e18;
 	}
 }
