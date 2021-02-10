@@ -11,15 +11,17 @@ pub use our_std::{
 // Import these traits so we can interact with the substrate storage modules.
 use crate::rates::APR;
 use crate::types::{AssetIndex, AssetPrice, CashIndex, Timestamp, Uint, MILLISECONDS_PER_YEAR};
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
+use frame_support::storage::{
+    IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
+};
 
 use crate::{
     chains::{
-        eth, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainSignature,
-        ChainSignatureList,
+        eth, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainHash,
+        ChainId, ChainSignature, ChainSignatureList,
     },
     log, notices,
-    notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeStatus},
+    notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState},
     params::MIN_TX_VALUE,
     reason,
     reason::{MathError, Reason},
@@ -28,10 +30,10 @@ use crate::{
         AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, EthAddress, Int,
         Nonce, Price, Quantity, SafeMul, USDQuantity,
     },
-    AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
-    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, Module, NextNoticeId,
-    Nonces, NoticeQueue, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
-    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    AccountNotices, AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
+    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, LatestNotice, Module,
+    Nonces, NoticeStates, Notices, Prices, RateModels, ReserveFactor, SubmitTransaction,
+    SupplyIndices, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 use frame_support::sp_runtime::traits::Convert;
 use our_std::convert::TryInto;
@@ -447,27 +449,33 @@ pub fn extract_internal<T: Config>(
     TotalSupplyAssets::insert(asset, total_supply_new);
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
-    // TODO: Significantly improve this
-    let notice_id = NextNoticeId::get();
-    let notice = Notice::ExtractionNotice(match chain_asset_account {
-        ChainAssetAccount::Eth(eth_asset, eth_account) => Ok(ExtractionNotice::Eth {
-            id: notice_id,
-            parent: [0u8; 32],
-            asset: eth_asset,
-            account: eth_account,
-            amount: amount.1,
-        }),
+    // TODO: Consider how to better factor this
+    let chain_id = recipient.chain_id();
+    let (latest_notice_id, parent_hash) =
+        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
+    let notice_id = latest_notice_id.seq();
+
+    let notice = Notice::ExtractionNotice(match (chain_asset_account, parent_hash) {
+        (ChainAssetAccount::Eth(eth_asset, eth_account), ChainHash::Eth(eth_parent_hash)) => {
+            Ok(ExtractionNotice::Eth {
+                id: notice_id,
+                parent: eth_parent_hash,
+                asset: eth_asset,
+                account: eth_account,
+                amount: amount.1,
+            })
+        }
         _ => Err(Reason::AssetExtractionNotSupported),
     }?);
-    let encoded_notice = notice.encode_notice();
 
-    // Add to Notice Queue
-    NoticeQueue::insert(notice_id, NoticeStatus::from(notice.clone()));
-
-    // Set next notice id
-    NextNoticeId::put(notice_id.seq());
+    // Add to notices, notice states, track the latest notice and index by account
+    Notices::insert(chain_id, notice_id, &notice);
+    NoticeStates::insert(chain_id, notice_id, NoticeState::from(&notice));
+    LatestNotice::insert(chain_id, (notice_id, notice.hash()));
+    AccountNotices::append(recipient, notice_id);
 
     // Deposit Notice Event
+    let encoded_notice = notice.encode_notice();
     Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
 
     Ok(()) // XXX events?
@@ -662,13 +670,10 @@ pub fn has_liquidity_to_reduce_cash(_holder: ChainAccount, _amount: CashQuantity
 
 pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
     // TODO: Do we want to return a failure here in any case, or collect them, etc?
-    for (notice_id, notice_status) in NoticeQueue::iter() {
-        match notice_status {
-            NoticeStatus::Pending {
-                signature_pairs,
-                notice,
-            } => {
-                let signer = notices::get_signer_key_for_notice(&notice)?;
+    for (chain_id, notice_id, notice_state) in NoticeStates::iter() {
+        match notice_state {
+            NoticeState::Pending { signature_pairs } => {
+                let signer = chain_id.signer_address()?;
 
                 if !notices::has_signer(&signature_pairs, signer) {
                     // find parent
@@ -676,11 +681,13 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), R
 
                     // XXX
                     // submit onchain call for aggregating the price
-                    let signature: ChainSignature = notices::sign_notice_chain(&notice)?;
+                    let notice = Notices::get(chain_id, notice_id)
+                        .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
+                    let signature: ChainSignature = notice.sign_notice()?;
 
                     log!("Posting Signature for [{},{}]", notice_id.0, notice_id.1);
 
-                    let call = <Call<T>>::publish_signature(notice_id, signature);
+                    let call = <Call<T>>::publish_signature(chain_id, notice_id, signature);
 
                     // TODO: Do we want to short-circuit on an error here?
                     let _res =
@@ -698,19 +705,19 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), R
 }
 
 pub fn publish_signature_internal(
+    chain_id: ChainId,
     notice_id: NoticeId,
     signature: ChainSignature,
 ) -> Result<(), Reason> {
     log!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1);
-    let status = <NoticeQueue>::get(notice_id).unwrap_or(NoticeStatus::Missing);
+    let state = <NoticeStates>::get(chain_id, notice_id);
 
-    match status {
-        NoticeStatus::Missing => Ok(()),
+    match state {
+        NoticeState::Missing => Ok(()),
 
-        NoticeStatus::Pending {
-            signature_pairs,
-            notice,
-        } => {
+        NoticeState::Pending { signature_pairs } => {
+            let notice = Notices::get(chain_id, notice_id)
+                .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
             let signer: ChainAccount = signature.recover(&notice.encode_notice())?; // XXX
             let has_signer_v = notices::has_signer(&signature_pairs, signer);
 
@@ -737,25 +744,22 @@ pub fn publish_signature_internal(
             // let signatures_new = {signature | signatures };
 
             // if len(signers_new & Validators) > 2/3 * len(Validators) {
-            // NoticeQueue::insert(notice_id, NoticeStatus::Done);
+            // NoticeQueue::insert(notice_id, NoticeState::Done);
             // Self::deposit_event(Event::SignedNotice(ChainId::Eth, notice_id, notice.encode_notice(), signatures)); // XXX generic
             // Ok(())
             // } else {
-            NoticeQueue::insert(
+            NoticeStates::insert(
+                chain_id,
                 notice_id,
-                NoticeStatus::Pending {
+                NoticeState::Pending {
                     signature_pairs: signature_pairs_next,
-                    notice,
                 },
             );
             Ok(())
             // }
         }
 
-        NoticeStatus::Done => {
-            // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
-            Ok(())
-        }
+        NoticeState::Executed => Ok(()),
     }
 }
 
@@ -887,7 +891,8 @@ mod tests {
             let asset_balances_pre = AssetBalances::get(asset, holder);
             let total_supply_pre = TotalSupplyAssets::get(asset);
             let total_borrows_pre = TotalBorrowAssets::get(asset);
-            let notice_queue_pre: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
             let events_pre: Vec<_> = System::events().into_iter().collect();
 
             let res = extract_internal::<Test>(asset, holder, recipient, quantity);
@@ -897,13 +902,14 @@ mod tests {
             let asset_balances_post = AssetBalances::get(asset, holder);
             let total_supply_post = TotalSupplyAssets::get(asset);
             let total_borrows_post = TotalBorrowAssets::get(asset);
-            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_states_post: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
             let events_post: Vec<_> = System::events().into_iter().collect();
 
             assert_eq!(asset_balances_pre, asset_balances_post);
             assert_eq!(total_supply_pre, total_supply_post);
             assert_eq!(total_borrows_pre, total_borrows_post);
-            assert_eq!(notice_queue_pre.len(), notice_queue_post.len());
+            assert_eq!(notice_states_pre.len(), notice_states_post.len());
             assert_eq!(events_pre.len(), events_post.len());
         });
     }
@@ -925,7 +931,8 @@ mod tests {
             let asset_balances_pre = AssetBalances::get(asset, holder);
             let total_supply_pre = TotalSupplyAssets::get(asset);
             let total_borrows_pre = TotalBorrowAssets::get(asset);
-            let notice_queue_pre: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
             let events_pre: Vec<_> = System::events().into_iter().collect();
 
             let res = extract_internal::<Test>(asset, holder, recipient, quantity);
@@ -935,7 +942,8 @@ mod tests {
             let asset_balances_post = AssetBalances::get(asset, holder);
             let total_supply_post = TotalSupplyAssets::get(asset);
             let total_borrows_post = TotalBorrowAssets::get(asset);
-            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
+            let notice_states_post: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
             let events_post: Vec<_> = System::events().into_iter().collect();
 
             assert_eq!(
@@ -944,13 +952,14 @@ mod tests {
             ); // 50e18
             assert_eq!(total_supply_pre, total_supply_post);
             assert_eq!(total_borrows_pre + 50000000000000000000, total_borrows_post);
-            assert_eq!(notice_queue_pre.len() + 1, notice_queue_post.len());
+            assert_eq!(notice_states_pre.len() + 1, notice_states_post.len());
             assert_eq!(events_pre.len() + 1, events_post.len());
 
-            let notice_status = notice_queue_post.into_iter().next().unwrap();
+            let notice_state = notice_states_post.into_iter().next().unwrap();
+            let notice = Notices::get(notice_state.0, notice_state.1);
             let notice_event = events_post.into_iter().next().unwrap();
 
-            let expected_notice_id = NoticeId(0, 0);
+            let expected_notice_id = NoticeId(0, 1);
             let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
                 id: expected_notice_id,
                 parent: [0u8; 32],
@@ -962,14 +971,16 @@ mod tests {
 
             assert_eq!(
                 (
+                    ChainId::Eth,
                     expected_notice_id,
-                    NoticeStatus::Pending {
-                        signature_pairs: ChainSignatureList::Eth(vec![]),
-                        notice: expected_notice.clone()
+                    NoticeState::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![])
                     }
                 ),
-                notice_status
+                notice_state
             );
+
+            assert_eq!(notice, Some(expected_notice.clone()));
 
             assert_eq!(
                 TestEvent::cash(Event::Notice(
@@ -997,16 +1008,18 @@ mod tests {
             let quantity = Quantity::from_nominal(symbol, "50.0");
             Prices::insert(symbol, 100_000); // $0.10
 
-            assert_eq!(NextNoticeId::get(), NoticeId(0, 0));
+            assert_eq!(LatestNotice::get(ChainId::Eth), NoticeId(0, 0));
             assert_eq!(
                 extract_internal::<Test>(asset, holder, recipient, quantity),
                 Ok(())
             );
 
-            let notice_queue_post: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
-            let notice_status = notice_queue_post.into_iter().next().unwrap();
+            let notice_state_post: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
+            let notice_state = notice_state_post.into_iter().next().unwrap();
+            let notice = Notices::get(notice_state.0, notice_state.1);
 
-            let expected_notice_id = NoticeId(0, 0);
+            let expected_notice_id = NoticeId(0, 1);
             let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
                 id: expected_notice_id,
                 parent: [0u8; 32],
@@ -1017,25 +1030,29 @@ mod tests {
 
             assert_eq!(
                 (
+                    ChainId::Eth,
                     expected_notice_id,
-                    NoticeStatus::Pending {
-                        signature_pairs: ChainSignatureList::Eth(vec![]),
-                        notice: expected_notice.clone()
+                    NoticeState::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![])
                     }
                 ),
-                notice_status
+                notice_state
             );
 
-            assert_eq!(NextNoticeId::get(), NoticeId(0, 1));
+            assert_eq!(notice, Some(expected_notice.clone()));
+
+            assert_eq!(LatestNotice::get(ChainId::Eth), NoticeId(0, 1));
             assert_eq!(
                 extract_internal::<Test>(asset, holder, recipient, quantity),
                 Ok(())
             );
 
-            let notice_queue_post_2: Vec<(NoticeId, NoticeStatus)> = NoticeQueue::iter().collect();
-            let notice_status_2 = notice_queue_post_2.into_iter().next().unwrap();
+            let notice_state_post_2: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
+            let notice_state_2 = notice_state_post_2.into_iter().next().unwrap();
+            let notice_2 = Notices::get(notice_state_2.0, notice_state_2.1);
 
-            let expected_notice_id_2 = NoticeId(0, 1);
+            let expected_notice_id_2 = NoticeId(0, 2);
             let expected_notice_2 = Notice::ExtractionNotice(ExtractionNotice::Eth {
                 id: expected_notice_id_2,
                 parent: [0u8; 32],
@@ -1046,16 +1063,18 @@ mod tests {
 
             assert_eq!(
                 (
+                    ChainId::Eth,
                     expected_notice_id_2,
-                    NoticeStatus::Pending {
-                        signature_pairs: ChainSignatureList::Eth(vec![]),
-                        notice: expected_notice_2.clone()
+                    NoticeState::Pending {
+                        signature_pairs: ChainSignatureList::Eth(vec![])
                     }
                 ),
-                notice_status_2
+                notice_state_2
             );
 
-            assert_eq!(NextNoticeId::get(), NoticeId(0, 2));
+            assert_eq!(notice_2, Some(expected_notice_2.clone()));
+
+            assert_eq!(LatestNotice::get(ChainId::Eth), NoticeId(0, 2));
         });
     }
 

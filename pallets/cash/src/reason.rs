@@ -1,3 +1,5 @@
+use crate::chains::ChainId;
+use crate::notices::NoticeId;
 use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
@@ -39,6 +41,7 @@ pub enum Reason {
     InvalidUTF8,
     SignatureAccountMismatch,
     IncorrectNonce(Nonce, Nonce),
+    NoticeMissing(ChainId, NoticeId),
 }
 
 impl From<MathError> for Reason {
