@@ -427,7 +427,7 @@ describe('Starport', () => {
     });
   });
 
-  describe.only('#invokeChain', () => {
+  describe('#invokeChain', () => {
     it('should invoke for the parent of an accepted notice', async () => {
       let notice0 = buildNotice(starport.methods.count_());
       let notice1 = buildNotice(starport.methods.count_());
@@ -443,17 +443,193 @@ describe('Starport', () => {
       );
     });
 
-    it.todo('should chain three notices');
-    it.todo('should chain notices across eras');
-    it.todo('should still reject notices if missing eras');
-    it.todo('should reject notice if already accepted');
-    it.todo('should reject notice with empty notice chain');
-    it.todo('should reject notice with empty notice chain and already accepted');
-    it.todo('should reject notice if mismatched head notice');
-    it.todo('should reject notice if mismatched mid notice');
+    it('should chain three notices', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let notice2 = buildNotice(starport.methods.count_());
+      let signatures2 = signAll(notice2, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice2, signatures2])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice2, signatures2]);
+
+      expect(await call(starport, 'invokeChain', [notice0, [notice1, notice2]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+    });
+
+    it('should chain four notices', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let notice2 = buildNotice(starport.methods.count_());
+      let notice3 = buildNotice(starport.methods.count_());
+      let signatures3 = signAll(notice3, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice3, signatures3])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice3, signatures3]);
+
+      expect(await call(starport, 'invokeChain', [notice0, [notice1, notice2, notice3]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+    });
+
+    it('should reject if tail notice not posted', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let notice2 = buildNotice(starport.methods.count_());
+      let notice3 = buildNotice(starport.methods.count_());
+      let signatures3 = signAll(notice3, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice3, signatures3])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      // Note: skipping `send` here
+
+      await expect(call(starport, 'invokeChain', [notice0, [notice1, notice2, notice3]]))
+        .rejects.toRevert('revert Tail notice must have been accepted');
+    });
+
+    it('should reject notice with empty notice chain and not previously posted', async () => {
+      let notice = buildNotice(starport.methods.count_());
+
+      await expect(call(starport, 'invokeChain', [notice, []]))
+        .rejects.toRevert('revert Tail notice must have been accepted');
+    });
+
+    it('should reject notice with empty notice chain and yes previously posted', async () => {
+      let notice = buildNotice(starport.methods.count_());
+      let signatures = signAll(notice, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice, signatures])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice, signatures]);
+
+      await expect(call(starport, 'invokeChain', [notice, []]))
+        .rejects.toRevert('revert Target notice can not be reused');
+    });
+
+    it('should chain notices across an era', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let notice2 = buildNotice(starport.methods.count_());
+      let notice3 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures3 = signAll(notice3, authorityWallets);
+
+      expect(await call(starport, 'eraId')).toEqualNumber(0);
+      expect(await call(starport, 'invoke', [notice3, signatures3])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice3, signatures3])
+      expect(await call(starport, 'eraId')).toEqualNumber(1);
+
+      expect(await call(starport, 'invokeChain', [notice0, [notice1, notice2, notice3]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+      await send(starport, 'invokeChain', [notice0, [notice1, notice2, notice3]]);
+      expect(await call(starport, 'eraId')).toEqualNumber(1);
+
+      expect(await call(starport, 'invokeChain', [notice1, [notice2, notice3]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000003'
+      );
+      await send(starport, 'invokeChain', [notice1, [notice2, notice3]]);
+      expect(await call(starport, 'eraId')).toEqualNumber(1);
+
+      expect(await call(starport, 'invokeChain', [notice2, [notice3]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000004'
+      );
+      await send(starport, 'invokeChain', [notice2, [notice3]]);
+      expect(await call(starport, 'eraId')).toEqualNumber(1);
+    });
+
+    it('should chain notices across multiple eras', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures1 = signAll(notice1, authorityWallets);
+      let notice2 = buildNotice(starport.methods.count_());
+      let notice3 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures3 = signAll(notice3, authorityWallets);
+
+      expect(await call(starport, 'eraId')).toEqualNumber(0);
+      expect(await call(starport, 'invoke', [notice1, signatures1])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice1, signatures1]);
+      expect(await call(starport, 'eraId')).toEqualNumber(1);
+
+      expect(await call(starport, 'invoke', [notice3, signatures3])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+      await send(starport, 'invoke', [notice3, signatures3]);
+      expect(await call(starport, 'eraId')).toEqualNumber(2);
+
+      expect(await call(starport, 'invokeChain', [notice2, [notice3]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000003'
+      );
+      await send(starport, 'invokeChain', [notice2, [notice3]]);
+      expect(await call(starport, 'eraId')).toEqualNumber(2);
+
+      // Note: we're using an extended chain here, even though we don't have to
+      expect(await call(starport, 'invokeChain', [notice0, [notice1, notice2, notice3]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000004'
+      );
+      await send(starport, 'invokeChain', [notice0, [notice1, notice2, notice3]]);
+      expect(await call(starport, 'eraId')).toEqualNumber(2);
+    });
+
+    it('should reject notice if already accepted', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let signatures1 = signAll(notice1, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice1, signatures1])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice1, signatures1]);
+
+      expect(await call(starport, 'invokeChain', [notice0, [notice1]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+      await send(starport, 'invokeChain', [notice0, [notice1]]);
+
+      await expect(call(starport, 'invokeChain', [notice0, [notice1]]))
+        .rejects.toRevert('revert Target notice can not be reused');
+    });
+
+    it('should reject notice if mismatched head notice', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let notice2 = buildNotice(starport.methods.count_());
+      let notice3 = buildNotice(starport.methods.count_());
+      let signatures3 = signAll(notice3, authorityWallets);
+
+      expect(await call(starport, 'eraId')).toEqualNumber(0);
+      await send(starport, 'invoke', [notice3, signatures3])
+
+      await expect(call(starport, 'invokeChain', [notice0, [notice2, notice3]]))
+        .rejects.toRevert('revert Notice hash mismatch');
+    });
+
+    it('should reject notice if mismatched mid notice', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let notice2 = buildNotice(starport.methods.count_());
+      let notice3 = buildNotice(starport.methods.count_());
+      let signatures3 = signAll(notice3, authorityWallets);
+
+      expect(await call(starport, 'eraId')).toEqualNumber(0);
+      await send(starport, 'invoke', [notice3, signatures3])
+
+      await expect(call(starport, 'invokeChain', [notice0, [notice1, notice3]]))
+        .rejects.toRevert('revert Notice hash mismatch');
+    });
+
+    /* Not sure these possible */
     it.todo('should reject notice if mismatched tail notice');
-    it.todo('should reject most recent notice');
-    it.todo('consider genesis notice 0x00000000');
+    it.todo('consider genesis parent hash of 0x00000000..');
   });
 
   describe('#unlock', () => {
