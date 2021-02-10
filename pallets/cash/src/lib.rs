@@ -46,8 +46,12 @@ use sp_runtime::{
 };
 
 use frame_support::sp_runtime::traits::Convert;
+
 use pallet_session;
 use pallet_timestamp;
+
+#[macro_use]
+extern crate lazy_static;
 
 pub mod chains;
 pub mod converters;
