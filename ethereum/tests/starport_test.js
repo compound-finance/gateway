@@ -427,6 +427,35 @@ describe('Starport', () => {
     });
   });
 
+  describe.only('#invokeChain', () => {
+    it('should invoke for the parent of an accepted notice', async () => {
+      let notice0 = buildNotice(starport.methods.count_());
+      let notice1 = buildNotice(starport.methods.count_());
+      let signatures1 = signAll(notice1, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice1, signatures1])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice1, signatures1]);
+
+      expect(await call(starport, 'invokeChain', [notice0, [notice1]])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+    });
+
+    it.todo('should chain three notices');
+    it.todo('should chain notices across eras');
+    it.todo('should still reject notices if missing eras');
+    it.todo('should reject notice if already accepted');
+    it.todo('should reject notice with empty notice chain');
+    it.todo('should reject notice with empty notice chain and already accepted');
+    it.todo('should reject notice if mismatched head notice');
+    it.todo('should reject notice if mismatched mid notice');
+    it.todo('should reject notice if mismatched tail notice');
+    it.todo('should reject most recent notice');
+    it.todo('consider genesis notice 0x00000000');
+  });
+
   describe('#unlock', () => {
     it('should unlock asset', async () => {
       await tokenA.methods.transfer(starport._address, 1500).send({ from: root });
