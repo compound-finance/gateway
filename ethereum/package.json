@@ -11,11 +11,14 @@
     "postinstall": "cd node_modules/solidity-parser-antlr && yarn install && yarn build",
     "compile": "npx saddle compile",
     "test": "npx saddle compile && npx saddle test",
-    "coverage": "npx saddle compile --trace && npx saddle coverage",
+    "coverage": "npx saddle compile --trace && npx saddle coverage && npx istanbul report --root=./coverage lcov json",
     "console": "npx -n --experimental-repl-await saddle console"
   },
   "resolutions": {
     "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",
     "ganache-core": "=2.13.2"
+  },
+  "devDependencies": {
+    "istanbul": "^0.4.5"
   }
 }
