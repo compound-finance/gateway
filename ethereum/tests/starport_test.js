@@ -287,6 +287,35 @@ describe('Starport', () => {
       expect(await call(starport, 'eraId', [])).toEqualNumber(2);
     });
 
+    it('should not decrement eras', async () => {
+      let notice0 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures0 = signAll(notice0, authorityWallets);
+
+      let notice1 = buildNotice(starport.methods.count_());
+      let signatures1 = signAll(notice1, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice0, signatures0])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      );
+      await send(starport, 'invoke', [notice0, signatures0]);
+      expect(await call(starport, 'eraId', [])).toEqualNumber(1);
+
+      let notice2 = buildNotice(starport.methods.count_(), { newEra: true });
+      let signatures2 = signAll(notice2, authorityWallets);
+
+      expect(await call(starport, 'invoke', [notice2, signatures2])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000002'
+      );
+      await send(starport, 'invoke', [notice2, signatures2]);
+      expect(await call(starport, 'eraId', [])).toEqualNumber(2);
+
+      expect(await call(starport, 'invoke', [notice1, signatures1])).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000003'
+      );
+      await send(starport, 'invoke', [notice1, signatures1]);
+      expect(await call(starport, 'eraId', [])).toEqualNumber(2);
+    });
+
     it('should invoke multiple notices', async () => {
       let notice0 = buildNotice(starport.methods.count_());
       let signatures0 = signAll(notice0, authorityWallets);

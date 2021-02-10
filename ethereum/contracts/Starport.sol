@@ -173,12 +173,16 @@ contract Starport {
 
         noticeParent; // unused
 
+        bool startNextEra = noticeEraId == eraId + 1 && noticeEraIndex == 0;
+
         require(
-            noticeEraId <= eraId || (noticeEraId == eraId + 1 && noticeEraIndex == 0),
+            noticeEraId <= eraId || startNextEra,
             "Notice must use existing era or start next era"
         );
 
-        eraId = noticeEraId; // This is either a no-op or the transition to next era
+        if (startNextEra) {
+            eraId++;
+        }
 
         bytes memory calldata_ = bytes(notice[100:]);
         (bool success, bytes memory callResult) = address(this).call(calldata_);
