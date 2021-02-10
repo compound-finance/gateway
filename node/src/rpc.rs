@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use compound_chain_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Index};
+use compound_chain_runtime::{opaque::Block, AccountId, BlockNumber, Hash, Index};
 use sc_client_api::AuxStore;
 use sc_finality_grandpa::{
     FinalityProofProvider, GrandpaJustificationStream, SharedAuthoritySet, SharedVoterState,
@@ -28,7 +28,6 @@ use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_consensus::SelectChain;
 use sp_consensus_aura::AuraApi;
-use sp_keystore::SyncCryptoStorePtr;
 use sp_transaction_pool::TransactionPool;
 
 /// Light client extra dependencies.
