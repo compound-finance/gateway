@@ -26,7 +26,7 @@ class Starport {
   async lockEth(actorLookup, weiAmount) {
     let actor = this.ctx.actors.get(actorLookup);
     // Note: we use gas price = 0 for tests to prevent this from scewing the eth balance of the user
-    return await this.starport.methods.lockETH().send({ value: weiAmount, from: actor.ethAddress(), gasPrice: "0" });
+    return await this.starport.methods.lockEth().send({ value: weiAmount, from: actor.ethAddress(), gasPrice: "0" });
   }
 
   async lock(actorLookup, amount, collateral, approve=true) {

@@ -40,6 +40,14 @@ impl NoticeId {
 lazy_static! {
     static ref UNLOCK_SIG: <Ethereum as Chain>::Hash =
         <Ethereum as Chain>::hash_bytes(b"unlock(address,uint256,address)");
+    static ref UNLOCK_CASH_SIG: <Ethereum as Chain>::Hash =
+        <Ethereum as Chain>::hash_bytes(b"unlockCash(address,uint256,uint256)");
+    static ref SET_FUTURE_YIELD_SIG: <Ethereum as Chain>::Hash =
+        <Ethereum as Chain>::hash_bytes(b"setFutureYield(uint256,uint256,uint256)");
+    static ref SET_SUPPLY_CAP_SIG: <Ethereum as Chain>::Hash =
+        <Ethereum as Chain>::hash_bytes(b"setSupplyCap(address,uint256)");
+    static ref CHANGE_AUTHORITIES_SIG: <Ethereum as Chain>::Hash =
+        <Ethereum as Chain>::hash_bytes(b"changeAuthorities(address[])");
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -109,25 +117,6 @@ pub trait EncodeNotice {
 
 const ETH_CHAIN_IDENT: &'static [u8] = b"ETH:";
 
-// TODO: We might want to make these slightly more efficient
-fn encode_addr(raw: &[u8; 20]) -> Vec<u8> {
-    let mut res: [u8; 32] = [0; 32];
-    res[12..32].copy_from_slice(raw);
-    res.to_vec()
-}
-
-fn encode_int32(raw: u32) -> Vec<u8> {
-    let mut res: [u8; 32] = [0; 32];
-    res[28..32].copy_from_slice(&raw.to_be_bytes());
-    res.to_vec()
-}
-
-fn encode_int128(raw: u128) -> Vec<u8> {
-    let mut res: [u8; 32] = [0; 32];
-    res[16..32].copy_from_slice(&raw.to_be_bytes());
-    res.to_vec()
-}
-
 fn encode_notice_params(
     id: &NoticeId,
     parent: &<Ethereum as Chain>::Hash,
@@ -180,19 +169,16 @@ impl EncodeNotice for CashExtractionNotice {
                 account,
                 amount,
                 cash_index,
-            } => {
-                let amount_encoded = encode_int128(*amount); // XXX cast more safely XXX JF: already converted I think
-                [
-                    ETH_CHAIN_IDENT.to_vec(),
-                    encode_int32(id.0),
-                    encode_int32(id.1),
-                    parent.to_vec(),
-                    encode_addr(account),
-                    amount_encoded,
-                    encode_int128(*cash_index),
-                ]
-                .concat()
-            }
+            } => encode_notice_params(
+                id,
+                parent,
+                *UNLOCK_CASH_SIG,
+                &[
+                    Token::Address(account.into()),
+                    Token::Uint((*amount).into()),
+                    Token::Uint((*cash_index).into()),
+                ],
+            ),
         }
     }
 }
@@ -206,16 +192,16 @@ impl EncodeNotice for FutureYieldNotice {
                 next_cash_yield,
                 next_cash_yield_start_at,
                 next_cash_index,
-            } => [
-                ETH_CHAIN_IDENT.to_vec(),
-                encode_int32(id.0),
-                encode_int32(id.1),
-                parent.to_vec(),
-                encode_int128(*next_cash_yield),
-                encode_int128(*next_cash_yield_start_at),
-                encode_int128(*next_cash_index),
-            ]
-            .concat(),
+            } => encode_notice_params(
+                id,
+                parent,
+                *SET_FUTURE_YIELD_SIG,
+                &[
+                    Token::Uint((*next_cash_yield).into()),
+                    Token::Uint((*next_cash_yield_start_at).into()),
+                    Token::Uint((*next_cash_index).into()),
+                ],
+            ),
         }
     }
 }
@@ -228,18 +214,12 @@ impl EncodeNotice for SetSupplyCapNotice {
                 parent,
                 asset,
                 amount,
-            } => {
-                let amount_encoded = encode_int128(*amount); // XXX cast more safely XXX JF: already converted I think
-                [
-                    ETH_CHAIN_IDENT.to_vec(),
-                    encode_int32(id.0),
-                    encode_int32(id.1),
-                    parent.to_vec(),
-                    encode_addr(asset),
-                    amount_encoded,
-                ]
-                .concat()
-            }
+            } => encode_notice_params(
+                id,
+                parent,
+                *SET_SUPPLY_CAP_SIG,
+                &[Token::Address(asset.into()), Token::Uint((*amount).into())],
+            ),
         }
     }
 }
@@ -251,19 +231,17 @@ impl EncodeNotice for ChangeAuthorityNotice {
                 id,
                 parent,
                 new_authorities,
-            } => {
-                let authorities_encoded: Vec<Vec<u8>> =
-                    new_authorities.iter().map(|x| encode_addr(x)).collect();
-
-                [
-                    ETH_CHAIN_IDENT.to_vec(),
-                    encode_int32(id.0),
-                    encode_int32(id.1),
-                    parent.to_vec(),
-                    authorities_encoded.concat(),
-                ]
-                .concat()
-            }
+            } => encode_notice_params(
+                id,
+                parent,
+                *CHANGE_AUTHORITIES_SIG,
+                &[Token::Array(
+                    new_authorities
+                        .iter()
+                        .map(|auth| Token::Address(auth.into()))
+                        .collect(),
+                )],
+            ),
         }
     }
 }
@@ -394,15 +372,20 @@ pub fn has_signer(signature_pairs: &ChainSignatureList, signer: ChainAccount) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ethabi::{Function, Param, ParamType, Token};
 
     #[test]
-    fn test_encodes_extraction_notice() {
+    fn test_encodes_extraction_notice() -> Result<(), ethabi::Error> {
+        let asset = [2u8; 20];
+        let amount = 50;
+        let account = [1u8; 20];
+
         let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
-            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 1),
             parent: [3u8; 32],
-            asset: [2u8; 20],
-            amount: 50,
-            account: [1u8; 20],
+            asset,
+            amount,
+            account,
         });
 
         let expected = [
@@ -410,7 +393,7 @@ mod tests {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 80, // eraId
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // eraIndex
+            0, 0, 1, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
             139, 195, 146, 7, // Function Signature (0x8bc39207)
@@ -423,120 +406,279 @@ mod tests {
         ];
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
+
+        // Test against auto-encoding
+        let asset_token = Token::Address(asset.into());
+        let amount_token = Token::Uint(amount.into());
+        let account_token = Token::Address(account.into());
+
+        let unlock_fn = Function {
+            name: String::from("unlock"),
+            inputs: vec![
+                Param {
+                    name: String::from("asset"),
+                    kind: ParamType::Address,
+                },
+                Param {
+                    name: String::from("amount"),
+                    kind: ParamType::Uint(256),
+                },
+                Param {
+                    name: String::from("account"),
+                    kind: ParamType::Address,
+                },
+            ],
+            outputs: vec![],
+            constant: false,
+        };
+        assert_eq!(
+            &unlock_fn.encode_input(&[asset_token, amount_token, account_token])?[..],
+            &expected[100..]
+        );
+        Ok(())
     }
 
     #[test]
-    fn test_encodes_cash_extraction_notice() {
+    fn test_encodes_cash_extraction_notice() -> Result<(), ethabi::Error> {
+        let account = [1u8; 20];
+        let amount = 50;
+        let cash_index = 75u128;
+
         let notice = Notice::CashExtractionNotice(CashExtractionNotice::Eth {
-            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 1),
             parent: [3u8; 32],
-            account: [1u8; 20],
-            amount: 55,
-            cash_index: 75u128,
+            account,
+            amount,
+            cash_index,
         });
 
         let expected = [
-            69, 84, 72, // chainType::ETH
+            69, 84, 72, 58, // ETH:
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 80, // eraID
+            0, 0, 80, // eraId
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // eraIndex
+            0, 0, 1, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
+            0x7a, 0x23, 0x46, 0x54, // Function Signature (0x7a234654)
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
             1, 1, 1, // account
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 55, // amount
+            0, 0, 50, // amount
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 75, // cash yield index
+            0, 0, 75, // cash index
         ];
-
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
+
+        // Test against auto-encoding
+        let account_token = Token::Address(account.into());
+        let amount_token = Token::Uint(amount.into());
+        let cash_index_token = Token::Uint(cash_index.into());
+
+        let unlock_cash_fn = Function {
+            name: String::from("unlockCash"),
+            inputs: vec![
+                Param {
+                    name: String::from("account"),
+                    kind: ParamType::Address,
+                },
+                Param {
+                    name: String::from("amount"),
+                    kind: ParamType::Uint(256),
+                },
+                Param {
+                    name: String::from("cashIndex"),
+                    kind: ParamType::Uint(256),
+                },
+            ],
+            outputs: vec![],
+            constant: false,
+        };
+        assert_eq!(
+            &unlock_cash_fn.encode_input(&[account_token, amount_token, cash_index_token])?[..],
+            &expected[100..]
+        );
+        Ok(())
     }
 
     #[test]
-    fn test_encodes_future_yield_notice() {
+    fn test_encodes_future_yield_notice() -> Result<(), ethabi::Error> {
+        let next_cash_yield = 700u128;
+        let next_cash_yield_start_at = 200u128;
+        let next_cash_index = 400u128;
+
         let notice = Notice::FutureYieldNotice(FutureYieldNotice::Eth {
-            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
-            parent: [5u8; 32],
-            next_cash_yield: 700u128,
-            next_cash_yield_start_at: 200u128,
-            next_cash_index: 400u128,
+            id: NoticeId(80, 1),
+            parent: [3u8; 32],
+            next_cash_yield,
+            next_cash_yield_start_at,
+            next_cash_index,
         });
 
         let expected = [
-            69, 84, 72, // chainType::ETH
+            69, 84, 72, 58, // ETH:
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 80, // eraID
+            0, 0, 80, // eraId
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // eraIndex
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, // parent
+            0, 0, 1, // eraIndex
+            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+            3, 3, 3, // parent
+            0x4f, 0xbb, 0x4d, 0x2f, // Function Signature (0x4fbb4d2f)
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 2, 188, // next cash yield
+            0, 0x02, 0xbc, // next_cash_yield
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 200, // next cash yield start at
+            0, 0, 200, // next_cash_yield_start_at
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 1, 144, // next cash yield index
+            0, 0x01, 0x90, // next_cash_index
         ];
-
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
+
+        // Test against auto-encoding
+        let next_cash_yield_token = Token::Uint(next_cash_yield.into());
+        let next_cash_yield_start_at_token = Token::Uint(next_cash_yield_start_at.into());
+        let next_cash_index_token = Token::Uint(next_cash_index.into());
+
+        let set_future_yield_fn = Function {
+            name: String::from("setFutureYield"),
+            inputs: vec![
+                Param {
+                    name: String::from("nextCashYield"),
+                    kind: ParamType::Uint(256),
+                },
+                Param {
+                    name: String::from("nextCashYieldStartAt"),
+                    kind: ParamType::Uint(256),
+                },
+                Param {
+                    name: String::from("nextCashYieldIndex"),
+                    kind: ParamType::Uint(256),
+                },
+            ],
+            outputs: vec![],
+            constant: false,
+        };
+        assert_eq!(
+            &set_future_yield_fn.encode_input(&[
+                next_cash_yield_token,
+                next_cash_yield_start_at_token,
+                next_cash_index_token
+            ])?[..],
+            &expected[100..]
+        );
+        Ok(())
     }
 
     #[test]
-    fn test_encodes_set_supply_cap_notice() {
+    fn test_encodes_set_supply_cap_notice() -> Result<(), ethabi::Error> {
+        let asset = [2u8; 20];
+        let amount = 50;
+
         let notice = Notice::SetSupplyCapNotice(SetSupplyCapNotice::Eth {
-            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 1),
             parent: [3u8; 32],
-            asset: [70u8; 20],
-            amount: 60,
+            asset,
+            amount,
         });
 
         let expected = [
-            69, 84, 72, // chainType::ETH
+            69, 84, 72, 58, // ETH:
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 80, // eraID
+            0, 0, 80, // eraId
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // eraIndex
+            0, 0, 1, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70,
-            70, 70, 70, 70, 70, 70, 70, // asset
+            0x57, 0x1f, 0x03, 0xe5, // Function Signature (0x571f03e5)
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+            2, 2, 2, // asset
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 60, // amount
+            0, 0, 50, // amount
         ];
-
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
+
+        // Test against auto-encoding
+        let asset_token = Token::Address(asset.into());
+        let amount_token = Token::Uint(amount.into());
+
+        let set_supply_cap_fn = Function {
+            name: String::from("setSupplyCap"),
+            inputs: vec![
+                Param {
+                    name: String::from("asset"),
+                    kind: ParamType::Address,
+                },
+                Param {
+                    name: String::from("amount"),
+                    kind: ParamType::Uint(256),
+                },
+            ],
+            outputs: vec![],
+            constant: false,
+        };
+        assert_eq!(
+            &set_supply_cap_fn.encode_input(&[asset_token, amount_token])?[..],
+            &expected[100..]
+        );
+        Ok(())
     }
 
     #[test]
-    fn test_encodes_new_authorities_notice() {
+    fn test_encodes_change_authorities_notice() -> Result<(), ethabi::Error> {
+        let new_authorities = vec![[6u8; 20], [7u8; 20], [8u8; 20]];
+
         let notice = Notice::ChangeAuthorityNotice(ChangeAuthorityNotice::Eth {
-            id: NoticeId(80, 0), // XXX need to keep state of current gen/within gen for each, also parent
+            id: NoticeId(80, 1),
             parent: [3u8; 32],
-            new_authorities: vec![[6u8; 20], [7u8; 20], [8u8; 20]],
+            new_authorities: new_authorities.clone(),
         });
 
         let expected = [
-            69, 84, 72, // chainType::ETH
+            69, 84, 72, 58, // ETH:
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 80, // eraID
+            0, 0, 80, // eraId
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, // eraIndex
+            0, 0, 1, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
+            0x14, 0xee, 0x45, 0xf2, // Function Signature (0x14ee45f2)
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0x20, // data offset
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 3, // authorities count
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-            6, 6, 6, // first authority
+            6, 6, 6, // vec[0]
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-            7, 7, 7, // second
+            7, 7, 7, // vec[1]
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-            8, 8, 8, // third
+            8, 8, 8, // vec[2]
         ];
-
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
+
+        // Test against auto-encoding
+        let new_authorities_token = Token::Array(
+            new_authorities
+                .iter()
+                .map(|auth| Token::Address(auth.into()))
+                .collect(),
+        );
+
+        let change_authorities_fn = Function {
+            name: String::from("changeAuthorities"),
+            inputs: vec![Param {
+                name: String::from("newAuthorities"),
+                kind: ParamType::Array(Box::new(ParamType::Address)),
+            }],
+            outputs: vec![],
+            constant: false,
+        };
+        assert_eq!(
+            &change_authorities_fn.encode_input(&[new_authorities_token])?[..],
+            &expected[100..]
+        );
+        Ok(())
     }
 }

@@ -39,7 +39,7 @@ describe('lock tests', () => {
   afterEach(() => teardown(ctx));
 
   test('lock asset', async () => {
-    let tx = await contracts.starport.methods.lockETH().send({ value: 1e18, from: accounts[0] });
+    let tx = await contracts.starport.methods.lockEth().send({ value: 1e18, from: accounts[0] });
     let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false, ['cash', 'FailedProcessingEthEvent']);
 
     expect(getEventData(goldieLocksEvent)).toEqual({
@@ -56,7 +56,7 @@ describe('lock tests', () => {
   }, 600000 /* 10m */);
 
   test('lock eth', async () => {
-    let tx = await contracts.starport.methods.lockETH().send({ value: 1e18, from: accounts[0] });
+    let tx = await contracts.starport.methods.lockEth().send({ value: 1e18, from: accounts[0] });
     let goldieLocksEvent = await waitForEvent(api, 'cash', 'GoldieLocks', false, ['cash', 'FailedProcessingEthEvent']);
 
     expect(getEventData(goldieLocksEvent)).toEqual({
