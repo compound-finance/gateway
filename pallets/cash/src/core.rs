@@ -470,7 +470,7 @@ pub fn extract_internal<T: Config>(
 
     // Add to notices, notice states, track the latest notice and index by account
     Notices::insert(chain_id, notice_id, &notice);
-    NoticeStates::insert(chain_id, notice_id, NoticeState::from(&notice));
+    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
     LatestNotice::insert(chain_id, (notice_id, notice.hash()));
     AccountNotices::append(recipient, notice_id);
 
@@ -812,6 +812,7 @@ pub fn exec_trx_request_internal<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chains::{Chain, Ethereum};
     use crate::mock::*;
     use crate::rates::{InterestRateModel, Utilization};
     use crate::symbol::USD;
@@ -1008,7 +1009,7 @@ mod tests {
             let quantity = Quantity::from_nominal(symbol, "50.0");
             Prices::insert(symbol, 100_000); // $0.10
 
-            assert_eq!(LatestNotice::get(ChainId::Eth), NoticeId(0, 0));
+            assert_eq!(LatestNotice::get(ChainId::Eth), None);
             assert_eq!(
                 extract_internal::<Test>(asset, holder, recipient, quantity),
                 Ok(())
@@ -1041,7 +1042,10 @@ mod tests {
 
             assert_eq!(notice, Some(expected_notice.clone()));
 
-            assert_eq!(LatestNotice::get(ChainId::Eth), NoticeId(0, 1));
+            assert_eq!(
+                LatestNotice::get(ChainId::Eth),
+                Some((NoticeId(0, 1), expected_notice.hash()))
+            );
             assert_eq!(
                 extract_internal::<Test>(asset, holder, recipient, quantity),
                 Ok(())
@@ -1055,7 +1059,7 @@ mod tests {
             let expected_notice_id_2 = NoticeId(0, 2);
             let expected_notice_2 = Notice::ExtractionNotice(ExtractionNotice::Eth {
                 id: expected_notice_id_2,
-                parent: [0u8; 32],
+                parent: <Ethereum as Chain>::hash_bytes(&expected_notice.encode_notice()),
                 asset: eth_asset,
                 account: eth_recipient,
                 amount: 50000000000000000000,
@@ -1074,7 +1078,10 @@ mod tests {
 
             assert_eq!(notice_2, Some(expected_notice_2.clone()));
 
-            assert_eq!(LatestNotice::get(ChainId::Eth), NoticeId(0, 2));
+            assert_eq!(
+                LatestNotice::get(ChainId::Eth),
+                Some((NoticeId(0, 2), expected_notice_2.hash()))
+            );
         });
     }
 

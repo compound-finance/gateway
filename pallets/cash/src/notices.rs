@@ -316,8 +316,8 @@ pub enum NoticeState {
     Executed,
 }
 
-impl From<&Notice> for NoticeState {
-    fn from(notice: &Notice) -> Self {
+impl NoticeState {
+    pub fn pending(notice: &Notice) -> Self {
         NoticeState::Pending {
             signature_pairs: default_notice_signatures(&notice),
         }
