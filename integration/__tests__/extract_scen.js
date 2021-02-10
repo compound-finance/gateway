@@ -23,7 +23,7 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
       let notice = getNotice(await ashley.extract(50, zrx));
       let signatures = await chain.getNoticeSignatures(notice);
       expect(await ashley.tokenBalance(zrx)).toEqual(900);
-      await starport.unlock(notice, signatures);
+      await starport.invoke(notice, signatures);
       expect(await ashley.tokenBalance(zrx)).toEqual(950);
       expect(await ashley.chainBalance(zrx)).toEqual(50);
     }

@@ -117,7 +117,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
 
     steps:
       - uses: actions/checkout@v2
@@ -125,7 +125,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v1
         with:
-          node-version: '12.x'
+          node-version: '14.x'
 
       - uses: actions/cache@v2
         with:
@@ -137,11 +137,53 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.8.1/solc-static-linux -O /usr/local/bin/solc
           sudo chmod +x /usr/local/bin/solc
 
       - name: Run tests
         run: yarn test
+
+  ethereum-coverage:
+    name: Ethereum Coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ethereum
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '14.x'
+
+      - uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Install solc
+        run: |
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.8.1/solc-static-linux -O /usr/local/bin/solc
+          sudo chmod +x /usr/local/bin/solc
+
+      - name: Run coverage
+        run: yarn coverage
+
+      - uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./ethereum/coverage/coverage-final.json
+          flags: solidity
+          verbose: true
 
   integration-tests:
     name: Integration Tests
@@ -153,7 +195,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v1
         with:
-          node-version: '12.x'
+          node-version: '14.x'
 
       - uses: actions/cache@v2
         with:
@@ -182,7 +224,7 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo wget https://github.com/ethereum/solidity/releases/download/v0.7.5/solc-static-linux -O /usr/local/bin/solc
+          sudo wget https://github.com/ethereum/solidity/releases/download/v0.8.1/solc-static-linux -O /usr/local/bin/solc
           sudo chmod +x /usr/local/bin/solc
 
       - name: Compile Ethereum contracts
@@ -192,10 +234,10 @@ jobs:
 
       - name: Build Compound Chain
         run: |
-          cargo build --release
+          cargo build
 
       - name: Run Integration Test
-        timeout-minutes: 20
+        timeout-minutes: 10
         run: |
           set -eo pipefail
           cd integration

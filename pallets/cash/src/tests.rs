@@ -30,7 +30,7 @@ fn it_fails_exec_trx_request_signed() {
     });
 }
 
-fn initialize_storage() {
+pub fn initialize_storage() {
     runtime_interfaces::set_validator_config_dev_defaults();
     CashModule::initialize_assets(vec![
         ConfigAsset {
@@ -152,11 +152,14 @@ fn correct_error_for_none_value() {
     // });
 }
 
+const TEST_OPF_URL: &str = "http://localhost/";
+
 #[test]
 fn test_process_open_price_feed_happy_path_makes_required_http_call() {
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
     let calls: Vec<testing::PendingRequest> = vec![testing::PendingRequest {
         method: "GET".into(),
-        uri: crate::oracle::OKEX_OPEN_PRICE_FEED_URL.into(),
+        uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
             crate::oracle::tests::API_RESPONSE_TEST_DATA
@@ -236,7 +239,7 @@ fn test_post_price_stale_price() {
     });
 }
 
-fn get_eth() -> ChainAsset {
+pub fn get_eth() -> ChainAsset {
     ChainAsset::Eth(
         <[u8; 20]>::try_from(hex::decode("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap())
             .unwrap(),
@@ -257,42 +260,14 @@ fn test_set_interest_rate_model() {
 }
 
 #[test]
-fn test_get_utilization() {
-    new_test_ext().execute_with(|| {
-        initialize_storage();
-        let asset = get_eth();
-        TotalSupplyAssets::insert(&asset, 100);
-        TotalBorrowAssets::insert(&asset, 50);
-        let utilization = CashModule::get_utilization(&asset).unwrap();
-        assert_eq!(utilization, Utilization::from_nominal("0.5"));
-    });
-}
-
-#[test]
-fn test_get_borrow_rate() {
-    new_test_ext().execute_with(|| {
-        initialize_storage();
-        let asset = get_eth();
-        let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
-        TotalSupplyAssets::insert(&asset, 100);
-        TotalBorrowAssets::insert(&asset, 50);
-
-        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
-            .unwrap();
-        let borrow_rate = CashModule::get_borrow_rate(&asset).unwrap();
-        assert_eq!(borrow_rate, 101.into());
-    });
-}
-
-#[test]
 fn offchain_worker_test() {
     use frame_support::traits::OffchainWorker;
-
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
     let mut calls: Vec<testing::PendingRequest> =
         events::tests::get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
     let price_call = testing::PendingRequest {
         method: "GET".into(),
-        uri: crate::oracle::OKEX_OPEN_PRICE_FEED_URL.into(),
+        uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
             crate::oracle::tests::API_RESPONSE_TEST_DATA

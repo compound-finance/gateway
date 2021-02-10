@@ -45,9 +45,16 @@ use sp_runtime::{
     },
 };
 
+use frame_support::sp_runtime::traits::Convert;
+
 use pallet_session;
+use pallet_timestamp;
+
+#[macro_use]
+extern crate lazy_static;
 
 pub mod chains;
+pub mod converters;
 pub mod core;
 pub mod events;
 pub mod log;
@@ -78,12 +85,16 @@ pub const OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER: &[u8; 41] =
 pub const OCW_STORAGE_LOCK_OPEN_PRICE_FEED: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+pub trait Config:
+    frame_system::Config + CreateSignedTransaction<Call<Self>> + pallet_timestamp::Config
+{
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
 
     /// The overarching dispatch call type.
     type Call: From<Call<Self>>;
+
+    type TimeConverter: Convert<<Self as pallet_timestamp::Config>::Moment, Timestamp>;
 }
 
 decl_storage! {
@@ -152,6 +163,9 @@ decl_storage! {
         /// The mapping of (status of) notices to be signed for Ethereum, by notice id.
         NoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
 
+        /// The next notice id that will be generated
+        NextNoticeId get(fn next_notice_id): NoticeId;
+
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
@@ -169,6 +183,14 @@ decl_storage! {
 
         /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
         Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
+
+        /// XXX Consider renaming this, this is more like a miner fee now
+        ReserveFactor get(fn reserve_factors): map hasher(blake2_128_concat) ChainAsset => crate::rates::ReserveFactor;
+
+        // PriceReporter;
+        // PriceKeyMapping;
+        // XXX delete me (part of magic extract)
+        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
     }
     add_extra_genesis {
         config(validator_ids): Vec<[u8;32]>;
@@ -246,6 +268,9 @@ decl_error! {
         /// Open oracle cannot fetch price due to an http error
         OpenOracleHttpFetchError,
 
+        /// Open oracle cannot fetch price due to an http error
+        OpenOracleBadUrl,
+
         /// Open oracle cannot deserialize the messages and/or signatures from eth encoded hex to binary
         OpenOracleApiResponseHexError,
 
@@ -272,9 +297,6 @@ decl_error! {
 
         /// Could not get the utilization ratio
         InterestRateModelGetUtilizationFailed,
-
-        /// Notice issue
-        InvalidNoticeParams,
 
         /// Signature recovery errror
         InvalidSignature,
@@ -348,6 +370,10 @@ decl_module! {
 
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
+
+        fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
+            Self::on_initialize_internal(block)
+        }
 
         /// Set the price using the open price feed.
         #[weight = 0]
@@ -499,14 +525,19 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
-    /// Check to make sure an asset is supported. Only returns Err when the asset is not supported
-    /// by compound chain.
-    fn check_asset_supported(asset: &ChainAsset) -> Result<(), Error<T>> {
-        if !AssetSymbols::contains_key(&asset) {
-            return Err(<Error<T>>::AssetNotSupported);
+    /// Called by substrate on block initialization. Note, this can fail under various scenarios
+    /// but the function signature does not allow us to express that to the substrate system.
+    /// This is our final stand
+    fn on_initialize_internal(block: T::BlockNumber) -> frame_support::weights::Weight {
+        match crate::core::on_initialize_core::<T>() {
+            Ok(weight) => weight,
+            Err(err) => {
+                // todo: something is going very wrong here..... we need to take some very serious
+                // action like invalidating the block if possible.
+                error!("Could not initialize block! {:#?} {:#?}", block, err);
+                0
+            }
         }
-
-        Ok(())
     }
 
     /// Update the interest rate model
@@ -514,28 +545,16 @@ impl<T: Config> Module<T> {
         asset: ChainAsset,
         model: InterestRateModel,
     ) -> Result<(), Error<T>> {
-        Self::check_asset_supported(&asset)?;
+        cash_err!(
+            crate::core::check_asset_supported(&asset),
+            <Error<T>>::AssetNotSupported
+        )?;
         cash_err!(
             model.check_parameters(),
             <Error<T>>::InterestRateModelInvalidParameters
         )?;
         RateModels::insert(&asset, model);
         Ok(())
-    }
-
-    /// Get the borrow rate for the given asset
-    pub fn get_borrow_rate(asset: &ChainAsset) -> Result<APR, Error<T>> {
-        if !RateModels::contains_key(asset) {
-            // XXX we should just make this part of the model getter
-            return Err(<Error<T>>::InterestRateModelNotSet);
-        }
-        let model = RateModels::get(asset);
-        let utilization = Self::get_utilization(asset)?;
-        let rate = cash_err!(
-            model.get_borrow_rate(utilization, 0),
-            <Error<T>>::InterestRateModelGetBorrowRateFailed
-        )?;
-        Ok(rate)
     }
 
     /// Body of the post_price extrinsic
@@ -602,18 +621,6 @@ impl<T: Config> Module<T> {
 
         // todo: update storage
         Ok(())
-    }
-
-    /// Get the utilization in the provided asset.
-    pub fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Error<T>> {
-        Self::check_asset_supported(asset)?;
-        let total_supply = TotalSupplyAssets::get(asset);
-        let total_borrow = TotalBorrowAssets::get(asset);
-        let utilization = cash_err!(
-            rates::get_utilization(total_supply, total_borrow),
-            <Error<T>>::InterestRateModelGetUtilizationFailed
-        )?;
-        Ok(utilization)
     }
 
     /// Convert from the chain spec file format hex encoded strings into the local storage format, binary blob
@@ -705,6 +712,13 @@ impl<T: Config> Module<T> {
             // working in another thread, no big deal
             return Ok(());
         }
+
+        // get the URL to poll, just return if there is no URL set up
+        let url = runtime_interfaces::validator_config_interface::get_opf_url().unwrap_or(vec![]);
+        if url.len() == 0 {
+            return Ok(());
+        }
+
         // check to see if it is time to poll or not
         let latest_price_feed_poll_block_number_storage =
             StorageValueRef::persistent(OCW_LATEST_PRICE_FEED_POLL_BLOCK_NUMBER);
@@ -718,9 +732,11 @@ impl<T: Config> Module<T> {
                 return Ok(());
             }
         }
+        let url = cash_err!(String::from_utf8(url), <Error<T>>::OpenOracleBadUrl)?;
+
         // poll
         let api_response = cash_err!(
-            crate::oracle::open_price_feed_request_okex(),
+            crate::oracle::open_price_feed_request(&url),
             <Error<T>>::OpenOracleHttpFetchError
         )?;
 
@@ -805,9 +821,7 @@ impl<T: Config> Module<T> {
             let pending_events_block = block_numbers.iter().min();
             if (pending_events_block.is_some()) {
                 let events_block: u32 = *pending_events_block.unwrap();
-                // from_block = events::get_next_block_hex(events_block.to_string())
-                //     .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
-                from_block = String::from("earliest");
+                from_block = format!("{:#X}", events_block);
             } else {
                 from_block = String::from("earliest");
             }
@@ -920,6 +934,16 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 }
             }
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .and_provides(sig)
+                .propagate(true)
+                .build(),
+            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .and_provides(sig)
+                .propagate(true)
+                .build(),
+            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)
                 .propagate(true)

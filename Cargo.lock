@@ -1592,6 +1592,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethbloom"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "779864b9c7f7ead1f092972c3257496c6a84b46dba2ce131dd8a282cb2cc5972"
+dependencies = [
+ "crunchy",
+ "fixed-hash 0.7.0",
+ "tiny-keccak 2.0.2",
+]
+
+[[package]]
 name = "ethereum-client"
 version = "0.1.0"
 dependencies = [
@@ -1631,6 +1642,18 @@ dependencies = [
  "impl-rlp 0.3.0",
  "impl-serde",
  "primitive-types 0.8.0",
+ "uint 0.9.0",
+]
+
+[[package]]
+name = "ethereum-types"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f64b5df66a228d85e4b17e5d6c6aa43b0310898ffe8a85988c4c032357aaabfd"
+dependencies = [
+ "ethbloom 0.11.0",
+ "fixed-hash 0.7.0",
+ "primitive-types 0.9.0",
  "uint 0.9.0",
 ]
 
@@ -4364,15 +4387,18 @@ dependencies = [
  "compound-crypto",
  "ethabi 12.0.0",
  "ethereum-client",
+ "ethereum-types 0.11.0",
  "frame-support",
  "frame-system",
  "hex",
  "hex-literal",
+ "lazy_static",
  "libsecp256k1",
  "num-bigint 0.3.1",
  "num-traits",
  "our-std",
  "pallet-session",
+ "pallet-timestamp",
  "parity-scale-codec",
  "parking_lot 0.11.1",
  "runtime-interfaces",
@@ -5026,6 +5052,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "primitive-types"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2415937401cb030a2a0a4d922483f945fa068f52a7dbb22ce0fe5f2b6f6adace"
+dependencies = [
+ "fixed-hash 0.7.0",
+ "uint 0.9.0",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5625,6 +5661,7 @@ version = "1.0.0"
 dependencies = [
  "compound-crypto",
  "lazy_static",
+ "our-std",
  "parity-scale-codec",
  "sp-externalities",
  "sp-io",

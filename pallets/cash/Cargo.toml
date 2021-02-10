@@ -22,11 +22,13 @@ sp-core = { default-features = false, version = '2.0.0', git = 'https://github.c
 sp-io = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git', features = ["disable_oom", "disable_panic_handler"]}
 sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
 ethabi = { version = "12.0.0", default-features = false }
+ethereum-types = { version = "0.11.0", default-features = false }
 hex = { version = "0.4.2", default-features = false }
 hex-literal = {version = "0.3.1", default-features = false}
 libsecp256k1 = { version = "0.3.2", default-features = false, features = ["hmac"] }
 tiny-keccak = { version = "2.0.0", features = ["keccak"], default-features = false }
 pallet-session = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+pallet-timestamp = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
 
 num-bigint = { default-features = false, version = "0.3" }
 num-traits = { default-features = false, version = "0.2" }
@@ -38,6 +40,7 @@ compound-crypto = { path = '../../compound-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
 our-std = { path = "../../std", default-features = false }
 parking_lot = "0.11.1"
+lazy_static = "1.4.0"
 
 [features]
 default = ['std']

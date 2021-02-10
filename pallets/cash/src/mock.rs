@@ -1,3 +1,4 @@
+use crate::types::Timestamp;
 use crate::{Call, Config, Module};
 use codec::alloc::sync::Arc;
 use frame_support::{impl_outer_dispatch, impl_outer_event, impl_outer_origin, parameter_types};
@@ -39,9 +40,14 @@ impl_outer_event! {
 #[derive(Clone, Eq, PartialEq)]
 pub struct Test;
 
+pub const MILLISECS_PER_BLOCK: u128 = 6000;
+
+pub const SLOT_DURATION: u128 = MILLISECS_PER_BLOCK;
+
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
+    pub const MinimumPeriod: u128 = SLOT_DURATION / 2;
 }
 
 impl frame_system::Config for Test {
@@ -67,6 +73,14 @@ impl frame_system::Config for Test {
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
     type SS58Prefix = SS58Prefix;
+}
+
+impl pallet_timestamp::Config for Test {
+    /// A timestamp: milliseconds since the unix epoch.
+    type Moment = Timestamp;
+    type OnTimestampSet = ();
+    type MinimumPeriod = MinimumPeriod;
+    type WeightInfo = ();
 }
 
 impl frame_system::offchain::SigningTypes for Test {
@@ -99,6 +113,7 @@ where
 impl Config for Test {
     type Event = TestEvent;
     type Call = Call<Test>;
+    type TimeConverter = crate::converters::TimeConverter<Self>;
 }
 
 // Build genesis storage according to the mock runtime.

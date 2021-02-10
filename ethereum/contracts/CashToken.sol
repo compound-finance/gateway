@@ -4,6 +4,12 @@ pragma solidity ^0.8.1;
 
 import "./ICash.sol";
 
+/**
+ * @title Compound Cash Token
+ * @author Compound Finance
+ * @notice The Compound Cash Token for Ethereum
+ * @dev XXX Finish implementing ERC-20 features
+ */
 contract CashToken is ICash {
     struct NextCashYieldAndIndex {
         uint128 yield;
