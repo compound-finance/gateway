@@ -181,7 +181,7 @@ jobs:
       - uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/coverage-final.json
+          files: ./ethereum/coverage/coverage-final.json
           flags: solidity
           verbose: true
 
