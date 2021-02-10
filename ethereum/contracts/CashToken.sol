@@ -10,26 +10,23 @@ import "./ICash.sol";
  * @dev XXX Finish implementing ERC-20 features
  */
 contract CashToken is ICash {
-    struct NextCashYieldAndIndex {
+    struct CashYieldAndIndex {
         uint128 yield;
         uint128 index;
     }
 
     address immutable public admin;
+    uint public cashYieldStartAt;
+    CashYieldAndIndex public cashYieldAndIndex;
+    uint public nextCashYieldStartAt;
+    CashYieldAndIndex public nextCashYieldAndIndex;
+
     mapping (address => mapping (address => uint)) internal allowances;
     uint internal totalCashPrincipal;
     mapping (address => uint256) internal cashPrincipal;
-    uint public cashYieldStartAt;
-    uint128 public cashYield;
-    uint128 public cashIndex;
-    uint public nextCashYieldStartAt;
-    NextCashYieldAndIndex public nextCashYieldAndIndex;
 
 	constructor(address starport) {
 		admin = starport;
-        cashYieldStartAt = block.timestamp;
-        cashYield = 43628;
-        cashIndex = 1e6;
 	}
 
     function mint(address account, uint amountPrincipal) external override {
@@ -48,23 +45,21 @@ contract CashToken is ICash {
         emit Transfer(account, address(0), amount);
     }
 
-    function setFutureYield(uint128 nextYield, uint nextYieldStartAt, uint128 nextIndex) external override {
+    function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external override {
         require(msg.sender == admin, "Sender is not an admin");
         uint nextAt = nextCashYieldStartAt;
 
         //@dev Cash yield is not set yet, first call of this method
         if (nextAt == 0) {
             cashYieldStartAt = nextYieldStartAt;
-            cashYield = nextYield;
-            cashIndex = nextIndex;
+            cashYieldAndIndex = CashYieldAndIndex(nextYield, nextIndex);
         } else if (block.timestamp > nextAt) {
             cashYieldStartAt = nextAt;
-            cashYield = nextCashYieldAndIndex.yield;
-            cashIndex = nextCashYieldAndIndex.index;
+            cashYieldAndIndex = nextCashYieldAndIndex;
         }
 
         nextCashYieldStartAt = nextYieldStartAt;
-        nextCashYieldAndIndex = NextCashYieldAndIndex(nextYield, nextIndex);
+        nextCashYieldAndIndex = CashYieldAndIndex(nextYield, nextIndex);
     }
 
     function getCashIndex() public view virtual override returns (uint) {
@@ -75,7 +70,7 @@ contract CashToken is ICash {
         if (block.timestamp > nextAt) {
             return calculateIndex(nextCashYieldAndIndex.index, nextCashYieldAndIndex.yield, nextAt);
         }
-        return calculateIndex(cashIndex, cashYield, cashYieldStartAt);
+        return calculateIndex(cashYieldAndIndex.index, cashYieldAndIndex.yield, cashYieldStartAt);
     }
 
     function totalSupply() external view override returns (uint) {
@@ -135,8 +130,8 @@ contract CashToken is ICash {
         return 6;
     }
 
-    function calculateIndex(uint index, uint yield, uint startAt) internal view returns (uint) {
-         // TODO work more on this formula
+    function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
+         // TODO work more on this formula, it is not right now
         return index * (271828 ** yield * (block.timestamp - startAt)) / 100000;
     }
 }

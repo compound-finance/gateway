@@ -23,7 +23,7 @@ interface IERC20 {
 interface ICash is IERC20 {
     function mint(address account, uint amountPrincipal) external;
     function burn(address account, uint amountPrincipal) external;
-    function setFutureYield(uint128 nextYield, uint nextYieldStartAt, uint128 nextIndex) external;
+    function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external;
     function getCashIndex() external returns (uint);
 }
 
