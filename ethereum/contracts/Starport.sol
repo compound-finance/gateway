@@ -288,9 +288,6 @@ contract Starport {
         bytes calldata target,
         bytes[] calldata notices
     ) internal view {
-        // Note: this check should be proven to be redundant
-        require(notices.length > 0, "Must have at least one notice");
-
         bytes32 currHash = hashNotice(target);
         require(isNoticeUsed[currHash] == false, "Target notice can not be reused");
 
