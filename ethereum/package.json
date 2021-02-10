@@ -15,6 +15,7 @@
     "console": "npx -n --experimental-repl-await saddle console"
   },
   "resolutions": {
-    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git"
+    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",
+    "ganache-core": "=2.13.2"
   }
 }
