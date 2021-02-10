@@ -27,6 +27,8 @@ contract CashToken is ICash {
 
 	constructor(address starport) {
 		admin = starport;
+        cashYieldStartAt = block.timestamp;
+        cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e6});
 	}
 
     function mint(address account, uint amountPrincipal) external override {
@@ -49,28 +51,21 @@ contract CashToken is ICash {
         require(msg.sender == admin, "Sender is not an admin");
         uint nextAt = nextCashYieldStartAt;
 
-        //@dev Cash yield is not set yet, first call of this method
-        if (nextAt == 0) {
-            cashYieldStartAt = nextYieldStartAt;
-            cashYieldAndIndex = CashYieldAndIndex(nextYield, nextIndex);
-        } else if (block.timestamp > nextAt) {
+        if (nextAt != 0 && block.timestamp > nextAt) {
             cashYieldStartAt = nextAt;
             cashYieldAndIndex = nextCashYieldAndIndex;
         }
 
         nextCashYieldStartAt = nextYieldStartAt;
-        nextCashYieldAndIndex = CashYieldAndIndex(nextYield, nextIndex);
+        nextCashYieldAndIndex = CashYieldAndIndex({yield: nextYield, index: nextIndex});
     }
 
     function getCashIndex() public view virtual override returns (uint) {
         uint nextAt = nextCashYieldStartAt;
-        if (nextAt == 0) {
-            return 1e6;
+        if (nextAt != 0 && block.timestamp > nextAt) {
+            return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
         }
-        if (block.timestamp > nextAt) {
-            return calculateIndex(nextCashYieldAndIndex.index, nextCashYieldAndIndex.yield, nextAt);
-        }
-        return calculateIndex(cashYieldAndIndex.index, cashYieldAndIndex.yield, cashYieldStartAt);
+        return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
     }
 
     function totalSupply() external view override returns (uint) {
@@ -131,7 +126,10 @@ contract CashToken is ICash {
     }
 
     function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
-         // TODO work more on this formula, it is not right now
-        return index * (271828 ** yield * (block.timestamp - startAt)) / 100000;
+         // TODO it needs more work and effort here
+        uint epower = yield * (block.timestamp - startAt);
+        uint eN = 271828;
+        uint eD = 100000;
+        return index * eN ** epower / eD ** epower;
     }
 }
