@@ -362,7 +362,7 @@ impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
         if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
             // delete existing validators
             for kv in <Validators>::iter() {
-                <NextValidators>::take(&kv.0);
+                <Validators>::take(&kv.0);
             }
             // push next validators into current validators
             for (id, chain_keys) in <NextValidators>::iter() {
@@ -462,8 +462,7 @@ decl_module! {
 
         #[weight = 0] // XXX
         pub fn change_authorities(origin, keys: Vec<(AccountId32, ChainKeys)>) -> dispatch::DispatchResult {
-            // TODO: assert root only
-
+            ensure_root(origin)?;
             for (id, _chain_keys) in <NextValidators>::iter() {
                 <NextValidators>::take(id);
             }

@@ -376,5 +376,7 @@
     }
   },
   "Source10": "AccountRS",
-  "LiquidityFactor": "u128"
+  "LiquidityFactor": "u128",
+  "Address": "MultiAddress",
+  "LookupSource": "MultiAddress"
 }

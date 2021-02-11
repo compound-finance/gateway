@@ -22,15 +22,24 @@ function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = nul
   });
 }
 
+function signAndSend(call, signerPair, api, onFinalize = true, rejectOnFailure = true) {
+  const callFn = (callback) => call.signAndSend(signerPair, callback);
+  return sendAndHandleEvents(callFn, api);
+}
+
 function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = true) {
+  const callFn = (callback) => call.send(callback);
+  return sendAndHandleEvents(callFn, api);
+}
+
+function sendAndHandleEvents(sendable, api, onFinalize = true, rejectOnFailure = true) {
   return new Promise((resolve, reject) => {
     let unsub;
     let id = trxId++;
     let debugMsg = (msg) => {
       debug(() => `sendAndWaitForEvents[id=${id}] - ${msg}`);
     }
-
-    call.send(({ events = [], status }) => {
+    sendable(({ events = [], status }) => {
       debugMsg(`Current status is ${status}`);
 
       let doResolve = (events) => {
@@ -62,14 +71,12 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
               return new Error(`DispatchError[id=${id}]: ${error.toString()}`);
             }
           });
-
         if (rejectOnFailure && failures.length > 0) {
           reject(failures[0]);
         } else {
           resolve(events);
         }
       };
-
       if (status.isInBlock) {
         debugMsg(`Transaction included at blockHash ${status.asInBlock}`);
         if (!onFinalize) {
@@ -84,7 +91,6 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
         reject("Transaction failed (Invalid)");
       }
     }).then((unsub_) => unsub = unsub_);
-
     debugMsg(`Submitted unsigned transaction...`);
   });
 }
@@ -138,6 +144,7 @@ module.exports = {
   findEvent,
   getEventData,
   sendAndWaitForEvents,
+  signAndSend,
   waitForEvent,
   getNotice,
   getEventName,
