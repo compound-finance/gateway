@@ -4,9 +4,7 @@ use crate::rpc;
 use compound_chain_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
 use sc_client_api::{ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
-use sc_network::NetworkService;
-use sc_service::{config::Configuration, error::Error as ServiceError, RpcHandlers, TaskManager};
-use sp_runtime::traits::Block as BlockT;
+use sc_service::{config::Configuration, error::Error as ServiceError, TaskManager};
 use std::sync::Arc;
 use std::time::Duration;
 
