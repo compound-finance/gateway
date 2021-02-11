@@ -81,7 +81,7 @@ contract CashToken is ICash {
         uint principal = amount / getCashIndex();
         cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
         cashPrincipal[msg.sender] = cashPrincipal[msg.sender] - principal;
-        emit Transfer(msg.sender, recipient, principal);
+        emit Transfer(msg.sender, recipient, amount);
         return true;
     }
 
@@ -102,7 +102,7 @@ contract CashToken is ICash {
         allowances[sender][spender] = allowances[sender][spender] - amount;
         cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
         cashPrincipal[sender] = cashPrincipal[sender] - principal;
-        emit Transfer(msg.sender, recipient, principal);
+        emit Transfer(sender, recipient, amount);
         return true;
     }
 
@@ -126,7 +126,7 @@ contract CashToken is ICash {
     }
 
     function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
-         // TODO it needs more work and effort here
+        // TODO it needs more work and effort here
         uint epower = yield * (block.timestamp - startAt);
         uint eN = 271828;
         uint eD = 100000;

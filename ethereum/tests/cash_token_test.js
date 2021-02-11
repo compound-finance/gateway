@@ -1,30 +1,18 @@
-const ABICoder = require("web3-eth-abi");
 const {
-  bigInt,
-  e18,
-  getNextContractAddress,
-  nRandomWallets,
-  nRandomAuthorities,
-  replaceByte,
-  sign,
-  signAll,
   sendRPC,
-  ETH_HEADER,
-  ETH_ADDRESS,
   ETH_ZERO_ADDRESS
 } = require('./utils');
 
-// TODO: test fee token
-describe('Starport', () => {
+describe('CashToken', () => {
   let cash;
-  let [root, admin, account1, account2] = saddle.accounts;
+  let [root, admin, account1, account2, account3] = saddle.accounts;
 
 
   beforeEach(async () => {
     cash = await deploy('CashToken', [admin], {from: root});
   });
 
-  describe('Unit Tests', () => {
+  describe('#constructor', () => {
     it('should have correct references', async () => {
       expect(await call(cash, 'admin')).toMatchAddress(admin);
       cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
@@ -116,14 +104,14 @@ describe('Starport', () => {
       // An attempt to burn tokens
       const tx = await send(cash, 'burn', [account1, burnAmount], { from: admin });
 
-      //expect(await call(cash, 'totalSupply')).toEqualNumber(burnAmount * cashIndex);
-      // expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(burnAmount * cashIndex);
+      expect(await call(cash, 'totalSupply')).toEqualNumber(burnAmount * cashIndex);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(burnAmount * cashIndex);
 
-      // expect(tx.events.Transfer.returnValues).toMatchObject({
-      //   from: account1,
-      //   to: ETH_ZERO_ADDRESS,
-      //   value: (cashIndex * burnAmount).toString()
-      // });
+      expect(tx.events.Transfer.returnValues).toMatchObject({
+        from: account1,
+        to: ETH_ZERO_ADDRESS,
+        value: (cashIndex * burnAmount).toString()
+      });
     });
 
     it('should fail if called not by an admin', async() => {
@@ -131,6 +119,156 @@ describe('Starport', () => {
     })
   });
 
+  describe('#totalSupply', () => {
+    it('should return total supply of cash', async () => {
+      expect(await call(cash, 'totalSupply')).toEqualNumber(0);
 
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal1 = 10e6;
+      const amountPrincipal2 = 5e6;
+      await send(cash, 'mint', [account1, amountPrincipal1], { from: admin });
+      await send(cash, 'mint', [account2, amountPrincipal2], { from: admin });
 
+      expect(await call(cash, 'totalSupply')).toEqualNumber((amountPrincipal1 + amountPrincipal2) * cashIndex);
+    });
+  });
+
+  describe('#balanceOf', () => {
+    it('should return balance of Cash tokens for given account', async () => {
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
+      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(0);
+
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal1 = 10e6;
+      const amountPrincipal2 = 5e6;
+      await send(cash, 'mint', [account1, amountPrincipal1], { from: admin });
+      await send(cash, 'mint', [account2, amountPrincipal2], { from: admin });
+
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(amountPrincipal1 * cashIndex);
+      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(amountPrincipal2 * cashIndex);
+    });
+  });
+
+  describe('#name', () => {
+    it('should return Cash token name', async () => {
+      expect(await call(cash, 'name', [])).toEqual("SECRET, change");
+    });
+  });
+
+  describe('#symbol', () => {
+    it('should return Cash token symbol', async () => {
+      expect(await call(cash, 'symbol', [])).toEqual("SECRET");
+    });
+  });
+
+  describe('#decimals', () => {
+    it('should return Cash token decimals number', async () => {
+      expect(await call(cash, 'decimals', [])).toEqualNumber(6);
+    });
+  });
+
+  describe('#approve, allowance', () => {
+    it('should approve transfers and modify allowances', async () => {
+      expect(await call(cash, 'allowance', [account1, account2])).toEqualNumber(0);
+      const amount = 10e6;
+      const tx = await send(cash, 'approve', [account2, amount], { from: account1});
+      expect(await call(cash, 'allowance', [account1, account2])).toEqualNumber(amount);
+      expect(tx.events.Approval.returnValues).toMatchObject({
+        owner: account1,
+        spender: account2,
+        value: amount.toString()
+      });
+    });
+  });
+
+  describe('#transfer', () => {
+    it('should transfer Cash tokens between users', async() => {
+      // Mint tokes first to have something to transfer
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal = 10e6;
+      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+
+      const amount = amountPrincipal * cashIndex;
+      const tx = await send(cash, 'transfer', [account2, amount], { from: account1 });
+      expect(tx.events.Transfer.returnValues).toMatchObject({
+        from: account1,
+        to: account2,
+        value: amount.toString()
+      });
+
+      expect(await call(cash, 'totalSupply')).toEqualNumber(amount);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
+      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(amount);
+    });
+
+    it('should fail if recipient is wrong', async() => {
+      await expect(send(cash, 'transfer', [account1, 1e6], { from: account1 })).rejects.toRevert("revert Invalid recipient");
+    });
+
+    it('should fail if not enough Cash tokens to transfer', async() => {
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal = 10e6;
+      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+
+      const amount = amountPrincipal * cashIndex;
+      // An attempt to transfer double amount
+      await expect(send(cash, 'transfer', [account2, 2 * amount], { from: account1 })).rejects.toRevert("revert");
+    });
+  });
+
+  describe('#transferFrom', () => {
+    it('should transfer Cash tokens between users', async() => {
+      // Mint tokes first to have something to transfer
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal = 10e6;
+      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const amount = amountPrincipal * cashIndex;
+
+      // Approve an account2 to move tokens on behalf of account1
+      await send(cash, 'approve', [account2, amount], {from: account1});
+
+      const tx = await send(cash, 'transferFrom', [account1, account3, amount], { from: account2 });
+      expect(tx.events.Transfer.returnValues).toMatchObject({
+        from: account1,
+        to: account3,
+        value: amount.toString()
+      });
+
+      expect(await call(cash, 'totalSupply')).toEqualNumber(amount);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
+      expect(await call(cash, 'balanceOf', [account3])).toEqualNumber(amount);
+    });
+
+    it('should fail if recipient is wrong', async() => {
+      await expect(send(cash, 'transferFrom', [account1, account1, 1e6], { from: account1 })).rejects.toRevert("revert Invalid recipient");
+    });
+
+    it('should fail if not enough allowance', async() => {
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal = 10e6;
+      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const amount = amountPrincipal * cashIndex;
+
+      // Approve an account2 to move tokens on behalf of account1
+      await send(cash, 'approve', [account2, amount / 2], {from: account1});
+
+      // An attempt to transfer double the approved amount
+      await expect(send(cash, 'transferFrom', [account1, account3, amount], { from: account2 })).rejects.toRevert("revert");
+    });
+
+    it('should fail if not enough Cash tokens to transfer', async() => {
+      const cashIndex = await call(cash, 'getCashIndex');
+      const amountPrincipal = 10e6;
+      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const amount = amountPrincipal * cashIndex;
+
+      // Approve an account2 to move tokens on behalf of account1
+      await send(cash, 'approve', [account2, 2 * amount], {from: account1});
+
+      // An attempt to transfer double the available amount
+      await expect(send(cash, 'transferFrom', [account1, account3, 2 * amount], { from: account2 })).rejects.toRevert("revert");
+    });
+  });
+
+  it.todo('#getCashIndex tests');
 });
