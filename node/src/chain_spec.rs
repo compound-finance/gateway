@@ -61,13 +61,6 @@ fn development_genesis() -> GenesisConfig {
         vec![authority_keys_from_seed("Alice")],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        // Pre-funded accounts
-        vec![
-            get_account_id_from_seed::<sr25519::Public>("Alice"),
-            get_account_id_from_seed::<sr25519::Public>("Bob"),
-            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-        ],
         true,
     )
 }
@@ -102,21 +95,6 @@ fn local_testnet_genesis() -> GenesisConfig {
         ],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        // Pre-funded accounts
-        vec![
-            get_account_id_from_seed::<sr25519::Public>("Alice"),
-            get_account_id_from_seed::<sr25519::Public>("Bob"),
-            get_account_id_from_seed::<sr25519::Public>("Charlie"),
-            get_account_id_from_seed::<sr25519::Public>("Dave"),
-            get_account_id_from_seed::<sr25519::Public>("Eve"),
-            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-        ],
         true,
     )
 }
@@ -152,21 +130,6 @@ fn staging_testnet_genesis() -> GenesisConfig {
         ],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        // Pre-funded accounts
-        vec![
-            get_account_id_from_seed::<sr25519::Public>("Alice"),
-            get_account_id_from_seed::<sr25519::Public>("Bob"),
-            get_account_id_from_seed::<sr25519::Public>("Charlie"),
-            get_account_id_from_seed::<sr25519::Public>("Dave"),
-            get_account_id_from_seed::<sr25519::Public>("Eve"),
-            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-        ],
         true,
     )
 }
@@ -196,7 +159,6 @@ pub fn staging_testnet_config() -> ChainSpec {
 fn testnet_genesis(
     initial_authorities: Vec<(AccountId, AuraId, GrandpaId)>,
     root_key: AccountId,
-    endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
 ) -> GenesisConfig {
     GenesisConfig {
@@ -354,7 +316,6 @@ pub(crate) mod tests {
         testnet_genesis(
             vec![authority_keys_from_seed("Alice")],
             get_account_id_from_seed::<sr25519::Public>("Alice"),
-            vec![],
             false,
         )
     }
