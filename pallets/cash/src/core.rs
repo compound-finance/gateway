@@ -779,6 +779,8 @@ pub fn exec_trx_request_internal<T: Config>(
     signature: ChainAccountSignature,
     nonce: Nonce,
 ) -> Result<(), Reason> {
+    log!("exec_trx_request_internal: {}", nonce);
+
     let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
 
     // Build Account=(Chain, Recover(Chain, Signature, NoncedRequest))
