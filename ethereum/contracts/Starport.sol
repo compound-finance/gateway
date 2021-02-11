@@ -199,7 +199,9 @@ contract Starport {
 
         bytes memory calldata_ = bytes(notice[100:]);
         (bool success, bytes memory callResult) = address(this).call(calldata_);
-        require(success, "Call failed");
+        if (!success) {
+            require(false, _getRevertMsg(callResult));
+        }
 
         return callResult;
     }
@@ -364,5 +366,16 @@ contract Starport {
         require(signer != address(0), "ECDSA: invalid signature");
 
         return signer;
+    }
+
+    function _getRevertMsg(bytes memory _returnData) internal pure returns (string memory) {
+        // If the _res length is less than 68, then the transaction failed silently (without a revert message)
+        if (_returnData.length < 68) return 'Call failed';
+
+        assembly {
+            // Slice the sighash.
+            _returnData := add(_returnData, 0x04)
+        }
+        return abi.decode(_returnData, (string)); // All that remains is the revert string
     }
 }

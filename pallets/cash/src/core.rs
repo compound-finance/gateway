@@ -32,8 +32,8 @@ use crate::{
     },
     AccountNotices, AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
     ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, LatestNotice, Module,
-    Nonces, NoticeStates, Notices, Prices, RateModels, ReserveFactor, SubmitTransaction,
-    SupplyIndices, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    Nonces, NoticeHashes, NoticeStates, Notices, Prices, RateModels, ReserveFactor,
+    SubmitTransaction, SupplyIndices, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 use frame_support::sp_runtime::traits::Convert;
 use our_std::convert::TryInto;
@@ -469,9 +469,11 @@ pub fn extract_internal<T: Config>(
     }?);
 
     // Add to notices, notice states, track the latest notice and index by account
+    let notice_hash = notice.hash();
     Notices::insert(chain_id, notice_id, &notice);
     NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
-    LatestNotice::insert(chain_id, (notice_id, notice.hash()));
+    LatestNotice::insert(chain_id, (notice_id, notice_hash));
+    NoticeHashes::insert(notice_hash, notice_id);
     AccountNotices::append(recipient, notice_id);
 
     // Deposit Notice Event
@@ -892,9 +894,14 @@ mod tests {
             let asset_balances_pre = AssetBalances::get(asset, holder);
             let total_supply_pre = TotalSupplyAssets::get(asset);
             let total_borrows_pre = TotalBorrowAssets::get(asset);
+            let events_pre: Vec<_> = System::events().into_iter().collect();
+            let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
             let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
                 NoticeStates::iter().collect();
-            let events_pre: Vec<_> = System::events().into_iter().collect();
+            let latest_notice_pre: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
+            let notice_hashes_pre: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
+            let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
+                AccountNotices::iter().collect();
 
             let res = extract_internal::<Test>(asset, holder, recipient, quantity);
 
@@ -903,15 +910,25 @@ mod tests {
             let asset_balances_post = AssetBalances::get(asset, holder);
             let total_supply_post = TotalSupplyAssets::get(asset);
             let total_borrows_post = TotalBorrowAssets::get(asset);
+            let events_post: Vec<_> = System::events().into_iter().collect();
+            let notices_post: Vec<(NoticeId, Notice)> =
+                Notices::iter_prefix(ChainId::Eth).collect();
             let notice_states_post: Vec<(ChainId, NoticeId, NoticeState)> =
                 NoticeStates::iter().collect();
-            let events_post: Vec<_> = System::events().into_iter().collect();
+            let latest_notice_post: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
+            let notice_hashes_post: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
+            let account_notices_post: Vec<(ChainAccount, Vec<NoticeId>)> =
+                AccountNotices::iter().collect();
 
             assert_eq!(asset_balances_pre, asset_balances_post);
             assert_eq!(total_supply_pre, total_supply_post);
             assert_eq!(total_borrows_pre, total_borrows_post);
-            assert_eq!(notice_states_pre.len(), notice_states_post.len());
             assert_eq!(events_pre.len(), events_post.len());
+            assert_eq!(notices_pre, notices_post);
+            assert_eq!(notice_states_pre, notice_states_post);
+            assert_eq!(latest_notice_pre, latest_notice_post);
+            assert_eq!(notice_hashes_pre, notice_hashes_post);
+            assert_eq!(account_notices_pre, account_notices_post);
         });
     }
 
@@ -932,9 +949,14 @@ mod tests {
             let asset_balances_pre = AssetBalances::get(asset, holder);
             let total_supply_pre = TotalSupplyAssets::get(asset);
             let total_borrows_pre = TotalBorrowAssets::get(asset);
+            let events_pre: Vec<_> = System::events().into_iter().collect();
+            let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
             let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
                 NoticeStates::iter().collect();
-            let events_pre: Vec<_> = System::events().into_iter().collect();
+            let latest_notice_pre: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
+            let notice_hashes_pre: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
+            let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
+                AccountNotices::iter().collect();
 
             let res = extract_internal::<Test>(asset, holder, recipient, quantity);
 
@@ -943,9 +965,15 @@ mod tests {
             let asset_balances_post = AssetBalances::get(asset, holder);
             let total_supply_post = TotalSupplyAssets::get(asset);
             let total_borrows_post = TotalBorrowAssets::get(asset);
+            let events_post: Vec<_> = System::events().into_iter().collect();
+            let notices_post: Vec<(NoticeId, Notice)> =
+                Notices::iter_prefix(ChainId::Eth).collect();
             let notice_states_post: Vec<(ChainId, NoticeId, NoticeState)> =
                 NoticeStates::iter().collect();
-            let events_post: Vec<_> = System::events().into_iter().collect();
+            let latest_notice_post: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
+            let notice_hashes_post: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
+            let account_notices_post: Vec<(ChainAccount, Vec<NoticeId>)> =
+                AccountNotices::iter().collect();
 
             assert_eq!(
                 asset_balances_pre - 50000000000000000000,
@@ -953,12 +981,22 @@ mod tests {
             ); // 50e18
             assert_eq!(total_supply_pre, total_supply_post);
             assert_eq!(total_borrows_pre + 50000000000000000000, total_borrows_post);
-            assert_eq!(notice_states_pre.len() + 1, notice_states_post.len());
+
             assert_eq!(events_pre.len() + 1, events_post.len());
 
-            let notice_state = notice_states_post.into_iter().next().unwrap();
-            let notice = Notices::get(notice_state.0, notice_state.1);
+            assert_eq!(notices_pre.len() + 1, notices_post.len());
+            assert_eq!(notice_states_pre.len() + 1, notice_states_post.len());
+            assert_ne!(latest_notice_pre, latest_notice_post);
+            assert_eq!(notice_hashes_pre.len() + 1, notice_hashes_post.len());
+            assert_eq!(account_notices_pre.len() + 1, account_notices_post.len());
+
             let notice_event = events_post.into_iter().next().unwrap();
+
+            let notice = notices_post.into_iter().last().unwrap().1;
+            let notice_state = notice_states_post.into_iter().last().unwrap();
+            let latest_notice = latest_notice_post.unwrap();
+            let notice_hash = notice_hashes_post.into_iter().last().unwrap();
+            let account_notice = account_notices_post.into_iter().last().unwrap();
 
             let expected_notice_id = NoticeId(0, 1);
             let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -969,7 +1007,9 @@ mod tests {
                 amount: 50000000000000000000,
             });
             let expected_notice_encoded = expected_notice.encode_notice();
+            let expected_notice_hash = expected_notice.hash();
 
+            assert_eq!(notice, expected_notice.clone());
             assert_eq!(
                 (
                     ChainId::Eth,
@@ -980,8 +1020,9 @@ mod tests {
                 ),
                 notice_state
             );
-
-            assert_eq!(notice, Some(expected_notice.clone()));
+            assert_eq!((expected_notice_id, expected_notice_hash), latest_notice);
+            assert_eq!((expected_notice_hash, expected_notice_id), notice_hash);
+            assert_eq!((recipient, vec![expected_notice_id]), account_notice);
 
             assert_eq!(
                 TestEvent::cash(Event::Notice(
@@ -1008,6 +1049,14 @@ mod tests {
             let symbol = symbol::<Test>(asset).expect("asset not found");
             let quantity = Quantity::from_nominal(symbol, "50.0");
             Prices::insert(symbol, 100_000); // $0.10
+
+            let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
+            let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
+                NoticeStates::iter().collect();
+            let latest_notice_pre: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
+            let notice_hashes_pre: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
+            let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
+                AccountNotices::iter().collect();
 
             assert_eq!(LatestNotice::get(ChainId::Eth), None);
             assert_eq!(
@@ -1051,36 +1100,54 @@ mod tests {
                 Ok(())
             );
 
-            let notice_state_post_2: Vec<(ChainId, NoticeId, NoticeState)> =
+            let notices_post_2: Vec<(NoticeId, Notice)> =
+                Notices::iter_prefix(ChainId::Eth).collect();
+            let notice_states_post_2: Vec<(ChainId, NoticeId, NoticeState)> =
                 NoticeStates::iter().collect();
-            let notice_state_2 = notice_state_post_2.into_iter().next().unwrap();
-            let notice_2 = Notices::get(notice_state_2.0, notice_state_2.1);
+            let latest_notice_post_2: Option<(NoticeId, ChainHash)> =
+                LatestNotice::get(ChainId::Eth);
+            let notice_hashes_post_2: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
+            let account_notices_post_2: Vec<(ChainAccount, Vec<NoticeId>)> =
+                AccountNotices::iter().collect();
 
-            let expected_notice_id_2 = NoticeId(0, 2);
+            assert_eq!(notices_pre.len() + 2, notices_post_2.len());
+            assert_eq!(notice_states_pre.len() + 2, notice_states_post_2.len());
+            assert_ne!(latest_notice_pre, latest_notice_post_2);
+            assert_eq!(notice_hashes_pre.len() + 2, notice_hashes_post_2.len());
+            assert_eq!(account_notices_pre.len() + 1, account_notices_post_2.len());
+
+            let latest_notice_2 = LatestNotice::get(ChainId::Eth).unwrap();
+            let notice_2 = Notices::get(ChainId::Eth, latest_notice_2.0).unwrap();
+            let notice_state_2 = NoticeStates::get(ChainId::Eth, latest_notice_2.0);
+            let notice_hash_2 = NoticeHashes::get(latest_notice_2.1).unwrap();
+            let account_notice_2 = AccountNotices::get(recipient);
+
+            let expected_notice_2_id = NoticeId(0, 2);
             let expected_notice_2 = Notice::ExtractionNotice(ExtractionNotice::Eth {
-                id: expected_notice_id_2,
+                id: expected_notice_2_id,
                 parent: <Ethereum as Chain>::hash_bytes(&expected_notice.encode_notice()),
                 asset: eth_asset,
                 account: eth_recipient,
                 amount: 50000000000000000000,
             });
+            let expected_notice_encoded_2 = expected_notice_2.encode_notice();
+            let expected_notice_hash_2 = expected_notice_2.hash();
 
+            assert_eq!(notice_2, expected_notice_2.clone());
             assert_eq!(
-                (
-                    ChainId::Eth,
-                    expected_notice_id_2,
-                    NoticeState::Pending {
-                        signature_pairs: ChainSignatureList::Eth(vec![])
-                    }
-                ),
+                NoticeState::Pending {
+                    signature_pairs: ChainSignatureList::Eth(vec![])
+                },
                 notice_state_2
             );
-
-            assert_eq!(notice_2, Some(expected_notice_2.clone()));
-
             assert_eq!(
-                LatestNotice::get(ChainId::Eth),
-                Some((NoticeId(0, 2), expected_notice_2.hash()))
+                (expected_notice_2_id, expected_notice_hash_2),
+                latest_notice_2
+            );
+            assert_eq!(expected_notice_2_id, notice_hash_2);
+            assert_eq!(
+                vec![expected_notice_id, expected_notice_2_id],
+                account_notice_2
             );
         });
     }

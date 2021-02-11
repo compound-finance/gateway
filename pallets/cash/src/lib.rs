@@ -163,6 +163,9 @@ decl_storage! {
         /// Notices contain information which can be synced to Starports
         Notices get(fn notices): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
 
+        /// Notice IDs, indexed by the hash of the notice itself
+        NoticeHashes get(fn notice_hashes): map hasher(blake2_128_concat) ChainHash => Option<NoticeId>;
+
         /// The state of a notice in regards to signing and execution, as tracked by the chain
         NoticeStates get(fn notice_states): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => NoticeState;
 
@@ -813,9 +816,9 @@ impl<T: Config> Module<T> {
             // Validator's cache is empty, fetch events from the earliest block with pending events
             log!("Block number has not been cached yet");
             let block_numbers: Vec<u32> = EthEventQueue::iter()
-                .filter_map(|((block_number, log_index), status)| {
+                .filter_map(|((block_number, _log_index), status)| {
                     if match status {
-                        EventStatus::<Ethereum>::Pending { signers } => true,
+                        EventStatus::<Ethereum>::Pending { .. } => true,
                         _ => false,
                     } {
                         Some(block_number)
@@ -825,7 +828,7 @@ impl<T: Config> Module<T> {
                 })
                 .collect();
             let pending_events_block = block_numbers.iter().min();
-            if (pending_events_block.is_some()) {
+            if pending_events_block.is_some() {
                 let events_block: u32 = *pending_events_block.unwrap();
                 from_block = format!("{:#X}", events_block);
             } else {

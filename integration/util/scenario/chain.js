@@ -1,5 +1,12 @@
 const { sendAndWaitForEvents, waitForEvent } = require('../substrate');
-const { sleep } = require('../util');
+const { sleep, arrayEquals, keccak256 } = require('../util');
+const {
+  getNoticeChainId,
+  encodeNotice,
+  getNoticeParentHash,
+  getNoticeId,
+  getRawHash,
+} = require('./types');
 
 class Chain {
   constructor(ctx) {
@@ -23,6 +30,40 @@ class Chain {
     return this.waitForEvent('cash', 'FailedProcessingEthEvent', onFinalize);
   }
 
+  async getNoticeChain(notice) {
+    // We're going to walk back from the latest notice, tracking
+    // the last accepted and a chain since that notice
+    let chainId = getNoticeChainId(notice);
+    let targetHash = keccak256(notice.EncodedNotice);
+
+    let [currNoticeId, currChainHash] = (await this.api().query.cash.latestNotice(chainId)).toJSON();
+    let currHash = getRawHash(currChainHash);
+    let currChain = [];
+
+    while (currNoticeId) {
+      let currNotice = (await this.api().query.cash.notices(chainId, currNoticeId)).toJSON();
+
+      if (arrayEquals(currNoticeId, notice.NoticeId)) {
+        return currChain;
+      }
+
+      let encodedNotice = encodeNotice(currNotice);
+      let parentHash = getNoticeParentHash(currNotice);
+      let isAccepted = await this.ctx.starport.isNoticeUsed(currHash);
+
+      if (isAccepted) {
+        currChain = [encodedNotice];
+      } else {
+        currChain = [encodedNotice, ...currChain];
+      }
+
+      currNoticeId = (await this.api().query.cash.noticeHashes({ [chainId]: parentHash })).toJSON();
+      currHash = parentHash;
+    }
+
+    throw new Error(`Notice not found in notice chain`);
+  }
+
   async getNoticeSignatures(notice, opts = {}) {
     opts = {
       sleep: 3000,
@@ -30,15 +71,14 @@ class Chain {
       signatures: 2, // TODO: How many signatures do we want? We should ask the validator count? Or wait for Done?
       ...opts
     };
-
-    let maybeNoticeStatus = await this.api().query.cash.noticeQueue([0, 0]);
-    let noticeStatus = maybeNoticeStatus.unwrap();
-    if (!noticeStatus.isPending) {
+    let chainId = getNoticeChainId(notice);
+    let noticeState = await this.api().query.cash.noticeStates(chainId, notice.NoticeId);
+    if (!noticeState.isPending) {
       throw new Error("Unexpected notice status (not pending)");
     }
-    let noticeStatusPending = noticeStatus.asPending;
+    let noticeStatePending = noticeState.asPending;
 
-    let signaturePairs = noticeStatusPending.signature_pairs;
+    let signaturePairs = noticeStatePending.signature_pairs;
 
     if (!signaturePairs.asEth) {
       throw new Error("Unexpected signature pairs (not eth)");

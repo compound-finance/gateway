@@ -414,7 +414,7 @@ describe('Starport', () => {
       let notice = buildNotice(starport.methods.revert_());
       let signatures = signAll(notice, authorityWallets);
 
-      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Call failed');
+      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert harness reversion');
     });
 
     it('should pass correct inputs and outputs', async () => {
