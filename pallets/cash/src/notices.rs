@@ -1,5 +1,7 @@
 use crate::{
-    chains::{Chain, ChainAccount, ChainSignature, ChainSignatureList, Ethereum},
+    chains::{
+        Chain, ChainAccount, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum,
+    },
     reason::Reason,
 };
 use codec::{Decode, Encode};
@@ -15,15 +17,13 @@ pub type EraIndex = u32;
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct NoticeId(pub EraId, pub EraIndex);
 
-impl Default for NoticeId {
-    fn default() -> NoticeId {
-        NoticeId(0, 0)
-    }
-}
-
 impl NoticeId {
     pub fn seq(&self) -> NoticeId {
         NoticeId(self.0, self.1 + 1)
+    }
+
+    pub fn seq_era(&self) -> NoticeId {
+        NoticeId(self.0 + 1, 0)
     }
 }
 
@@ -109,6 +109,36 @@ pub enum Notice {
     FutureYieldNotice(FutureYieldNotice),
     SetSupplyCapNotice(SetSupplyCapNotice),
     ChangeAuthorityNotice(ChangeAuthorityNotice),
+}
+
+impl Notice {
+    pub fn hash(&self) -> ChainHash {
+        self.chain_id().hash_bytes(&self.encode_notice()[..])
+    }
+
+    pub fn chain_id(&self) -> ChainId {
+        match self {
+            Notice::ExtractionNotice(n) => match n {
+                ExtractionNotice::Eth { .. } => ChainId::Eth,
+            },
+            Notice::CashExtractionNotice(n) => match n {
+                CashExtractionNotice::Eth { .. } => ChainId::Eth,
+            },
+            Notice::FutureYieldNotice(n) => match n {
+                FutureYieldNotice::Eth { .. } => ChainId::Eth,
+            },
+            Notice::SetSupplyCapNotice(n) => match n {
+                SetSupplyCapNotice::Eth { .. } => ChainId::Eth,
+            },
+            Notice::ChangeAuthorityNotice(n) => match n {
+                ChangeAuthorityNotice::Eth { .. } => ChainId::Eth,
+            },
+        }
+    }
+
+    pub fn sign_notice(&self) -> Result<ChainSignature, Reason> {
+        self.chain_id().sign(&self.encode_notice()[..])
+    }
 }
 
 pub trait EncodeNotice {
@@ -278,85 +308,25 @@ pub fn default_notice_signatures(notice: &Notice) -> ChainSignatureList {
     }
 }
 
-// TODO: What's a better way to handle which chain to pull?
-pub fn sign_notice_chain(notice: &Notice) -> Result<ChainSignature, Reason> {
-    match notice {
-        Notice::ExtractionNotice(n) => match n {
-            ExtractionNotice::Eth { .. } => Ok(ChainSignature::Eth(
-                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
-            )),
-        },
-        Notice::CashExtractionNotice(n) => match n {
-            CashExtractionNotice::Eth { .. } => Ok(ChainSignature::Eth(
-                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
-            )),
-        },
-        Notice::FutureYieldNotice(n) => match n {
-            FutureYieldNotice::Eth { .. } => Ok(ChainSignature::Eth(
-                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
-            )),
-        },
-        Notice::SetSupplyCapNotice(n) => match n {
-            SetSupplyCapNotice::Eth { .. } => Ok(ChainSignature::Eth(
-                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
-            )),
-        },
-        Notice::ChangeAuthorityNotice(n) => match n {
-            ChangeAuthorityNotice::Eth { .. } => Ok(ChainSignature::Eth(
-                <Ethereum as Chain>::sign_message(&notice.encode_notice())?,
-            )),
-        },
-    }
-}
-
-// TODO: What's a better way to handle which chain to use?
-pub fn get_signer_key_for_notice(notice: &Notice) -> Result<ChainAccount, Reason> {
-    match notice {
-        Notice::ExtractionNotice(n) => match n {
-            ExtractionNotice::Eth { .. } => {
-                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
-            }
-        },
-        Notice::CashExtractionNotice(n) => match n {
-            CashExtractionNotice::Eth { .. } => {
-                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
-            }
-        },
-        Notice::FutureYieldNotice(n) => match n {
-            FutureYieldNotice::Eth { .. } => {
-                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
-            }
-        },
-        Notice::SetSupplyCapNotice(n) => match n {
-            SetSupplyCapNotice::Eth { .. } => {
-                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
-            }
-        },
-        Notice::ChangeAuthorityNotice(n) => match n {
-            ChangeAuthorityNotice::Eth { .. } => {
-                Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
-            }
-        },
-    }
-}
-
 /// Type for the status of a notice on the queue.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum NoticeStatus {
+pub enum NoticeState {
     Missing,
-    Pending {
-        signature_pairs: ChainSignatureList,
-        notice: Notice,
-    },
-    Done,
+    Pending { signature_pairs: ChainSignatureList },
+    Executed,
 }
 
-impl From<Notice> for NoticeStatus {
-    fn from(notice: Notice) -> Self {
-        NoticeStatus::Pending {
+impl NoticeState {
+    pub fn pending(notice: &Notice) -> Self {
+        NoticeState::Pending {
             signature_pairs: default_notice_signatures(&notice),
-            notice,
         }
+    }
+}
+
+impl Default for NoticeState {
+    fn default() -> Self {
+        NoticeState::Missing
     }
 }
 

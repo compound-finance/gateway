@@ -40,6 +40,56 @@ impl ChainId {
             ChainId::Tez => Ok(ChainAsset::Tez(Tezos::to_address(addr)?)),
         }
     }
+
+    pub fn signer_address(self) -> Result<ChainAccount, Reason> {
+        match self {
+            ChainId::Comp => Ok(ChainAccount::Comp(<Compound as Chain>::signer_address()?)),
+            ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
+            ChainId::Dot => Ok(ChainAccount::Dot(<Polkadot as Chain>::signer_address()?)),
+            ChainId::Sol => Ok(ChainAccount::Sol(<Solana as Chain>::signer_address()?)),
+            ChainId::Tez => Ok(ChainAccount::Tez(<Tezos as Chain>::signer_address()?)),
+        }
+    }
+
+    pub fn hash_bytes(self, data: &[u8]) -> ChainHash {
+        match self {
+            ChainId::Comp => ChainHash::Comp(<Compound as Chain>::hash_bytes(data)),
+            ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::hash_bytes(data)),
+            ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::hash_bytes(data)),
+            ChainId::Sol => ChainHash::Sol(<Solana as Chain>::hash_bytes(data)),
+            ChainId::Tez => ChainHash::Tez(<Tezos as Chain>::hash_bytes(data)),
+        }
+    }
+
+    pub fn sign(self, message: &[u8]) -> Result<ChainSignature, Reason> {
+        match self {
+            ChainId::Comp => Ok(ChainSignature::Comp(<Compound as Chain>::sign_message(
+                message,
+            )?)),
+            ChainId::Eth => Ok(ChainSignature::Eth(<Ethereum as Chain>::sign_message(
+                message,
+            )?)),
+            ChainId::Dot => Ok(ChainSignature::Dot(<Polkadot as Chain>::sign_message(
+                message,
+            )?)),
+            ChainId::Sol => Ok(ChainSignature::Sol(<Solana as Chain>::sign_message(
+                message,
+            )?)),
+            ChainId::Tez => Ok(ChainSignature::Tez(<Tezos as Chain>::sign_message(
+                message,
+            )?)),
+        }
+    }
+
+    pub fn zero_hash(self) -> ChainHash {
+        match self {
+            ChainId::Comp => ChainHash::Comp(<Compound as Chain>::zero_hash()),
+            ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
+            ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
+            ChainId::Sol => ChainHash::Sol(<Solana as Chain>::zero_hash()),
+            ChainId::Tez => ChainHash::Tez(<Tezos as Chain>::zero_hash()),
+        }
+    }
 }
 
 impl Default for ChainId {
@@ -65,6 +115,16 @@ impl ChainAccount {
             _ => panic!("XXX not implemented"),
         }
     }
+}
+
+/// Type for an hash tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainHash {
+    Comp(<Compound as Chain>::Hash),
+    Eth(<Ethereum as Chain>::Hash),
+    Dot(<Polkadot as Chain>::Hash),
+    Sol(<Solana as Chain>::Hash),
+    Tez(<Tezos as Chain>::Hash),
 }
 
 // Implement deserialization for ChainAccounts so we can use them in GenesisConfig / ChainSpec JSON.
@@ -248,6 +308,7 @@ pub trait Chain {
     type EventId: Debuggable + Clone + Eq + Ord;
     type Event: Debuggable + Clone + Eq;
 
+    fn zero_hash() -> Self::Hash;
     fn hash_bytes(data: &[u8]) -> Self::Hash;
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
@@ -276,6 +337,10 @@ impl Chain for Compound {
     type EventId = comp::EventId;
     type Event = comp::Event;
 
+    fn zero_hash() -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
         panic!("XXX not implemented");
     }
@@ -302,6 +367,10 @@ impl Chain for Ethereum {
 
     type EventId = eth::EventId;
     type Event = eth::Event;
+
+    fn zero_hash() -> Self::Hash {
+        [0u8; 32]
+    }
 
     fn hash_bytes(data: &[u8]) -> Self::Hash {
         use tiny_keccak::Hasher;
@@ -351,6 +420,10 @@ impl Chain for Polkadot {
     type EventId = dot::EventId;
     type Event = dot::Event;
 
+    fn zero_hash() -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
         panic!("XXX not implemented");
     }
@@ -378,6 +451,10 @@ impl Chain for Solana {
     type EventId = sol::EventId;
     type Event = sol::Event;
 
+    fn zero_hash() -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
         panic!("XXX not implemented");
     }
@@ -404,6 +481,10 @@ impl Chain for Tezos {
 
     type EventId = tez::EventId;
     type Event = tez::Event;
+
+    fn zero_hash() -> Self::Hash {
+        panic!("XXX not implemented");
+    }
 
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
         panic!("XXX not implemented");

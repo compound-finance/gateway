@@ -11,10 +11,10 @@ extern crate ethereum_client;
 extern crate trx_request;
 
 use crate::chains::{
-    Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainId, ChainSignature,
+    Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
     ChainSignatureList, Ethereum,
 };
-use crate::notices::{Notice, NoticeId, NoticeStatus};
+use crate::notices::{Notice, NoticeId, NoticeState};
 use crate::rates::{InterestRateModel, APR};
 use crate::reason::Reason;
 use crate::symbol::Symbol;
@@ -160,11 +160,20 @@ decl_storage! {
         /// The mapping of (status of) events witnessed on Ethereum, by event id.
         EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
 
-        /// The mapping of (status of) notices to be signed for Ethereum, by notice id.
-        NoticeQueue get(fn notice_queue): map hasher(blake2_128_concat) NoticeId => Option<NoticeStatus>;
+        /// Notices contain information which can be synced to Starports
+        Notices get(fn notices): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
 
-        /// The next notice id that will be generated
-        NextNoticeId get(fn next_notice_id): NoticeId;
+        /// Notice IDs, indexed by the hash of the notice itself
+        NoticeHashes get(fn notice_hashes): map hasher(blake2_128_concat) ChainHash => Option<NoticeId>;
+
+        /// The state of a notice in regards to signing and execution, as tracked by the chain
+        NoticeStates get(fn notice_states): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => NoticeState;
+
+        /// The most recent notice emitted for a given chain
+        LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
+
+        /// Index of notices by chain account
+        AccountNotices get(fn account_notices): map hasher(blake2_128_concat) ChainAccount => Vec<NoticeId>;
 
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
@@ -478,9 +487,9 @@ decl_module! {
         }
 
         #[weight = 0] // XXX
-        pub fn publish_signature(origin, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
+        pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
-            cash_err!(core::publish_signature_internal(notice_id, signature), Error::<T>::PublishSignatureFailure)?;
+            cash_err!(core::publish_signature_internal(chain_id, notice_id, signature), Error::<T>::PublishSignatureFailure)?;
 
             Ok(())
         }
@@ -807,9 +816,9 @@ impl<T: Config> Module<T> {
             // Validator's cache is empty, fetch events from the earliest block with pending events
             log!("Block number has not been cached yet");
             let block_numbers: Vec<u32> = EthEventQueue::iter()
-                .filter_map(|((block_number, log_index), status)| {
+                .filter_map(|((block_number, _log_index), status)| {
                     if match status {
-                        EventStatus::<Ethereum>::Pending { signers } => true,
+                        EventStatus::<Ethereum>::Pending { .. } => true,
                         _ => false,
                     } {
                         Some(block_number)
@@ -819,7 +828,7 @@ impl<T: Config> Module<T> {
                 })
                 .collect();
             let pending_events_block = block_numbers.iter().min();
-            if (pending_events_block.is_some()) {
+            if pending_events_block.is_some() {
                 let events_block: u32 = *pending_events_block.unwrap();
                 from_block = format!("{:#X}", events_block);
             } else {
@@ -938,17 +947,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .and_provides(sig)
                 .propagate(true)
                 .build(),
-            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
-                .longevity(10)
-                .and_provides(sig)
-                .propagate(true)
-                .build(),
-            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
-                .longevity(10)
-                .and_provides(sig)
-                .propagate(true)
-                .build(),
-            Call::publish_signature(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+            Call::publish_signature(_, _, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)
                 .propagate(true)

@@ -237,7 +237,7 @@ jobs:
           cargo build
 
       - name: Run Integration Test
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           set -eo pipefail
           cd integration

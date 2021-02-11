@@ -1,4 +1,5 @@
 const { log, error } = require('../util/log');
+const Web3Utils = require('web3-utils');
 
 function genPort() {
   // TODO: Actually check port is free?
@@ -77,6 +78,13 @@ function lookupBy(cls, lookupKey, arr, lookup) {
   }
 }
 
+function arrayEquals(a, b) {
+  return Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((val, index) => val === b[index]);
+}
+
 module.exports = {
   genPort,
   sleep,
@@ -85,4 +93,6 @@ module.exports = {
   getInfoKey,
   stripHexPrefix,
   lookupBy,
+  arrayEquals,
+  keccak256: Web3Utils.keccak256,
 };
