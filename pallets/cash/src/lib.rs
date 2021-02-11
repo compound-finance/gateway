@@ -931,12 +931,11 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     (Err(_e), _) => InvalidTransaction::Call.into(),
                     (Ok(sender), 0) => ValidTransaction::with_tag_prefix("CashPallet")
                         .longevity(10)
-                        .and_provides((sender, nonce))
+                        .and_provides((sender, 0))
                         .propagate(true)
                         .build(),
                     (Ok(sender), _) => ValidTransaction::with_tag_prefix("CashPallet")
                         .longevity(10)
-                        .and_requires((sender, nonce - 1))
                         .and_provides((sender, nonce))
                         .propagate(true)
                         .build(),
