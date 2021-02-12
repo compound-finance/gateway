@@ -201,7 +201,7 @@ describe('CashToken', () => {
       expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(amount);
     });
 
-    it('should fail if recipient is wrong', async() => {
+    it('should fail if recipient is invalid', async() => {
       await expect(send(cash, 'transfer', [account1, 1e6], { from: account1 })).rejects.toRevert("revert Invalid recipient");
     });
 
@@ -239,7 +239,7 @@ describe('CashToken', () => {
       expect(await call(cash, 'balanceOf', [account3])).toEqualNumber(amount);
     });
 
-    it('should fail if recipient is wrong', async() => {
+    it('should fail if recipient is invalid', async() => {
       await expect(send(cash, 'transferFrom', [account1, account1, 1e6], { from: account1 })).rejects.toRevert("revert Invalid recipient");
     });
 
