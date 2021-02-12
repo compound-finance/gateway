@@ -147,7 +147,7 @@ contract Starport {
      * @return The result of the invokation of the action of the notice.
      */
     function invoke(bytes calldata notice, bytes[] calldata signatures) external returns (bytes memory) {
-        checkNoticeAuthorized(notice, authorities, signatures);
+        checkNoticeSignerAuthorized(notice, authorities, signatures);
 
         return invokeNoticeInternal(notice);
     }
@@ -245,9 +245,6 @@ contract Starport {
         require(msg.sender == address(this), "Call must originate locally");
         require(newAuthorities.length > 0, "New authority set can not be empty");
 
-        // XXX TODO: min authorities length?
-        // XXX TODO: check for repeats in the authorities list?
-
         emit ChangeAuthorities(newAuthorities);
 
         authorities = newAuthorities;
@@ -274,7 +271,7 @@ contract Starport {
      * @param authorities_ A set of authorities to check the notice against? TODO: Why pass this in?
      * @param signatures The signatures to verify
      */
-    function checkNoticeAuthorized(
+    function checkNoticeSignerAuthorized(
         bytes calldata notice,
         address[] memory authorities_,
         bytes[] calldata signatures

@@ -2,17 +2,18 @@ const ABICoder = require("web3-eth-abi");
 const {
   bigInt,
   e18,
+  e6,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,
   replaceByte,
   sign,
   signAll,
+  toPrincipal,
   ETH_HEADER,
   ETH_ADDRESS
 } = require('./utils');
 
-// TODO: test fee token
 describe('Starport', () => {
   let starport;
   let cash;
@@ -56,7 +57,11 @@ describe('Starport', () => {
     const cashAddress = getNextContractAddress(root, rootNonce + 1);
 
     starport = await deploy('StarportHarness', [cashAddress, authorityAddresses]);
-    cash = await deploy('MockCashToken', [starport._address, e18(100), account1]);
+    cash = await deploy('CashToken', [starport._address]);
+
+    // Give some 100e6 CASH to account1
+    let mintPrincipal = await cash.methods.amountToPrincipal(e6(100)).call();
+    await starport.methods.mint_(account1, mintPrincipal).send({ from: root });
 
     tokenA = await deploy('FaucetToken', [e18(100), "tokenA", 18, "TKNA"]);
     tokenFee = await deploy('FeeToken', [e18(100), "tokenFee", 18, "TFEE"]);
@@ -161,7 +166,7 @@ describe('Starport', () => {
     });
 
     it('should lock cash', async () => {
-      const lockAmount = e18(1);
+      const lockAmount = e6(1);
       const balancePre = bigInt(await call(cash, 'balanceOf', [account1]));
 
       // Approve starport to move tokens first
@@ -171,14 +176,24 @@ describe('Starport', () => {
       const balancePost = bigInt(await call(cash, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(lockAmount);
-      expect(await call(cash, 'balanceOf', [starport._address])).toEqualNumber(lockAmount);
+      // Cash is burned, it doesn't live here
+      expect(await call(cash, 'balanceOf', [starport._address])).toEqualNumber(0);
       expect(await call(starport, 'cash')).toMatchAddress(cash._address);
 
       expect(tx.events.LockCash.returnValues).toMatchObject({
         amount: lockAmount.toString(),
-        // yieldIndex: TODO
+        principal: toPrincipal(lockAmount).toString(),
         holder: account1
       });
+    });
+
+    it('should not lock eth via lock()', async () => {
+      const lockAmount = e18(1);
+      const starportEthPre = await web3.eth.getBalance(starport._address);
+
+      expect(starportEthPre).toEqualNumber(0);
+
+      await expect(call(starport, 'lock', [lockAmount, ETH_ADDRESS], { from: account1 })).rejects.toRevert('revert Please use lockEth');
     });
 
     it('should lock eth', async () => {
@@ -219,27 +234,27 @@ describe('Starport', () => {
     });
   });
 
-  describe('#checkNoticeAuthorized', () => {
+  describe('#checkNoticeSignerAuthorized', () => {
     it('should authorize message', async () => {
       const signatures = signAll(testUnlockNotice, authorityWallets);
-      await call(starport, 'checkNoticeAuthorized_', [testUnlockNotice, authorityAddresses, signatures]);
+      await call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures]);
     });
 
     it('should not authorize duplicate sigs', async () => {
       const duplicateAccounts = Array(3).fill(authorityWallets[0]);
       const signatures = signAll(testUnlockNotice, duplicateAccounts);
-      await expect(call(starport, 'checkNoticeAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Duplicated authority signer');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Duplicated authority signer');
     });
 
     it('should not authorize with too few signatures', async () => {
       const signatures = [sign(testUnlockNotice, authorityWallets[0]).signature];
-      await expect(call(starport, 'checkNoticeAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Below quorum threshold');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Below quorum threshold');
     });
 
     it('should not authorize with an unauthorized signer', async () => {
       const badAccounts = nRandomWallets(2);
       const signatures = signAll(testUnlockNotice, badAccounts);
-      await expect(call(starport, 'checkNoticeAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Unauthorized authority signer');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Unauthorized authority signer');
     });
   });
 
@@ -689,6 +704,55 @@ describe('Starport', () => {
 
       expect(Number(await tokenNS.methods.balanceOf(starport._address).call())).toEqual(500);
       expect(Number(await tokenNS.methods.balanceOf(account2).call())).toEqual(1000);
+    });
+
+    it('should not unlock token with insufficient liquidity', async () => {
+      await expect(call(starport, 'unlock_', [tokenA._address, 1000, account2])).rejects.toRevert('revert Transfer: insufficient balance');
+    });
+
+    it('should unlock eth', async () => {
+      const unlockAmount = e18(1);
+
+      await starport.methods.receive_().send({ from: root, value: Number(unlockAmount) });
+
+      expect(Number(await web3.eth.getBalance(starport._address))).toEqualNumber(unlockAmount);
+      let balancePre = await web3.eth.getBalance(account2);
+
+      const tx = await send(starport, 'unlock_', [ETH_ADDRESS, unlockAmount, account2]);
+
+      expect(tx.events.Unlock.returnValues).toMatchObject({
+        asset: ETH_ADDRESS,
+        account: account2,
+        amount: '1000000000000000000'
+      });
+
+      expect(Number(await web3.eth.getBalance(starport._address))).toEqualNumber(0);
+      let balancePost = await web3.eth.getBalance(account2);
+      expect(balancePost - balancePre).toEqualNumber(unlockAmount);
+    });
+
+    it('should not unlock eth with insufficient liquidity', async () => {
+      const unlockAmount = e18(1);
+
+      await expect(call(starport, 'unlock_', [ETH_ADDRESS, unlockAmount, account2])).rejects.toRevert('revert');
+    });
+
+    it('should unlock cash', async () => {
+      let mintPrincipal = await cash.methods.amountToPrincipal(e6(1)).call();
+
+      expect(Number(await cash.methods.balanceOf(starport._address).call())).toEqual(0);
+      expect(Number(await cash.methods.balanceOf(account2).call())).toEqual(0);
+
+      const tx = await send(starport, 'unlockCash_', [account2, mintPrincipal]);
+
+      expect(tx.events.UnlockCash.returnValues).toMatchObject({
+        account: account2,
+        amount: '1000000',
+        principal: '100'
+      });
+
+      expect(Number(await cash.methods.balanceOf(starport._address).call())).toEqual(0);
+      expect(Number(await cash.methods.balanceOf(account2).call())).toEqualNumber(e6(1));
     });
 
     it('should unlock via #invoke', async () => {

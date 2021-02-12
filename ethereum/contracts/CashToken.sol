@@ -134,7 +134,7 @@ contract CashToken is ICash {
         return index * eN ** epower / eD ** epower;
     }
 
-    function amountToPrincipal(uint amount) internal view returns (uint128) {
+    function amountToPrincipal(uint amount) public view returns (uint128) {
         uint256 principal = amount / getCashIndex();
         require(principal < type(uint128).max, "amountToPrincipal::overflow");
         return uint128(principal);

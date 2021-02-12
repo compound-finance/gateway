@@ -15,13 +15,22 @@ contract StarportHarness is Starport {
 		return getQuorum(authorityCount);
 	}
 
-	/// Harness to call `checkNoticeAuthorized`
-	function checkNoticeAuthorized_(
+	/// Harness to call `checkNoticeSignerAuthorized`
+	function checkNoticeSignerAuthorized_(
         bytes calldata notice,
         address[] memory authorities_,
         bytes[] calldata signatures
     ) external view {
-		return checkNoticeAuthorized(notice, authorities_, signatures);
+		return checkNoticeSignerAuthorized(notice, authorities_, signatures);
+	}
+
+	/// Harness to call `mint` on Cash Token
+	function mint_(address holder, uint128 principal) external {
+		cash.mint(holder, principal);
+	}
+
+	/// Harness to accept ether
+	function receive_() external payable {
 	}
 
 	/// Harness to call `recover`
