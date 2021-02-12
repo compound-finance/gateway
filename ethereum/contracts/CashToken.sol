@@ -1,107 +1,135 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.1;
 
+import "./ICash.sol";
+
 /**
  * @title Compound Cash Token
  * @author Compound Finance
  * @notice The Compound Cash Token for Ethereum
  * @dev XXX Finish implementing ERC-20 features
  */
-contract CashToken {
-
-    /// @notice EIP-20 token name for this token
-    string public constant name = "Widget Token";
-
-    /// @notice EIP-20 token symbol for this token
-    string public constant symbol = "WDGT";
-
-    /// @notice EIP-20 token decimals for this token
-    uint8 public constant decimals = 18;
-
-    /// @notice EIP-20 token total supply for this token
-    uint256 public totalSupply;
-
-    mapping (address => mapping (address => uint256)) internal allowances;
-
-    mapping (address => uint256) internal balances;
-
-    /// @notice The standard EIP-20 transfer event
-    event Transfer(address indexed from, address indexed to, uint256 amount);
-
-    /// @notice The standard EIP-20 approval event
-    event Approval(address indexed owner, address indexed spender, uint256 amount);
+contract CashToken is ICash {
+    struct CashYieldAndIndex {
+        uint128 yield;
+        uint128 index;
+    }
 
     address immutable public admin;
+    uint public cashYieldStartAt;
+    CashYieldAndIndex public cashYieldAndIndex;
+    uint public nextCashYieldStartAt;
+    CashYieldAndIndex public nextCashYieldAndIndex;
 
-    constructor(address admin_) {
-        admin = admin_;
+    mapping (address => mapping (address => uint)) internal allowances;
+    uint internal totalCashPrincipal;
+    mapping (address => uint256) internal cashPrincipal;
+
+	constructor(address starport) {
+		admin = starport;
+        cashYieldStartAt = block.timestamp;
+        cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e6});
+	}
+
+    function mint(address account, uint amountPrincipal) external override {
+        require(msg.sender == admin, "Sender is not an admin");
+        uint amount = amountPrincipal * getCashIndex();
+        cashPrincipal[account] = cashPrincipal[account] + amountPrincipal;
+        totalCashPrincipal = totalCashPrincipal + amountPrincipal;
+        emit Transfer(address(0), account, amount);
     }
 
-    /**
-     * @notice Get the number of tokens `spender` is approved to spend on behalf of `account`
-     * @param account The address of the account holding the funds
-     * @param spender The address of the account spending the funds
-     * @return The number of tokens approved
-     */
-    function allowance(address account, address spender) external view returns (uint256) {
-        return allowances[account][spender];
+    function burn(address account, uint amountPrincipal) external override {
+        require(msg.sender == admin, "Sender is not an admin");
+        uint amount = amountPrincipal * getCashIndex();
+        cashPrincipal[account] = cashPrincipal[account] - amountPrincipal;
+        totalCashPrincipal = totalCashPrincipal - amountPrincipal;
+        emit Transfer(account, address(0), amount);
     }
 
-    /**
-     * @notice Approve `spender` to transfer up to `amount` from `src`
-     * @dev This will overwrite the approval amount for `spender`
-     *  and is subject to issues noted [here](https://eips.ethereum.org/EIPS/eip-20#approve)
-     * @param spender The address of the account which may transfer tokens
-     * @param amount The number of tokens that are approved (2^256-1 means infinite)
-     * @return Whether or not the approval succeeded
-     */
-    function approve(address spender, uint256 amount) external returns (bool) {
+    function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external override {
+        require(msg.sender == admin, "Sender is not an admin");
+        uint nextAt = nextCashYieldStartAt;
+
+        if (nextAt != 0 && block.timestamp > nextAt) {
+            cashYieldStartAt = nextAt;
+            cashYieldAndIndex = nextCashYieldAndIndex;
+        }
+
+        nextCashYieldStartAt = nextYieldStartAt;
+        nextCashYieldAndIndex = CashYieldAndIndex({yield: nextYield, index: nextIndex});
+    }
+
+    function getCashIndex() public view virtual override returns (uint) {
+        uint nextAt = nextCashYieldStartAt;
+        if (nextAt != 0 && block.timestamp > nextAt) {
+            return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
+        }
+        return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
+    }
+
+    function totalSupply() external view override returns (uint) {
+        return totalCashPrincipal * getCashIndex();
+    }
+
+    function balanceOf(address account) external view override returns (uint) {
+        return cashPrincipal[account] * getCashIndex();
+    }
+
+    function transfer(address recipient, uint amount) external override returns (bool) {
+        require(msg.sender != recipient, "Invalid recipient");
+        uint principal = amount / getCashIndex();
+        cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
+        cashPrincipal[msg.sender] = cashPrincipal[msg.sender] - principal;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view override returns (uint256) {
+        return allowances[owner][spender];
+    }
+
+    function approve(address spender, uint amount) external override returns (bool) {
         allowances[msg.sender][spender] = amount;
-
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
-    // TODO: implement
-    // function getHypotheticalIndex() public view returns (uint)
-
-    /**
-     * @notice Get the number of tokens held by the `account`
-     * @param account The address of the account to get the balance of
-     * @return The number of tokens held
-     */
-    function balanceOf(address account) external view returns (uint256) {
-        return balances[account];
-    }
-
-    /**
-     * @notice Transfer `amount` tokens from `msg.sender` to `dst`
-     * @param dst The address of the destination account
-     * @param amount The number of tokens to transfer
-     * @return Whether or not the transfer succeeded
-     */
-    function transfer(address dst, uint amount) external returns (bool) {
-        return transferFrom(msg.sender, dst, amount);
-    }
-
-    // TODO: actually implement CASH principal balances etc
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _value
-    )
-        public
-        returns (bool)
-    {
-        // require(_to != address(0), "TransferFrom: Can't send to address zero");
-        // require(_value <= balances[_from], "TransferFrom: Inadequate balance");
-        // require(_value <= allowed[_from][msg.sender], "TransferFrom: Inadequate allowance");
-
-        balances[_from] -= _value;
-        balances[_to] += _value;
-        // allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
-        // emit Transfer(_from, _to, _value);
+    function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
+        require(sender != recipient, "Invalid recipient");
+        address spender = msg.sender;
+        uint principal = amount / getCashIndex();
+        allowances[sender][spender] = allowances[sender][spender] - amount;
+        cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
+        cashPrincipal[sender] = cashPrincipal[sender] - principal;
+        emit Transfer(sender, recipient, amount);
         return true;
     }
 
+    /**
+     * @dev Returns the name of the token.
+     */
+    function name() external pure returns (string memory) {
+        return "SECRET, change";
+    }
+
+    /**
+     * @dev Returns the symbol of the token, usually a shorter version of the
+     * name.
+     */
+    function symbol() external pure returns (string memory) {
+        return "SECRET";
+    }
+
+    function decimals() external pure returns (uint8) {
+        return 6;
+    }
+
+    function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
+        // TODO it needs more work and effort here
+        uint epower = yield * (block.timestamp - startAt);
+        uint eN = 271828;
+        uint eD = 100000;
+        return index * eN ** epower / eD ** epower;
+    }
 }

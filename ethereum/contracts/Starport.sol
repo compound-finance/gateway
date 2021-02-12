@@ -2,7 +2,7 @@
 pragma solidity ^0.8.1;
 pragma abicoder v2;
 
-import "./IERC20.sol";
+import "./ICash.sol";
 
 /**
  * @title Compound Chain Starport
@@ -63,7 +63,7 @@ contract Starport {
     // Internal function for locking CASH (as opposed to collateral assets)
     function lockCashInternal(uint amount, address sender) internal {
         // cash.burn(amount);
-        uint yieldIndex = cash.fetchHypotheticalIndex();
+        uint yieldIndex = cash.getCashIndex();
         transferInCash(sender, amount);
 
         emit LockCash(sender, amount, yieldIndex);

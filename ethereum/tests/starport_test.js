@@ -163,6 +163,10 @@ describe('Starport', () => {
     it('should lock cash', async () => {
       const lockAmount = e18(1);
       const balancePre = bigInt(await call(cash, 'balanceOf', [account1]));
+
+      // Approve starport to move tokens first
+      await send(cash, 'approve', [starport._address, lockAmount], {from: account1});
+
       const tx = await send(starport, 'lock', [lockAmount, cash._address], { from: account1 });
       const balancePost = bigInt(await call(cash, 'balanceOf', [account1]));
 

@@ -49,8 +49,33 @@ const replaceByte = (hexStr, index, replacement) => {
   return `${start}${mid}${end}`;
 }
 
+const sendRPC = (web3_, method, params) => {
+  return new Promise((resolve, reject) => {
+    if (!web3_.currentProvider || typeof (web3_.currentProvider) === 'string') {
+      return reject(`cannot send from currentProvider=${web3_.currentProvider}`);
+    }
+
+    web3_.currentProvider.send(
+      {
+        jsonrpc: '2.0',
+        method: method,
+        params: params,
+        id: new Date().getTime() // Id of the request; anything works, really
+      },
+      (err, response) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(response);
+        }
+      }
+    );
+  });
+}
+
 const ETH_HEADER = "0x4554483a";
 const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const ETH_ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 module.exports = {
   bigInt,
@@ -61,6 +86,8 @@ module.exports = {
   replaceByte,
   sign,
   signAll,
+  sendRPC,
   ETH_HEADER,
-  ETH_ADDRESS
+  ETH_ADDRESS,
+  ETH_ZERO_ADDRESS
 };
