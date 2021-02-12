@@ -3,7 +3,6 @@ use sp_runtime_interface::pass_by::PassByCodec;
 #[macro_use]
 extern crate lazy_static;
 use compound_crypto::CryptoError;
-use our_std::Debuggable;
 use std::sync::Mutex;
 
 #[derive(Clone, PassByCodec, codec::Encode, codec::Decode)]

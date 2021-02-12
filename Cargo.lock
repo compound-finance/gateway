@@ -5662,7 +5662,6 @@ version = "1.0.0"
 dependencies = [
  "compound-crypto",
  "lazy_static",
- "our-std",
  "parity-scale-codec",
  "sp-externalities",
  "sp-io",

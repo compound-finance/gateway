@@ -361,6 +361,19 @@ impl Quantity {
         Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
     }
 
+    /// Quantity<S> + Quantity<S> -> Quantity<S>
+    pub fn add(self, other: Quantity) -> Result<Quantity, MathError> {
+        if self.symbol() != other.symbol() {
+            return Err(MathError::SymbolMismatch);
+        }
+        Ok(Quantity(
+            self.symbol(),
+            self.value()
+                .checked_add(other.value())
+                .ok_or(MathError::Overflow)?,
+        ))
+    }
+
     /// Quantity * CashPrincipal (per unit quantity) -> CashPrincipal (total)
     /// used for computing interest on interest during on_initialize
     pub fn as_cash_principal(
