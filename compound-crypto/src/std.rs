@@ -196,7 +196,7 @@ impl Keyring for InMemoryKeyring {
 type ThreadSafeKeyring = dyn Keyring + Send + Sync;
 
 lazy_static::lazy_static! {
-    pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = Mutex::new(Arc::new(dev_keyring()));
+    pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = Mutex::new(Arc::new(crate::aws_kms::KmsKeyring::new()));
 }
 
 pub(crate) const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";
