@@ -21,9 +21,9 @@ contract CashToken is ICash {
     uint public nextCashYieldStartAt;
     CashYieldAndIndex public nextCashYieldAndIndex;
 
-    mapping (address => mapping (address => uint)) internal allowances;
-    uint internal totalCashPrincipal;
-    mapping (address => uint256) internal cashPrincipal;
+    mapping (address => mapping (address => uint)) public allowances;
+    uint public totalCashPrincipal;
+    mapping (address => uint256) public cashPrincipal;
 
 	constructor(address starport) {
         admin = starport;
@@ -31,31 +31,31 @@ contract CashToken is ICash {
         cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e6});
 	}
 
-    function mint(address account, uint principal) external override {
+    function mint(address account, uint principal) external override returns (uint) {
         require(msg.sender == admin, "Must be admin");
         uint amount = principal * getCashIndex();
         cashPrincipal[account] += principal;
         totalCashPrincipal += principal;
         emit Transfer(address(0), account, amount);
+        return amount;
     }
 
-    function burn(address account, uint principal) external override {
+    function burn(address account, uint amount) external override returns (uint) {
         require(msg.sender == admin, "Must be admin");
-        uint amount = principal * getCashIndex();
+        uint principal = amount / getCashIndex();
         cashPrincipal[account] -= principal;
         totalCashPrincipal -= principal;
         emit Transfer(account, address(0), amount);
+        return principal;
     }
 
     function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external override {
         require(msg.sender == admin, "Must be admin");
         uint nextAt = nextCashYieldStartAt;
-
         if (nextAt != 0 && block.timestamp > nextAt) {
             cashYieldStartAt = nextAt;
             cashYieldAndIndex = nextCashYieldAndIndex;
         }
-
         nextCashYieldStartAt = nextYieldStartAt;
         nextCashYieldAndIndex = CashYieldAndIndex({yield: nextYield, index: nextIndex});
     }

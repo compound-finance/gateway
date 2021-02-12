@@ -75,16 +75,16 @@ describe('CashToken', () => {
       expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
 
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      const tx = await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const principal = 10e6;
+      const tx = await send(cash, 'mint', [account1, principal], { from: admin });
 
-      expect(await call(cash, 'totalSupply')).toEqualNumber(amountPrincipal * cashIndex);
-      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(amountPrincipal * cashIndex);
+      expect(await call(cash, 'totalSupply')).toEqualNumber(principal * cashIndex);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(principal * cashIndex);
 
       expect(tx.events.Transfer.returnValues).toMatchObject({
         from: ETH_ZERO_ADDRESS,
         to: account1,
-        value: (cashIndex * amountPrincipal).toString()
+        value: (cashIndex * principal).toString()
       });
     });
 
@@ -97,20 +97,20 @@ describe('CashToken', () => {
     it('should burn tokens and emit `Transfer` event', async () => {
       // Let's mint tokens first, to have something to burn
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      const burnAmount = 5e6;
-      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const principal = 10e6;
+      const burnAmount = 5e6 * cashIndex;
+      await send(cash, 'mint', [account1, principal], { from: admin });
 
       // An attempt to burn tokens
       const tx = await send(cash, 'burn', [account1, burnAmount], { from: admin });
 
-      expect(await call(cash, 'totalSupply')).toEqualNumber(burnAmount * cashIndex);
-      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(burnAmount * cashIndex);
+      expect(await call(cash, 'totalSupply')).toEqualNumber(burnAmount);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(burnAmount);
 
       expect(tx.events.Transfer.returnValues).toMatchObject({
         from: account1,
         to: ETH_ZERO_ADDRESS,
-        value: (cashIndex * burnAmount).toString()
+        value: (burnAmount).toString()
       });
     });
 
@@ -124,12 +124,12 @@ describe('CashToken', () => {
       expect(await call(cash, 'totalSupply')).toEqualNumber(0);
 
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal1 = 10e6;
-      const amountPrincipal2 = 5e6;
-      await send(cash, 'mint', [account1, amountPrincipal1], { from: admin });
-      await send(cash, 'mint', [account2, amountPrincipal2], { from: admin });
+      const principal1 = 10e6;
+      const principal2 = 5e6;
+      await send(cash, 'mint', [account1, principal1], { from: admin });
+      await send(cash, 'mint', [account2, principal2], { from: admin });
 
-      expect(await call(cash, 'totalSupply')).toEqualNumber((amountPrincipal1 + amountPrincipal2) * cashIndex);
+      expect(await call(cash, 'totalSupply')).toEqualNumber((principal1 + principal2) * cashIndex);
     });
   });
 
@@ -139,13 +139,13 @@ describe('CashToken', () => {
       expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(0);
 
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal1 = 10e6;
-      const amountPrincipal2 = 5e6;
-      await send(cash, 'mint', [account1, amountPrincipal1], { from: admin });
-      await send(cash, 'mint', [account2, amountPrincipal2], { from: admin });
+      const principal1 = 10e6;
+      const principal2 = 5e6;
+      await send(cash, 'mint', [account1, principal1], { from: admin });
+      await send(cash, 'mint', [account2, principal2], { from: admin });
 
-      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(amountPrincipal1 * cashIndex);
-      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(amountPrincipal2 * cashIndex);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(principal1 * cashIndex);
+      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(principal2 * cashIndex);
     });
   });
 
@@ -185,10 +185,10 @@ describe('CashToken', () => {
     it('should transfer Cash tokens between users', async() => {
       // Mint tokes first to have something to transfer
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
 
-      const amount = amountPrincipal * cashIndex;
+      const amount = principal * cashIndex;
       const tx = await send(cash, 'transfer', [account2, amount], { from: account1 });
       expect(tx.events.Transfer.returnValues).toMatchObject({
         from: account1,
@@ -207,10 +207,10 @@ describe('CashToken', () => {
 
     it('should fail if not enough Cash tokens to transfer', async() => {
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
 
-      const amount = amountPrincipal * cashIndex;
+      const amount = principal * cashIndex;
       // An attempt to transfer double amount
       await expect(send(cash, 'transfer', [account2, 2 * amount], { from: account1 })).rejects.toRevert("revert");
     });
@@ -220,9 +220,9 @@ describe('CashToken', () => {
     it('should transfer Cash tokens between users', async() => {
       // Mint tokes first to have something to transfer
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
-      const amount = amountPrincipal * cashIndex;
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
+      const amount = principal * cashIndex;
 
       // Approve an account2 to move tokens on behalf of account1
       await send(cash, 'approve', [account2, amount], {from: account1});
@@ -245,9 +245,9 @@ describe('CashToken', () => {
 
     it('should fail if not enough allowance', async() => {
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
-      const amount = amountPrincipal * cashIndex;
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
+      const amount = principal * cashIndex;
 
       // Approve an account2 to move tokens on behalf of account1
       await send(cash, 'approve', [account2, amount / 2], {from: account1});
@@ -258,9 +258,9 @@ describe('CashToken', () => {
 
     it('should fail if not enough Cash tokens to transfer', async() => {
       const cashIndex = await call(cash, 'getCashIndex');
-      const amountPrincipal = 10e6;
-      await send(cash, 'mint', [account1, amountPrincipal], { from: admin });
-      const amount = amountPrincipal * cashIndex;
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
+      const amount = principal * cashIndex;
 
       // Approve an account2 to move tokens on behalf of account1
       await send(cash, 'approve', [account2, 2 * amount], {from: account1});
