@@ -13,7 +13,7 @@ import "./ICash.sol";
 contract Starport {
     ICash immutable public cash;
 
-    address constant public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    IERC20 constant public ETH_ADDRESS = IERC20(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
     address[] public authorities;
 
@@ -21,8 +21,9 @@ contract Starport {
     mapping(bytes32 => bool) public isNoticeUsed;
 
     event Lock(IERC20 asset, address holder, uint amount);
-    event LockCash(address holder, uint amount, uint yieldIndex);
+    event LockCash(address holder, uint amount, uint128 principal);
     event Unlock(address account, uint amount, IERC20 asset);
+    event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
 
     constructor(ICash cash_, address[] memory authorities_) {
@@ -44,10 +45,12 @@ contract Starport {
      */
     function lock(uint amount, IERC20 asset) public {
         // TODO: Check Supply Cap
+        require(asset != ETH_ADDRESS, "Please use lockEth");
+
         if (asset == cash) {
-            lockCashInternal(amount, msg.sender);
+            lockCashInternal(amount);
         } else {
-            lockInternal(amount, asset, msg.sender);
+            lockAssetInternal(amount, asset);
         }
     }
 
@@ -57,24 +60,23 @@ contract Starport {
      */
     function lockEth() public payable {
         // TODO: Check Supply Cap
-        emit Lock(IERC20(ETH_ADDRESS), msg.sender, msg.value);
+        emit Lock(ETH_ADDRESS, msg.sender, msg.value);
     }
 
-    // Internal function for locking CASH (as opposed to collateral assets)
-    function lockCashInternal(uint amount, address sender) internal {
-        // cash.burn(amount);
-        uint yieldIndex = cash.getCashIndex();
-        transferInCash(sender, amount);
-
-        emit LockCash(sender, amount, yieldIndex);
+    /**
+     * @notice Internal function for locking CASH (as opposed to collateral assets)
+     * @dev Locking CASH will burn the CASH (as it's being transfer to Compound Chain)
+     * @param amount The amount of CASH to lock and burn.
+     */
+    function lockCashInternal(uint amount) internal {
+        uint128 principal = cash.burn(msg.sender, amount);
+        emit LockCash(msg.sender, amount, principal);
     }
 
     // Internal function for locking non-ETH collateral assets
-    function lockInternal(uint amount, IERC20 asset, address sender) internal {
-        // TODO: Check Supply Cap
-        uint amountTransferred = transferIn(sender, amount, asset);
-
-        emit Lock(asset, sender, amountTransferred);
+    function lockAssetInternal(uint amount, IERC20 asset) internal {
+        uint amountTransferred = transferIn(msg.sender, amount, asset);
+        emit Lock(asset, msg.sender, amountTransferred);
     }
 
     // Transfer in an asset, returning the balance actually accrued (i.e. less token fees)
@@ -104,7 +106,7 @@ contract Starport {
     }
 
     // Transfer out an asset
-    // Note: we do not check fees here, since we do not account for them
+    // Note: we do not check fees here, since we do not account for them on transfer out
     function transferOut(address to, uint amount, IERC20 asset) internal {
         INonStandardERC20(address(asset)).transfer(to, amount);
 
@@ -123,11 +125,6 @@ contract Starport {
                 }
         }
         require(success, "transferOut failed");
-    }
-
-    // TODO: Why not just use `transferIn`?
-    function transferInCash(address from, uint amount) internal {
-        require(cash.transferFrom(from, address(this), amount) == true, "TransferInCash");
     }
 
     /*
@@ -209,17 +206,34 @@ contract Starport {
     /**
      * @notice Unlock the given asset from the Starport
      * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @dev Note: for Cash token, we would expect to use `unlockCash` which mints the CASH.
      * @param asset The Asset to unlock
      * @param amount The amount of the asset to unlock in its native token units
      * @param account The account to transfer the asset to
      */
-    function unlock(IERC20 asset, uint amount, address account) external {
+    function unlock(IERC20 asset, uint amount, address payable account) external {
         require(msg.sender == address(this), "Call must originate locally");
 
-        // XXX TODO: This needs to handle Ether, Cash and collateral tokens
         emit Unlock(account, amount, asset);
 
-        transferOut(account, amount, asset);
+        if (asset == ETH_ADDRESS) {
+            account.transfer(amount);
+        } else {
+            transferOut(account, amount, asset);
+        }
+    }
+
+    /**
+     * @notice Unlock CASH from the Starport by minting
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @param principal The principal of CASH to unlock
+     * @param account The account to transfer the asset to
+     */
+    function unlockCash(uint128 principal, address account) external {
+        require(msg.sender == address(this), "Call must originate locally");
+
+        uint256 amount = cash.mint(account, principal);
+        emit UnlockCash(account, amount, principal);
     }
 
     /**
