@@ -1,5 +1,6 @@
 const ganache = require('ganache-core');
 const Web3 = require('web3');
+const RLP = require('rlp');
 const { readContractsFile, deployContract } = require('../ethereum');
 const { genPort } = require('../util');
 
@@ -40,6 +41,13 @@ class Eth {
     let actor = this.ctx.actors.get(actorLookup);
 
     return Number(await this.web3.eth.getBalance(actor.ethAddress()));
+  }
+
+  async getNextContractAddress(skip = 0) {
+    const nonce = await this.web3.eth.getTransactionCount(this.defaultFrom);
+    const address = this.web3.utils.sha3(
+      RLP.encode([this.defaultFrom, nonce + skip])).slice(12).substring(14);
+    return this.web3.utils.toChecksumAddress(`0x${address}`);
   }
 
   async teardown() {

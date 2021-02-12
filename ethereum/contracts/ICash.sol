@@ -21,8 +21,8 @@ interface IERC20 {
  * @title Generic Cash Token Interface
  */
 interface ICash is IERC20 {
-    function mint(address account, uint principal) external returns (uint);
-    function burn(address account, uint amount) external returns (uint);
+    function mint(address account, uint128 principal) external returns (uint);
+    function burn(address account, uint256 amount) external returns (uint128);
     function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external;
     function getCashIndex() external view returns (uint);
 }

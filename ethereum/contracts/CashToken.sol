@@ -7,7 +7,6 @@ import "./ICash.sol";
  * @title Compound Cash Token
  * @author Compound Finance
  * @notice The Compound Cash Token for Ethereum
- * @dev XXX Finish implementing ERC-20 features
  */
 contract CashToken is ICash {
     struct CashYieldAndIndex {
@@ -23,28 +22,28 @@ contract CashToken is ICash {
 
     mapping (address => mapping (address => uint)) public allowances;
     uint public totalCashPrincipal;
-    mapping (address => uint256) public cashPrincipal;
+    mapping (address => uint128) public cashPrincipal;
 
 	constructor(address starport) {
         admin = starport;
         cashYieldStartAt = block.timestamp;
-        cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e6});
+        cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e4});
 	}
 
-    function mint(address account, uint principal) external override returns (uint) {
+    function mint(address account, uint128 principal) external override returns (uint) {
         require(msg.sender == admin, "Must be admin");
         uint amount = principal * getCashIndex();
         cashPrincipal[account] += principal;
-        totalCashPrincipal += principal;
+        totalCashPrincipal = totalCashPrincipal + principal;
         emit Transfer(address(0), account, amount);
         return amount;
     }
 
-    function burn(address account, uint amount) external override returns (uint) {
+    function burn(address account, uint256 amount) external override returns (uint128) {
         require(msg.sender == admin, "Must be admin");
-        uint principal = amount / getCashIndex();
+        uint128 principal = amountToPrincipal(amount);
         cashPrincipal[account] -= principal;
-        totalCashPrincipal -= principal;
+        totalCashPrincipal = totalCashPrincipal - principal;
         emit Transfer(account, address(0), amount);
         return principal;
     }
@@ -79,7 +78,7 @@ contract CashToken is ICash {
 
     function transfer(address recipient, uint amount) external override returns (bool) {
         require(msg.sender != recipient, "Invalid recipient");
-        uint principal = amount / getCashIndex();
+        uint128 principal = amountToPrincipal(amount);
         cashPrincipal[recipient] += principal;
         cashPrincipal[msg.sender] -= principal;
         emit Transfer(msg.sender, recipient, amount);
@@ -99,7 +98,7 @@ contract CashToken is ICash {
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
         require(sender != recipient, "Invalid recipient");
         address spender = msg.sender;
-        uint principal = amount / getCashIndex();
+        uint128 principal = amountToPrincipal(amount);
         allowances[sender][spender] -= amount;
         cashPrincipal[recipient] += principal;
         cashPrincipal[sender] -= principal;
@@ -132,5 +131,11 @@ contract CashToken is ICash {
         uint eN = 271828;
         uint eD = 100000;
         return index * eN ** epower / eD ** epower;
+    }
+
+    function amountToPrincipal(uint amount) public view returns (uint128) {
+        uint256 principal = amount / getCashIndex();
+        require(principal < type(uint128).max, "amountToPrincipal::overflow");
+        return uint128(principal);
     }
 }

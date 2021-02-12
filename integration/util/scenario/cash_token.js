@@ -1,33 +1,42 @@
 const { readContractsFile } = require('../ethereum');
 const { Token } = require('./token');
 
-class CashToken {
+class CashToken extends Token {
   constructor(cashToken, owner, ctx) {
+    super('cash', 'CASH', 'Cash Token', 6, cashToken, owner, ctx);
+
     this.cashToken = cashToken;
-    this.owner = owner;
-    this.ctx = ctx;
   }
 
-  ethAddress() {
-    return this.cashToken._address;
+  toTrxArg() {
+    return `CASH`;
   }
 
-  toToken() {
-    return new Token(
-      'cash', // TODO: Consider pulling these from the token itself
-      'CASH',
-      'Cash Token',
-      18,
-      this.cashToken,
-      this.owner,
-      this.ctx
-    );
+  async cashIndex() {
+    return this.cashToken.methods.getCashIndex().call();
+  }
+
+  async cashIndex() {
+    return this.cashToken.methods.getCashIndex().call();
+  }
+
+  async getCashPrincipal(actorLookup) {
+    let actor = this.ctx.actors.get(actorLookup);
+    return Number(await this.token.methods.cashPrincipal(actor.ethAddress()).call());
+  }
+
+  async getTotalCashPrincipal() {
+    return Number(await this.token.methods.totalCashPrincipal().call());
+  }
+
+  async getCashYieldAndIndex() {
+    // TODO: How to parse result?
+    return await this.token.methods.cashYieldAndIndex().call();
   }
 }
 
-async function buildCashToken(cashTokenInfo, ctx) {
+async function buildCashToken(cashTokenInfo, ctx, owner) {
   ctx.log("Deploying cash token...");
-  let owner = ctx.eth.accounts[0];
   let cashToken = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'CashToken', [owner])
 
   return new CashToken(cashToken, owner, ctx);

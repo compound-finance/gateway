@@ -22,13 +22,13 @@ pub const USD: Symbol = Symbol::new("USD", 6);
 ///
 /// Useful for writing human values in a const context.
 pub const fn static_pow10(decimals: u8) -> Uint {
-    let mut v: Uint = 10;
+    let mut v: Uint = 1;
     let mut i = 0;
     loop {
-        i += 1;
         if i >= decimals {
             return v;
         }
+        i += 1;
         v *= 10;
     }
 }
@@ -100,5 +100,20 @@ impl our_std::str::FromStr for Symbol {
 impl From<Symbol> for String {
     fn from(symbol: Symbol) -> String {
         format!("{}/{}", symbol.ticker(), symbol.decimals())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_static_pow10() {
+        assert_eq!(static_pow10(0), 1);
+        assert_eq!(static_pow10(1), 10);
+        assert_eq!(static_pow10(2), 100);
+        assert_eq!(static_pow10(3), 1000);
+        assert_eq!(static_pow10(4), 10000);
+        assert_eq!(static_pow10(5), 100000);
     }
 }

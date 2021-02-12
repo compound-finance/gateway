@@ -35,9 +35,9 @@
   },
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
-  "CashPrincipal": ["Int"],
-  "CashIndex": ["Uint"],
-  "AssetIndex": ["Uint"],
+  "CashPrincipal": "Int",
+  "CashIndex": "Uint",
+  "AssetIndex": "Uint",
   "SessionIndex": "u32",
   "AccountId32": "[u8;32]",
   "AccountId": "AccountId32",
@@ -65,6 +65,12 @@
       "Dot": ["[u8; 32]"],
       "Sol": ["[u8; 32]"],
       "Tez": ["[u8; 32]"]
+    }
+  },
+  "CashAsset": {
+    "_enum": {
+      "Cash": "",
+      "Asset": "ChainAsset"
     }
   },
   "ChainAsset": {
@@ -142,8 +148,7 @@
     "id": "NoticeId",
     "parent": "[u8; 32]",
     "account": "[u8; 20]",
-    "amount": "u128",
-    "cash_index": "u128"
+    "principal": "u128"
   },
   "CashExtractionNotice": {
     "_enum": {
@@ -292,7 +297,8 @@
       "InvalidUTF8": "",
       "SignatureAccountMismatch": "",
       "IncorrectNonce": "(Nonce, Nonce)",
-      "NoticeMissing": "(ChainId, NoticeId)"
+      "NoticeMissing": "(ChainId, NoticeId)",
+      "NegativePrincipalExtrction": ""
     }
   },
   "MathError": {

@@ -10,6 +10,14 @@ const e18 = num => {
   return bigInt(num) * bigInt(1e18);
 };
 
+const e6 = num => {
+  return bigInt(num) * bigInt(1e6);
+};
+
+const toPrincipal = (n, index = 1e4) => {
+  return Number(n) / index;
+};
+
 const getNextContractAddress = (acct, nonce) => {
   return '0x' + web3.utils.sha3(RLP.encode([acct, nonce])).slice(12).substring(14);
 };
@@ -80,6 +88,7 @@ const ETH_ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 module.exports = {
   bigInt,
   e18,
+  e6,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,
@@ -87,6 +96,7 @@ module.exports = {
   sign,
   signAll,
   sendRPC,
+  toPrincipal,
   ETH_HEADER,
   ETH_ADDRESS,
   ETH_ZERO_ADDRESS
