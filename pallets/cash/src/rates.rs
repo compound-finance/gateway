@@ -7,6 +7,8 @@ use crate::{
     reason::MathError,
     types::{uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint},
 };
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
 /// Error enum for interest rates
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -36,6 +38,7 @@ impl From<Uint> for APR {
 impl APR {
     pub const DECIMALS: u8 = 4;
     pub const ZERO: APR = APR::from_nominal("0");
+    pub const ONE: APR = APR::from_nominal("1");
     pub const MAX: APR = APR::from_nominal("0.35"); // 35%
 
     pub const fn from_nominal(s: &'static str) -> Self {
@@ -49,16 +52,20 @@ impl APR {
     /// exp{r * dt} where dt is change in time in seconds
     // XXX why is this an index, should it be a CashIndexDelta or something?
     pub fn over_time(self, dt: Timestamp) -> Result<CashIndex, MathError> {
-        let increment = (self.as_f64() * (dt as f64) / (MILLISECONDS_PER_YEAR as f64)).exp()
-            * 10f64.powf(CashIndex::DECIMALS as f64);
-        if !increment.is_normal() {
-            // this can happen when increment is + infinity for example
-            return Err(MathError::AbnormalFloatingPointResult);
+        let index_scale = &BigInt::from(CashIndex::ONE.0);
+        let scaled_rate: &BigInt =
+            &(index_scale * self.0 * dt / MILLISECONDS_PER_YEAR / APR::ONE.0);
+        let t1 = index_scale * index_scale * index_scale; //     1
+        let t2 = scaled_rate * index_scale * index_scale; //     x
+        let t3 = scaled_rate * scaled_rate * index_scale / 2; // x^2 / 2
+        let t4 = scaled_rate * scaled_rate * scaled_rate / 6; // x^3 / 6
+        let unscaled = t1 + t2 + t3 + t4;
+        let scaled: BigInt = unscaled / index_scale / index_scale;
+        if let Some(raw) = scaled.to_u128() {
+            Ok(CashIndex(raw))
+        } else {
+            Err(MathError::Overflow)
         }
-        if increment > (Uint::max_value() as f64) {
-            return Err(MathError::Overflow);
-        }
-        Ok(CashIndex(increment as Uint))
     }
 }
 
@@ -641,10 +648,62 @@ mod test {
 
     #[test]
     fn test_over_time() {
-        let r = APR::from_nominal("0.2"); // 20% per year
-        let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
-        let actual = r.over_time(dt).unwrap(); // compounded continuously
-        let expected = CashIndex::from_nominal("1.1051"); // from google sheets
-        assert_eq!(actual, expected);
+        let mut rates = vec!["0", "0.0001", "0.03", "0.1", "0.2"];
+        let months_per_year = 12;
+        let weeks_per_year = 52;
+        let days_per_year = 365;
+        let hours_per_year = days_per_year * 24;
+        let minutes_per_year = hours_per_year * 60;
+        let seconds_per_year = minutes_per_year * 60;
+
+        let mut year_fractions = vec![
+            // months_per_year,
+            // weeks_per_year,
+            // days_per_year,
+            hours_per_year,
+            minutes_per_year,
+            seconds_per_year,
+        ];
+
+        for rate in rates.drain(..) {
+            for year_frac in year_fractions.iter() {
+                let r = APR::from_nominal(rate);
+                let dt = MILLISECONDS_PER_YEAR / year_frac;
+                let actual = match r.over_time(dt) {
+                    Ok(actual) => actual,
+                    Err(e) => panic!(
+                        "Math error during over_time  r = {}, year_frac = {}, error = {:?}",
+                        rate, year_frac, e
+                    ),
+                };
+
+                let float_rate = (r.0 as f64) / 10f64.powf(APR::DECIMALS as f64);
+                let float_rate_over_time =
+                    float_rate * (dt as f64) / (MILLISECONDS_PER_YEAR as f64);
+                let float_exact_reference = float_rate_over_time.exp();
+                let float_exact_as_uint =
+                    (float_exact_reference * (CashIndex::ONE.0 as f64)) as u128;
+                let error_wei = if float_exact_as_uint > actual.0 {
+                    float_exact_as_uint - actual.0
+                } else {
+                    actual.0 - float_exact_as_uint
+                };
+
+                assert!(
+                    error_wei < 1000,
+                    format!(
+                        "exp test case out of range r = {}, year_frac = {}, error = {}",
+                        rate, year_frac, error_wei
+                    )
+                );
+                // println!(
+                //     "{}, {}, {}, {}",
+                //     rate,
+                //     year_frac,
+                //     actual.0,
+                //     float_exact_reference * (CashIndex::ONE.0 as f64)
+                // );
+            }
+        }
     }
 }

@@ -425,7 +425,7 @@ impl CashPrincipal {
 pub struct CashIndex(pub Uint);
 
 impl CashIndex {
-    pub const DECIMALS: Decimals = 4;
+    pub const DECIMALS: Decimals = 18;
     pub const ONE: CashIndex = CashIndex(static_pow10(Self::DECIMALS));
 
     /// Get a CASH index from a string.

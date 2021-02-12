@@ -94,7 +94,7 @@ impl our_std::fmt::Display for Reason {
 }
 
 /// Type for reporting failures from calculations.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
 pub enum MathError {
     AbnormalFloatingPointResult,
     DivisionByZero,
