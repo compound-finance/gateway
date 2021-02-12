@@ -206,6 +206,8 @@ impl Portfolio {
     fn get_cash_balance(self: &Self) -> Result<USDSignedQuantity, Reason> {
         let cash_price = price(CASH);
         let cash_principal = self.cash_principal;
+        // XXX this read clashes somewhat with the rest of the code due to the impure nature
+        // consider parameterizing or pulling into portfolio struct for more control
         let cash_index: CashIndex = GlobalCashIndex::get();
         let cash_balance =
             cash_principal_to_cash_balance_signed_quantity(cash_principal, cash_index)?;
