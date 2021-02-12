@@ -2,6 +2,7 @@
 pragma solidity ^0.8.1;
 
 import "./ICash.sol";
+import "./Exponent.sol";
 
 /**
  * @title Compound Cash Token
@@ -126,10 +127,17 @@ contract CashToken is ICash {
     }
 
     function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
-        // TODO it needs more work and effort here
-        uint epower = yield * (block.timestamp - startAt);
-        uint eN = 271828;
-        uint eD = 100000;
-        return index * eN ** epower / eD ** epower;
+        uint128 epower = uint128(yield * (block.timestamp - startAt) / 1e6);
+
+        Fraction.Fraction128 memory percent = Exponent.exp(
+            Fraction.Fraction128({
+                num: epower,
+                den: 365 * 24 * 60 * 60
+            }),
+            1,
+            1
+        );
+
+        return index * percent.num / percent.den;
     }
 }

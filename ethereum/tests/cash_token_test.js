@@ -270,5 +270,46 @@ describe('CashToken', () => {
     });
   });
 
-  it.todo('#getCashIndex tests');
+  describe.only('#getCashIndex', () => {
+    it.only('should return cashIndex', async() => {
+      //const cashIndex1 = await call(cash, 'getCashIndex');
+      //console.log('cash index 1 = ', cashIndex1);
+
+      const blockNumber = await web3.eth.getBlockNumber();
+      const block = await web3.eth.getBlock(blockNumber);
+
+      const startAt = await call(cash, 'cashYieldStartAt', []);
+      const yieldAndIndex = await call(cash, 'cashYieldAndIndex', []);
+      console.log("startAt = ", startAt);
+      console.log("yield and index = ", yieldAndIndex);
+      const nextYieldTimestamp = block.timestamp + 30 * 60;
+      await send(cash, 'setFutureYield', [43628, 1e6, nextYieldTimestamp], {from: admin});
+
+      console.log("startAt = ", startAt);
+      console.log("yield and index = ", yieldAndIndex);
+
+      await sendRPC(web3, "evm_increaseTime", [365 * 24 * 60 * 60]);
+      await sendRPC(web3, "evm_mine", []);
+
+      const cashIndex2 = await call(cash, 'getCashIndex');
+      console.log('cash index 2 = ', cashIndex2);
+
+      // const blockNumber2 = await web3.eth.getBlockNumber();
+      // const block2 = await web3.eth.getBlock(blockNumber2);
+      // console.log("block timestamp = ", block2.timestamp);
+
+      // console.log('cash index 2 = ', cashIndex2);
+      // await sendRPC(web3, "evm_increaseTime", [24 * 60 * 60]);
+      // await sendRPC(web3, "evm_mine", []);
+
+      // const blockNumber3 = await web3.eth.getBlockNumber();
+      // const block3 = await web3.eth.getBlock(blockNumber3);
+      // console.log("block timestamp = ", block3.timestamp);
+
+      // const cashIndex3 = await call(cash, 'getCashIndex');
+      // console.log('cash index 3 = ', cashIndex3);
+    });
+  });
+
+  // it.todo('#getCashIndex tests');
 });
