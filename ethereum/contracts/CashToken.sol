@@ -20,18 +20,18 @@ contract CashToken is ICash {
     uint public nextCashYieldStartAt;
     CashYieldAndIndex public nextCashYieldAndIndex;
 
-    mapping (address => mapping (address => uint)) internal allowances;
+    mapping (address => mapping (address => uint)) public allowances;
     uint public totalCashPrincipal;
     mapping (address => uint128) public cashPrincipal;
 
 	constructor(address starport) {
-		admin = starport;
+        admin = starport;
         cashYieldStartAt = block.timestamp;
         cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e4});
 	}
 
     function mint(address account, uint128 principal) external override returns (uint) {
-        require(msg.sender == admin, "Sender is not an admin");
+        require(msg.sender == admin, "Must be admin");
         uint amount = principal * getCashIndex();
         cashPrincipal[account] += principal;
         totalCashPrincipal = totalCashPrincipal + principal;
@@ -40,7 +40,7 @@ contract CashToken is ICash {
     }
 
     function burn(address account, uint amount) external override returns (uint128) {
-        require(msg.sender == admin, "Sender is not an admin");
+        require(msg.sender == admin, "Must be admin");
         uint128 principal = amountToPrincipal(amount);
         cashPrincipal[account] -= principal;
         totalCashPrincipal = totalCashPrincipal - principal;
@@ -49,14 +49,12 @@ contract CashToken is ICash {
     }
 
     function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external override {
-        require(msg.sender == admin, "Sender is not an admin");
+        require(msg.sender == admin, "Must be admin");
         uint nextAt = nextCashYieldStartAt;
-
         if (nextAt != 0 && block.timestamp > nextAt) {
             cashYieldStartAt = nextAt;
             cashYieldAndIndex = nextCashYieldAndIndex;
         }
-
         nextCashYieldStartAt = nextYieldStartAt;
         nextCashYieldAndIndex = CashYieldAndIndex({yield: nextYield, index: nextIndex});
     }
@@ -65,8 +63,9 @@ contract CashToken is ICash {
         uint nextAt = nextCashYieldStartAt;
         if (nextAt != 0 && block.timestamp > nextAt) {
             return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
+        } else {
+            return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
         }
-        return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
     }
 
     function totalSupply() external view override returns (uint) {
@@ -100,7 +99,7 @@ contract CashToken is ICash {
         require(sender != recipient, "Invalid recipient");
         address spender = msg.sender;
         uint128 principal = amountToPrincipal(amount);
-        allowances[sender][spender] = allowances[sender][spender] - amount;
+        allowances[sender][spender] -= amount;
         cashPrincipal[recipient] += principal;
         cashPrincipal[sender] -= principal;
         emit Transfer(sender, recipient, amount);
