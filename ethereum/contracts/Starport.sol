@@ -13,16 +13,17 @@ import "./ICash.sol";
 contract Starport {
     ICash immutable public cash;
 
-    address constant public ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
     address[] public authorities;
 
     uint public eraId; // TODO: could bitpack here and use uint32
     mapping(bytes32 => bool) public isNoticeUsed;
 
-    event Lock(IERC20 asset, address holder, uint amount);
-    event LockCash(address holder, uint amount, uint yieldIndex);
-    event Unlock(address account, uint amount, IERC20 asset);
+    event Lock(address asset, address holder, uint amount);
+    event LockCash(address holder, uint amount, uint128 principal);
+    event Unlock(address account, uint amount, address asset);
+    event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
 
     constructor(ICash cash_, address[] memory authorities_) {
@@ -42,12 +43,14 @@ contract Starport {
      * @param amount The amount (in the asset's native wei) to lock
      * @param asset The asset to lock in the Starport
      */
-    function lock(uint amount, IERC20 asset) public {
+    function lock(uint amount, address asset) public {
         // TODO: Check Supply Cap
-        if (asset == cash) {
-            lockCashInternal(amount, msg.sender);
+        require(asset != ETH_ADDRESS, "Please use lockEth");
+
+        if (asset == address(cash)) {
+            lockCashInternal(amount);
         } else {
-            lockInternal(amount, asset, msg.sender);
+            lockAssetInternal(amount, asset);
         }
     }
 
@@ -57,31 +60,30 @@ contract Starport {
      */
     function lockEth() public payable {
         // TODO: Check Supply Cap
-        emit Lock(IERC20(ETH_ADDRESS), msg.sender, msg.value);
+        emit Lock(ETH_ADDRESS, msg.sender, msg.value);
     }
 
-    // Internal function for locking CASH (as opposed to collateral assets)
-    function lockCashInternal(uint amount, address sender) internal {
-        // cash.burn(amount);
-        uint yieldIndex = cash.getCashIndex();
-        transferInCash(sender, amount);
-
-        emit LockCash(sender, amount, yieldIndex);
+    /**
+     * @notice Internal function for locking CASH (as opposed to collateral assets)
+     * @dev Locking CASH will burn the CASH (as it's being transfer to Compound Chain)
+     * @param amount The amount of CASH to lock and burn.
+     */
+    function lockCashInternal(uint amount) internal {
+        uint128 principal = cash.burn(msg.sender, amount);
+        emit LockCash(msg.sender, amount, principal);
     }
 
     // Internal function for locking non-ETH collateral assets
-    function lockInternal(uint amount, IERC20 asset, address sender) internal {
-        // TODO: Check Supply Cap
-        uint amountTransferred = transferIn(sender, amount, asset);
-
-        emit Lock(asset, sender, amountTransferred);
+    function lockAssetInternal(uint amount, address asset) internal {
+        uint amountTransferred = transferAssetIn(msg.sender, amount, asset);
+        emit Lock(asset, msg.sender, amountTransferred);
     }
 
     // Transfer in an asset, returning the balance actually accrued (i.e. less token fees)
-    // Note: do not use for Ether or CASH (XXX: Why not CASH?)
-    function transferIn(address from, uint amount, IERC20 asset) internal returns (uint) {
-        uint balanceBefore = asset.balanceOf(address(this));
-        INonStandardERC20(address(asset)).transferFrom(from, address(this), amount);
+    // Note: do not use for Ether or CASH
+    function transferAssetIn(address from, uint amount, address asset) internal returns (uint) {
+        uint balanceBefore = IERC20(asset).balanceOf(address(this));
+        INonStandardERC20(asset).transferFrom(from, address(this), amount);
 
         bool success;
         assembly {
@@ -97,16 +99,16 @@ contract Starport {
                     revert(0, 0)
                 }
         }
-        require(success, "transferIn failed");
+        require(success, "transferAssetIn failed");
 
-        uint balanceAfter = asset.balanceOf(address(this));
+        uint balanceAfter = IERC20(asset).balanceOf(address(this));
         return balanceAfter - balanceBefore;
     }
 
     // Transfer out an asset
-    // Note: we do not check fees here, since we do not account for them
-    function transferOut(address to, uint amount, IERC20 asset) internal {
-        INonStandardERC20(address(asset)).transfer(to, amount);
+    // Note: we do not check fees here, since we do not account for them on transfer out
+    function transferAssetOut(address to, uint amount, address asset) internal {
+        INonStandardERC20(asset).transfer(to, amount);
 
         bool success;
         assembly {
@@ -122,12 +124,7 @@ contract Starport {
                     revert(0, 0)
                 }
         }
-        require(success, "transferOut failed");
-    }
-
-    // TODO: Why not just use `transferIn`?
-    function transferInCash(address from, uint amount) internal {
-        require(cash.transferFrom(from, address(this), amount) == true, "TransferInCash");
+        require(success, "transferAssetOut failed");
     }
 
     /*
@@ -150,7 +147,7 @@ contract Starport {
      * @return The result of the invokation of the action of the notice.
      */
     function invoke(bytes calldata notice, bytes[] calldata signatures) external returns (bytes memory) {
-        checkNoticeAuthorized(notice, authorities, signatures);
+        checkNoticeSignerAuthorized(notice, authorities, signatures);
 
         return invokeNoticeInternal(notice);
     }
@@ -209,17 +206,34 @@ contract Starport {
     /**
      * @notice Unlock the given asset from the Starport
      * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @dev Note: for Cash token, we would expect to use `unlockCash` which mints the CASH.
      * @param asset The Asset to unlock
      * @param amount The amount of the asset to unlock in its native token units
      * @param account The account to transfer the asset to
      */
-    function unlock(IERC20 asset, uint amount, address account) external {
+    function unlock(address asset, uint amount, address payable account) external {
         require(msg.sender == address(this), "Call must originate locally");
 
-        // XXX TODO: This needs to handle Ether, Cash and collateral tokens
         emit Unlock(account, amount, asset);
 
-        transferOut(account, amount, asset);
+        if (asset == ETH_ADDRESS) {
+            account.transfer(amount);
+        } else {
+            transferAssetOut(account, amount, asset);
+        }
+    }
+
+    /**
+     * @notice Unlock CASH from the Starport by minting
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @param account The account to transfer the asset to
+     * @param principal The principal of CASH to unlock
+     */
+    function unlockCash(address account, uint128 principal) external {
+        require(msg.sender == address(this), "Call must originate locally");
+
+        uint256 amount = cash.mint(account, principal);
+        emit UnlockCash(account, amount, principal);
     }
 
     /**
@@ -230,9 +244,6 @@ contract Starport {
     function changeAuthorities(address[] calldata newAuthorities) external {
         require(msg.sender == address(this), "Call must originate locally");
         require(newAuthorities.length > 0, "New authority set can not be empty");
-
-        // XXX TODO: min authorities length?
-        // XXX TODO: check for repeats in the authorities list?
 
         emit ChangeAuthorities(newAuthorities);
 
@@ -260,7 +271,7 @@ contract Starport {
      * @param authorities_ A set of authorities to check the notice against? TODO: Why pass this in?
      * @param signatures The signatures to verify
      */
-    function checkNoticeAuthorized(
+    function checkNoticeSignerAuthorized(
         bytes calldata notice,
         address[] memory authorities_,
         bytes[] calldata signatures

@@ -18,7 +18,7 @@ class Token {
   }
 
   toTrxArg() {
-    return `eth:${this.ethAddress()}`;
+    return `Eth:${this.ethAddress()}`;
   }
 
   toChainAsset() {
@@ -237,7 +237,7 @@ async function buildTokens(tokensInfoHash, ctx) {
   }, Promise.resolve([]));
 
   tokens.push(new EtherToken(ctx));
-  tokens.push(ctx.cashToken.toToken());
+  tokens.push(ctx.cashToken);
 
   return new Tokens(tokens, ctx);
 }

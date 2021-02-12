@@ -41,7 +41,7 @@ lazy_static! {
     static ref UNLOCK_SIG: <Ethereum as Chain>::Hash =
         <Ethereum as Chain>::hash_bytes(b"unlock(address,uint256,address)");
     static ref UNLOCK_CASH_SIG: <Ethereum as Chain>::Hash =
-        <Ethereum as Chain>::hash_bytes(b"unlockCash(address,uint256,uint256)");
+        <Ethereum as Chain>::hash_bytes(b"unlockCash(address,uint128)");
     static ref SET_FUTURE_YIELD_SIG: <Ethereum as Chain>::Hash =
         <Ethereum as Chain>::hash_bytes(b"setFutureYield(uint256,uint256,uint256)");
     static ref SET_SUPPLY_CAP_SIG: <Ethereum as Chain>::Hash =
@@ -67,8 +67,7 @@ pub enum CashExtractionNotice {
         id: NoticeId,
         parent: <Ethereum as Chain>::Hash,
         account: <Ethereum as Chain>::Address,
-        amount: <Ethereum as Chain>::Amount,
-        cash_index: <Ethereum as Chain>::CashIndex,
+        principal: <Ethereum as Chain>::Amount,
     },
 }
 
@@ -197,16 +196,14 @@ impl EncodeNotice for CashExtractionNotice {
                 id,
                 parent,
                 account,
-                amount,
-                cash_index,
+                principal,
             } => encode_notice_params(
                 id,
                 parent,
                 *UNLOCK_CASH_SIG,
                 &[
                     Token::Address(account.into()),
-                    Token::Uint((*amount).into()),
-                    Token::Uint((*cash_index).into()),
+                    Token::Uint((*principal).into()),
                 ],
             ),
         }
@@ -411,15 +408,13 @@ mod tests {
     #[test]
     fn test_encodes_cash_extraction_notice() -> Result<(), ethabi::Error> {
         let account = [1u8; 20];
-        let amount = 50;
-        let cash_index = 75u128;
+        let principal = 50;
 
         let notice = Notice::CashExtractionNotice(CashExtractionNotice::Eth {
             id: NoticeId(80, 1),
             parent: [3u8; 32],
             account,
-            amount,
-            cash_index,
+            principal,
         });
 
         let expected = [
@@ -430,21 +425,18 @@ mod tests {
             0, 0, 1, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            0x7a, 0x23, 0x46, 0x54, // Function Signature (0x7a234654)
+            0x4c, 0xfa, 0x3d, 0xa3, // Function Signature (0x4cfa3da3)
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
             1, 1, 1, // account
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 50, // amount
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 75, // cash index
+            0, 0, 50, // principal
         ];
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
 
         // Test against auto-encoding
         let account_token = Token::Address(account.into());
-        let amount_token = Token::Uint(amount.into());
-        let cash_index_token = Token::Uint(cash_index.into());
+        let principal_token = Token::Uint(principal.into());
 
         let unlock_cash_fn = Function {
             name: String::from("unlockCash"),
@@ -454,19 +446,15 @@ mod tests {
                     kind: ParamType::Address,
                 },
                 Param {
-                    name: String::from("amount"),
-                    kind: ParamType::Uint(256),
-                },
-                Param {
-                    name: String::from("cashIndex"),
-                    kind: ParamType::Uint(256),
+                    name: String::from("principal"),
+                    kind: ParamType::Uint(128),
                 },
             ],
             outputs: vec![],
             constant: false,
         };
         assert_eq!(
-            &unlock_cash_fn.encode_input(&[account_token, amount_token, cash_index_token])?[..],
+            &unlock_cash_fn.encode_input(&[account_token, principal_token])?[..],
             &expected[100..]
         );
         Ok(())

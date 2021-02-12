@@ -132,7 +132,8 @@ async function buildCtx(scenInfo={}) {
   debug(() => `test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   let ctx = new Ctx(scenInfo);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
-  ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx);
+  let starportAddress = await ctx.eth.getNextContractAddress(1);
+  ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
   ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, ctx);

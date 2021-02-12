@@ -15,13 +15,22 @@ contract StarportHarness is Starport {
 		return getQuorum(authorityCount);
 	}
 
-	/// Harness to call `checkNoticeAuthorized`
-	function checkNoticeAuthorized_(
+	/// Harness to call `checkNoticeSignerAuthorized`
+	function checkNoticeSignerAuthorized_(
         bytes calldata notice,
         address[] memory authorities_,
         bytes[] calldata signatures
     ) external view {
-		return checkNoticeAuthorized(notice, authorities_, signatures);
+		return checkNoticeSignerAuthorized(notice, authorities_, signatures);
+	}
+
+	/// Harness to call `mint` on Cash Token
+	function mint_(address holder, uint128 principal) external {
+		cash.mint(holder, principal);
+	}
+
+	/// Harness to accept ether
+	function receive_() external payable {
 	}
 
 	/// Harness to call `recover`
@@ -29,12 +38,17 @@ contract StarportHarness is Starport {
 		return recover(digest, signature);
 	}
 
-	/// Harness to call `unlock`
-	function unlock_(IERC20 asset, uint amount, address account) external {
+	/// Harness to call `unlock` with this as `msg.sender`
+	function unlock_(address asset, uint amount, address payable account) external {
 		Starport(this).unlock(asset, amount, account);
 	}
 
-	/// Harness to call `changeAuthorities`
+	/// Harness to call `unlockCash` with this as `msg.sender`
+	function unlockCash_(address account, uint128 principal) external {
+		Starport(this).unlockCash(account, principal);
+	}
+
+	/// Harness to call `changeAuthorities` with this as `msg.sender`
 	function changeAuthorities_(address[] calldata newAuthorities) external {
 		Starport(this).changeAuthorities(newAuthorities);
 	}

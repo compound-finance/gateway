@@ -1,4 +1,4 @@
-use crate::chains::{ChainAccount, ChainAsset};
+use crate::chains::{CashAsset, ChainAccount, ChainAsset};
 use trx_request;
 
 impl From<trx_request::Account> for ChainAccount {
@@ -9,10 +9,11 @@ impl From<trx_request::Account> for ChainAccount {
     }
 }
 
-impl From<trx_request::Asset> for ChainAsset {
+impl From<trx_request::Asset> for CashAsset {
     fn from(account: trx_request::Asset) -> Self {
         match account {
-            trx_request::Asset::Eth(eth_address) => ChainAsset::Eth(eth_address),
+            trx_request::Asset::Cash => CashAsset::Cash,
+            trx_request::Asset::Eth(eth_address) => CashAsset::Asset(ChainAsset::Eth(eth_address)),
         }
     }
 }
@@ -39,8 +40,10 @@ mod tests {
     #[test]
     fn test_asset_to_chain_asset() {
         assert_eq!(
-            ChainAsset::from(trx_request::Asset::Eth(ETH)),
-            ChainAsset::Eth(ETH)
+            CashAsset::from(trx_request::Asset::Eth(ETH)),
+            CashAsset::Asset(ChainAsset::Eth(ETH))
         );
+
+        assert_eq!(CashAsset::from(trx_request::Asset::Cash), CashAsset::Cash);
     }
 }

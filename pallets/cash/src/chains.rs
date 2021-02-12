@@ -152,6 +152,13 @@ impl From<ChainAccount> for String {
     }
 }
 
+/// Type for an asset or CASH
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum CashAsset {
+    Cash,
+    Asset(ChainAsset),
+}
+
 /// Type for an asset tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainAsset {

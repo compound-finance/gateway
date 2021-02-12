@@ -3,6 +3,7 @@ const { getInfoKey } = require('../util');
 const { instantiateInfo } = require('./scen_info');
 const { sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
+const { CashToken } = require('./cash_token');
 
 class Actor {
   constructor(name, ethAddress, chainKey, ctx) {
@@ -25,7 +26,7 @@ class Actor {
   }
 
   toTrxArg() {
-    return `eth:${this.ethAddress()}`;
+    return `Eth:${this.ethAddress()}`;
   }
 
   async nonce() {
@@ -59,31 +60,40 @@ class Actor {
     return await token.getBalance(this);
   }
 
-  async chainBalance(tokenLookup) {
-    let token = this.ctx.tokens.get(tokenLookup);
-    let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
-    return token.toTokenAmount(weiAmount);
+  async chainCashPrincipal() {
+    let principal = await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
+    return principal.toNumber();
   }
 
-  async lock(amount, collateral, awaitEvent = true) {
-    let lockRes = await this.ctx.starport.lock(this, amount, collateral);
+  async chainCashBalance() {
+    return await this.chainCashPrincipal() * await this.ctx.chain.cashIndex();
+  }
+
+  async chainBalance(tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+    if (token instanceof CashToken) {
+      return token.toTokenAmount(await this.chainCashBalance());
+    } else {
+      let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+      return token.toTokenAmount(weiAmount);
+    }
+  }
+
+  async lock(amount, asset, awaitEvent = true) {
+    let lockRes = await this.ctx.starport.lock(this, amount, asset);
     if (awaitEvent) {
       await this.ctx.chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
     }
     return lockRes;
   }
 
-  async extract(amount, collateral, recipient = null) {
-    let token = this.ctx.tokens.get(collateral);
+  async extract(amount, asset, recipient = null) {
+    let token = this.ctx.tokens.get(asset);
     let weiAmount = token.toWeiAmount(amount);
 
-    let trxReq = this.ctx.generateTrxReq("extract", weiAmount, token, recipient || this);
+    let trxReq = this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
 
-    return await this.runTrxRequest(trxReq);
-  }
-
-  async extractCash(amount) {
-    let trxReq = this.ctx.generateTrxReq("extract-cash", amount);
+    this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
 
     return await this.runTrxRequest(trxReq);
   }
