@@ -3,6 +3,7 @@ const {
   bigInt,
   e18,
   e6,
+  fromNow,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,
@@ -1015,6 +1016,94 @@ describe('Starport', () => {
 
     it('should fail when cash token is passed in', async () => {
       await expect(call(starport, 'setSupplyCap', [cash._address, 500], { from: root })).rejects.toRevert('revert Cash does not accept supply cap');
+    });
+  });
+
+  describe('#setFutureYield', () => {
+    it('should set future yield in Cash Token', async () => {
+      const nextCashYield = 1200; // 12%
+      const nextCashYieldIndex = 1234;
+      const nextCashYieldStart = fromNow(60 * 10); // 10m
+
+      expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
+        yield: "0",
+        index: "10000",
+      });
+      expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(0);
+      expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
+        yield: "0",
+        index: "0",
+      });
+
+      const tx = await send(starport, 'setFutureYield_', [nextCashYield, nextCashYieldIndex, nextCashYieldStart]);
+
+      expect(tx.events.SetFutureYield.returnValues).toMatchObject({
+        nextCashYield: nextCashYield.toString(),
+        nextCashYieldIndex: nextCashYieldIndex.toString(),
+        nextCashYieldStart: nextCashYieldStart.toString(),
+      });
+
+      expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
+        yield: "0",
+        index: "10000",
+      });
+      expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(nextCashYieldStart);
+      expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
+        yield: "1200",
+        index: "1234",
+      });
+    });
+
+    it('should set future yield via #invoke', async () => {
+      const nextCashYield = 1200; // 12%
+      const nextCashYieldIndex = 1234;
+      const nextCashYieldStart = fromNow(60 * 10); // 10m
+
+      let setFutureYieldNotice = buildNotice(starport.methods.setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart), { newEra: true });
+      let signatures = signAll(setFutureYieldNotice, authorityWallets);
+
+      const tx = await send(starport, 'invoke', [setFutureYieldNotice, signatures], { from: account1 });
+
+      expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
+        yield: "0",
+        index: "10000",
+      });
+      expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(nextCashYieldStart);
+      expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
+        yield: "1200",
+        index: "1234",
+      });
+
+      expect(tx.events.SetFutureYield.returnValues).toMatchObject({
+        nextCashYield: nextCashYield.toString(),
+        nextCashYieldIndex: nextCashYieldIndex.toString(),
+        nextCashYieldStart: nextCashYieldStart.toString(),
+      });
+    });
+
+    it('should set future yield via hand-coded notice', async () => {
+      const setFutureYieldNotice =
+        "0x4554483a"                                                       + // b'ETH:'
+        "0000000000000000000000000000000000000000000000000000000000000000" + // EraId
+        "0000000000000000000000000000000000000000000000000000000000000000" + // EraIndex
+        "3030303030303030303030303030303030303030303030303030303030303030" + // Parent Hash
+        "1e9d77d9"                                                         + // "setFutureYield(uint128,uint128,uint256)"
+        "00000000000000000000000000000000000000000000000000000000000004b0" + // nextCashYield
+        "00000000000000000000000000000000000000000000000000000000000004d2" + // nextCashYieldIndex
+        "0000000000000000000000000000000000000000000000000000000062082f07"   // nextCashYieldStart
+
+      const signatures = signAll(setFutureYieldNotice, authorityWallets);
+      const tx = await send(starport, 'invoke', [setFutureYieldNotice, signatures], { from: account1 });
+
+      expect(tx.events.SetFutureYield.returnValues).toMatchObject({
+        nextCashYield: "1200",
+        nextCashYieldIndex: "1234",
+        nextCashYieldStart: "1644703495",
+      });
+    });
+
+    it('should fail when not called by self', async () => {
+      await expect(call(starport, 'setFutureYield', [1, 2, 3])).rejects.toRevert('revert Call must originate locally');
     });
   });
 });

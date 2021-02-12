@@ -16,10 +16,6 @@ class CashToken extends Token {
     return this.cashToken.methods.getCashIndex().call();
   }
 
-  async cashIndex() {
-    return this.cashToken.methods.getCashIndex().call();
-  }
-
   async getCashPrincipal(actorLookup) {
     let actor = this.ctx.actors.get(actorLookup);
     return Number(await this.token.methods.cashPrincipal(actor.ethAddress()).call());

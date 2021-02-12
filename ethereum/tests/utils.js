@@ -81,6 +81,10 @@ const sendRPC = (web3_, method, params) => {
   });
 }
 
+const fromNow = (seconds) => {
+  return Math.floor(seconds + (new Date() / 1000));
+}
+
 const ETH_HEADER = "0x4554483a";
 const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const ETH_ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -89,6 +93,7 @@ module.exports = {
   bigInt,
   e18,
   e6,
+  fromNow,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,

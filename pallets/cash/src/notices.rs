@@ -43,7 +43,7 @@ lazy_static! {
     static ref UNLOCK_CASH_SIG: <Ethereum as Chain>::Hash =
         <Ethereum as Chain>::hash_bytes(b"unlockCash(address,uint128)");
     static ref SET_FUTURE_YIELD_SIG: <Ethereum as Chain>::Hash =
-        <Ethereum as Chain>::hash_bytes(b"setFutureYield(uint256,uint256,uint256)");
+        <Ethereum as Chain>::hash_bytes(b"setFutureYield(uint128,uint128,uint256)");
     static ref SET_SUPPLY_CAP_SIG: <Ethereum as Chain>::Hash =
         <Ethereum as Chain>::hash_bytes(b"setSupplyCap(address,uint256)");
     static ref CHANGE_AUTHORITIES_SIG: <Ethereum as Chain>::Hash =
@@ -77,8 +77,8 @@ pub enum FutureYieldNotice {
         id: NoticeId,
         parent: <Ethereum as Chain>::Hash,
         next_cash_yield: <Ethereum as Chain>::Rate,
-        next_cash_yield_start_at: <Ethereum as Chain>::Timestamp,
         next_cash_index: <Ethereum as Chain>::CashIndex,
+        next_cash_yield_start: <Ethereum as Chain>::Timestamp,
     },
 }
 
@@ -217,7 +217,7 @@ impl EncodeNotice for FutureYieldNotice {
                 id,
                 parent,
                 next_cash_yield,
-                next_cash_yield_start_at,
+                next_cash_yield_start,
                 next_cash_index,
             } => encode_notice_params(
                 id,
@@ -225,8 +225,8 @@ impl EncodeNotice for FutureYieldNotice {
                 *SET_FUTURE_YIELD_SIG,
                 &[
                     Token::Uint((*next_cash_yield).into()),
-                    Token::Uint((*next_cash_yield_start_at).into()),
                     Token::Uint((*next_cash_index).into()),
+                    Token::Uint((*next_cash_yield_start).into()),
                 ],
             ),
         }
@@ -463,15 +463,15 @@ mod tests {
     #[test]
     fn test_encodes_future_yield_notice() -> Result<(), ethabi::Error> {
         let next_cash_yield = 700u128;
-        let next_cash_yield_start_at = 200u128;
+        let next_cash_yield_start = 200u128;
         let next_cash_index = 400u128;
 
         let notice = Notice::FutureYieldNotice(FutureYieldNotice::Eth {
             id: NoticeId(80, 1),
             parent: [3u8; 32],
             next_cash_yield,
-            next_cash_yield_start_at,
             next_cash_index,
+            next_cash_yield_start,
         });
 
         let expected = [
@@ -482,20 +482,20 @@ mod tests {
             0, 0, 1, // eraIndex
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, // parent
-            0x4f, 0xbb, 0x4d, 0x2f, // Function Signature (0x4fbb4d2f)
+            0x1e, 0x9d, 0x77, 0xd9, // Function Signature (0x1e9d77d9)
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0x02, 0xbc, // next_cash_yield
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 200, // next_cash_yield_start_at
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0x01, 0x90, // next_cash_index
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 200, // next_cash_yield_start
         ];
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
 
         // Test against auto-encoding
         let next_cash_yield_token = Token::Uint(next_cash_yield.into());
-        let next_cash_yield_start_at_token = Token::Uint(next_cash_yield_start_at.into());
+        let next_cash_yield_start_at_token = Token::Uint(next_cash_yield_start.into());
         let next_cash_index_token = Token::Uint(next_cash_index.into());
 
         let set_future_yield_fn = Function {
@@ -503,14 +503,14 @@ mod tests {
             inputs: vec![
                 Param {
                     name: String::from("nextCashYield"),
-                    kind: ParamType::Uint(256),
-                },
-                Param {
-                    name: String::from("nextCashYieldStartAt"),
-                    kind: ParamType::Uint(256),
+                    kind: ParamType::Uint(128),
                 },
                 Param {
                     name: String::from("nextCashYieldIndex"),
+                    kind: ParamType::Uint(128),
+                },
+                Param {
+                    name: String::from("nextCashYieldStart"),
                     kind: ParamType::Uint(256),
                 },
             ],
@@ -520,8 +520,8 @@ mod tests {
         assert_eq!(
             &set_future_yield_fn.encode_input(&[
                 next_cash_yield_token,
+                next_cash_index_token,
                 next_cash_yield_start_at_token,
-                next_cash_index_token
             ])?[..],
             &expected[100..]
         );

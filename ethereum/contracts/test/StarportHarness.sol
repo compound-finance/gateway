@@ -53,6 +53,11 @@ contract StarportHarness is Starport {
 		Starport(this).changeAuthorities(newAuthorities);
 	}
 
+	/// Harness to call `setFutureYield` with this as `msg.sender`
+	function setFutureYield_(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart) external {
+		Starport(this).setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
+	}
+
 	/// Simple function to test notices
 	function count_() public returns (uint) {
 		return counter += 1;
