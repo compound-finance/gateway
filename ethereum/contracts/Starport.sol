@@ -13,16 +13,16 @@ import "./ICash.sol";
 contract Starport {
     ICash immutable public cash;
 
-    IERC20 constant public ETH_ADDRESS = IERC20(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+    address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
     address[] public authorities;
 
     uint public eraId; // TODO: could bitpack here and use uint32
     mapping(bytes32 => bool) public isNoticeUsed;
 
-    event Lock(IERC20 asset, address holder, uint amount);
+    event Lock(address asset, address holder, uint amount);
     event LockCash(address holder, uint amount, uint128 principal);
-    event Unlock(address account, uint amount, IERC20 asset);
+    event Unlock(address account, uint amount, address asset);
     event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
 
@@ -43,11 +43,11 @@ contract Starport {
      * @param amount The amount (in the asset's native wei) to lock
      * @param asset The asset to lock in the Starport
      */
-    function lock(uint amount, IERC20 asset) public {
+    function lock(uint amount, address asset) public {
         // TODO: Check Supply Cap
         require(asset != ETH_ADDRESS, "Please use lockEth");
 
-        if (asset == cash) {
+        if (asset == address(cash)) {
             lockCashInternal(amount);
         } else {
             lockAssetInternal(amount, asset);
@@ -74,16 +74,16 @@ contract Starport {
     }
 
     // Internal function for locking non-ETH collateral assets
-    function lockAssetInternal(uint amount, IERC20 asset) internal {
-        uint amountTransferred = transferIn(msg.sender, amount, asset);
+    function lockAssetInternal(uint amount, address asset) internal {
+        uint amountTransferred = transferAssetIn(msg.sender, amount, asset);
         emit Lock(asset, msg.sender, amountTransferred);
     }
 
     // Transfer in an asset, returning the balance actually accrued (i.e. less token fees)
-    // Note: do not use for Ether or CASH (XXX: Why not CASH?)
-    function transferIn(address from, uint amount, IERC20 asset) internal returns (uint) {
-        uint balanceBefore = asset.balanceOf(address(this));
-        INonStandardERC20(address(asset)).transferFrom(from, address(this), amount);
+    // Note: do not use for Ether or CASH
+    function transferAssetIn(address from, uint amount, address asset) internal returns (uint) {
+        uint balanceBefore = IERC20(asset).balanceOf(address(this));
+        INonStandardERC20(asset).transferFrom(from, address(this), amount);
 
         bool success;
         assembly {
@@ -99,16 +99,16 @@ contract Starport {
                     revert(0, 0)
                 }
         }
-        require(success, "transferIn failed");
+        require(success, "transferAssetIn failed");
 
-        uint balanceAfter = asset.balanceOf(address(this));
+        uint balanceAfter = IERC20(asset).balanceOf(address(this));
         return balanceAfter - balanceBefore;
     }
 
     // Transfer out an asset
     // Note: we do not check fees here, since we do not account for them on transfer out
-    function transferOut(address to, uint amount, IERC20 asset) internal {
-        INonStandardERC20(address(asset)).transfer(to, amount);
+    function transferAssetOut(address to, uint amount, address asset) internal {
+        INonStandardERC20(asset).transfer(to, amount);
 
         bool success;
         assembly {
@@ -124,7 +124,7 @@ contract Starport {
                     revert(0, 0)
                 }
         }
-        require(success, "transferOut failed");
+        require(success, "transferAssetOut failed");
     }
 
     /*
@@ -211,7 +211,7 @@ contract Starport {
      * @param amount The amount of the asset to unlock in its native token units
      * @param account The account to transfer the asset to
      */
-    function unlock(IERC20 asset, uint amount, address payable account) external {
+    function unlock(address asset, uint amount, address payable account) external {
         require(msg.sender == address(this), "Call must originate locally");
 
         emit Unlock(account, amount, asset);
@@ -219,17 +219,17 @@ contract Starport {
         if (asset == ETH_ADDRESS) {
             account.transfer(amount);
         } else {
-            transferOut(account, amount, asset);
+            transferAssetOut(account, amount, asset);
         }
     }
 
     /**
      * @notice Unlock CASH from the Starport by minting
      * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
-     * @param principal The principal of CASH to unlock
      * @param account The account to transfer the asset to
+     * @param principal The principal of CASH to unlock
      */
-    function unlockCash(uint128 principal, address account) external {
+    function unlockCash(address account, uint128 principal) external {
         require(msg.sender == address(this), "Call must originate locally");
 
         uint256 amount = cash.mint(account, principal);

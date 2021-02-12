@@ -18,7 +18,11 @@ class Token {
   }
 
   toTrxArg() {
-    return `eth:${this.ethAddress()}`;
+    if (this.symbol === 'CASH') {
+      return `CASH`;
+    } else {
+      return `Eth:${this.ethAddress()}`;
+    }
   }
 
   toChainAsset() {

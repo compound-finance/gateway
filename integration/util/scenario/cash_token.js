@@ -17,7 +17,7 @@ class CashToken {
       'cash', // TODO: Consider pulling these from the token itself
       'CASH',
       'Cash Token',
-      18,
+      6,
       this.cashToken,
       this.owner,
       this.ctx
@@ -25,9 +25,8 @@ class CashToken {
   }
 }
 
-async function buildCashToken(cashTokenInfo, ctx) {
+async function buildCashToken(cashTokenInfo, ctx, owner) {
   ctx.log("Deploying cash token...");
-  let owner = ctx.eth.accounts[0];
   let cashToken = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'CashToken', [owner])
 
   return new CashToken(cashToken, owner, ctx);

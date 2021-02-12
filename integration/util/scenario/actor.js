@@ -25,7 +25,7 @@ class Actor {
   }
 
   toTrxArg() {
-    return `eth:${this.ethAddress()}`;
+    return `Eth:${this.ethAddress()}`;
   }
 
   async nonce() {
@@ -65,25 +65,19 @@ class Actor {
     return token.toTokenAmount(weiAmount);
   }
 
-  async lock(amount, collateral, awaitEvent = true) {
-    let lockRes = await this.ctx.starport.lock(this, amount, collateral);
+  async lock(amount, asset, awaitEvent = true) {
+    let lockRes = await this.ctx.starport.lock(this, amount, asset);
     if (awaitEvent) {
       await this.ctx.chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
     }
     return lockRes;
   }
 
-  async extract(amount, collateral, recipient = null) {
-    let token = this.ctx.tokens.get(collateral);
+  async extract(amount, asset, recipient = null) {
+    let token = this.ctx.tokens.get(asset);
     let weiAmount = token.toWeiAmount(amount);
 
-    let trxReq = this.ctx.generateTrxReq("extract", weiAmount, token, recipient || this);
-
-    return await this.runTrxRequest(trxReq);
-  }
-
-  async extractCash(amount) {
-    let trxReq = this.ctx.generateTrxReq("extract-cash", amount);
+    let trxReq = this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
 
     return await this.runTrxRequest(trxReq);
   }

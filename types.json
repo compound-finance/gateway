@@ -67,6 +67,12 @@
       "Tez": ["[u8; 32]"]
     }
   },
+  "CashAsset": {
+    "_enum": {
+      "Cash": "",
+      "Asset": "ChainAsset"
+    }
+  },
   "ChainAsset": {
     "_enum": {
       "Comp": ["[u8; 20]"],
@@ -142,8 +148,7 @@
     "id": "NoticeId",
     "parent": "[u8; 32]",
     "account": "[u8; 20]",
-    "amount": "u128",
-    "cash_index": "u128"
+    "principal": "u128"
   },
   "CashExtractionNotice": {
     "_enum": {
@@ -292,7 +297,8 @@
       "InvalidUTF8": "",
       "SignatureAccountMismatch": "",
       "IncorrectNonce": "(Nonce, Nonce)",
-      "NoticeMissing": "(ChainId, NoticeId)"
+      "NoticeMissing": "(ChainId, NoticeId)",
+      "NegativePrincipalExtrction": ""
     }
   },
   "MathError": {

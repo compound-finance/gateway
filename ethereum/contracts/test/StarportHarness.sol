@@ -30,13 +30,13 @@ contract StarportHarness is Starport {
 	}
 
 	/// Harness to call `unlock` with this as `msg.sender`
-	function unlock_(IERC20 asset, uint amount, address payable account) external {
+	function unlock_(address asset, uint amount, address payable account) external {
 		Starport(this).unlock(asset, amount, account);
 	}
 
 	/// Harness to call `unlockCash` with this as `msg.sender`
-	function unlockCash_(uint128 principal, address account) external {
-		Starport(this).unlockCash(principal, account);
+	function unlockCash_(address account, uint128 principal) external {
+		Starport(this).unlockCash(account, principal);
 	}
 
 	/// Harness to call `changeAuthorities` with this as `msg.sender`

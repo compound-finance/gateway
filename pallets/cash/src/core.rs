@@ -504,7 +504,7 @@ pub fn extract_internal<T: Config>(
     Ok(()) // XXX events?
 }
 
-pub fn extract_cash_principal_internal<T: Config>(
+pub fn extract_cash_internal<T: Config>(
     holder: ChainAccount,
     recipient: ChainAccount,
     amount_or_principal: Either<Quantity, CashPrincipal>,
@@ -843,11 +843,7 @@ pub fn exec_trx_request_internal<T: Config>(
     match trx_request {
         trx_request::TrxRequest::Extract(amount, asset, account) => match CashAsset::from(asset) {
             CashAsset::Cash => {
-                extract_cash_principal_internal::<T>(
-                    sender,
-                    account.into(),
-                    Left(Quantity(CASH, amount)),
-                )?;
+                extract_cash_internal::<T>(sender, account.into(), Left(Quantity(CASH, amount)))?;
             }
             CashAsset::Asset(chain_asset) => {
                 let symbol = symbol::<T>(chain_asset).ok_or(Reason::AssetNotSupported)?;
