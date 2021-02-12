@@ -474,8 +474,7 @@ pub fn lock_internal<T: Config>(
         holder_repay_amount,
         Reason::RepayTooMuch,
     )?;
-    let mut assets_with_nonzero_balance: Vec<ChainAsset> =
-        AssetsWithNonZeroBalance::get(&holder).unwrap_or(vec![]);
+    let mut assets_with_nonzero_balance: Vec<ChainAsset> = AssetsWithNonZeroBalance::get(&holder);
 
     let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
         asset,

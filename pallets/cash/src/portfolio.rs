@@ -119,15 +119,7 @@ impl Portfolio {
     pub fn from_storage(account: &ChainAccount) -> Result<Portfolio, Reason> {
         let cash_principal: CashPrincipal = CashPrincipals::get(account);
 
-        let assets_with_non_zero_balance = match AssetsWithNonZeroBalance::get(account) {
-            Some(e) => e,
-            None => {
-                return Ok(Portfolio {
-                    positions: vec![],
-                    cash_principal,
-                })
-            }
-        };
+        let assets_with_non_zero_balance = AssetsWithNonZeroBalance::get(account);
 
         let mut positions = Vec::new();
 
@@ -227,13 +219,9 @@ impl Portfolio {
 
         for position in self.positions.iter() {
             let price = price(position.symbol());
-            let liquidation_factor: LiquidityFactor = LiquidityFactors::get(&position.symbol());
-            // xxx is there another way to do this involving div_int somehow?
-            if liquidation_factor == LiquidityFactor::ZERO {
-                return Err(Reason::MathError(MathError::DivisionByZero));
-            }
+            let liquidity_factor: LiquidityFactor = LiquidityFactors::get(&position.symbol());
             let value = position.usd_value(price)?;
-            let converted_liquidation_factor: AssetBalance = liquidation_factor
+            let converted_liquidation_factor: AssetBalance = liquidity_factor
                 .0
                 .try_into()
                 .map_err(|_| MathError::Overflow)?;
@@ -256,8 +244,7 @@ impl Portfolio {
                     converted_liquidation_factor,
                     LiquidityFactor::DECIMALS,
                     value.symbol().decimals(),
-                )
-                .ok_or(MathError::Overflow)?;
+                )?;
 
                 SignedQuantity(value.symbol(), raw)
             };

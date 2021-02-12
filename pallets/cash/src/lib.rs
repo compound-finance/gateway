@@ -157,7 +157,7 @@ decl_storage! {
         AssetBalances get(fn asset_balance): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetBalance;
 
         /// Assets with non-zero balance
-        AssetsWithNonZeroBalance get(fn assets_with_non_zero_balance): map hasher(blake2_128_concat) ChainAccount => Option<Vec<ChainAsset>>;
+        AssetsWithNonZeroBalance get(fn assets_with_non_zero_balance): map hasher(blake2_128_concat) ChainAccount => Vec<ChainAsset>;
 
         /// The mapping of asset indices, by asset and account.
         LastIndices get(fn last_indices): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;

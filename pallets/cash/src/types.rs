@@ -526,18 +526,40 @@ pub fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -
 /// the output number of decimals.
 ///
 /// Not recommended to use directly, to be used in SafeMath implementations.
-pub fn div_int(a: Int, a_decimals: u8, b: Int, b_decimals: u8, out_decimals: u8) -> Option<Int> {
-    let denom_decimals = b_decimals.checked_add(out_decimals)?;
+pub fn div_int(
+    a: Int,
+    a_decimals: u8,
+    b: Int,
+    b_decimals: u8,
+    out_decimals: u8,
+) -> Result<Int, MathError> {
+    let denom_decimals = b_decimals
+        .checked_add(out_decimals)
+        .ok_or(MathError::Overflow)?;
     if denom_decimals > a_decimals {
         // scale up
-        let scale_decimals = denom_decimals.checked_sub(a_decimals)?;
-        let scale = 10i128.checked_pow(scale_decimals as u32)?;
-        a.checked_mul(scale)?.checked_div(b)
+        let scale_decimals = denom_decimals
+            .checked_sub(a_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10i128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        a.checked_mul(scale)
+            .ok_or(MathError::Overflow)?
+            .checked_div(b)
+            .ok_or(MathError::DivisionByZero)
     } else {
         // scale down
-        let scale_decimals = a_decimals.checked_sub(denom_decimals)?;
-        let scale = 10i128.checked_pow(scale_decimals as u32)?;
-        a.checked_div(b)?.checked_div(scale)
+        let scale_decimals = a_decimals
+            .checked_sub(denom_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10i128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        a.checked_div(b)
+            .ok_or(MathError::DivisionByZero)?
+            .checked_div(scale)
+            .ok_or(MathError::DivisionByZero)
     }
 }
 
