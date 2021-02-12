@@ -17,11 +17,13 @@ use frame_support::storage::{
 
 use crate::{
     chains::{
-        eth, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainHash,
-        ChainId, ChainSignature, ChainSignatureList,
+        eth, CashAsset, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount,
+        ChainHash, ChainId, ChainSignature, ChainSignatureList,
     },
     log, notices,
-    notices::{EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState},
+    notices::{
+        CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
+    },
     params::MIN_TX_VALUE,
     reason,
     reason::{MathError, Reason},
@@ -35,6 +37,7 @@ use crate::{
     Nonces, NoticeHashes, NoticeStates, Notices, Prices, RateModels, ReserveFactor,
     SubmitTransaction, SupplyIndices, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
+use either::{Either, Left, Right};
 use frame_support::sp_runtime::traits::Convert;
 use our_std::convert::TryInto;
 
@@ -419,6 +422,33 @@ pub fn lock_cash_internal<T: Config>(
     Ok(())
 }
 
+pub fn dispatch_notice_internal<T: Config>(
+    chain_id: ChainId,
+    recipient_opt: Option<ChainAccount>,
+    notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,
+) -> Result<(), Reason> {
+    let (latest_notice_id, parent_hash) =
+        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
+    let notice_id = latest_notice_id.seq();
+
+    let notice = notice_fn(notice_id, parent_hash)?;
+
+    // Add to notices, notice states, track the latest notice and index by account
+    let notice_hash = notice.hash();
+    Notices::insert(chain_id, notice_id, &notice);
+    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
+    LatestNotice::insert(chain_id, (notice_id, notice_hash));
+    NoticeHashes::insert(notice_hash, notice_id);
+    if let Some(recipient) = recipient_opt {
+        AccountNotices::append(recipient, notice_id);
+    }
+
+    // Deposit Notice Event
+    let encoded_notice = notice.encode_notice();
+    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
+    Ok(())
+}
+
 pub fn extract_internal<T: Config>(
     asset: ChainAsset,
     holder: ChainAccount,
@@ -449,36 +479,27 @@ pub fn extract_internal<T: Config>(
     TotalSupplyAssets::insert(asset, total_supply_new);
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
-    // TODO: Consider how to better factor this
-    let chain_id = recipient.chain_id();
-    let (latest_notice_id, parent_hash) =
-        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
-    let notice_id = latest_notice_id.seq();
-
-    let notice = Notice::ExtractionNotice(match (chain_asset_account, parent_hash) {
-        (ChainAssetAccount::Eth(eth_asset, eth_account), ChainHash::Eth(eth_parent_hash)) => {
-            Ok(ExtractionNotice::Eth {
-                id: notice_id,
-                parent: eth_parent_hash,
-                asset: eth_asset,
-                account: eth_account,
-                amount: amount.1,
-            })
-        }
-        _ => Err(Reason::AssetExtractionNotSupported),
-    }?);
-
-    // Add to notices, notice states, track the latest notice and index by account
-    let notice_hash = notice.hash();
-    Notices::insert(chain_id, notice_id, &notice);
-    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
-    LatestNotice::insert(chain_id, (notice_id, notice_hash));
-    NoticeHashes::insert(notice_hash, notice_id);
-    AccountNotices::append(recipient, notice_id);
-
-    // Deposit Notice Event
-    let encoded_notice = notice.encode_notice();
-    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
+    dispatch_notice_internal::<T>(
+        recipient.chain_id(),
+        Some(recipient),
+        &|notice_id, parent_hash| {
+            Ok(Notice::ExtractionNotice(
+                match (chain_asset_account, parent_hash) {
+                    (
+                        ChainAssetAccount::Eth(eth_asset, eth_account),
+                        ChainHash::Eth(eth_parent_hash),
+                    ) => Ok(ExtractionNotice::Eth {
+                        id: notice_id,
+                        parent: eth_parent_hash,
+                        asset: eth_asset,
+                        account: eth_account,
+                        amount: amount.1,
+                    }),
+                    _ => Err(Reason::AssetExtractionNotSupported),
+                }?,
+            ))
+        },
+    )?;
 
     Ok(()) // XXX events?
 }
@@ -486,10 +507,17 @@ pub fn extract_internal<T: Config>(
 pub fn extract_cash_principal_internal<T: Config>(
     holder: ChainAccount,
     recipient: ChainAccount,
-    principal: CashPrincipal,
+    amount_or_principal: Either<Quantity, CashPrincipal>,
 ) -> Result<(), Reason> {
     let index = GlobalCashIndex::get();
-    let amount = index.as_hold_amount(principal)?;
+    let (amount, principal) = match amount_or_principal {
+        Left(amount) => (amount, index.as_hold_principal(amount)?),
+        Right(principal) => (index.as_hold_amount(principal)?, principal),
+    };
+    let principal_positive: u128 = principal
+        .0
+        .try_into()
+        .map_err(|_| Reason::NegativePrincipalExtrction)?;
 
     require_min_tx_value!(value::<T>(amount)?);
     require!(
@@ -511,8 +539,23 @@ pub fn extract_cash_principal_internal<T: Config>(
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    // XXX
-    // Add CashExtractionNotice(Recipient, Amount, CashIndex) to NoticeQueueRecipient.Chain
+    dispatch_notice_internal::<T>(
+        recipient.chain_id(),
+        Some(recipient),
+        &|notice_id, parent_hash| {
+            Ok(Notice::CashExtractionNotice(match (holder, parent_hash) {
+                (ChainAccount::Eth(eth_account), ChainHash::Eth(eth_parent_hash)) => {
+                    Ok(CashExtractionNotice::Eth {
+                        id: notice_id,
+                        parent: eth_parent_hash,
+                        account: eth_account,
+                        principal: principal_positive,
+                    })
+                }
+                _ => Err(Reason::AssetExtractionNotSupported),
+            }?))
+        },
+    )?;
 
     Ok(()) // XXX events?
 }
@@ -798,13 +841,21 @@ pub fn exec_trx_request_internal<T: Config>(
     );
 
     match trx_request {
-        trx_request::TrxRequest::Extract(amount, asset, account) => {
-            let chain_asset: ChainAsset = asset.into();
-            let symbol = symbol::<T>(chain_asset).ok_or(Reason::AssetNotSupported)?;
-            let quantity = Quantity(symbol, amount.into());
+        trx_request::TrxRequest::Extract(amount, asset, account) => match CashAsset::from(asset) {
+            CashAsset::Cash => {
+                extract_cash_principal_internal::<T>(
+                    sender,
+                    account.into(),
+                    Left(Quantity(CASH, amount)),
+                )?;
+            }
+            CashAsset::Asset(chain_asset) => {
+                let symbol = symbol::<T>(chain_asset).ok_or(Reason::AssetNotSupported)?;
+                let quantity = Quantity(symbol, amount.into());
 
-            extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
-        }
+                extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
+            }
+        },
     }
 
     // Update user nonce

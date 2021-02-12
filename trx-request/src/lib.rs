@@ -24,6 +24,7 @@ pub enum Chain {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Asset {
+    Cash,
     Eth([u8; 20]),
 }
 
@@ -58,15 +59,18 @@ fn parse_amount<'a>(t: &Token) -> Result<Amount, ParseError<'a>> {
     }
 }
 
-// TODO: How do handle casing here? For now, let's just assume all lower-case, which maybe we can enforce?
 fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     match chain {
-        "eth" => Ok(Chain::Eth),
+        "Eth" => Ok(Chain::Eth),
         _ => Err(ParseError::InvalidChain(chain)),
     }
 }
 
 fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
+    if &account[0..2] != "0x" {
+        Err(ParseError::InvalidChainAccount(Chain::Eth))?;
+    }
+
     let account_vec: Vec<u8> =
         hex::decode(&account[2..]).map_err(|_| ParseError::InvalidChainAccount(Chain::Eth))?;
     let chain_account: [u8; 20] = account_vec
@@ -100,6 +104,7 @@ fn parse_account<'a>(t: &Token<'a>) -> Result<Account, ParseError<'a>> {
 
 fn parse_asset<'a>(t: &Token<'a>) -> Result<Asset, ParseError<'a>> {
     match t {
+        Token::Identifier("Cash") | Token::Identifier("CASH") => Ok(Asset::Cash),
         Token::Pair(Some((chain_str, account_str))) => {
             let chain = parse_chain(chain_str)?;
             Ok(parse_chain_asset(chain, account_str)?)
@@ -137,7 +142,7 @@ fn parse<'a>(tokens: Lexer<'a, Token<'a>>) -> Result<TrxRequest, ParseError<'a>>
     let token_vec = tokens.collect::<Vec<Token<'a>>>();
 
     match &token_vec[..] {
-        [Token::LeftDelim, Token::Identifier("extract"), args @ .., Token::RightDelim] => {
+        [Token::LeftDelim, Token::Identifier("Extract"), args @ .., Token::RightDelim] => {
             parse_extract(args)
         }
         [Token::LeftDelim, Token::Identifier(fun), .., Token::RightDelim] => {
@@ -181,28 +186,42 @@ mod tests {
       parse_fail_invalid_expression:
         "hello" => Err(ParseError::InvalidExpression),
       parse_fail_unknown_function:
-        "(my-fun 3 eth:0x55)" => Err(ParseError::UnknownFunction("my-fun")),
+        "(MyFun 3 Eth:0x55)" => Err(ParseError::UnknownFunction("MyFun")),
       parse_extract:
-        "(extract 3 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+        "(Extract 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
           3,
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
+      parse_extract_cash_in_caps:
+        "(Extract 3 CASH Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+          3,
+          Asset::Cash,
+          Account::Eth(ALAN)
+        )),
+      parse_extract_cash_in_camel:
+        "(Extract 3 Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+          3,
+          Asset::Cash,
+          Account::Eth(ALAN)
+        )),
       parse_extract_hex:
-        "(extract 0x0100 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+        "(Extract 0x0100 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
           256,
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
+      parse_fail_no_zero_ex:
+        "(Extract 3 Eth:xxeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
       parse_fail_invalid_amount_invalid:
-        "(extract hi eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
+        "(Extract hi Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
       parse_fail_invalid_amount_too_large_int:
-        "(extract 340282366920938463463374607431768211456 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
+        "(Extract 340282366920938463463374607431768211456 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
       parse_fail_invalid_amount_too_large_hex:
-        "(extract 0xffffffffffffffffffffffffffffffff00 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
+        "(Extract 0xffffffffffffffffffffffffffffffff00 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
       parse_fail_invalid_asset:
-        "(extract 5 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeff eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
+        "(Extract 5 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeff Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
       parse_fail_invalid_recipient:
-        "(extract 5 eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee eth:0x0101010101010101010101010101010101010101ff)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
+        "(Extract 5 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101ff)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
     }
 }

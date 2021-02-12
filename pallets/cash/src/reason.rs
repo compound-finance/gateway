@@ -42,6 +42,7 @@ pub enum Reason {
     SignatureAccountMismatch,
     IncorrectNonce(Nonce, Nonce),
     NoticeMissing(ChainId, NoticeId),
+    NegativePrincipalExtrction,
 }
 
 impl From<MathError> for Reason {
