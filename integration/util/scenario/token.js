@@ -18,11 +18,7 @@ class Token {
   }
 
   toTrxArg() {
-    if (this.symbol === 'CASH') {
-      return `CASH`;
-    } else {
-      return `Eth:${this.ethAddress()}`;
-    }
+    return `Eth:${this.ethAddress()}`;
   }
 
   toChainAsset() {
@@ -241,7 +237,7 @@ async function buildTokens(tokensInfoHash, ctx) {
   }, Promise.resolve([]));
 
   tokens.push(new EtherToken(ctx));
-  tokens.push(ctx.cashToken.toToken());
+  tokens.push(ctx.cashToken);
 
   return new Tokens(tokens, ctx);
 }

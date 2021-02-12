@@ -507,13 +507,15 @@ pub fn extract_internal<T: Config>(
 pub fn extract_cash_internal<T: Config>(
     holder: ChainAccount,
     recipient: ChainAccount,
-    amount_or_principal: Either<Quantity, CashPrincipal>,
+    amount_or_principal: Either<Quantity, CashPrincipal>, // XXX
 ) -> Result<(), Reason> {
     let index = GlobalCashIndex::get();
+    // XXX Some topics about `Either`, principal_positive and inputs here
     let (amount, principal) = match amount_or_principal {
         Left(amount) => (amount, index.as_hold_principal(amount)?),
         Right(principal) => (index.as_hold_amount(principal)?, principal),
     };
+    // XXX
     let principal_positive: u128 = principal
         .0
         .try_into()

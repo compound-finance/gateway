@@ -103,6 +103,11 @@ class Chain {
   async postPrice(payload, signature, onFinalize = true) {
     return await sendAndWaitForEvents(this.api().tx.cash.postPrice(payload, signature), this.api(), onFinalize);
   }
+
+  async cashIndex() {
+    let index = await this.ctx.api().query.cash.globalCashIndex();
+    return index.toNumber();
+  }
 }
 
 function buildChain(ctx) {

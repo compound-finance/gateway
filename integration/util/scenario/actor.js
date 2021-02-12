@@ -3,6 +3,7 @@ const { getInfoKey } = require('../util');
 const { instantiateInfo } = require('./scen_info');
 const { sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
+const { CashToken } = require('./cash_token');
 
 class Actor {
   constructor(name, ethAddress, chainKey, ctx) {
@@ -59,10 +60,23 @@ class Actor {
     return await token.getBalance(this);
   }
 
+  async chainCashPrincipal() {
+    let principal = await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
+    return principal.toNumber();
+  }
+
+  async chainCashBalance() {
+    return await this.chainCashPrincipal() * await this.ctx.chain.cashIndex();
+  }
+
   async chainBalance(tokenLookup) {
     let token = this.ctx.tokens.get(tokenLookup);
-    let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
-    return token.toTokenAmount(weiAmount);
+    if (token instanceof CashToken) {
+      return token.toTokenAmount(await this.chainCashBalance());
+    } else {
+      let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+      return token.toTokenAmount(weiAmount);
+    }
   }
 
   async lock(amount, asset, awaitEvent = true) {
@@ -78,6 +92,8 @@ class Actor {
     let weiAmount = token.toWeiAmount(amount);
 
     let trxReq = this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
+
+    this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
 
     return await this.runTrxRequest(trxReq);
   }
