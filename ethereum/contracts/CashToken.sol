@@ -39,7 +39,7 @@ contract CashToken is ICash {
         return amount;
     }
 
-    function burn(address account, uint256 amount) external override returns (uint128) {
+    function burn(address account, uint amount) external override returns (uint128) {
         require(msg.sender == admin, "Must be admin");
         uint128 principal = amountToPrincipal(amount);
         cashPrincipal[account] -= principal;
