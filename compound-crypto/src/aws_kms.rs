@@ -8,7 +8,6 @@ use rusoto_core::{Region, RusotoError};
 use rusoto_kms::{GetPublicKeyRequest, Kms, KmsClient, SignError, SignRequest, SignResponse};
 use secp256k1::util::{FULL_PUBLIC_KEY_SIZE, TAG_PUBKEY_FULL};
 use secp256k1::{PublicKey, PublicKeyFormat, RecoveryId, Signature};
-use std::cell::RefCell;
 
 /// Store your keys in AWS Key Management Service (KMS) for increased security. KMS is implemented
 /// using Hardware Signing Modules (HSMs) for the highest level of security. It is relatively inexpensive
@@ -17,11 +16,8 @@ use std::cell::RefCell;
 /// Some very useful links
 /// https://luhenning.medium.com/the-dark-side-of-the-elliptic-curve-signing-ethereum-transactions-with-aws-kms-in-javascript-83610d9a6f81
 /// https://github.com/lucashenning/aws-kms-ethereum-signing
-struct KmsKeyring {
+pub struct KmsKeyring {
     client: KmsClient,
-    // we _should_ be ok to use RefCell here because access to the global KEYRING is synchronized
-    // more info https://doc.rust-lang.org/stable/book/ch15-05-interior-mutability.html
-    runtime: RefCell<tokio::runtime::Runtime>,
 }
 
 impl Keyring for KmsKeyring {
@@ -31,25 +27,22 @@ impl Keyring for KmsKeyring {
         self: &Self,
         messages: Vec<&[u8]>,
         key_id: &KeyId,
+        mut runtime: tokio::runtime::Runtime,
     ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError> {
-        self.runtime
-            .borrow_mut()
-            .block_on(self.sign_async(messages, key_id))
+        runtime.block_on(self.sign_async(messages, key_id))
     }
 
-    fn sign_one(self: &Self, messages: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
+    fn sign_one(self: &Self, messages: &[u8], key_id: &KeyId, mut runtime: tokio::runtime::Runtime) -> Result<[u8; 65], CryptoError> {
         // we will use the batch interface
-        self.sign(vec![messages], key_id)?
+        self.sign(vec![messages], key_id, runtime)?
             .drain(..)
             .next()
             .ok_or(CryptoError::Unknown)?
     }
 
     /// Get the public key corresponding to the provided key ID.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError> {
-        self.runtime
-            .borrow_mut()
-            .block_on(self.get_public_key_async(key_id))
+    fn get_public_key(self: &Self, key_id: &KeyId, mut runtime: tokio::runtime::Runtime) -> Result<PublicKeyBytes, CryptoError> {
+        runtime.block_on(self.get_public_key_async(key_id))
     }
 }
 
@@ -67,8 +60,7 @@ impl KmsKeyring {
 
         // todo: It is unclear to me under what circumstances tokio runtime creation fails, for now.. unwrap..?
         KmsKeyring {
-            client: client,
-            runtime: RefCell::new(tokio::runtime::Runtime::new().unwrap()),
+            client: client
         }
     }
 

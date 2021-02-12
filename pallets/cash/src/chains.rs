@@ -340,6 +340,7 @@ impl Chain for Ethereum {
         let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
             .ok_or(Reason::KeyNotFound)?;
         let pubk = runtime_interfaces::keyring_interface::get_public_key(eth_key_id)?;
+        log(pubk)
 
         Ok(public_key_bytes_to_eth_address(&pubk))
     }

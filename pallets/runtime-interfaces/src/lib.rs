@@ -10,6 +10,7 @@ use std::sync::Mutex;
 pub struct Config {
     eth_starport_address: Vec<u8>,
     eth_lock_event_topic: Vec<u8>,
+    tokio_runtime: RefCell<tokio::runtime::Runtime>,
 }
 
 /// XXX Possible sanity checks for config fields here
@@ -32,6 +33,7 @@ pub fn new_config(eth_starport_address: Vec<u8>, eth_lock_event_topic: Vec<u8>) 
     return Config {
         eth_starport_address: eth_starport_address,
         eth_lock_event_topic: eth_lock_event_topic,
+        tokio_runtime: RefCell::new(tokio::runtime::Runtime::new().unwrap()),
     };
 }
 
@@ -101,29 +103,33 @@ pub trait KeyringInterface {
     fn sign(
         messages: Vec<Vec<u8>>,
         key_id: Vec<u8>,
+        runtime: tokio::runtime::Runtime
     ) -> Result<Vec<Result<compound_crypto::SignatureBytes, CryptoError>>, CryptoError> {
         let keyring = compound_crypto::KEYRING
             .lock()
             .map_err(|_| CryptoError::KeyringLock)?;
+        let runtime = compound_crypto::RUNTIME.lock().map_err(|_| CryptoError::KeyringLock)?;
         let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
         let messages: Vec<&[u8]> = messages.iter().map(|e| e.as_slice()).collect();
-        keyring.sign(messages, &key_id)
+        runtime.block_on(keyring.sign(messages, &key_id))
     }
 
-    fn sign_one(message: Vec<u8>, key_id: Vec<u8>) -> Result<[u8; 65], CryptoError> {
+    fn sign_one(message: Vec<u8>, key_id: Vec<u8>, runtime: tokio::runtime::Runtime) -> Result<[u8; 65], CryptoError> {
         let keyring = compound_crypto::KEYRING
             .lock()
             .map_err(|_| CryptoError::KeyringLock)?;
+        let runtime = compound_crypto::RUNTIME.lock().map_err(|_| CryptoError::KeyringLock)?;
         let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
-        keyring.sign_one(&message, &key_id)
+        runtime.block_on(keyring.sign_one(&message, &key_id))
     }
 
-    fn get_public_key(key_id: Vec<u8>) -> Result<[u8; 64], CryptoError> {
+    fn get_public_key(key_id: Vec<u8>, runtime: tokio::runtime::Runtime) -> Result<[u8; 64], CryptoError> {
         let keyring = compound_crypto::KEYRING
             .lock()
             .map_err(|_| CryptoError::KeyringLock)?;
+            let runtime = compound_crypto::RUNTIME.lock().map_err(|_| CryptoError::KeyringLock)?;
         let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
-        keyring.get_public_key(&key_id)
+        runtime.block_on(keyring.get_public_key(&key_id))
     }
 }
 

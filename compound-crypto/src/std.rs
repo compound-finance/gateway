@@ -1,4 +1,5 @@
 use crate::dev_keyring;
+use crate::aws_kms;
 use crate::no_std::*;
 use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
@@ -154,8 +155,8 @@ impl InMemoryKeyring {
     }
 
     /// Get the eth address (bytes) associated with the given key id.
-    pub fn get_eth_address(self: &Self, key_id: &KeyId) -> Result<AddressBytes, CryptoError> {
-        let public_key = self.get_public_key(key_id)?;
+    pub fn get_eth_address(self: &Self, key_id: &KeyId, runtime: tokio::runtime::Runtime) -> Result<AddressBytes, CryptoError> {
+        let public_key = self.get_public_key(key_id, runtime)?;
         Ok(public_key_bytes_to_eth_address(&public_key))
     }
 }
@@ -168,6 +169,7 @@ impl Keyring for InMemoryKeyring {
         self: &Self,
         messages: Vec<&[u8]>,
         key_id: &KeyId,
+        mut runtime: tokio::runtime::Runtime,
     ) -> Result<Vec<Result<SignatureBytes, CryptoError>>, CryptoError> {
         let private_key = self.get_private_key(key_id)?;
 
@@ -179,13 +181,13 @@ impl Keyring for InMemoryKeyring {
         Ok(result)
     }
 
-    fn sign_one(self: &Self, message: &[u8], key_id: &KeyId) -> Result<[u8; 65], CryptoError> {
+    fn sign_one(self: &Self, message: &[u8], key_id: &KeyId, mut runtime: tokio::runtime::Runtime) -> Result<[u8; 65], CryptoError> {
         let private_key = self.get_private_key(key_id)?;
         Ok(eth_sign(message, &private_key, false))
     }
 
     /// Get the public key associated with the given key id.
-    fn get_public_key(self: &Self, key_id: &KeyId) -> Result<PublicKeyBytes, CryptoError> {
+    fn get_public_key(self: &Self, key_id: &KeyId, mut runtime: tokio::runtime::Runtime) -> Result<PublicKeyBytes, CryptoError> {
         let private = self.get_private_key(key_id)?;
         // could not call serialize from the keypair so I had to re-derive the public key here
         let public = secp256k1::PublicKey::from_secret_key(&private);
@@ -196,7 +198,17 @@ impl Keyring for InMemoryKeyring {
 type ThreadSafeKeyring = dyn Keyring + Send + Sync;
 
 lazy_static::lazy_static! {
-    pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = Mutex::new(Arc::new(dev_keyring()));
+    // # conditional to set aws keyring
+    pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = {
+        let keyring_type : Option<String> = std::env::var("KEYRING_TYPE").ok().into();
+        let aws_kms = String::from("AWS_KMS");
+
+        if keyring_type == Some(aws_kms) {
+            Mutex::new(Arc::new(aws_kms::KmsKeyring::new()))
+        } else {
+            Mutex::new(Arc::new(dev_keyring()))
+        }
+    };
 }
 
 pub(crate) const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";
