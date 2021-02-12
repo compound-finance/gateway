@@ -65,7 +65,7 @@ describe('CashToken', () => {
       const blockNumber = await web3.eth.getBlockNumber();
       const block = await web3.eth.getBlock(blockNumber);
       const nextYieldTimestamp = block.timestamp + 30 * 60;
-      await expect(send(cash, 'setFutureYield', [43628, 1e6, nextYieldTimestamp], { from: account1 })).rejects.toRevert("revert Sender is not an admin");
+      await expect(send(cash, 'setFutureYield', [43628, 1e6, nextYieldTimestamp], { from: account1 })).rejects.toRevert("revert Must be admin");
     })
   });
 
@@ -89,7 +89,7 @@ describe('CashToken', () => {
     });
 
     it('should fail if called not by an admin', async() => {
-      await expect(send(cash, 'mint', [account1, 10e6], { from: account1 })).rejects.toRevert("revert Sender is not an admin");
+      await expect(send(cash, 'mint', [account1, 10e6], { from: account1 })).rejects.toRevert("revert Must be admin");
     })
   });
 
@@ -115,7 +115,7 @@ describe('CashToken', () => {
     });
 
     it('should fail if called not by an admin', async() => {
-      await expect(send(cash, 'burn', [account1, 10e6], { from: account1 })).rejects.toRevert("revert Sender is not an admin");
+      await expect(send(cash, 'burn', [account1, 10e6], { from: account1 })).rejects.toRevert("revert Must be admin");
     })
   });
 

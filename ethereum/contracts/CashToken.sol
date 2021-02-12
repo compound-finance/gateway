@@ -26,29 +26,29 @@ contract CashToken is ICash {
     mapping (address => uint256) internal cashPrincipal;
 
 	constructor(address starport) {
-		admin = starport;
+        admin = starport;
         cashYieldStartAt = block.timestamp;
         cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e6});
 	}
 
-    function mint(address account, uint amountPrincipal) external override {
-        require(msg.sender == admin, "Sender is not an admin");
-        uint amount = amountPrincipal * getCashIndex();
-        cashPrincipal[account] = cashPrincipal[account] + amountPrincipal;
-        totalCashPrincipal = totalCashPrincipal + amountPrincipal;
+    function mint(address account, uint principal) external override {
+        require(msg.sender == admin, "Must be admin");
+        uint amount = principal * getCashIndex();
+        cashPrincipal[account] += principal;
+        totalCashPrincipal += principal;
         emit Transfer(address(0), account, amount);
     }
 
-    function burn(address account, uint amountPrincipal) external override {
-        require(msg.sender == admin, "Sender is not an admin");
-        uint amount = amountPrincipal * getCashIndex();
-        cashPrincipal[account] = cashPrincipal[account] - amountPrincipal;
-        totalCashPrincipal = totalCashPrincipal - amountPrincipal;
+    function burn(address account, uint principal) external override {
+        require(msg.sender == admin, "Must be admin");
+        uint amount = principal * getCashIndex();
+        cashPrincipal[account] -= principal;
+        totalCashPrincipal -= principal;
         emit Transfer(account, address(0), amount);
     }
 
     function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external override {
-        require(msg.sender == admin, "Sender is not an admin");
+        require(msg.sender == admin, "Must be admin");
         uint nextAt = nextCashYieldStartAt;
 
         if (nextAt != 0 && block.timestamp > nextAt) {
@@ -64,8 +64,9 @@ contract CashToken is ICash {
         uint nextAt = nextCashYieldStartAt;
         if (nextAt != 0 && block.timestamp > nextAt) {
             return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
+        } else {
+            return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
         }
-        return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
     }
 
     function totalSupply() external view override returns (uint) {
@@ -79,8 +80,8 @@ contract CashToken is ICash {
     function transfer(address recipient, uint amount) external override returns (bool) {
         require(msg.sender != recipient, "Invalid recipient");
         uint principal = amount / getCashIndex();
-        cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
-        cashPrincipal[msg.sender] = cashPrincipal[msg.sender] - principal;
+        cashPrincipal[recipient] += principal;
+        cashPrincipal[msg.sender] -= principal;
         emit Transfer(msg.sender, recipient, amount);
         return true;
     }
@@ -99,9 +100,9 @@ contract CashToken is ICash {
         require(sender != recipient, "Invalid recipient");
         address spender = msg.sender;
         uint principal = amount / getCashIndex();
-        allowances[sender][spender] = allowances[sender][spender] - amount;
-        cashPrincipal[recipient] = cashPrincipal[recipient] + principal;
-        cashPrincipal[sender] = cashPrincipal[sender] - principal;
+        allowances[sender][spender] -= amount;
+        cashPrincipal[recipient] += principal;
+        cashPrincipal[sender] -= principal;
         emit Transfer(sender, recipient, amount);
         return true;
     }
