@@ -1,11 +1,5 @@
 #![macro_use]
 
-#[cfg(feature = "std")]
-use frame_support;
-
-#[cfg(not(feature = "std"))]
-use sp_runtime;
-
 // This file includes macros to make it easy to log from either an
 // std or no_std environment. Just use log!("My Log: {}", 5); and
 // things should just magically work.

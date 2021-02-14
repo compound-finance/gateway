@@ -20,8 +20,8 @@ use crate::reason::Reason;
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
-    ConfigAsset, ConfigSetString, EncodedNotice, EthAddress, EventStatus, Nonce, ReporterSet,
-    SessionIndex, SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+    ConfigAsset, ConfigSetString, EncodedNotice, EventStatus, Nonce, ReporterSet, SessionIndex,
+    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
 };
 use codec::{alloc::string::String, Decode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
@@ -146,8 +146,11 @@ decl_storage! {
         /// The mapping of CASH principal, by account.
         CashPrincipals get(fn cash_principal): map hasher(blake2_128_concat) ChainAccount => CashPrincipal;
 
-        /// The mapping of asset balances, by chain and account.
+        /// The mapping of asset balances, by asset and account.
         AssetBalances get(fn asset_balance): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetBalance;
+
+        /// The mapping of asset indices, by asset and account.
+        LastIndices get(fn last_indices): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
 
         // XXX break into separate storage
         //  liquidity factor, supply cap, etc.
@@ -416,11 +419,11 @@ decl_module! {
 
             // XXX do we want to store/check hash to allow replaying?
             // TODO: use more generic function?
-            let signer: crate::types::ValidatorKey = cash_err!(
+            let signer: crate::types::ValidatorIdentity = cash_err!(
                 compound_crypto::eth_recover(&payload[..], &signature, false),  // XXX why is this using eth for validator sig though?
                 Error::<T>::InvalidSignature)?;
 
-            let validators: Vec<EthAddress> = <Validators>::iter().map(|v| v.1.eth_address).collect();
+            let validators: ValidatorSet = <Validators>::iter().map(|v| v.1.eth_address).collect();
 
             if !validators.contains(&signer) {
                 log!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);

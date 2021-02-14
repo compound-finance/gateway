@@ -55,17 +55,21 @@ pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
 pub type SignedPayload = Vec<u8>; // XXX
 
 /// Type for signature used to verify that a signed payload comes from a validator.
-pub type ValidatorSig = [u8; 65]; // XXX secp256k1 sign, but why secp256k1?
+pub type ValidatorSig = <Ethereum as Chain>::Signature;
 
 /// Type for an address used to identify a validator.
-pub type ValidatorKey = [u8; 20]; // XXX secp256k1 public key, but why secp256k1?
+pub type ValidatorIdentity = <Ethereum as Chain>::Address;
 
-pub type EthAddress = ValidatorKey;
+/// Type for representing the keys to sign notices
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct ChainKeys {
+    pub eth_address: <Ethereum as Chain>::Address,
+}
 
 pub type SessionIndex = u32;
 
 /// Type for a set of validator identities.
-pub type ValidatorSet = Vec<ValidatorKey>; // XXX whats our set type? ordered Vec?
+pub type ValidatorSet = Vec<ValidatorIdentity>; // XXX whats our set type? ordered Vec?
 
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Clone, Deserialize, Serialize)]
@@ -80,7 +84,7 @@ pub struct ConfigAsset {
 }
 
 // For using in GenesisConfig / ChainSpec JSON.
-// XXX
+// XXX move
 use our_std::{fmt::Display, str::FromStr};
 use serde::{de, Deserializer, Serializer};
 
@@ -131,18 +135,8 @@ pub struct Quantity(pub Symbol, pub AssetAmount);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
 pub struct CashPrincipal(pub Int);
 
-/// Type for representing the keys to sign notices
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct ChainKeys {
-    pub eth_address: ValidatorKey,
-}
-
-/// Type for representing a multiplicative index on Compound Chain.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct CashIndex(pub Uint);
-
 impl CashPrincipal {
-    pub const DECIMALS: u8 = 6;
+    pub const DECIMALS: u8 = CASH.decimals();
 
     /// Get a CASH index from a string.
     pub const fn from_nominal(s: &'static str) -> Self {
@@ -163,6 +157,10 @@ impl CashPrincipal {
         ))
     }
 }
+
+/// Type for representing a multiplicative index on Compound Chain.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct CashIndex(pub Uint);
 
 impl CashIndex {
     pub const DECIMALS: u8 = 4;
@@ -246,11 +244,24 @@ where
 pub struct AssetIndex(pub Uint);
 
 impl AssetIndex {
-    pub const DECIMALS: u8 = CashPrincipal::DECIMALS;
+    pub const DECIMALS: u8 = CASH.decimals();
 
     /// Get an asset index from a string.
     pub const fn from_nominal(s: &'static str) -> Self {
         AssetIndex(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+
+    pub fn cash_principal_since(
+        self,
+        since: AssetIndex,
+        balance: AssetBalance,
+    ) -> Result<CashPrincipal, MathError> {
+        let delta_index = self.0.checked_sub(since.0).ok_or(MathError::Underflow)?;
+        Ok(CashPrincipal(
+            balance
+                .checked_mul(TryFrom::try_from(delta_index).map_err(|_| MathError::Overflow)?)
+                .ok_or(MathError::Overflow)?,
+        ))
     }
 }
 
@@ -359,6 +370,19 @@ impl Quantity {
     /// Get a quantity from a string.
     pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
         Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
+    }
+
+    /// Quantity<S> + Quantity<S> -> Quantity<S>
+    pub fn add(self, other: Quantity) -> Result<Quantity, MathError> {
+        if self.symbol() != other.symbol() {
+            return Err(MathError::SymbolMismatch);
+        }
+        Ok(Quantity(
+            self.symbol(),
+            self.value()
+                .checked_add(other.value())
+                .ok_or(MathError::Overflow)?,
+        ))
     }
 
     /// Quantity * CashPrincipal (per unit quantity) -> CashPrincipal (total)
@@ -684,6 +708,16 @@ mod tests {
         let increment = CashIndex::from_nominal("1.01"); // increment by 1%
         let actual = old_index.increment(increment).unwrap();
         let expected = CashIndex::from_nominal("1.1110");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_cash_principal_since() {
+        let old_index = AssetIndex::from_nominal("1.0");
+        let cur_index = AssetIndex::from_nominal("1.1");
+        let balance = 100i128;
+        let actual = cur_index.cash_principal_since(old_index, balance).unwrap();
+        let expected = CashPrincipal::from_nominal("10");
         assert_eq!(actual, expected);
     }
 }
