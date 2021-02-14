@@ -102,6 +102,14 @@ class Token {
   async getPrice() {
     return Number(await this.ctx.api().query.cash.prices(await this.getSymbol()));
   }
+
+  async totalChainSupply() {
+    return this.toTokenAmount(await this.ctx.api().query.cash.totalSupplyAssets(this.toChainAsset()));
+  }
+
+  async totalChainBorrows() {
+    return this.toTokenAmount(await this.ctx.api().query.cash.totalBorrowAssets(this.toChainAsset()));
+  }
 }
 
 class EtherToken extends Token {

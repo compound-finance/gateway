@@ -223,7 +223,8 @@
       "ModelKinkUtilizationOver100Percent",
       "ModelKinkUtilizationNotPositive",
       "ModelRateOutOfBounds",
-      "Overflowed"
+      "Overflowed",
+      "ReserveFactorOver100Percent"
     ]
   },
   "ReserveFactor": "Uint",
@@ -279,7 +280,7 @@
       "InvalidSymbol": "",
       "InvalidUTF8": "",
       "KeyNotFound": "",
-      "MathError": "MathError",
+      "MathError": "(MathError)",
       "MinTxValueNotMet": "",
       "MissingEvent": "",
       "NegativePrincipalExtraction": "",
@@ -289,17 +290,19 @@
       "NoticeAlreadySigned": "",
       "NoticeMissing": "(ChainId, NoticeId)",
       "NotImplemented": "",
+      "OracleError": "(OracleError)",
       "ParseIntError": "",
-      "RatesError": "RatesError",
+      "RatesError": "(RatesError)",
       "RepayTooMuch": "",
       "SelfTransfer": "",
       "SignatureAccountMismatch": "",
       "SignatureMismatch": "",
+      "StringError": "",
       "TimeTravelNotAllowed": "",
-      "TrxRequestParseError": "TrxReqParseError",
+      "TrxRequestParseError": "(TrxReqParseError)",
       "UnknownValidator": "",
       "ValidatorAlreadySigned": "",
-      "SetYieldNextError": "SetYieldNextError",
+      "SetYieldNextError": "(SetYieldNextError)",
       "MaxForNonCashAsset": "",
       "MaxWithNegativeCashPrincipal": ""
     }
@@ -375,6 +378,21 @@
       "TimestampTooSoonToNext": ""
     }
   },
+
   "Source10": "AccountRS",
-  "LiquidityFactor": "u128"
+  "LiquidityFactor": "u128",
+
+  "Source11": "OracleRS",
+  "OracleError": {
+    "_enum": {
+      "HexParseError" :"",
+      "EthAbiParseError" :"",
+      "InvalidKind" :"",
+      "InvalidTicker" :"",
+      "JsonParseError" :"",
+      "HttpError" :"",
+      "InvalidOpenOracleApiResponse" :"",
+      "InvalidSymbol" :""
+    }
+  }
 }

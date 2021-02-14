@@ -163,6 +163,15 @@ fn compute_cash_principal_per_internal(
         .checked_div(cash_index)?
         .checked_div(MILLISECONDS_PER_YEAR)?;
 
+    log!(
+        "compute_cash_principal_per_internal({}, {}, {}, {})={} [unscaled]",
+        asset_rate,
+        dt,
+        price_asset,
+        cash_index,
+        unscaled
+    );
+
     scale_multiple_terms(
         unscaled,
         APR::DECIMALS + Price::DECIMALS,
@@ -462,6 +471,8 @@ pub fn lock_internal<T: Config>(
     holder: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
+    log!("lock_internal={:?}", &holder);
+
     let holder_asset = AssetBalances::get(asset, holder);
     let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
 
@@ -1246,7 +1257,7 @@ pub fn effect_of_asset_interest_internal(
 
 // Off-chain Workers //
 
-pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
+pub fn process_notices_internal<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
     // TODO: Do we want to return a failure here in any case, or collect them, etc?
     for (chain_id, notice_id, notice_state) in NoticeStates::iter() {
         match notice_state {
@@ -1414,6 +1425,9 @@ pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights
 
         cash_principal_borrow_increase = cash_principal_borrow_increase
             .add(borrow_asset.as_cash_principal(cash_borrow_principal_per)?)?;
+
+        log!("change_in_time={}, asset={:?}, supply_asset={:?}, borrow_asset={:?}, price={}, cash_borrow_principal_per={}, cash_principal_supply_increase: {}, cash_hold_principal_per={}, cash_principal_borrow_increase: {}, asset_cost={}, asset_yield={}",
+            change_in_time, &asset, supply_asset, borrow_asset, asset_price, cash_borrow_principal_per.0, cash_principal_supply_increase.0, cash_hold_principal_per.0, cash_principal_borrow_increase.0, asset_cost.0, asset_yield.0);
 
         asset_updates.push((asset.clone(), new_supply_index, new_borrow_index));
     }

@@ -1,6 +1,7 @@
 use crate::chains::ChainId;
 use crate::internal::set_yield_next::SetYieldNextError;
 use crate::notices::NoticeId;
+use crate::oracle::OracleError;
 use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
@@ -42,12 +43,14 @@ pub enum Reason {
     NoticeAlreadySigned,
     NoticeMissing(ChainId, NoticeId),
     NotImplemented,
+    OracleError(OracleError),
     ParseIntError,
     RatesError(RatesError),
     RepayTooMuch,
     SelfTransfer,
     SignatureAccountMismatch,
     SignatureMismatch,
+    StringError,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,

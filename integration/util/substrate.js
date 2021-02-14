@@ -2,24 +2,65 @@ const { debug, log } = require('./log');
 const { arrayToHex, concatArray } = require('./util');
 const types = require('@polkadot/types');
 
-// TODO: Consider moving into ctx
+// TODO: Consider moving these vars into ctx
 let trxId = 0;
+let lastEvent = 0;
 
-function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = null) {
-  return new Promise((resolve, reject) => {
-    api.query.system.events((events) => {
+let subscribed;
 
+let allEvents = [];
+let callbacks = [];
+
+// TODO: Refactor here?
+function subscribeEvents(api) {
+  api.query.system.events((events) => {
+    events.forEach(({ event }) => {
+      debug(`Found event: ${event.section}:${event.method}`);
+    });
+
+    allEvents = [...allEvents, ...events];
+    callbacks.forEach((callback) => callback(allEvents));
+  });
+}
+
+function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = null, trackLastEvent = true) {
+  if (!subscribed) {
+    subscribeEvents(api);
+    subscribed = true;
+  }
+
+  let resolve, reject;
+  let promise = new Promise((resolve_, reject_) => {
+    resolve = resolve_;
+    reject = reject_;
+  });
+  let resolved = false;
+  let handler = (events) => {
+    if (!resolved) {
       // Loop through the Vec<EventRecord>
-      events.forEach(({ event }) => {
-        debug(`Found event: ${event.section}:${event.method}`);
+      events.forEach(({ event }, i) => {
+        if (trackLastEvent && i <= lastEvent) {
+          return;
+        }
+
         if (event.section === pallet && event.method === method) {
+          if (trackLastEvent) {
+            lastEvent = i;
+          }
+          resolved = true;
           return resolve(event);
         } else if (failureEvent && event.section === failureEvent[0] && event.method === failureEvent[1]) {
+          resolved = true;
           return reject(new Error(`Found failure event ${event.section}:${event.method} - ${JSON.stringify(getEventData(event))}`));
         }
       });
-    });
-  });
+    }
+  };
+
+  callbacks.push(handler);
+  handler(allEvents);
+
+  return promise;
 }
 
 function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = true) {
@@ -36,7 +77,17 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
       let doResolve = (events) => {
         unsub(); // Note: unsub isn't apparently working, but we are calling it
 
-        let failures = events
+        let cashFailures = events
+          .filter(({ event }) =>
+            api.events.cash.Failure.is(event)
+          )
+          .map(({ event: { data: reason } }) => {
+            debug(() => `sendAndWaitForEvents[id=${id}] - Failing call: ${JSON.stringify(call)} ${call.toString()}`);
+
+            return new Error(`DispatchError[id=${id}]: ${reason.toString()}`);
+          });
+
+        let systemFailures = events
           .filter(({ event }) =>
             api.events.system.ExtrinsicFailed.is(event)
           )
@@ -62,6 +113,11 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
               return new Error(`DispatchError[id=${id}]: ${error.toString()}`);
             }
           });
+
+        let failures = [
+          ...cashFailures,
+          ...systemFailures
+        ];
 
         if (rejectOnFailure && failures.length > 0) {
           reject(failures[0]);

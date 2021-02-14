@@ -208,7 +208,7 @@ impl CashPrincipal {
 pub struct CashIndex(pub Uint);
 
 impl CashIndex {
-    pub const DECIMALS: u8 = 4;
+    pub const DECIMALS: u8 = 18;
 
     pub const ONE: CashIndex = CashIndex(static_pow10(Self::DECIMALS));
 

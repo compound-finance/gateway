@@ -100,6 +100,30 @@ class Actor {
     }
   }
 
+  async cashForToken(token) {
+    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let lastIndex = await this.ctx.api().query.cash.lastIndices(token.toChainAsset(), this.toChainAccount());
+
+    if (assetBalance == 0) {
+      return 0;
+    } else if (assetBalance > 0) {
+      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
+      let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
+      return Number(assetBalance.toBigInt() * (supplyIndex.toBigInt() - lastIndex.toBigInt()));
+    } else {
+      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
+      let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
+      return Number(assetBalance.toBigInt() * (borrowIndex.toBigInt() - lastIndex.toBigInt()));
+    }
+  }
+
+  async cash() {
+    // TODO: Use non-zero balances
+    let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
+    console.log({cashForTokens});
+    return await this.chainCashPrincipal() + cashForTokens.reduce((acc, el) => acc + el, 0);
+  }
+
   async lock(amount, asset, awaitEvent = true) {
     return await this.declare("lock", [amount, asset], async () => {
       let lockRes = await this.ctx.starport.lock(this, amount, asset);
