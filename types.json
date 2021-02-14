@@ -298,7 +298,7 @@
       "SignatureAccountMismatch": "",
       "IncorrectNonce": "(Nonce, Nonce)",
       "NoticeMissing": "(ChainId, NoticeId)",
-      "NegativePrincipalExtrction": ""
+      "NegativePrincipalExtraction": ""
     }
   },
   "MathError": {
