@@ -51,9 +51,6 @@ pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 /// Type for a set of open price feed reporters.
 pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
 
-/// Type for an encoded payload within an extrinsic.
-pub type SignedPayload = Vec<u8>; // XXX
-
 /// Type for signature used to verify that a signed payload comes from a validator.
 pub type ValidatorSig = <Ethereum as Chain>::Signature;
 
@@ -112,14 +109,6 @@ pub type ConfigSet<T> = Vec<T>;
 
 /// Type for a set of configuration strings
 pub type ConfigSetString = ConfigSet<String>;
-
-/// Type for the status of an event on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum EventStatus<C: Chain> {
-    Pending { signers: crate::ValidatorSet },
-    Failed { hash: C::Hash, reason: Reason },
-    Done,
-}
 
 // XXX ord should really assert symbol is same for these
 

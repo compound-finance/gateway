@@ -17,6 +17,8 @@ let validatorInfoMap = {
     grandpa_key: "5FA9nQDVg267DEd8m1ZypXLBnvN7SFxYwV7ndqSYGiN9TTpu",
     eth_private_key: "50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374",
     eth_account: "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61",
+    node_key: '0x0000000000000000000000000000000000000000000000000000000000000001',
+    peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp', // I have _no idea_ how this is generated
     spawn_args: ['--alice'],
   },
   'bob': {
@@ -24,20 +26,106 @@ let validatorInfoMap = {
     grandpa_key: "5GoNkf6WdbxCFnPdAnYYQyCjAKPJgLNxXwPjwTh6DGg6gN3E",
     eth_private_key: "6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d",
     eth_account: "0x8ad1b2918c34ee5d3e881a57c68574ea9dbecb81",
+    node_key: '0x0000000000000000000000000000000000000000000000000000000000000002',
+    peer_id: '12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD', // I have _no idea_ how this is generated
     spawn_args: ['--bob'],
   }
 };
 
 class Validator {
-  constructor(name, info, rpcPort, p2pPort, wsPort, wsProvider, api, ps) {
+  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, chainSpecFile) {
+    this.ctx = ctx;
     this.name = name;
     this.info = info;
     this.rpcPort = rpcPort;
     this.p2pPort = p2pPort;
     this.wsPort = wsPort;
-    this.wsProvider = wsProvider;
-    this.api = api;
+    this.nodeKey = nodeKey;
+    this.peerId = peerId;
+    this.logLevel = logLevel;
+    this.spawnOpts = spawnOpts;
+    this.extraArgs = extraArgs;
+    this.validatorArgs = validatorArgs;
+    this.ethPrivateKey = ethPrivateKey;
+    this.chainSpecFile = chainSpecFile;
+    this.wsProvider = null;
+    this.api = null;
+    this.ps = null;
+    this.bootnodes = null;
+  }
+
+  asPeer() {
+    // Note: we assume loopback address
+    return `/ip4/127.0.0.1/tcp/${this.p2pPort}/p2p/${this.peerId}`;
+  }
+
+  async start(peers=[]) {
+    this.bootnodes = peers.map((peer) => {
+      return ['--reserved-nodes', peer];
+    }).flat();
+
+    let ps = spawnValidator(this.ctx, [
+      '--chain',
+      this.chainSpecFile,
+      '--rpc-methods',
+      'Unsafe',
+      '--rpc-port',
+      this.rpcPort,
+      '--ws-port',
+      this.wsPort,
+      '--port',
+      this.p2pPort,
+      '--tmp',
+      '--no-mdns',
+      '--node-key',
+      this.nodeKey,
+      '-lruntime=debug',
+      '--reserved-only',
+      ...this.bootnodes,
+      ...this.extraArgs,
+      ...this.validatorArgs
+    ], {
+      env: {
+        ...this.spawnOpts,
+        ETH_RPC_URL: this.ctx.eth.web3Url,
+        ETH_KEY: this.ethPrivateKey,
+        ETH_KEY_ID: "my_eth_key_id"
+      }
+    });
+
+    process.on('exit', () => {
+      ps.kill('SIGTERM'); // No matter what, always kill compound-chain node
+    });
+
+    ps.on('error', (err) => {
+      this.ctx.__abort(`Failed to spawn validator: ${err}`);
+    });
+
+    ps.on('close', (code) => {
+      this.ctx.log(`Validator terminated, code=${code}`);
+      if (code !== 0) {
+        if (this.ctx.__linkValidator()) {
+          this.ctx.__abort(`Validator failed unexpectedly with code ${code}`);
+        }
+      }
+    });
+
+    // TODO: Should we make awaiting optional? We could also spawn multiple at the
+    //       same time, since this isn't order dependent.
+    await until(() => canConnectTo('localhost', this.wsPort), {
+      retries: 50,
+      message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`
+    });
+
+    const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
+    const api = await ApiPromise.create({
+      provider: wsProvider,
+      types: await loadTypes(this.ctx)
+    });
+
     this.ps = ps;
+    this.api = api;
+    this.wsProvider = wsProvider;
   }
 
   async teardown() {
@@ -82,6 +170,11 @@ class Validators {
     }
   }
 
+  async start() {
+    let peers = this.validators.map((validator) => validator.asPeer());
+    await Promise.all(this.validators.map((validator) => validator.start(peers)));
+  }
+
   async teardown() {
     await Promise.all(this.validators.map(async (validator) => {
       await validator.teardown();
@@ -109,12 +202,14 @@ function spawnValidator(ctx, args = [], opts = {}) {
   return proc;
 }
 
-async function buildValidator(validatorName, validatorInfo, ctx) {
+function buildValidator(validatorName, validatorInfo, ctx) {
   ctx.log(`Starting Validator ${validatorName}...`);
 
-  let rpcPort = validatorInfo.rpcPort || genPort();
-  let p2pPort = validatorInfo.p2pPort || genPort();
-  let wsPort = validatorInfo.wsPort || genPort();
+  let rpcPort = validatorInfo.rpc_port || genPort();
+  let p2pPort = validatorInfo.p2p_port || genPort();
+  let wsPort = validatorInfo.ws_port || genPort();
+  let nodeKey = getInfoKey(validatorInfo, 'node_key', `validator ${validatorName}`);
+  let peerId = getInfoKey(validatorInfo, 'peer_id', `validator ${validatorName}`);
 
   let logLevel = ctx.__logLevel();
   let spawnOpts = logLevel !== 'info' ? { RUST_LOG: logLevel } : {};
@@ -128,61 +223,7 @@ async function buildValidator(validatorName, validatorInfo, ctx) {
 
   let chainSpecFile = ctx.chainSpec.file();
 
-  let ps = spawnValidator(ctx, [
-    '--chain',
-    chainSpecFile,
-    '--rpc-methods',
-    'Unsafe',
-    '--rpc-port',
-    rpcPort,
-    '--ws-port',
-    wsPort,
-    '--port',
-    p2pPort,
-    '--tmp',
-    '-lruntime=debug',
-    ...extraArgs,
-    ...validatorArgs
-  ], {
-    env: {
-      ...spawnOpts,
-      ETH_RPC_URL: ctx.eth.web3Url,
-      ETH_KEY: ethPrivateKey,
-      ETH_KEY_ID: "my_eth_key_id"
-    }
-  });
-
-  process.on('exit', () => {
-    ps.kill('SIGTERM'); // No matter what, always kill compound-chain node
-  });
-
-  ps.on('error', (err) => {
-    ctx.__abort(`Failed to spawn validator: ${err}`);
-  });
-
-  ps.on('close', (code) => {
-    ctx.log(`Validator terminated, code=${code}`);
-    if (code !== 0) {
-      if (ctx.__linkValidator()) {
-        ctx.__abort(`Validator failed unexpectedly with code ${code}`);
-      }
-    }
-  });
-
-  // TODO: Should we make awaiting optional? We could also spawn multiple at the
-  //       same time, since this isn't order dependent.
-  await until(() => canConnectTo('localhost', wsPort), {
-    retries: 50,
-    message: `Awaiting websocket for validator ${validatorName} on port ${wsPort}...`
-  });
-
-  const wsProvider = new WsProvider(`ws://localhost:${wsPort}`);
-  const api = await ApiPromise.create({
-    provider: wsProvider,
-    types: await loadTypes(ctx)
-  });
-
-  return new Validator(validatorName, validatorInfo, rpcPort, p2pPort, wsPort, wsProvider, api, ps);
+  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, chainSpecFile);
 }
 
 async function getValidatorsInfo(validatorsInfoHash, ctx) {
@@ -193,14 +234,13 @@ async function buildValidators(validatorsInfoHash, ctx) {
   ctx.log("Starting Validators...");
 
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
-  let validators = await validatorsInfo.reduce(async (acc, [validatorName, validatorInfo]) => {
-    return [
-      ...await acc,
-      await buildValidator(validatorName, validatorInfo, ctx)
-    ];
-  }, Promise.resolve([]));
+  let validatorsList = await validatorsInfo.map(([validatorName, validatorInfo]) =>
+    buildValidator(validatorName, validatorInfo, ctx));
 
-  return new Validators(validators, ctx);
+  let validators = new Validators(validatorsList, ctx);
+  await validators.start();
+
+  return validators;
 }
 
 module.exports = {

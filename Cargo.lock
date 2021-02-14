@@ -1606,10 +1606,12 @@ dependencies = [
 name = "ethereum-client"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "ethabi 12.0.0",
  "frame-support",
  "hex",
+ "lazy_static",
+ "our-std",
+ "parity-scale-codec",
  "serde",
  "serde_json",
  "sp-io",

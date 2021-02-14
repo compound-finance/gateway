@@ -17,9 +17,10 @@ use frame_support::storage::{
 
 use crate::{
     chains::{
-        eth, CashAsset, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount,
-        ChainHash, ChainId, ChainSignature, ChainSignatureList,
+        CashAsset, Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount,
+        ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum,
     },
+    events::{ChainLogEvent, ChainLogId, EventState},
     log, notices,
     notices::{
         CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
@@ -30,16 +31,18 @@ use crate::{
     symbol::{Symbol, CASH},
     types::{
         AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, Nonce, Price,
-        Quantity, SafeMul, USDQuantity, ValidatorIdentity,
+        Quantity, SafeMul, USDQuantity, ValidatorIdentity, ValidatorSig,
     },
     AccountNotices, AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
-    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, LastIndices,
-    LatestNotice, Module, Nonces, NoticeHashes, NoticeStates, Notices, Prices, RateModels,
-    ReserveFactor, SubmitTransaction, SupplyIndices, TotalBorrowAssets, TotalCashPrincipal,
-    TotalSupplyAssets,
+    ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex, LastBlockTimestamp,
+    LastIndices, LatestNotice, Module, Nonces, NoticeHashes, NoticeStates, Notices, Prices,
+    RateModels, ReserveFactor, SubmitTransaction, SupplyIndices, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
+use codec::{Decode, Encode};
 use either::{Either, Left, Right};
 use frame_support::sp_runtime::traits::Convert;
+use frame_support::traits::UnfilteredDispatchable;
 use our_std::convert::TryInto;
 
 macro_rules! require {
@@ -349,30 +352,30 @@ fn withdraw_and_borrow_principal(
 
 // Protocol interface //
 
-pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reason> {
-    match event.data {
-        eth::EventData::Lock {
-            asset,
-            holder,
-            amount,
-        } => lock_internal::<T>(
-            ChainAsset::Eth(asset),
-            ChainAccount::Eth(holder),
-            Quantity(symbol::<T>(ChainAsset::Eth(asset)).ok_or(Reason::NoSuchAsset)?, amount),
-        ),
+pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(), Reason> {
+    log!("apply_chain_event_internal(event): {:?}", &event);
 
-        eth::EventData::LockCash {
-            holder,
-            amount,
-            .. // XXX do we want to use index?
-        } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity(CASH, amount)),
+    match event {
+        ChainLogEvent::Eth(eth_event) => {
+            match eth_event.event {
+                ethereum_client::events::EthereumEvent::Lock {
+                    asset,
+                    holder,
+                    amount,
+                } => lock_internal::<T>(
+                    ChainAsset::Eth(asset),
+                    ChainAccount::Eth(holder),
+                    Quantity(symbol::<T>(ChainAsset::Eth(asset)).ok_or(Reason::NoSuchAsset)?, amount),
+                ),
 
-        eth::EventData::Gov {} => {
-            // XXX also handle 'remote control' trx requests (aka do)
-            // XXX are these 'do' now?
-            //   Decode a SCALE-encoded set of extrinsics from the event
-            //   For each extrinsic, dispatch the given extrinsic as Root
-            Err(Reason::NotImplemented)
+                ethereum_client::events::EthereumEvent::LockCash {
+                    holder,
+                    amount,
+                    .. // XXX do we want to use index?
+                } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity(CASH, amount)),
+
+                ethereum_client::events::EthereumEvent::Gov { extrinsics } => dispatch_extrinsics_internal::<T>(extrinsics),
+            }
         }
     }
 }
@@ -413,6 +416,33 @@ fn set_asset_balance_internal(asset: ChainAsset, account: ChainAccount, balance:
         // XXX add to assets with non zero balance
     }
     AssetBalances::insert(asset, account, balance);
+}
+
+pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Result<(), Reason> {
+    //   Decode a SCALE-encoded set of extrinsics from the event
+    //   For each extrinsic, dispatch the given extrinsic as Root
+    extrinsics.iter().map(|payload| {
+        log!(
+            "dispatch_extrinsics_internal:: dispatching extrinsic {}",
+            hex::encode(&payload)
+        );
+        let call_res: Result<<T as Config>::Call, _> = Decode::decode(&mut &payload[..]);
+        match call_res {
+            Ok(call) => {
+                log!("dispatch_extrinsics_internal:: dispatching {:?}", call);
+                let res = call.dispatch_bypass_filter(frame_system::RawOrigin::Root.into());
+                log!("dispatch_extrinsics_internal:: res {:?}", res);
+                // TODO: Collect results?
+            }
+            _ => {
+                log!(
+                    "dispatch_extrinsics_internal:: failed to decode extrinsic {}",
+                    hex::encode(&payload)
+                );
+            }
+        }
+    });
+    Ok(())
 }
 
 pub fn lock_internal<T: Config>(
@@ -1357,6 +1387,110 @@ pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights
         Clear CashYieldNext
      */
     Ok(0)
+}
+
+pub fn process_events_internal<T: Config>(
+    events: Vec<(ChainLogId, ChainLogEvent)>,
+) -> Result<(), Reason> {
+    for (event_id, event) in events.into_iter() {
+        log!(
+            "Processing event and sending extrinsic: {} {:?}",
+            event_id.show(),
+            event
+        );
+
+        // XXX
+        let signature =  // XXX why are we signing with eth?
+            <Ethereum as Chain>::sign_message(&event.encode()[..])?; // XXX
+        let call = Call::process_chain_event(event_id, event, signature);
+
+        // TODO: Do we want to short-circuit on an error here?
+        let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
+            .map_err(|()| Reason::FailedToSubmitExtrinsic);
+
+        if res.is_err() {
+            log!("Error while sending event extrinsic");
+        }
+    }
+    Ok(())
+}
+
+pub fn process_chain_event_internal<T: Config>(
+    event_id: ChainLogId,
+    event: ChainLogEvent,
+    signature: ValidatorSig,
+) -> Result<(), Reason> {
+    // XXX sig
+    // XXX do we want to store/check hash to allow replaying?
+    // TODO: use more generic function?
+    // XXX why is this using eth for validator sig though?
+    let signer: crate::types::ValidatorIdentity =
+        compound_crypto::eth_recover(&event.encode()[..], &signature, false)?;
+    let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
+
+    if !validators.contains(&signer) {
+        log!(
+            "Signer of a log event is not a known validator {:?}, validators are {:?}",
+            signer,
+            validators
+        );
+        return Err(Reason::UnknownValidator)?;
+    }
+
+    match EventStates::get(event_id) {
+        EventState::Pending { signers } => {
+            // XXX sets?
+            if signers.contains(&signer) {
+                log!("process_chain_event_internal({}): Validator has already signed this payload {:?}", event_id.show(), signer);
+                return Err(Reason::ValidatorAlreadySigned);
+            }
+
+            // Add new validator to the signers
+            let mut signers_new = signers.clone();
+            signers_new.push(signer.clone()); // XXX unique add to set?
+
+            if passes_validation_threshold(&signers_new, &validators) {
+                match apply_chain_event_internal::<T>(event) {
+                    Ok(()) => {
+                        EventStates::insert(event_id, EventState::Done);
+                        <Module<T>>::deposit_event(Event::ProcessedChainEvent(event_id));
+                        Ok(())
+                    }
+
+                    Err(reason) => {
+                        log!(
+                            "process_chain_event_internal({}) apply failed: {:?}",
+                            event_id.show(),
+                            reason
+                        );
+                        EventStates::insert(event_id, EventState::Failed { reason });
+                        <Module<T>>::deposit_event(Event::FailedProcessingChainEvent(
+                            event_id, reason,
+                        ));
+                        Ok(())
+                    }
+                }
+            } else {
+                log!(
+                    "process_chain_event_internal({}) signer_count={}",
+                    event_id.show(),
+                    signers_new.len()
+                );
+                EventStates::insert(
+                    event_id,
+                    EventState::Pending {
+                        signers: signers_new,
+                    },
+                );
+                Ok(())
+            }
+        }
+
+        EventState::Failed { .. } | EventState::Done => {
+            // TODO: Eventually we should be deleting or retrying here (based on monotonic ids and signing order)
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]

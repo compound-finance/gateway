@@ -65,53 +65,41 @@ pub fn initialize_storage() {
 }
 
 #[test]
-// TODO: move into integraion test area, validators are not present in unit tests as not all pallets are loaded
 fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();
         // Dispatch a signed extrinsic.
-        // XXX
-        let event_id = (3858223, 0);
-        let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
-        let checked_payload = payload.clone();
-        let sig = <Ethereum as Chain>::sign_message(&payload).unwrap(); // Sign with our "shared" private key for now XXX
+        let event_id = ChainLogId::Eth(3858223, 0);
+        let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
+            block_hash: [3; 32],
+            block_number: 3858223,
+            transaction_index: 0,
+            log_index: 0,
+            event: ethereum_client::EthereumEvent::Lock {
+                asset: [1; 20],
+                holder: [2; 20],
+                amount: 10,
+            },
+        });
+        let payload = event.encode();
+        let signature = <Ethereum as Chain>::sign_message(&payload).unwrap(); // Sign with our "shared" private key for now XXX
 
-        assert_ok!(CashModule::process_eth_event(Origin::none(), payload, sig));
-        let event_status = CashModule::eth_event_queue(event_id).unwrap();
-        match event_status {
-            EventStatus::<Ethereum>::Pending { signers } => {
+        assert_ok!(CashModule::process_chain_event(
+            Origin::none(),
+            event_id,
+            event,
+            signature
+        ));
+
+        let event_state = CashModule::event_states(event_id);
+        match event_state {
+            EventState::Pending { signers } => {
                 assert_eq!(signers.len(), 1);
-                assert_eq!(hex::encode(signers[0]), "6a72a2f14577d9cd0167801efdd54a07b40d2b61");
+                assert_eq!(
+                    hex::encode(signers[0]),
+                    "6a72a2f14577d9cd0167801efdd54a07b40d2b61"
+                );
             }
-            _ => {
-                assert!(false);
-            }
-        }
-
-        // Second validator also saw this event
-        let payload_validator_2 = checked_payload.clone();
-        let sig_validator_2 = [238, 16, 209, 247, 127, 204, 226, 110, 235, 0, 62, 178, 92, 3, 21, 98, 228, 151, 49, 101, 43, 60, 18, 190, 2, 53, 127, 122, 190, 161, 216, 207, 5, 8, 141, 244, 66, 182, 118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167, 209, 126, 30, 123, 73, 238, 34, 28];
-        assert_ok!(CashModule::process_eth_event(Origin::none(), payload_validator_2, sig_validator_2));
-        let event_status_validator_2 = CashModule::eth_event_queue(event_id).unwrap();
-        match event_status_validator_2 {
-            EventStatus::<Ethereum>::Done => {
-                // Check emitted events
-                let our_events = System::events()
-                    .into_iter()
-                    .map(|r| r.event)
-                    .filter_map(|e| {
-                        if let TestEvent::cash(inner) = e { Some(inner) } else { None }
-                    })
-                    .collect::<Vec<_>>();
-                let expected_event = Event::ProcessedEthEvent(checked_payload);
-                assert_eq!(our_events[1], expected_event);
-            }
-
-            // XXX this now triggers a failure, not sure how to change the test data to increase the value
-            EventStatus::<Ethereum>::Failed { reason: Reason::MinTxValueNotMet, .. } => {
-                assert!(true);
-            }
-
             _ => {
                 assert!(false);
             }
@@ -122,9 +110,27 @@ fn process_eth_event_happy_path() {
 #[test]
 fn process_eth_event_fails_for_bad_signature() {
     new_test_ext().execute_with(|| {
+        let event_id = ChainLogId::Eth(3858223, 0);
+        let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
+            block_hash: [3; 32],
+            block_number: 3858223,
+            transaction_index: 0,
+            log_index: 0,
+            event: ethereum_client::EthereumEvent::Lock {
+                asset: [1; 20],
+                holder: [2; 20],
+                amount: 10,
+            },
+        });
+
         // Dispatch a signed extrinsic.
         assert_err!(
-            CashModule::process_eth_event(Origin::signed(Default::default()), vec![], [0; 65]),
+            CashModule::process_chain_event(
+                Origin::signed(Default::default()),
+                event_id,
+                event,
+                [0; 65]
+            ),
             DispatchError::BadOrigin
         );
     });
@@ -133,10 +139,30 @@ fn process_eth_event_fails_for_bad_signature() {
 #[test]
 fn process_eth_event_fails_if_not_validator() {
     new_test_ext().execute_with(|| {
+        let event_id = ChainLogId::Eth(3858223, 0);
+        let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
+            block_hash: [3; 32],
+            block_number: 3858223,
+            transaction_index: 0,
+            log_index: 0,
+            event: ethereum_client::EthereumEvent::Lock {
+                asset: [1; 20],
+                holder: [2; 20],
+                amount: 10,
+            },
+        });
+
         initialize_storage();
-        let payload = hex::decode("2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000").unwrap();
-        let sig = [238, 16, 209, 247, 127, 204, 225, 110, 235, 0, 62, 178, 92, 3, 21, 98, 228, 151, 49, 101, 43, 60, 18, 190, 2, 53, 127, 122, 190, 161, 216, 207, 5, 8, 141, 244, 66, 182, 118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167, 209, 126, 30, 123, 73, 238, 34, 28];
-        assert_err!(CashModule::process_eth_event(Origin::none(), payload, sig), Error::<Test>::UnknownValidator);
+        let sig = [
+            238, 16, 209, 247, 127, 204, 225, 110, 235, 0, 62, 178, 92, 3, 21, 98, 228, 151, 49,
+            101, 43, 60, 18, 190, 2, 53, 127, 122, 190, 161, 216, 207, 5, 8, 141, 244, 66, 182,
+            118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167,
+            209, 126, 30, 123, 73, 238, 34, 28,
+        ];
+        assert_err!(
+            CashModule::process_chain_event(Origin::none(), event_id, event, sig),
+            Error::<Test>::ErrorProcessingChainEvent
+        );
     });
 }
 
@@ -281,7 +307,7 @@ fn offchain_worker_test() {
 
     calls.push(price_call);
 
-    let (mut t, pool_state, offchain_state) = new_test_ext_with_http_calls(calls);
+    let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
 
     t.execute_with(|| {
         initialize_storage();
@@ -318,7 +344,7 @@ fn offchain_worker_test() {
             "01612605d0de98506ced9ca0414a08b7c335cd1dfa0ea2b62d283a2e27d8d33c25eb0abd6cc2625d950f59baf3300a71e269c3f3eea81e5ed8876bb2f4e75cfd000000000000000000000000000000000000000000000000000000000000001b",
             "883317a2aa03f1523e95bedb961d7aabfbfba73bb9f54685639d0bc1eb2fd16a7c5510e7f68e1e0824bd5a96093ef921aabb36f79e89defc4d216f6dc0d79fbb000000000000000000000000000000000000000000000000000000000000001b"
         ];
-        for x  in 0..8 {
+        for _ in 0..8 {
             let tx = pool_state.write().transactions.pop().unwrap();
             let ex: Extrinsic = Decode::decode(&mut &*tx).unwrap();
             if let Call::post_price(msg, sig) = ex.call {
@@ -344,23 +370,54 @@ fn offchain_worker_test() {
         assert_eq!(ex1.signature, None);
         assert_eq!(ex2.signature, None);
         assert_eq!(ex3.signature, None);
-        if let Call::process_eth_event(payload, signature) = ex1.call {
-            assert_eq!(hex::encode(&payload), "0b033c000e00000000e4e81fa6b16327d4b78cfeb83aade04ba7075165feb1ea27f888c384f1b0dc14fd6b387d5ff47031000010632d5ec76b0500000000000000");
-            assert_eq!(hex::encode(&signature), "d3d8533515d0ccaab0f1c51122608bb83da0039cf8e1985f32a111f5545521a972b0023a447b67e3a39a0d624fd42ee57c66660a3e79595a8e7cfb2ead84ac1f1b");
+
+        if let Call::process_chain_event(event_id, event, _signature) = ex1.call {
+            assert_eq!(event_id, ChainLogId::Eth(3932939, 14)); // TODO: Should this be trx index or log_index?
+            assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
+                block_hash: [164, 169, 110, 149, 119, 24, 227, 163, 11, 119, 166, 103, 249, 57, 120, 216, 244, 56, 189, 205, 86, 255, 3, 84, 95, 8, 200, 51, 217, 162, 102, 135],
+                block_number: 3932939,
+                transaction_index: 4,
+                log_index: 14,
+                event: ethereum_client::EthereumEvent::Lock {
+                    asset: [228, 232, 31, 166, 177, 99, 39, 212, 183, 140, 254, 184, 58, 173, 224, 75, 167, 7, 81, 101],
+                    holder: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    amount: 100000000000000000000,
+                },
+            }));
         } else {
             assert!(false);
         }
 
-        if let Call::process_eth_event(payload, signature) = ex2.call {
-            assert_eq!(hex::encode(&payload), "e1023c000100000000d87ba7a50b2e7e660f678a895e4b72e7cb4ccd9cfeb1ea27f888c384f1b0dc14fd6b387d5ff4703100e1f505000000000000000000000000");
-            assert_eq!(hex::encode(&signature), "39b79abc082ecb3b510979e189755491601ffc36467c990f627efd4d03bc12ff7768d3c0df746d351b7585950ae0da3444964c91113fa53e50298a9c7f15cab51b");
+        if let Call::process_chain_event(event_id, event, _signature) = ex2.call {
+            assert_eq!(event_id, ChainLogId::Eth(3932897, 1));
+            assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
+                block_hash: [165, 200, 2, 78, 105, 154, 92, 48, 235, 150, 94, 71, 181, 21, 124, 6, 199, 111, 59, 114, 107, 255, 55, 122, 10, 83, 51, 165, 97, 242, 86, 72],
+                block_number: 3932897,
+                transaction_index: 0,
+                log_index: 1,
+                event: ethereum_client::EthereumEvent::Lock {
+                    asset: [216, 123, 167, 165, 11, 46, 126, 102, 15, 103, 138, 137, 94, 75, 114, 231, 203, 76, 205, 156],
+                    holder: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    amount: 100000000,
+                },
+            }));
         } else {
             assert!(false);
         }
 
-        if let Call::process_eth_event(payload, signature) = ex3.call {
-            assert_eq!(hex::encode(&payload), "2fdf3a000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee513c1ff435eccedd0fda5edd2ad5e5461f0e87260080e03779c311000000000000000000");
-            assert_eq!(hex::encode(&signature), "e4b438dcc6106be70a9da56df54b2e42a42fa147778eaeb7f6660979591568ae15ca421a4ecca3237d71aaf207d5eec910163dae011680e0dd6185cd7e6304691c");
+        if let Call::process_chain_event(event_id, event, _signature) = ex3.call {
+            assert_eq!(event_id, ChainLogId::Eth(3858223, 0));
+            assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
+                block_hash: [193, 192, 235, 55, 181, 105, 35, 173, 158, 32, 253, 179, 28, 168, 130, 152, 141, 82, 23, 247, 202, 36, 182, 41, 124, 166, 237, 112, 8, 17, 207, 35],
+                block_number: 3858223,
+                transaction_index: 0,
+                log_index: 0,
+                event: ethereum_client::EthereumEvent::Lock {
+                    asset: [238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238],
+                    holder: [81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31, 14, 135, 38],
+                    amount: 5000000000000000,
+                },
+            }));
         } else {
             assert!(false);
         }

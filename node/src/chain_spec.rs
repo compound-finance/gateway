@@ -47,7 +47,6 @@ pub fn authority_keys_from_seed(seed: &str) -> (AccountId, AuraId, GrandpaId) {
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
         "eth_starport_address" : "0xbbde1662bC3ED16aA8C618c9833c801F3543B587",
-        "eth_lock_event_topic" : "0xec36c0364d931187a76cf66d7eee08fad0ec2e8b7458a8d8b26b36769d4d13f3"
         // todo: override with environment variable and/or cli param?
     });
     let as_object = value.as_object();
@@ -240,14 +239,9 @@ pub fn extract_configuration_from_properties(
     let eth_starport_address = properties.get(&key_address)?;
     let eth_starport_address_str = eth_starport_address.as_str()?;
 
-    let key_topic = "eth_lock_event_topic".to_owned();
-    let eth_lock_event_topic = properties.get(&key_topic)?;
-    let eth_lock_event_topic_str = eth_lock_event_topic.as_str()?;
-
     // todo: eager validation of some kind here - basic sanity checking? or no?
     Some(runtime_interfaces::new_config(
         eth_starport_address_str.into(),
-        eth_lock_event_topic_str.into(),
     ))
 }
 
@@ -262,23 +256,18 @@ pub(crate) mod tests {
     fn test_extract_configuration_from_properties_happy_path() {
         let expected_starport = "hello starport";
         let expected_topic = "hello topic";
-        let properties = serde_json::json!({"eth_starport_address": expected_starport, "eth_lock_event_topic": expected_topic });
+        let properties = serde_json::json!({ "eth_starport_address": expected_starport });
         let properties = properties.as_object().unwrap();
 
         let config = extract_configuration_from_properties(&properties);
         assert!(config.is_some());
         let config = config.unwrap();
         let actual_eth_starport_address = config.get_eth_starport_address();
-        let actual_eth_lock_event_topic = config.get_eth_lock_event_topic();
         // let actual = String::from_utf8(actual).unwrap();
 
         assert_eq!(
             actual_eth_starport_address.as_slice(),
             expected_starport.as_bytes()
-        );
-        assert_eq!(
-            actual_eth_lock_event_topic.as_slice(),
-            expected_topic.as_bytes()
         );
     }
 

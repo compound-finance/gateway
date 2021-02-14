@@ -14,24 +14,25 @@ use crate::chains::{
     Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
     ChainSignatureList, Ethereum,
 };
+use crate::events::{ChainLogEvent, ChainLogId, EventState};
 use crate::notices::{Notice, NoticeId, NoticeState};
 use crate::rates::{InterestRateModel, APR};
 use crate::reason::Reason;
 use crate::symbol::Symbol;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
-    ConfigAsset, ConfigSetString, EncodedNotice, EventStatus, Nonce, ReporterSet, SessionIndex,
-    SignedPayload, Timestamp, ValidatorSet, ValidatorSig,
+    ConfigAsset, ConfigSetString, EncodedNotice, Nonce, ReporterSet, SessionIndex, Timestamp,
+    ValidatorSig,
 };
-use codec::{alloc::string::String, Decode};
-use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
+use codec::{alloc::string::String, Decode, Encode};
+use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, Parameter};
 use frame_system::{
     ensure_none, ensure_root,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
 use our_std::{
     convert::{TryFrom, TryInto},
-    str,
+    if_std, str,
     vec::Vec,
 };
 use sp_core::crypto::AccountId32;
@@ -46,6 +47,7 @@ use sp_runtime::{
 };
 
 use frame_support::sp_runtime::traits::Convert;
+use frame_support::{traits::UnfilteredDispatchable, weights::GetDispatchInfo};
 
 use pallet_session;
 use pallet_timestamp;
@@ -92,7 +94,10 @@ pub trait Config:
     type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
 
     /// The overarching dispatch call type.
-    type Call: From<Call<Self>>;
+    type Call: From<Call<Self>>
+        + Parameter
+        + UnfilteredDispatchable<Origin = Self::Origin>
+        + GetDispatchInfo;
 
     type TimeConverter: Convert<<Self as pallet_timestamp::Config>::Moment, Timestamp>;
 }
@@ -160,8 +165,8 @@ decl_storage! {
         /// Mapping of assets to symbols, which determines if an asset is supported.
         AssetSymbols get(fn asset_symbol): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
 
-        /// The mapping of (status of) events witnessed on Ethereum, by event id.
-        EthEventQueue get(fn eth_event_queue): map hasher(blake2_128_concat) chains::eth::EventId => Option<EventStatus<Ethereum>>;
+        /// The mapping of (status of) events witnessed on a given chain, by event id.
+        EventStates get(fn event_states): map hasher(blake2_128_concat) ChainLogId => EventState;
 
         /// Notices contain information which can be synced to Starports
         Notices get(fn notices): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
@@ -222,11 +227,11 @@ decl_event!(
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
-        /// An Ethereum event was successfully processed. [payload]
-        ProcessedEthEvent(SignedPayload),
+        /// An Ethereum event was successfully processed. [event_id]
+        ProcessedChainEvent(ChainLogId),
 
-        /// An Ethereum event failed during processing. [payload, reason]
-        FailedProcessingEthEvent(SignedPayload, Reason),
+        /// An Ethereum event failed during processing. [event_id, reason]
+        FailedProcessingChainEvent(ChainLogId, Reason),
 
         /// Signed notice. [chain_id, notice_id, message, signatures]
         SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
@@ -319,11 +324,11 @@ decl_error! {
         /// Failed to publish signatures
         PublishSignatureFailure,
 
-        /// Invalid events block number
-        EventsBlockNumberError,
-
         /// Error processing trx request
         TrxRequestError,
+
+        /// Error when processing chain event
+        ErrorProcessingChainEvent
     }
 }
 
@@ -332,6 +337,9 @@ macro_rules! r#cash_err {
         match $expr {
             core::result::Result::Ok(val) => Ok(val),
             core::result::Result::Err(err) => {
+                if_std! {
+                    println!("Error {:#?}", err)
+                }
                 log!("Error {:#?}", err);
                 Err($new_err)
             }
@@ -412,81 +420,14 @@ decl_module! {
             Ok(())
         }
 
+        // TODO: Do we need to sign the event id, too?
         #[weight = 1] // XXX how are we doing weights?
-        pub fn process_eth_event(origin, payload: SignedPayload, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("process_eth_event(origin,payload,sig): {} {}", hex::encode(&payload), hex::encode(&signature));
+        pub fn process_chain_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+            log!("process_chain_event(origin,event_id,event,sig): {:?} {:?} {}", event_id, &event, hex::encode(&signature));
             ensure_none(origin)?;
 
-            // XXX do we want to store/check hash to allow replaying?
-            // TODO: use more generic function?
-            let signer: crate::types::ValidatorIdentity = cash_err!(
-                compound_crypto::eth_recover(&payload[..], &signature, false),  // XXX why is this using eth for validator sig though?
-                Error::<T>::InvalidSignature)?;
-
-            let validators: ValidatorSet = <Validators>::iter().map(|v| v.1.eth_address).collect();
-
-            if !validators.contains(&signer) {
-                log!("Signer of a payload is not a known validator {:?}, validators are {:?}", signer, validators);
-                return Err(Error::<T>::UnknownValidator)?
-            }
-
-            let event = chains::eth::Event::decode(&mut payload.as_slice()).map_err(|_| <Error<T>>::DecodeEthereumEventError)?; // XXX
-            let status = <EthEventQueue>::get(event.id).unwrap_or(EventStatus::<Ethereum>::Pending { signers: vec![] }); // XXX
-            match status {
-                EventStatus::<Ethereum>::Pending { signers } => {
-                    // XXX sets?
-                    if signers.contains(&signer) {
-                        log!("Validator has already signed this payload {:?}", signer);
-                        return Err(Error::<T>::AlreadySigned)?
-                    }
-
-                    // Add new validator to the signers
-                    let mut signers_new = signers.clone();
-                    signers_new.push(signer.clone()); // XXX unique add to set?
-
-                    if core::passes_validation_threshold(&signers_new, &validators) {
-                        match core::apply_eth_event_internal::<T>(event) {
-                            Ok(()) => {
-                                EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                                Self::deposit_event(Event::ProcessedEthEvent(payload));
-                                Ok(())
-                            }
-
-                            Err(reason) => {
-                                EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash: Ethereum::hash_bytes(payload.as_slice()), reason: reason });
-                                Self::deposit_event(Event::FailedProcessingEthEvent(payload, reason));
-                                Ok(())
-                            }
-                        }
-                    } else {
-                        EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Pending { signers: signers_new });
-                        Ok(())
-                    }
-                }
-
-                // Retry logic to allow retrying Failures (which should never happen, but theoretically can)
-                EventStatus::<Ethereum>::Failed { hash, .. } => {
-                    // XXX require(compute_hash(payload) == hash, "event data differs from failure");
-                    match core::apply_eth_event_internal::<T>(event) {
-                        Ok(_) => {
-                            EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Done);
-                            Self::deposit_event(Event::ProcessedEthEvent(payload));
-                            Ok(())
-                        }
-
-                        Err(new_reason) => {
-                            EthEventQueue::insert(event.id, EventStatus::<Ethereum>::Failed { hash, reason: new_reason});
-                            Self::deposit_event(Event::FailedProcessingEthEvent(payload, new_reason));
-                            Ok(())
-                        }
-                    }
-                }
-
-                EventStatus::<Ethereum>::Done => {
-                    // TODO: Eventually we should be deleting here (based on monotonic ids and signing order)
-                    Ok(())
-                }
-            }
+            cash_err!(core::process_chain_event_internal::<T>(event_id, event, signature), Error::<T>::ErrorProcessingChainEvent)?;
+            Ok(())
         }
 
         #[weight = 0] // XXX
@@ -791,108 +732,62 @@ impl<T: Config> Module<T> {
 
     // XXX disambiguate whats for ethereum vs not
     fn fetch_events_with_lock() -> Result<(), Error<T>> {
-        // Create a reference to Local Storage value.
-        // Since the local storage is common for all offchain workers, it's a good practice
-        // to prepend our entry with the pallet name.
         let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_ETHEREUM_BLOCK);
 
-        // Local storage is persisted and shared between runs of the offchain workers,
-        // offchain workers may run concurrently. We can use the `mutate` function to
-        // write a storage entry in an atomic fashion.
-        //
-        // With a similar API as `StorageValue` with the variables `get`, `set`, `mutate`.
-        // We will likely want to use `mutate` to access
-        // the storage comprehensively.
-        //
-        // Ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
-
-        // XXXX TODO Add second check for:
-        // Should be either the block of the latest Pending event which we haven't signed,
-        // or if there are no such events, otherwise the block after the latest event, otherwise the earliest (configuration/genesis) block
-        let from_block: String;
-        if let Some(Some(cached_block_num)) = s_info.get::<String>() {
+        let from_block: String = if let Some(Some(cached_block_num)) = s_info.get::<u64>() {
             // Ethereum block number has been cached, fetch events starting from the next after cached block
             log!("Last cached block number: {:?}", cached_block_num);
-            from_block = events::get_next_block_hex(cached_block_num)
-                .map_err(|_| <Error<T>>::EventsBlockNumberError)?;
+
+            events::encode_block_hex(cached_block_num + 1)
         } else {
             // Validator's cache is empty, fetch events from the earliest block with pending events
             log!("Block number has not been cached yet");
-            let block_numbers: Vec<u32> = EthEventQueue::iter()
-                .filter_map(|((block_number, _log_index), status)| {
-                    if match status {
-                        EventStatus::<Ethereum>::Pending { .. } => true,
-                        _ => false,
-                    } {
-                        Some(block_number)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            let pending_events_block = block_numbers.iter().min();
-            if pending_events_block.is_some() {
-                let events_block: u32 = *pending_events_block.unwrap();
-                from_block = format!("{:#X}", events_block);
-            } else {
-                from_block = String::from("earliest");
-            }
-        }
+            // let block_numbers: Vec<u32> = EthEventQueue::iter()
+            //     .filter_map(|((block_number, _log_index), status)| {
+            //         if match status {
+            //             EventStatus::<Ethereum>::Pending { .. } => true,
+            //             _ => false,
+            //         } {
+            //             Some(block_number)
+            //         } else {
+            //             None
+            //         }
+            //     })
+            //     .collect();
+            // let pending_events_block = block_numbers.iter().min();
+            // if pending_events_block.is_some() {
+            //     let events_block: u32 = *pending_events_block.unwrap();
+            //     from_block = format!("{:#X}", events_block);
+            // } else {
+            //}
+            String::from("earliest")
+        };
+
         log!("Fetching events starting from block {:?}", from_block);
 
-        // Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
-        //   it before doing heavy computations or write operations.
-        // ref: https://substrate.dev/rustdocs/v2.0.0-rc3/sp_runtime/offchain/storage_lock/index.html
-        //
-        // There are four ways of defining a lock:
-        //   1) `new` - lock with default time and block expiration
-        //   2) `with_deadline` - lock with default block but custom time expiration
-        //   3) `with_block_deadline` - lock with default time but custom block expiration
-        //   4) `with_block_and_time_deadline` - lock with custom time and block expiration
-        // Here we choose the default one for now.
         let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_ETHEREUM_EVENTS);
 
-        // We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
-        //   executed by previous run of ocw, so the function just returns.
-        // ref: https://substrate.dev/rustdocs/v2.0.0/sp_runtime/offchain/storage_lock/struct.StorageLock.html#method.try_lock
         if let Ok(_guard) = lock.try_lock() {
             match events::fetch_events(from_block) {
-                Ok(starport_info) => {
-                    log!("Result: {:?}", starport_info);
+                Ok(event_info) => {
+                    log!("Result: {:?}", event_info);
+
+                    // TODO: The failability here is bad, since we don't want to re-process events
+                    // We need to make sure this is fully idempotent
 
                     // Send extrinsics for all events
-                    let _ = Self::process_lock_events(starport_info.lock_events)?;
+                    cash_err!(
+                        core::process_events_internal::<T>(event_info.events),
+                        Error::<T>::ErrorProcessingChainEvent
+                    )?;
 
                     // Save latest block in ocw storage
-                    s_info.set(&starport_info.latest_eth_block);
+                    s_info.set(&event_info.latest_eth_block);
                 }
                 Err(err) => {
                     log!("Error while fetching events: {:?}", err);
                     return Err(Error::<T>::HttpFetchingError);
                 }
-            }
-        }
-        Ok(())
-    }
-
-    fn process_lock_events(
-        events: Vec<ethereum_client::LogEvent<ethereum_client::LockEvent>>,
-    ) -> Result<(), Error<T>> {
-        for event in events.iter() {
-            log!("Processing `Lock` event and sending extrinsic: {:?}", event);
-
-            // XXX
-            let payload =
-                events::to_lock_event_payload(&event).map_err(|_| <Error<T>>::HttpFetchingError)?;
-            let signature =  // XXX why are we signing with eth?
-                cash_err!(<Ethereum as Chain>::sign_message(&payload), <Error<T>>::InvalidSignature)?; // XXX
-            let call = Call::process_eth_event(payload, signature);
-
-            // XXX Unsigned tx for now
-            let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into());
-            if res.is_err() {
-                log!("Error while sending `Lock` event extrinsic");
-                return Err(Error::<T>::OffchainUnsignedLockTxError);
             }
         }
         Ok(())
@@ -909,18 +804,10 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::process_eth_event(payload, _signature) => {
+            Call::process_chain_event(_event_id, _event, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
-                    .priority(100)
-                    // The transaction is only valid for next 10 blocks. After that it's
-                    // going to be revalidated by the pool.
                     .longevity(10)
-                    .and_provides(payload)
-                    // It's fine to propagate that transaction to other peers, which means it can be
-                    // created even by nodes that don't produce blocks.
-                    // Note that sometimes it's better to keep it for yourself (if you are the block
-                    // producer), since for instance in some schemes others may copy your solution and
-                    // claim a reward.
+                    .and_provides(signature) // TODO: Correct provides?
                     .propagate(true)
                     .build()
             }
