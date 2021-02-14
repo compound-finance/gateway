@@ -29,13 +29,14 @@ use crate::{
     reason::{MathError, Reason},
     symbol::{Symbol, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, EthAddress, Int,
-        Nonce, Price, Quantity, SafeMul, USDQuantity,
+        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, Nonce, Price,
+        Quantity, SafeMul, USDQuantity, ValidatorIdentity,
     },
     AccountNotices, AssetBalances, AssetSymbols, BorrowIndices, Call, CashPrincipals, CashYield,
-    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, LatestNotice, Module,
-    Nonces, NoticeHashes, NoticeStates, Notices, Prices, RateModels, ReserveFactor,
-    SubmitTransaction, SupplyIndices, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp, LastIndices,
+    LatestNotice, Module, Nonces, NoticeHashes, NoticeStates, Notices, Prices, RateModels,
+    ReserveFactor, SubmitTransaction, SupplyIndices, TotalBorrowAssets, TotalCashPrincipal,
+    TotalSupplyAssets,
 };
 use either::{Either, Left, Right};
 use frame_support::sp_runtime::traits::Convert;
@@ -105,15 +106,15 @@ pub fn value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, MathError>
 // Internal helpers
 
 pub fn passes_validation_threshold(
-    signers: &Vec<EthAddress>,
-    validators: &Vec<EthAddress>,
+    signers: &Vec<ValidatorIdentity>,
+    validators: &Vec<ValidatorIdentity>,
 ) -> bool {
-    let mut signer_set = BTreeSet::<EthAddress>::new();
+    let mut signer_set = BTreeSet::<ValidatorIdentity>::new();
     for v in signers {
         signer_set.insert(*v);
     }
 
-    let mut validator_set = BTreeSet::<EthAddress>::new();
+    let mut validator_set = BTreeSet::<ValidatorIdentity>::new();
     for v in validators {
         validator_set.insert(*v);
     }
@@ -338,6 +339,46 @@ fn withdraw_and_borrow_principal(
     )
 }
 
+// Internal state modifying helpers //
+
+fn dispatch_notice_internal<T: Config>(
+    chain_id: ChainId,
+    recipient_opt: Option<ChainAccount>,
+    notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,
+) -> Result<(), Reason> {
+    // XXX this cannot fail
+    let (latest_notice_id, parent_hash) =
+        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
+    let notice_id = latest_notice_id.seq();
+
+    let notice = notice_fn(notice_id, parent_hash)?; // XXX fixme cannot fail
+
+    // Add to notices, notice states, track the latest notice and index by account
+    let notice_hash = notice.hash();
+    Notices::insert(chain_id, notice_id, &notice);
+    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
+    LatestNotice::insert(chain_id, (notice_id, notice_hash));
+    NoticeHashes::insert(notice_hash, notice_id);
+    if let Some(recipient) = recipient_opt {
+        AccountNotices::append(recipient, notice_id);
+    }
+
+    // Deposit Notice Event
+    let encoded_notice = notice.encode_notice();
+    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
+    Ok(()) // XXX cannot fail
+}
+
+/// Update the index of which assets an account has non-zero balances in.
+fn set_asset_balance_internal(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
+    if balance == 0 {
+        // XXX delete from assets with non zero balance
+    } else {
+        // XXX add to assets with non zero balance
+    }
+    AssetBalances::insert(asset, account, balance);
+}
+
 // Protocol interface //
 
 pub fn apply_eth_event_internal<T: Config>(event: eth::Event) -> Result<(), Reason> {
@@ -384,13 +425,25 @@ pub fn lock_internal<T: Config>(
         Reason::RepayTooMuch,
     )?;
 
-    AssetBalances::insert(asset, holder, holder_asset_new);
+    let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
+        asset,
+        holder,
+        holder_asset,
+        holder_asset_new,
+        CashPrincipals::get(holder),
+    )?;
+
+    LastIndices::insert(asset, holder, last_index_post);
+    CashPrincipals::insert(holder, cash_principal_post);
     TotalSupplyAssets::insert(asset, total_supply_new);
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
+    set_asset_balance_internal(asset, holder, holder_asset_new);
+
     // XXX real events
     <Module<T>>::deposit_event(Event::GoldieLocks(asset, holder, amount.value())); // XXX -> raw amount?
-    Ok(())
+
+    Ok(()) // XXX events?
 }
 
 pub fn lock_cash_internal<T: Config>(
@@ -420,35 +473,7 @@ pub fn lock_cash_internal<T: Config>(
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    // XXX should we return events to be deposited?
-    Ok(())
-}
-
-pub fn dispatch_notice_internal<T: Config>(
-    chain_id: ChainId,
-    recipient_opt: Option<ChainAccount>,
-    notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,
-) -> Result<(), Reason> {
-    let (latest_notice_id, parent_hash) =
-        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
-    let notice_id = latest_notice_id.seq();
-
-    let notice = notice_fn(notice_id, parent_hash)?;
-
-    // Add to notices, notice states, track the latest notice and index by account
-    let notice_hash = notice.hash();
-    Notices::insert(chain_id, notice_id, &notice);
-    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
-    LatestNotice::insert(chain_id, (notice_id, notice_hash));
-    NoticeHashes::insert(notice_hash, notice_id);
-    if let Some(recipient) = recipient_opt {
-        AccountNotices::append(recipient, notice_id);
-    }
-
-    // Deposit Notice Event
-    let encoded_notice = notice.encode_notice();
-    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
-    Ok(())
+    Ok(()) // XXX should we return events to be deposited?
 }
 
 pub fn extract_internal<T: Config>(
@@ -477,10 +502,22 @@ pub fn extract_internal<T: Config>(
     )?;
     let total_borrow_new = add_amount_to_raw(TotalBorrowAssets::get(asset), holder_borrow_amount)?;
 
-    AssetBalances::insert(asset, holder, holder_asset_new);
+    let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
+        asset,
+        holder,
+        holder_asset,
+        holder_asset_new,
+        CashPrincipals::get(holder),
+    )?;
+
+    LastIndices::insert(asset, holder, last_index_post);
+    CashPrincipals::insert(holder, cash_principal_post);
     TotalSupplyAssets::insert(asset, total_supply_new);
     TotalBorrowAssets::insert(asset, total_borrow_new);
 
+    set_asset_balance_internal(asset, holder, holder_asset_new);
+
+    // XXX fix me this cannot fail
     dispatch_notice_internal::<T>(
         recipient.chain_id(),
         Some(recipient),
@@ -544,6 +581,7 @@ pub fn extract_cash_internal<T: Config>(
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
+    // XXX fix me this cannot fail
     dispatch_notice_internal::<T>(
         recipient.chain_id(),
         Some(recipient),
@@ -618,13 +656,33 @@ pub fn transfer_internal<T: Config>(
         Reason::RepayTooMuch,
     )?;
 
+    let (sender_cash_principal_post, sender_last_index_post) = effect_of_asset_interest_internal(
+        asset,
+        sender,
+        sender_asset,
+        sender_asset_new,
+        sender_cash_principal_new,
+    )?;
+    let (recipient_cash_principal_post, recipient_last_index_post) =
+        effect_of_asset_interest_internal(
+            asset,
+            recipient,
+            recipient_asset,
+            recipient_asset_new,
+            CashPrincipals::get(recipient),
+        )?;
+
+    LastIndices::insert(asset, sender, sender_last_index_post);
+    LastIndices::insert(asset, recipient, recipient_last_index_post);
+    CashPrincipals::insert(sender, sender_cash_principal_post);
+    CashPrincipals::insert(recipient, recipient_cash_principal_post);
     CashPrincipals::insert(miner, miner_cash_principal_new);
-    CashPrincipals::insert(sender, sender_cash_principal_new);
-    AssetBalances::insert(asset, sender, sender_asset_new);
-    AssetBalances::insert(asset, recipient, recipient_asset_new);
     TotalSupplyAssets::insert(asset, total_supply_new);
     TotalBorrowAssets::insert(asset, total_borrow_new);
     TotalCashPrincipal::put(total_cash_principal_new);
+
+    set_asset_balance_internal(asset, sender, sender_asset_new);
+    set_asset_balance_internal(asset, recipient, recipient_asset_new);
 
     Ok(()) // XXX events?
 }
@@ -707,95 +765,6 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     Ok(()) // XXX events?
 }
 
-/// Block initialization step that can fail
-pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
-    let now: Timestamp = now::<T>();
-    let previous: Timestamp = LastBlockTimestamp::get();
-
-    let change_in_time = now
-        .checked_sub(previous)
-        .ok_or(Reason::TimeTravelNotAllowed)?;
-
-    let weight = on_initialize(change_in_time)?;
-
-    LastBlockTimestamp::put(now);
-
-    Ok(weight)
-}
-
-/// Block initialization step that can fail
-pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights::Weight, Reason> {
-    let mut cash_principal_supply_increase = CashPrincipal::ZERO;
-    let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
-
-    let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
-    let cash_index = GlobalCashIndex::get();
-
-    for (asset, symbol) in AssetSymbols::iter() {
-        // note we do not need to check that the asset is supported because it is by definition
-        // of where we got it from
-        let (asset_cost, asset_yield) = get_rates(&asset)?;
-        let asset_price = Prices::get(&symbol);
-
-        let cash_borrow_principal_per =
-            compute_cash_principal_per(asset_cost, change_in_time, cash_index, asset_price)?;
-        let cash_hold_principal_per =
-            compute_cash_principal_per(asset_yield, change_in_time, cash_index, asset_price)?;
-
-        let current_supply_index = SupplyIndices::get(&asset);
-        let current_borrow_index = BorrowIndices::get(&asset);
-        let new_supply_index = increment_index(current_supply_index, cash_hold_principal_per)?;
-        let new_borrow_index = increment_index(current_borrow_index, cash_borrow_principal_per)?;
-
-        let supply_asset = get_total_supply_assets(&asset)?;
-        let borrow_asset = get_total_borrow_assets(&asset)?;
-
-        // CashPrincipal__Increase = CashPrincipal__Increase + ___Asset * Cash__PrincipalPer
-
-        cash_principal_supply_increase = cash_principal_supply_increase
-            .add(supply_asset.as_cash_principal(cash_hold_principal_per)?)?;
-
-        cash_principal_borrow_increase = cash_principal_borrow_increase
-            .add(borrow_asset.as_cash_principal(cash_borrow_principal_per)?)?;
-
-        asset_updates.push((asset.clone(), new_supply_index, new_borrow_index));
-    }
-
-    // Pay miners and update the CASH interest index on CASH itself
-    let cash_yield: APR = CashYield::get();
-    let cash_index_old: CashIndex = GlobalCashIndex::get();
-    let total_cash_principal: CashPrincipal = TotalCashPrincipal::get();
-
-    let increment = cash_yield.over_time(change_in_time)?;
-    let cash_index_new = cash_index_old.increment(increment)?;
-    let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
-    let miner_spread_principal =
-        cash_principal_borrow_increase.sub(cash_principal_supply_increase)?;
-    let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
-    let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&miner);
-    let miner_cash_principal_new = miner_cash_principal_old.add(miner_spread_principal)?;
-
-    // * WARNING - BEGIN STORAGE all checks and failures must happen above
-
-    for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
-        SupplyIndices::insert(asset.clone(), new_supply_index);
-        BorrowIndices::insert(asset, new_borrow_index);
-    }
-
-    GlobalCashIndex::put(cash_index_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
-    CashPrincipals::insert(miner, miner_cash_principal_new);
-
-    // todo: xxx support changing cash APRs
-    /*
-    Possibly update the CASH rate:
-    If NextAPRStartAtNow
-        Set CashYield=NextAPR
-        Clear CashYieldNext
-     */
-    Ok(0)
-}
-
 // Liquidity Checks //
 
 pub fn has_liquidity_to_reduce_asset(_holder: ChainAccount, _amount: AssetQuantity) -> bool {
@@ -814,7 +783,7 @@ pub fn has_liquidity_to_reduce_cash(_holder: ChainAccount, _amount: CashQuantity
     true // XXX
 }
 
-// Off chain worker //
+// Off chain workers //
 
 pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
     // TODO: Do we want to return a failure here in any case, or collect them, etc?
@@ -961,6 +930,118 @@ pub fn exec_trx_request_internal<T: Config>(
     Nonces::insert(sender, current_nonce + 1);
 
     Ok(())
+}
+
+// Dispatch Extrinsic Lifecycle //
+
+/// Block initialization step that can fail
+pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
+    let now: Timestamp = now::<T>();
+    let previous: Timestamp = LastBlockTimestamp::get();
+
+    let change_in_time = now
+        .checked_sub(previous)
+        .ok_or(Reason::TimeTravelNotAllowed)?;
+
+    let weight = on_initialize(change_in_time)?;
+
+    LastBlockTimestamp::put(now);
+
+    Ok(weight)
+}
+
+/// Block initialization step that can fail
+pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights::Weight, Reason> {
+    let mut cash_principal_supply_increase = CashPrincipal::ZERO;
+    let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
+
+    let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
+    let cash_index = GlobalCashIndex::get();
+
+    // Iterate through listed assets, adding the CASH principal they generated/paid last block
+    for (asset, symbol) in AssetSymbols::iter() {
+        let (asset_cost, asset_yield) = get_rates(&asset)?;
+        let asset_price = Prices::get(&symbol);
+
+        let cash_borrow_principal_per =
+            compute_cash_principal_per(asset_cost, change_in_time, cash_index, asset_price)?;
+        let cash_hold_principal_per =
+            compute_cash_principal_per(asset_yield, change_in_time, cash_index, asset_price)?;
+
+        let current_supply_index = SupplyIndices::get(&asset);
+        let current_borrow_index = BorrowIndices::get(&asset);
+        let new_supply_index = increment_index(current_supply_index, cash_hold_principal_per)?;
+        let new_borrow_index = increment_index(current_borrow_index, cash_borrow_principal_per)?;
+
+        let supply_asset = get_total_supply_assets(&asset)?;
+        let borrow_asset = get_total_borrow_assets(&asset)?;
+
+        cash_principal_supply_increase = cash_principal_supply_increase
+            .add(supply_asset.as_cash_principal(cash_hold_principal_per)?)?;
+
+        cash_principal_borrow_increase = cash_principal_borrow_increase
+            .add(borrow_asset.as_cash_principal(cash_borrow_principal_per)?)?;
+
+        asset_updates.push((asset.clone(), new_supply_index, new_borrow_index));
+    }
+
+    // Pay miners and update the CASH interest index on CASH itself
+    let cash_yield: APR = CashYield::get();
+    let cash_index_old: CashIndex = GlobalCashIndex::get();
+    let total_cash_principal: CashPrincipal = TotalCashPrincipal::get();
+
+    let increment = cash_yield.over_time(change_in_time)?;
+    let cash_index_new = cash_index_old.increment(increment)?;
+    let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
+    let miner_spread_principal =
+        cash_principal_borrow_increase.sub(cash_principal_supply_increase)?;
+    let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
+    let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&miner);
+    let miner_cash_principal_new = miner_cash_principal_old.add(miner_spread_principal)?;
+
+    // * WARNING - BEGIN STORAGE all checks and failures must happen above
+
+    for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
+        SupplyIndices::insert(asset.clone(), new_supply_index);
+        BorrowIndices::insert(asset, new_borrow_index);
+    }
+
+    GlobalCashIndex::put(cash_index_new);
+    TotalCashPrincipal::put(total_cash_principal_new);
+    CashPrincipals::insert(miner, miner_cash_principal_new);
+
+    // todo: xxx support changing cash APRs
+    /*
+    Possibly update the CASH rate:
+    If NextAPRStartAtNow
+        Set CashYield=NextAPR
+        Clear CashYieldNext
+     */
+    Ok(0)
+}
+
+/// Return CASH Principal post asset interest, and updated asset index, for a given account
+pub fn effect_of_asset_interest_internal(
+    asset: ChainAsset,
+    account: ChainAccount,
+    asset_balance_old: AssetBalance,
+    asset_balance_new: AssetBalance,
+    cash_principal_pre: CashPrincipal,
+) -> Result<(CashPrincipal, AssetIndex), MathError> {
+    let last_index = LastIndices::get(asset, account);
+    let cash_index = if asset_balance_old >= 0 {
+        SupplyIndices::get(asset)
+    } else {
+        BorrowIndices::get(asset)
+    };
+    let cash_principal_delta = cash_index.cash_principal_since(last_index, asset_balance_old)?;
+    let cash_principal_post = cash_principal_pre.add(cash_principal_delta)?;
+    let last_index_post = if asset_balance_new >= 0 {
+        SupplyIndices::get(asset)
+    } else {
+        BorrowIndices::get(asset)
+    };
+    Ok((cash_principal_post, last_index_post))
 }
 
 #[cfg(test)]
