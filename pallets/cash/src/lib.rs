@@ -721,6 +721,7 @@ impl<T: Config> Module<T> {
         } else {
             // Validator's cache is empty, fetch events from the earliest block with pending events
             log!("Block number has not been cached yet");
+            // XXX TODO: Add back?
             // let block_numbers: Vec<u32> = EthEventQueue::iter()
             //     .filter_map(|((block_number, _log_index), status)| {
             //         if match status {
@@ -786,7 +787,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
             Call::process_chain_event(_event_id, _event, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
-                    .and_provides(signature) // TODO: Correct provides?
+                    .and_provides(signature)
                     .propagate(true)
                     .build()
             }
