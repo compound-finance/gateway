@@ -238,6 +238,9 @@ decl_event!(
 
         /// When a new notice is generated
         Notice(NoticeId, Notice, EncodedNotice),
+
+        /// Executed Governance Action
+        ExecutedGovernance(Vec<(Vec<u8>, bool)>),
     }
 );
 

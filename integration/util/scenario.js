@@ -40,6 +40,7 @@ function buildScenariosInternal(name, baseScenInfo, opts, scenarios, testFn) {
       realTestFn(scenario.name, async () => {
         let scenInfo = merge(baseScenInfo, scenario.info || {});
         let ctx = await buildCtx(scenInfo);
+        ctx.ctx = ctx; // Self reference to make ctx pattern-matchable for scenario fns
         try {
           if (opts.beforeEach) {
             await opts.beforeEach(ctx);

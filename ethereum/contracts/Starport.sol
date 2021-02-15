@@ -13,6 +13,7 @@ import "./ICash.sol";
 contract Starport {
     ICash immutable public cash;
 
+    address public admin;
     address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
     address[] public authorities;
@@ -25,9 +26,11 @@ contract Starport {
     event Unlock(address account, uint amount, address asset);
     event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
+    event ExecuteProposal(string title, bytes[] extrinsics);
 
-    constructor(ICash cash_, address[] memory authorities_) {
+    constructor(ICash cash_, address admin_, address[] memory authorities_) {
         cash = cash_;
+        admin = admin_;
         authorities = authorities_;
 
         emit ChangeAuthorities(authorities_);
@@ -125,6 +128,17 @@ contract Starport {
                 }
         }
         require(success, "transferAssetOut failed");
+    }
+
+    /**
+     * @notice Executes governance proposal on Compound Chain
+     * @dev This must be called from the admin, which should be the Compound Timelock
+     * @param extrinsics SCALE-encoded extrinsics that can execute on Compound Chain
+     */
+    function executeProposal(string calldata title, bytes[] calldata extrinsics) external {
+        require(msg.sender == admin, "Call must originate from admin");
+
+        emit ExecuteProposal(title, extrinsics);
     }
 
     /*

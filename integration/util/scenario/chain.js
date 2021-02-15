@@ -108,6 +108,11 @@ class Chain {
     let index = await this.ctx.api().query.cash.globalCashIndex();
     return index.toNumber();
   }
+
+  async interestRateModel(token) {
+    let model = await this.ctx.api().query.cash.rateModels(token.toChainAsset());
+    return model.toJSON();
+  }
 }
 
 function buildChain(ctx) {

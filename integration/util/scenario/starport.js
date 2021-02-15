@@ -1,5 +1,6 @@
 const { getValidatorsInfo } = require('./validator');
 const { EtherToken } = require('./token');
+const { encodeCall } = require('../substrate');
 
 class Starport {
   constructor(starport, starportTopics, ctx) {
@@ -44,6 +45,19 @@ class Starport {
     }
   }
 
+  async executeProposal(title, extrinsics, awaitEvent = true) {
+    let encodedCalls = extrinsics.map(encodeCall);
+    let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root() });
+    let event;
+    if (awaitEvent) {
+      event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
+    }
+    return {
+      event,
+      result
+    };
+  }
+
   async isNoticeUsed(noticeHash) {
     return await this.starport.methods.isNoticeUsed(noticeHash).call();
   }
@@ -51,7 +65,6 @@ class Starport {
   async invoke(notice, signaturePairs) {
     let encoded = notice.EncodedNotice;
     let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());
-    this.ctx.log({ encoded, signatures });
     return await this.starport.methods.invoke(encoded, signatures).send({ from: this.ctx.eth.defaultFrom, gas: 5000000 });
   }
 
@@ -70,7 +83,7 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
-  let starport = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'Starport', [ctx.cashToken.ethAddress(), validators]);
+  let starport = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'Starport', [ctx.cashToken.ethAddress(), ctx.eth.root(), validators]);
 
   let starportTopics = Object.fromEntries(starport
     ._jsonInterface
