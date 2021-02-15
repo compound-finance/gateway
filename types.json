@@ -21,18 +21,6 @@
     "asset": "ChainAsset"
   },
   "ConfigSetString": "Vec<String>",
-  "EventStatus": {
-    "_enum": {
-      "Pending": {
-        "signers": "ValidatorSet"
-      },
-      "Failed": {
-        "hash": "[u8; 32]",
-        "reason": "Reason"
-      },
-      "Done": {}
-    }
-  },
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
   "CashPrincipal": "Int",
@@ -252,7 +240,7 @@
     }
   },
 
-  "Source6": "ReasonRS",
+  "Source5": "ReasonRS",
   "TrxReqParseError": {
     "_enum": [
       "NotImplemented",
@@ -269,6 +257,8 @@
   "Reason": {
     "_enum": {
       "AssetExtractionNotSupported": "",
+      "AssetNotSupported": "",
+      "AssetSymbolNotFound": "",
       "BadAccount": "",
       "BadAddress": "",
       "BadAsset": "",
@@ -277,28 +267,36 @@
       "ChainMismatch": "",
       "CryptoError": "CryptoError",
       "FailedToSubmitExtrinsic": "",
+      "HttpError": "",
+      "IncorrectNonce": "(Nonce, Nonce)",
+      "InKindLiquidation": "",
       "InsufficientChainCash": "",
       "InsufficientLiquidity": "",
       "InsufficientTotalFunds": "",
       "InvalidSignature": "",
       "InvalidSymbol": "",
+      "InvalidUTF8": "",
       "KeyNotFound": "",
       "MathError": "MathError",
       "MinTxValueNotMet": "",
+      "MissingEvent": "",
+      "NegativePrincipalExtraction": "",
+      "NegativePrincipalExtrction": "",
       "None": "",
       "NoSuchAsset": "",
       "NoticeAlreadySigned": "",
+      "NoticeMissing": "(ChainId, NoticeId)",
       "NotImplemented": "",
       "ParseIntError": "",
+      "RatesError": "RatesError",
       "RepayTooMuch": "",
-      "SignatureMismatch": "",
-      "AssetNotSupported": "",
-      "TrxRequestParseError": "TrxReqParseError",
-      "InvalidUTF8": "",
+      "SelfTransfer": "",
       "SignatureAccountMismatch": "",
-      "IncorrectNonce": "(Nonce, Nonce)",
-      "NoticeMissing": "(ChainId, NoticeId)",
-      "NegativePrincipalExtraction": ""
+      "SignatureMismatch": "",
+      "TimeTravelNotAllowed": "",
+      "TrxRequestParseError": "TrxReqParseError",
+      "UnknownValidator": "",
+      "ValidatorAlreadySigned": "",
     }
   },
   "MathError": {
@@ -310,5 +308,58 @@
       "PriceNotUSD",
       "DivisionByZero"
     ]
+  },
+
+  "Source6": "EventsRS",
+  "EventInfo": {
+    "latest_eth_block": "u64",
+    "events": "Vec<(ChainLogId, ChainLogEvent)>"
+  },
+  "ChainLogId": {
+    "_enum": {
+      "Eth": "(u64, u64)"
+    }
+  },
+  "ChainLogEvent": {
+    "_enum": {
+      "Eth": "EthereumLogEvent"
+    }
+  },
+  "EventState": {
+    "_enum": {
+      "Pending": {
+        "signers": "Vec<ValidatorKey>"
+      },
+      "Failed": {
+        "reason": "Reason"
+      },
+      "Done": {}
+    }
+  },
+
+  "Source7": "EthereumClientRS",
+  "EthereumLogEvent": {
+    "block_hash": "[u8; 32]",
+    "block_number": "u64",
+    "transaction_index": "u64",
+    "log_index": "u64",
+    "event": "EthereumEvent"
+  },
+  "EthereumEvent": {
+    "_enum": {
+      "Lock": {
+        "asset": "[u8; 20]",
+        "holder": "[u8; 20]",
+        "amount": "u128"
+      },
+      "LockCash": {
+        "holder": "[u8; 20]",
+        "amount": "u128",
+        "principal": "u128"
+      },
+      "Gov": {
+        "extrinsics": "Vec<Vec<u8>>"
+      }
+    }
   }
 }

@@ -1,7 +1,25 @@
+#[macro_use]
+extern crate lazy_static;
+
+pub mod events;
+
+use crate::events::decode_event;
+pub use crate::events::EthereumEvent;
+use codec::{Decode, Encode};
 use frame_support::debug;
-/// for now this will just focus on serialization and deserialization of payloads
+use our_std::convert::TryInto;
+use our_std::RuntimeDebug;
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum EthereumClientError {
+    HttpIoError,
+    HttpTimeout,
+    HttpErrorCode(u16),
+    InvalidUTF8,
+    JsonParseError,
+}
 
 #[derive(Deserialize, Debug)]
 pub struct ResponseError {
@@ -58,82 +76,20 @@ fn deserialize_get_block_number_response(
     serde_json::from_str(response)
 }
 
-fn extract_address(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::Address> {
-    if let ethabi::token::Token::Address(address) = candidate {
-        return Ok(*address);
-    }
-    Err(anyhow::anyhow!("candidate is not an address"))
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct EthereumLogEvent {
+    pub block_hash: [u8; 32],
+    pub block_number: u64,
+    pub transaction_index: u64,
+    pub log_index: u64,
+    pub event: EthereumEvent,
 }
 
-// TODO enable back if needed later
-// fn extract_string(candidate: &ethabi::token::Token) -> anyhow::Result<String> {
-//     if let ethabi::token::Token::String(s) = candidate {
-//         return Ok(s.clone());
-//     }
-//     Err(anyhow::anyhow!("candidate is not a string"))
-// }
-
-pub fn extract_uint(candidate: &ethabi::token::Token) -> anyhow::Result<ethabi::Uint> {
-    if let ethabi::token::Token::Uint(u) = candidate {
-        return Ok(*u);
-    }
-    Err(anyhow::anyhow!("candidate is not an uint"))
-}
-
-#[derive(Debug)]
-pub struct LockEvent {
-    pub asset: ethabi::Address,
-    pub holder: ethabi::Address,
-    pub amount: ethabi::Uint,
-}
-
-#[derive(Debug)]
-pub struct LockCashEvent {
-    pub holder: ethabi::Address,
-    pub amount: ethabi::Uint,
-    pub yield_index: ethabi::Uint,
-}
-
-#[derive(Debug)]
-pub struct LogEvent<T: DecodableEvent> {
-    pub block_hash: String,
-    pub block_number: String,
-    pub transaction_index: String,
-    pub log_index: String,
-    pub event: T,
-}
-
-pub trait DecodableEvent {
-    fn new(data: String) -> Self;
-}
-
-impl DecodableEvent for LockEvent {
-    fn new(data: String) -> LockEvent {
-        let abi_decoded = decode_events(
-            data,
-            vec![
-                ethabi::param_type::ParamType::Address,   // asset
-                ethabi::param_type::ParamType::Address,   // holder
-                ethabi::param_type::ParamType::Uint(256), // amount
-            ],
-        );
-
-        let decoded = abi_decoded.unwrap();
-        let asset = extract_address(&decoded[0]).unwrap();
-        let holder = extract_address(&decoded[1]).unwrap();
-        let amount = extract_uint(&decoded[2]).unwrap();
-
-        return LockEvent {
-            asset: asset,
-            holder: holder,
-            amount: amount,
-        };
-    }
-}
-
-// TODO add implementation of DecodableEvent for LockCashEvent
-
-fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<String, http::Error> {
+fn send_rpc(
+    server: &str,
+    method: &'static str,
+    params: Vec<&str>,
+) -> Result<String, EthereumClientError> {
     // TODO - move 2_000 to config???
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
     let data = format!(
@@ -141,7 +97,7 @@ fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<Str
         method,
         params.join(",")
     );
-    debug::native::info!("Data for send_rpc: {}", data.clone());
+    // debug::native::info!("Data for send_rpc: {}", data.clone());
 
     let request = http::Request::post(server, vec![data]);
 
@@ -149,15 +105,16 @@ fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<Str
         .deadline(deadline)
         .add_header("Content-Type", "application/json")
         .send()
-        .map_err(|_| http::Error::IoError)?;
+        .map_err(|_| EthereumClientError::HttpIoError)?;
 
     let response = pending
         .try_wait(deadline)
-        .map_err(|_| http::Error::DeadlineReached)??;
+        .map_err(|_| EthereumClientError::HttpTimeout)?
+        .map_err(|_| EthereumClientError::HttpTimeout)?;
 
     if response.code != 200 {
         debug::warn!("Unexpected status code: {}", response.code);
-        return Err(http::Error::Unknown);
+        return Err(EthereumClientError::HttpErrorCode(response.code));
     }
 
     let body = response.body().collect::<Vec<u8>>();
@@ -165,81 +122,130 @@ fn send_rpc(server: &str, method: &'static str, params: Vec<&str>) -> Result<Str
     // Create a str slice from the body.
     let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
         debug::warn!("No UTF8 body");
-        http::Error::Unknown
+        EthereumClientError::InvalidUTF8
     })?;
 
     Ok(String::from(body_str))
 }
 
-// this helped me https://codeburst.io/deep-dive-into-ethereum-logs-a8d2047c7371?gi=dfa340e5e3e5
-fn decode_events(
-    data: String,
-    types: Vec<ethabi::param_type::ParamType>,
-) -> anyhow::Result<Vec<ethabi::token::Token>> {
-    // the data are a hex encoded string starting with 0x
-    if !data.starts_with("0x") {
-        return Err(anyhow::anyhow!("missing 0x prefix"));
+fn parse_word(val_opt: Option<String>) -> Option<[u8; 32]> {
+    match val_opt {
+        Some(val) => match events::decode_hex(&val) {
+            Ok(v) => match ethabi::decode(&[ethabi::ParamType::FixedBytes(32)], &v[..]) {
+                Ok(tokens) => match &tokens[..] {
+                    [ethabi::token::Token::FixedBytes(bytes)] => bytes[..].try_into().ok(),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        },
+        None => None,
     }
-
-    let to_decode: String = data.chars().skip(2).collect();
-    let decoded = hex::decode(to_decode.as_bytes()).map_err(anyhow::Error::msg)?;
-
-    // event Lock(address asset, address holder, uint amount);
-    let abi_decoded = ethabi::decode(&types[..], &decoded).map_err(anyhow::Error::msg)?;
-
-    // Check that lengths are the same
-    if abi_decoded.len() != types.len() {
-        return Err(anyhow::anyhow!(
-            "length of decoded event data is not correct"
-        ));
-    }
-
-    Ok(abi_decoded)
 }
 
-pub fn fetch_and_decode_events<T: DecodableEvent>(
+// Note: our hex library won't even _parse_ hex with an odd-number of digits
+//       so we need to pad before we parse with ethabi, as opposed to decoding
+//       and then padding.
+fn pad(val: String) -> Option<String> {
+    if val.len() > 66 || &val[0..2] != "0x" {
+        None
+    } else {
+        let mut s = String::with_capacity(64);
+        let padding = 66 - val.len();
+        for _ in 0..padding {
+            s.push('0');
+        }
+        s.push_str(&val[2..]);
+        Some(s)
+    }
+}
+
+fn parse_u64(val_opt: Option<String>) -> Option<u64> {
+    match val_opt {
+        Some(val) => match pad(val) {
+            Some(padded) => match hex::decode(&padded) {
+                Ok(v) => match ethabi::decode(&[ethabi::ParamType::Uint(256)], &v[..]) {
+                    Ok(tokens) => match tokens[..] {
+                        [ethabi::token::Token::Uint(uint)] => uint.try_into().ok(),
+                        _ => None,
+                    },
+                    _ => None,
+                },
+                _ => None,
+            },
+            None => None,
+        },
+        None => None,
+    }
+}
+
+pub fn fetch_and_decode_logs(
     server: &str,
     params: Vec<&str>,
-) -> Result<Vec<LogEvent<T>>, http::Error> {
+) -> Result<Vec<EthereumLogEvent>, EthereumClientError> {
     let body_str: String = send_rpc(server, "eth_getLogs", params)?;
-    let deserialized_body =
-        deserialize_get_logs_response(&body_str).map_err(|_| http::Error::Unknown)?;
+    let deserialized_body = deserialize_get_logs_response(&body_str)
+        .map_err(|_| EthereumClientError::JsonParseError)?;
+    let eth_logs = deserialized_body
+        .result
+        .ok_or(EthereumClientError::JsonParseError)?;
 
-    let body_data = deserialized_body.result.ok_or(http::Error::Unknown)?;
-    debug::native::info!("Eth Starport found {} log result(s)", body_data.len());
-    let mut log_events: Vec<LogEvent<T>> = Vec::new();
+    debug::native::info!("Eth Starport found {} log result(s)", eth_logs.len());
 
-    for eth_log in body_data {
-        if eth_log.block_hash.is_none()
-            || eth_log.transaction_index.is_none()
-            || eth_log.data.is_none()
-            || eth_log.block_number.is_none()
-            || eth_log.log_index.is_none()
-        {
-            debug::native::info!("Missing critical field from eth log event");
-            continue;
-        }
+    Ok(eth_logs
+        .into_iter()
+        .filter_map(|eth_log| {
+            println!("eth log {:?}", eth_log);
+            match (
+                parse_word(eth_log.block_hash),
+                parse_u64(eth_log.transaction_index),
+                eth_log.data,
+                eth_log.topics,
+                parse_u64(eth_log.block_number),
+                parse_u64(eth_log.log_index),
+            ) {
+                (
+                    Some(block_hash),
+                    Some(transaction_index),
+                    Some(data),
+                    Some(topics),
+                    Some(block_number),
+                    Some(log_index),
+                ) => match decode_event(topics, data) {
+                    Ok(event) => Some(EthereumLogEvent {
+                        block_hash,
+                        block_number,
+                        transaction_index,
+                        log_index,
+                        event,
+                    }),
+                    Err(err) => {
+                        println!("Failed to parse log {:?}", err);
+                        None
+                    }
+                },
+                _ => {
+                    println!("Missing critical field from eth log event");
 
-        let lock_event = DecodableEvent::new(eth_log.data.ok_or(http::Error::Unknown)?);
-        log_events.push(LogEvent {
-            block_hash: eth_log.block_hash.ok_or(http::Error::Unknown)?,
-            block_number: eth_log.block_number.ok_or(http::Error::Unknown)?,
-            transaction_index: eth_log.transaction_index.ok_or(http::Error::Unknown)?,
-            log_index: eth_log.log_index.ok_or(http::Error::Unknown)?,
-            event: lock_event,
-        });
-    }
-
-    Ok(log_events)
+                    None
+                }
+            }
+        })
+        .collect())
 }
 
-pub fn fetch_latest_block(server: &str) -> Result<String, http::Error> {
+pub fn fetch_latest_block(server: &str) -> Result<u64, EthereumClientError> {
     let body_str: String = send_rpc(server, "eth_blockNumber", vec![])?;
-    let deserialized_body =
-        deserialize_get_block_number_response(&body_str).map_err(|_| http::Error::Unknown)?;
+    let deserialized_body = deserialize_get_block_number_response(&body_str)
+        .map_err(|_| EthereumClientError::JsonParseError)?;
 
-    let block_number = deserialized_body.result.ok_or(http::Error::Unknown)?;
-    return Ok(block_number);
+    parse_u64(Some(
+        deserialized_body
+            .result
+            .ok_or(EthereumClientError::JsonParseError)?,
+    ))
+    .ok_or(EthereumClientError::JsonParseError)
 }
 
 #[cfg(test)]
@@ -323,23 +329,5 @@ mod tests {
         assert!(actual.result.is_none());
         assert!(actual.error.is_none());
         // todo : assert all the fields, but i inspected it, it is working fine.....
-    }
-
-    #[test]
-    fn test_decode_events() {
-        // from https://kovan.etherscan.io/tx/0x1276fa72a2d8efec8e127dac6e57eb678e706cb4fbdd1b311bda75d2691b1941#eventlog
-        const DATA_FIELD: &str = r#"0x000000000000000000000000d87ba7a50b2e7e660f678a895e4b72e7cb4ccd9c000000000000000000000000b819706e897eacf235cdb5048962bd65873202c400000000000000000000000000000000000000000000000000000000018cba80"#;
-        let actual = decode_events(
-            String::from(DATA_FIELD),
-            vec![
-                ethabi::param_type::ParamType::Address,
-                ethabi::param_type::ParamType::Address,
-                ethabi::param_type::ParamType::Uint(256),
-            ],
-        );
-        if actual.is_err() {
-            println!("{}", actual.err().unwrap());
-            assert!(false);
-        }
     }
 }

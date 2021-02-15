@@ -541,18 +541,18 @@ pub mod eth {
         SignatureRecoveryError,
     }
 
-    pub type BlockNumber = u32;
-    pub type LogIndex = u32;
+    pub type BlockNumber = u64;
+    pub type LogIndex = u64;
 
     pub type EventId = (BlockNumber, LogIndex);
 
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {
         pub id: EventId,
         pub data: EventData,
     }
 
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub enum EventData {
         // XXX only event is 'do'?
         Lock {
@@ -568,7 +568,7 @@ pub mod eth {
         },
 
         Gov {
-            // XXX all these become do?
+            extrinsics: Vec<Vec<u8>>,
         },
     }
 }

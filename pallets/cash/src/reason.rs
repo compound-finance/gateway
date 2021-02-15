@@ -20,6 +20,7 @@ pub enum Reason {
     ChainMismatch,
     CryptoError(compound_crypto::CryptoError),
     FailedToSubmitExtrinsic,
+    HttpError,
     IncorrectNonce(Nonce, Nonce),
     InKindLiquidation,
     InsufficientChainCash,
@@ -31,12 +32,14 @@ pub enum Reason {
     KeyNotFound,
     MathError(MathError),
     MinTxValueNotMet,
+    MissingEvent,
     NegativePrincipalExtraction,
+    NegativePrincipalExtrction,
     None,
     NoSuchAsset,
     NoticeAlreadySigned,
-    NotImplemented,
     NoticeMissing(ChainId, NoticeId),
+    NotImplemented,
     ParseIntError,
     RatesError(RatesError),
     RepayTooMuch,
@@ -45,6 +48,8 @@ pub enum Reason {
     SignatureMismatch,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
+    UnknownValidator,
+    ValidatorAlreadySigned,
 }
 
 impl From<MathError> for Reason {
