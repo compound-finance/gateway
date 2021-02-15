@@ -85,7 +85,19 @@ function arrayEquals(a, b) {
     a.every((val, index) => val === b[index]);
 }
 
+// Concat `a` and `b` typed arrays of same type
+function concatArray(a, b) {
+    var c = new (a.constructor)(a.length + b.length);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
+}
+
+let arrayToHex = (x) => Buffer.from(x).toString('hex');
+
 module.exports = {
+  arrayToHex,
+  concatArray,
   genPort,
   sleep,
   until,

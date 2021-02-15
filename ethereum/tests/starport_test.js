@@ -56,7 +56,7 @@ describe('Starport', () => {
     const rootNonce = await web3.eth.getTransactionCount(root);
     const cashAddress = getNextContractAddress(root, rootNonce + 1);
 
-    starport = await deploy('StarportHarness', [cashAddress, authorityAddresses]);
+    starport = await deploy('StarportHarness', [cashAddress, root, authorityAddresses]);
     cash = await deploy('CashToken', [starport._address]);
 
     // Give some 100e6 CASH to account1
@@ -78,6 +78,7 @@ describe('Starport', () => {
   describe('Unit Tests', () => {
     it('should have correct references', async () => {
       expect(await call(starport, 'cash')).toMatchAddress(cash._address);
+      expect(await call(starport, 'admin')).toMatchAddress(root);
       expect(await call(cash, 'admin')).toMatchAddress(starport._address);
     });
   });
@@ -231,6 +232,21 @@ describe('Starport', () => {
         holder: account1,
         amount: lockAmount.toString()
       });
+    });
+  });
+
+  describe('#gov', () => {
+    it('should emit gov event', async () => {
+      const extrinsics = ["0x010203", "0x040506"]
+      const tx = await send(starport, 'gov', [extrinsics], { from: root });
+      expect(tx.events.Gov.returnValues).toMatchObject({
+        extrinsics
+      });
+    });
+
+    it('should fail if not from admin', async () => {
+      const extrinsics = ["0x11", "0x22"]
+      await expect(send(starport, 'gov', [extrinsics], { from: account1 })).rejects.toRevert('revert Call must originate from admin');
     });
   });
 

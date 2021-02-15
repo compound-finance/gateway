@@ -419,29 +419,36 @@ fn set_asset_balance_internal(asset: ChainAsset, account: ChainAccount, balance:
 }
 
 pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Result<(), Reason> {
-    //   Decode a SCALE-encoded set of extrinsics from the event
-    //   For each extrinsic, dispatch the given extrinsic as Root
-    extrinsics.iter().map(|payload| {
-        log!(
-            "dispatch_extrinsics_internal:: dispatching extrinsic {}",
-            hex::encode(&payload)
-        );
-        let call_res: Result<<T as Config>::Call, _> = Decode::decode(&mut &payload[..]);
-        match call_res {
-            Ok(call) => {
-                log!("dispatch_extrinsics_internal:: dispatching {:?}", call);
-                let res = call.dispatch_bypass_filter(frame_system::RawOrigin::Root.into());
-                log!("dispatch_extrinsics_internal:: res {:?}", res);
-                // TODO: Collect results?
+    // Decode a SCALE-encoded set of extrinsics from the event
+    // For each extrinsic, dispatch the given extrinsic as Root
+    let results: Vec<_> = extrinsics
+        .into_iter()
+        .map(|payload| {
+            log!(
+                "dispatch_extrinsics_internal:: dispatching extrinsic {}",
+                hex::encode(&payload)
+            );
+            let call_res: Result<<T as Config>::Call, _> = Decode::decode(&mut &payload[..]);
+            match call_res {
+                Ok(call) => {
+                    log!("dispatch_extrinsics_internal:: dispatching {:?}", call);
+                    let res = call.dispatch_bypass_filter(frame_system::RawOrigin::Root.into());
+                    log!("dispatch_extrinsics_internal:: res {:?}", res);
+                    (payload, res.is_ok())
+                }
+                _ => {
+                    log!(
+                        "dispatch_extrinsics_internal:: failed to decode extrinsic {}",
+                        hex::encode(&payload)
+                    );
+                    (payload, false)
+                }
             }
-            _ => {
-                log!(
-                    "dispatch_extrinsics_internal:: failed to decode extrinsic {}",
-                    hex::encode(&payload)
-                );
-            }
-        }
-    });
+        })
+        .collect();
+
+    <Module<T>>::deposit_event(Event::ExecutedGovernance(results));
+
     Ok(())
 }
 

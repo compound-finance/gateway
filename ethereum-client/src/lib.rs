@@ -191,12 +191,13 @@ pub fn fetch_and_decode_logs(
         .result
         .ok_or(EthereumClientError::JsonParseError)?;
 
-    debug::native::info!("Eth Starport found {} log result(s)", eth_logs.len());
+    if eth_logs.len() > 0 {
+        debug::native::info!("Eth Starport found {} logs", eth_logs.len());
+    }
 
     Ok(eth_logs
         .into_iter()
         .filter_map(|eth_log| {
-            println!("eth log {:?}", eth_log);
             match (
                 parse_word(eth_log.block_hash),
                 parse_u64(eth_log.transaction_index),

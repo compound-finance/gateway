@@ -15,6 +15,10 @@ class Eth {
     this.ctx = ctx;
   }
 
+  root() {
+    return this.defaultFrom;
+  }
+
   async __deployContract(contractsFile, contractName, contractArgs, opts = {}) {
     let contracts = await readContractsFile(contractsFile);
 

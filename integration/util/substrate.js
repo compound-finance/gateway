@@ -1,4 +1,6 @@
 const { debug, log } = require('./log');
+const { arrayToHex, concatArray } = require('./util');
+const types = require('@polkadot/types');
 
 // TODO: Consider moving into ctx
 let trxId = 0;
@@ -120,7 +122,19 @@ function getNotice(events) {
   return getEventData(noticeEvent);
 }
 
+function encodeCall(call) {
+  return '0x' + arrayToHex(concatArray(call.callIndex, call.data));
+}
+
+function decodeCall(api, callData) {
+  let call = new types.GenericCall(api.registry, callData);
+
+  return call.toHuman();
+}
+
 module.exports = {
+  decodeCall,
+  encodeCall,
   findEvent,
   getEventData,
   sendAndWaitForEvents,

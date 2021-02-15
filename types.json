@@ -226,17 +226,18 @@
       "Overflowed"
     ]
   },
-  "ReserveFactor": ["Uint"],
-  "APR": ["Uint"],
-  "Utilization": ["Uint"],
+  "ReserveFactor": "Uint",
+  "APR": "(Uint)",
+  "Utilization": "(Uint)",
+  "KinkModel": {
+    "zero_rate": "APR",
+    "kink_rate": "APR",
+    "kink_utilization": "Utilization",
+    "full_rate": "APR"
+  },
   "InterestRateModel": {
     "_enum": {
-      "Kink": {
-        "zero_rate": "APR",
-        "kink_rate": "APR",
-        "kink_utilization": "Utilization",
-        "full_rate": "APR"
-      }
+      "Kink": "KinkModel"
     }
   },
 
@@ -296,7 +297,7 @@
       "TimeTravelNotAllowed": "",
       "TrxRequestParseError": "TrxReqParseError",
       "UnknownValidator": "",
-      "ValidatorAlreadySigned": "",
+      "ValidatorAlreadySigned": ""
     }
   },
   "MathError": {

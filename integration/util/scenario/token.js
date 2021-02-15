@@ -21,8 +21,8 @@ class Token {
     return `Eth:${this.ethAddress()}`;
   }
 
-  toChainAsset() {
-    return { Eth: this.ethAddress() };
+  toChainAsset(lower = false) {
+    return { Eth: lower ? this.ethAddress().toLowerCase() : this.ethAddress() };
   }
 
   toTokenObject() {
