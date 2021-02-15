@@ -1,5 +1,6 @@
 {
   "Source0": "TypesRS",
+  "Decimals": "u8",
   "Bips": "u128",
   "Nonce": "u32",
   "Timestamp": "u128",
@@ -11,14 +12,24 @@
   "AssetQuantity": "Quantity",
   "CashQuantity": "Quantity",
   "USDQuantity": "Quantity",
+  "LiquidityFactor": "u128",
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
   "ValidatorIdentity": "[u8; 20]",
-  "ValidatorSet": "Vec<ValidatorIdentity>",
-  "ConfigAsset": {
+  "ValidatorKeys": {
+    "substrate_id": "SubstrateId",
+    "eth_address": "[u8; 20]"
+  },
+  "AssetInfo": {
+    "asset": "ChainAsset",
+    "decimals": "Decimals",
+    "liquidity_factor": "LiquidityFactor",
+    "rate_model": "InterestRateModel",
+    "reserve_factor": "ReserveFactor",
+    "supply_cap": "AssetAmount",
     "symbol": "Symbol",
-    "asset": "ChainAsset"
+    "ticker": "Ticker"
   },
   "ConfigSetString": "Vec<String>",
   "Price": ["Symbol", "AssetPrice"],
@@ -29,9 +40,12 @@
   "SessionIndex": "u32",
   "AccountId32": "[u8;32]",
   "AccountId": "AccountId32",
+  "SubstrateId": "AccountId32",
 
   "Source1": "SymbolRS",
-  "Symbol": "([u8; 12], u8)",
+  "Symbol": "[u8; 12]",
+  "Ticker": "[u8; 12]",
+  "Units": "(Ticker, u8)",
 
   "Source2": "ChainsRS",
   "ChainId": {

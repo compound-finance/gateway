@@ -1,12 +1,10 @@
 use crate::{
-    chains::{CashAsset, ChainAccount},
-    core,
-    core::symbol,
-    reason,
+    chains::ChainAccount,
+    core::{self, get_asset},
     reason::Reason,
     require,
     symbol::CASH,
-    types::{CashPrincipal, Nonce, Quantity},
+    types::{CashOrChainAsset, CashPrincipal, Nonce, Quantity},
     CashPrincipals, Config, GlobalCashIndex, Nonces,
 };
 use either::{Left, Right};
@@ -18,8 +16,7 @@ pub fn exec_trx_request<T: Config>(
     nonce_opt: Option<Nonce>,
 ) -> Result<(), Reason> {
     // Match TrxReq against known Transaction Requests
-    let trx_request = trx_request::parse_request(request_str)
-        .map_err(|e| Reason::TrxRequestParseError(reason::to_parse_error(e)))?;
+    let trx_request = trx_request::parse_request(request_str)?;
 
     if let Some(nonce) = nonce_opt {
         // Read Require Nonce=Nonce_Account+1
@@ -32,8 +29,8 @@ pub fn exec_trx_request<T: Config>(
 
     match trx_request {
         trx_request::TrxRequest::Extract(max_amount, asset, account) => {
-            match CashAsset::from(asset) {
-                CashAsset::Cash => {
+            match CashOrChainAsset::from(asset) {
+                CashOrChainAsset::Cash => {
                     let quantity = match max_amount {
                         trx_request::MaxAmount::Max => {
                             // Read Principal=CashPrincipal_Signer assuming CashPrincipal_Signer ≥ 0 or fail
@@ -47,33 +44,36 @@ pub fn exec_trx_request<T: Config>(
                         }
 
                         // XXX Should we check for negative amounts / principals?
-                        trx_request::MaxAmount::Amount(amount) => Left(Quantity(CASH, amount)),
+                        trx_request::MaxAmount::Amount(amount) => Left(Quantity::new(amount, CASH)),
                     };
-
                     core::extract_cash_internal::<T>(sender, account.into(), quantity)?;
                 }
-                CashAsset::Asset(chain_asset) => match max_amount {
+
+                CashOrChainAsset::ChainAsset(chain_asset) => match max_amount {
                     trx_request::MaxAmount::Max => {
                         return Err(Reason::MaxForNonCashAsset);
                     }
                     trx_request::MaxAmount::Amount(amount) => {
-                        let symbol = symbol(&chain_asset).ok_or(Reason::AssetNotSupported)?;
-                        let quantity = Quantity(symbol, amount.into());
-
-                        core::extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
+                        let asset = get_asset::<T>(chain_asset)?;
+                        core::extract_internal::<T>(
+                            asset,
+                            sender,
+                            account.into(),
+                            asset.as_quantity(amount.into()),
+                        )?;
                     }
                 },
             }
         }
         trx_request::TrxRequest::Transfer(max_amount, asset, account) => {
-            match CashAsset::from(asset) {
-                CashAsset::Cash => {
+            match CashOrChainAsset::from(asset) {
+                CashOrChainAsset::Cash => {
                     let index = GlobalCashIndex::get(); // XXX This is re-loaded in `transfer_cash_principal_internal`
-
                     let principal = match max_amount {
                         trx_request::MaxAmount::Max => CashPrincipals::get(sender),
                         trx_request::MaxAmount::Amount(amount) => {
-                            index.as_hold_principal(Quantity(CASH, amount))? // XXX We later re-calcuate the amount
+                            index.as_hold_principal(Quantity::new(amount, CASH))?
+                            // XXX We later re-calcuate the amount
                         }
                     };
 
@@ -82,22 +82,20 @@ pub fn exec_trx_request<T: Config>(
                         principal >= CashPrincipal::ZERO,
                         Reason::MaxWithNegativeCashPrincipal
                     );
-
                     core::transfer_cash_principal_internal::<T>(sender, account.into(), principal)?;
                 }
-                CashAsset::Asset(chain_asset) => match max_amount {
+
+                CashOrChainAsset::ChainAsset(chain_asset) => match max_amount {
                     trx_request::MaxAmount::Max => {
                         return Err(Reason::MaxForNonCashAsset);
                     }
                     trx_request::MaxAmount::Amount(amount) => {
-                        let symbol = symbol(&chain_asset).ok_or(Reason::AssetNotSupported)?;
-                        let quantity = Quantity(symbol, amount.into());
-
+                        let asset = get_asset::<T>(chain_asset)?;
                         core::transfer_internal::<T>(
-                            chain_asset,
+                            asset,
                             sender,
                             account.into(),
-                            quantity,
+                            asset.as_quantity(amount.into()),
                         )?;
                     }
                 },

@@ -2,23 +2,21 @@
 pub use our_std::{
     cmp::{max, min},
     collections::btree_set::BTreeSet,
-    convert::TryFrom,
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     fmt, result,
     result::Result,
     str,
 };
 
-// Import these traits so we can interact with the substrate storage modules.
-use crate::rates::APR;
-use crate::types::{
-    AssetIndex, AssetPrice, CashAmount, CashIndex, Timestamp, Uint, MILLISECONDS_PER_YEAR,
-};
+use codec::{Decode, Encode};
+use either::{Either, Left, Right};
+use frame_support::sp_runtime::traits::Convert;
 use frame_support::storage::{
     IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
 };
+use frame_support::traits::UnfilteredDispatchable;
 
-use crate::portfolio::Portfolio;
+// Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::{
         Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainHash,
@@ -29,23 +27,22 @@ use crate::{
     notices::{
         CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
     },
-    params::{MIN_TX_VALUE, TRANSFER_FEE},
+    params::{MILLISECONDS_PER_YEAR, MIN_TX_VALUE, TRANSFER_FEE},
+    portfolio::Portfolio,
+    rates::{Utilization, APR},
     reason::{MathError, Reason},
-    symbol::{Symbol, CASH},
+    symbol::{Units, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetQuantity, CashPrincipal, CashQuantity, Int, Nonce, Price,
-        Quantity, SafeMul, USDQuantity, ValidatorIdentity, ValidatorSig,
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, AssetQuantity, Balance,
+        CashIndex, CashPrincipal, CashQuantity, Int, Nonce, Price, Quantity, Timestamp,
+        USDQuantity, Uint, ValidatorIdentity, ValidatorSig,
     },
-    AccountNotices, AssetBalances, AssetSymbols, AssetsWithNonZeroBalance, BorrowIndices, Call,
-    CashPrincipals, CashYield, ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex,
+    AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, Call, CashPrincipals,
+    CashYield, ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex,
     LastBlockTimestamp, LastIndices, LatestNotice, Module, NoticeHashes, NoticeStates, Notices,
-    Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices, TotalBorrowAssets,
+    Prices, SubmitTransaction, SupplyIndices, SupportedAssets, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
-use codec::{Decode, Encode};
-use either::{Either, Left, Right};
-use frame_support::sp_runtime::traits::Convert;
-use frame_support::traits::UnfilteredDispatchable;
 
 #[macro_export]
 macro_rules! require {
@@ -65,10 +62,6 @@ macro_rules! require_min_tx_value {
 
 // Public helper functions //
 
-pub fn symbol(asset: &ChainAsset) -> Option<Symbol> {
-    AssetSymbols::get(asset)
-}
-
 pub fn try_chain_asset_account(
     asset: ChainAsset,
     account: ChainAccount,
@@ -81,33 +74,51 @@ pub fn try_chain_asset_account(
     }
 }
 
-pub fn now<T: Config>() -> Timestamp {
+pub fn get_now<T: Config>() -> Timestamp {
     let now = <pallet_timestamp::Module<T>>::get();
     T::TimeConverter::convert(now)
 }
 
-pub fn price(symbol: Symbol) -> Price {
-    match symbol {
-        CASH => Price::from_nominal(CASH, "1.0"),
-        _ => Price(symbol, Prices::get(symbol)),
+/// Return the full asset info for an asset.
+pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
+    Ok(SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?)
+}
+
+/// Return the USD price associated with the given units. XXX actually asset? or units or both?
+pub fn get_price<T: Config>(units: Units) -> Price {
+    match units {
+        CASH => Price::from_nominal(CASH.ticker, "1.0"),
+        _ => Price::new(units.ticker, Prices::get(units.ticker)),
     }
 }
 
-fn get_symbol(asset: &ChainAsset) -> Result<Symbol, Reason> {
-    AssetSymbols::get(asset).ok_or(Reason::AssetSymbolNotFound)
-}
-
-pub fn get_total_supply_assets(asset: &ChainAsset) -> Result<Quantity, Reason> {
-    Ok(Quantity(get_symbol(asset)?, TotalSupplyAssets::get(asset)))
-}
-
-pub fn get_total_borrow_assets(asset: &ChainAsset) -> Result<Quantity, Reason> {
-    Ok(Quantity(get_symbol(asset)?, TotalBorrowAssets::get(asset)))
+/// Return a quantity with units of the given asset.
+pub fn get_quantity<T: Config>(asset: ChainAsset, amount: AssetAmount) -> Result<Quantity, Reason> {
+    Ok(SupportedAssets::get(asset)
+        .ok_or(Reason::AssetNotSupported)?
+        .as_quantity(amount))
 }
 
 /// Return the USD value of the asset amount.
-pub fn value(amount: AssetQuantity) -> Result<USDQuantity, MathError> {
-    amount.mul(price(amount.symbol()))
+pub fn get_value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, Reason> {
+    Ok(amount.mul_price(get_price::<T>(amount.units))?)
+}
+
+/// Return the current utilization for the asset.
+pub fn get_utilization<T: Config>(asset: &ChainAsset) -> Result<Utilization, Reason> {
+    let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
+    let total_supply = TotalSupplyAssets::get(asset);
+    let total_borrow = TotalBorrowAssets::get(asset);
+    Ok(crate::rates::get_utilization(total_supply, total_borrow)?)
+}
+
+/// Return the current borrow and supply rates for the asset.
+pub fn get_rates<T: Config>(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
+    let info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
+    let utilization = get_utilization::<T>(asset)?;
+    Ok(info
+        .rate_model
+        .get_rates(utilization, APR::ZERO, info.reserve_factor)?)
 }
 
 // Internal helpers
@@ -155,7 +166,7 @@ fn compute_cash_principal_per_internal(
     asset_rate: Uint,
     dt: Uint,
     cash_index: Uint,
-    price_asset: Uint,
+    price_asset: AssetPrice,
 ) -> Option<Uint> {
     let unscaled = asset_rate
         .checked_mul(dt)?
@@ -175,10 +186,11 @@ pub fn compute_cash_principal_per(
     asset_rate: APR,
     dt: Timestamp,
     cash_index: CashIndex,
-    price_asset: AssetPrice,
+    price_asset: Price,
 ) -> Result<CashPrincipal, Reason> {
-    let raw = compute_cash_principal_per_internal(asset_rate.0, dt, cash_index.0, price_asset)
-        .ok_or(Reason::MathError(MathError::Overflow))?;
+    let raw =
+        compute_cash_principal_per_internal(asset_rate.0, dt, cash_index.0, price_asset.value)
+            .ok_or(Reason::MathError(MathError::Overflow))?;
 
     let raw: Int = raw
         .try_into()
@@ -187,56 +199,15 @@ pub fn compute_cash_principal_per(
     Ok(CashPrincipal(raw))
 }
 
-pub fn increment_index(lhs: AssetIndex, rhs: CashPrincipal) -> Result<AssetIndex, Reason> {
-    // note - we assume decimals must match
-    let converted: Uint = rhs
-        .0
-        .try_into()
-        .map_err(|_| Reason::MathError(MathError::SignMismatch))?;
-    let raw = lhs
-        .0
-        .checked_add(converted)
-        .ok_or(Reason::MathError(MathError::Overflow))?;
-
-    Ok(AssetIndex(raw))
-}
-
-/// Check to make sure an asset is supported. Only returns Err when the asset is not supported
-/// by compound chain.
-pub fn check_asset_supported(asset: &ChainAsset) -> Result<(), Reason> {
-    if !AssetSymbols::contains_key(&asset) {
-        return Err(Reason::AssetNotSupported);
-    }
-
-    Ok(())
-}
-
-/// READ the utilization for a given asset
-pub fn get_utilization(asset: &ChainAsset) -> Result<crate::rates::Utilization, Reason> {
-    check_asset_supported(asset)?;
-    let total_supply = TotalSupplyAssets::get(asset);
-    let total_borrow = TotalBorrowAssets::get(asset);
-    Ok(crate::rates::get_utilization(total_supply, total_borrow)?)
-}
-
-/// READ the borrow and supply rates for a given asset
-pub fn get_rates(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
-    check_asset_supported(asset)?;
-    let model = RateModels::get(asset);
-    let utilization = get_utilization(asset)?;
-    let reserve_factor = ReserveFactor::get(asset);
-    Ok(model.get_rates(utilization, APR::ZERO, reserve_factor)?)
-}
-
 fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
-    a.checked_add(b.value()).ok_or(MathError::Overflow)
+    a.checked_add(b.value).ok_or(MathError::Overflow)
 }
 
 fn add_amount_to_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> Result<AssetBalance, MathError> {
-    let signed = Int::try_from(amount.value()).or(Err(MathError::Overflow))?;
+    let signed = Int::try_from(amount.value).or(Err(MathError::Overflow))?;
     balance.checked_add(signed).ok_or(MathError::Overflow)
 }
 
@@ -260,14 +231,14 @@ fn sub_amount_from_raw(
     b: AssetQuantity,
     underflow: Reason,
 ) -> Result<AssetAmount, Reason> {
-    Ok(a.checked_sub(b.value()).ok_or(underflow)?)
+    Ok(a.checked_sub(b.value).ok_or(underflow)?)
 }
 
 fn sub_amount_from_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> Result<AssetBalance, MathError> {
-    let signed = Int::try_from(amount.value()).or(Err(MathError::Overflow))?;
+    let signed = Int::try_from(amount.value).or(Err(MathError::Overflow))?;
     Ok(balance.checked_sub(signed).ok_or(MathError::Underflow)?)
 }
 
@@ -308,12 +279,15 @@ fn repay_and_supply_amount(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> (AssetQuantity, AssetQuantity) {
-    let Quantity(symbol, raw_amount) = amount;
+    let Quantity {
+        value: raw_amount,
+        units,
+    } = amount;
     let repay_amount = min(neg_balance(balance), raw_amount);
     let supply_amount = raw_amount - repay_amount;
     (
-        Quantity(symbol, repay_amount),
-        Quantity(symbol, supply_amount),
+        Quantity::new(repay_amount, units),
+        Quantity::new(supply_amount, units),
     )
 }
 
@@ -321,12 +295,15 @@ fn withdraw_and_borrow_amount(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> (AssetQuantity, AssetQuantity) {
-    let Quantity(symbol, raw_amount) = amount;
+    let Quantity {
+        value: raw_amount,
+        units,
+    } = amount;
     let withdraw_amount = min(pos_balance(balance), raw_amount);
     let borrow_amount = raw_amount - withdraw_amount;
     (
-        Quantity(symbol, withdraw_amount),
-        Quantity(symbol, borrow_amount),
+        Quantity::new(withdraw_amount, units),
+        Quantity::new(borrow_amount, units),
     )
 }
 
@@ -367,19 +344,22 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                     holder,
                     amount,
                 } => lock_internal::<T>(
-                    ChainAsset::Eth(asset),
+                    get_asset::<T>(ChainAsset::Eth(asset))?,
                     ChainAccount::Eth(holder),
-                    Quantity(symbol(&ChainAsset::Eth(asset)).ok_or(Reason::NoSuchAsset)?, amount),
+                    get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
                 ),
 
                 ethereum_client::events::EthereumEvent::LockCash {
                     holder,
                     amount,
-                    .. // XXX do we want to use index?
-                } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity(CASH, amount)),
+                    .. // XXX do we want to use index? XXX now we are supposed to get unsigned principal
+                } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity::new(amount, CASH)),
 
-                ethereum_client::events::EthereumEvent::ExecuteProposal { title: _title, extrinsics } => dispatch_extrinsics_internal::<T>(extrinsics),
-                ethereum_client::events::EthereumEvent::ExecTrxRequest { account, trx_request } => internal::exec_trx_request::exec_trx_request::<T>(&trx_request[..], ChainAccount::Eth(account), None)
+                ethereum_client::events::EthereumEvent::ExecuteProposal { title: _title, extrinsics } =>
+                    dispatch_extrinsics_internal::<T>(extrinsics),
+
+                ethereum_client::events::EthereumEvent::ExecTrxRequest { account, trx_request } =>
+                    internal::exec_trx_request::exec_trx_request::<T>(&trx_request[..], ChainAccount::Eth(account), None),
             }
         }
     }
@@ -458,44 +438,39 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
 }
 
 pub fn lock_internal<T: Config>(
-    asset: ChainAsset,
+    asset: AssetInfo,
     holder: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    let holder_asset = AssetBalances::get(asset, holder);
+    let holder_asset = AssetBalances::get(asset.asset, holder);
     let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
 
     let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
-    let total_supply_new = add_amount_to_raw(TotalSupplyAssets::get(asset), holder_supply_amount)?;
+    let total_supply_new =
+        add_amount_to_raw(TotalSupplyAssets::get(asset.asset), holder_supply_amount)?;
     let total_borrow_new = sub_amount_from_raw(
-        TotalBorrowAssets::get(asset),
+        TotalBorrowAssets::get(asset.asset),
         holder_repay_amount,
         Reason::RepayTooMuch,
     )?;
-    let mut assets_with_nonzero_balance: Vec<ChainAsset> = AssetsWithNonZeroBalance::get(&holder);
 
     let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
-        asset,
+        asset.asset,
         holder,
         holder_asset,
         holder_asset_new,
         CashPrincipals::get(holder),
     )?;
 
-    LastIndices::insert(asset, holder, last_index_post);
+    LastIndices::insert(asset.asset, holder, last_index_post);
     CashPrincipals::insert(holder, cash_principal_post);
-    TotalSupplyAssets::insert(asset, total_supply_new);
-    TotalBorrowAssets::insert(asset, total_borrow_new);
+    TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
 
-    set_asset_balance_internal(asset, holder, holder_asset_new);
+    set_asset_balance_internal(asset.asset, holder, holder_asset_new);
 
-    // XXX note - right now AssetsWithNonZeroBalance is more like "any asset this account has interacted with"
-    if !assets_with_nonzero_balance.iter().any(|e| *e == asset) {
-        assets_with_nonzero_balance.push(asset);
-        AssetsWithNonZeroBalance::insert(&holder, assets_with_nonzero_balance);
-    }
     // XXX real events
-    <Module<T>>::deposit_event(Event::GoldieLocks(asset, holder, amount.value())); // XXX -> raw amount?
+    <Module<T>>::deposit_event(Event::GoldieLocks(asset.asset, holder, amount.value)); // XXX -> raw amount?
 
     Ok(()) // XXX events?
 }
@@ -531,45 +506,46 @@ pub fn lock_cash_internal<T: Config>(
 }
 
 pub fn extract_internal<T: Config>(
-    asset: ChainAsset,
+    asset: AssetInfo,
     holder: ChainAccount,
     recipient: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
     let chain_asset_account =
-        try_chain_asset_account(asset, recipient).ok_or(Reason::ChainMismatch)?;
-    require_min_tx_value!(value(amount)?);
+        try_chain_asset_account(asset.asset, recipient).ok_or(Reason::ChainMismatch)?;
+    require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_asset(&holder, &asset, amount.value())?,
+        has_liquidity_to_reduce_asset::<T>(holder, asset, amount)?,
         Reason::InsufficientLiquidity
     );
 
-    let holder_asset = AssetBalances::get(asset, holder);
+    let holder_asset = AssetBalances::get(asset.asset, holder);
     let (holder_withdraw_amount, holder_borrow_amount) =
         withdraw_and_borrow_amount(holder_asset, amount);
 
     let holder_asset_new = sub_amount_from_balance(holder_asset, amount)?;
     let total_supply_new = sub_amount_from_raw(
-        TotalSupplyAssets::get(asset),
+        TotalSupplyAssets::get(asset.asset),
         holder_withdraw_amount,
         Reason::InsufficientTotalFunds,
     )?;
-    let total_borrow_new = add_amount_to_raw(TotalBorrowAssets::get(asset), holder_borrow_amount)?;
+    let total_borrow_new =
+        add_amount_to_raw(TotalBorrowAssets::get(asset.asset), holder_borrow_amount)?;
 
     let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
-        asset,
+        asset.asset,
         holder,
         holder_asset,
         holder_asset_new,
         CashPrincipals::get(holder),
     )?;
 
-    LastIndices::insert(asset, holder, last_index_post);
+    LastIndices::insert(asset.asset, holder, last_index_post);
     CashPrincipals::insert(holder, cash_principal_post);
-    TotalSupplyAssets::insert(asset, total_supply_new);
-    TotalBorrowAssets::insert(asset, total_borrow_new);
+    TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
 
-    set_asset_balance_internal(asset, holder, holder_asset_new);
+    set_asset_balance_internal(asset.asset, holder, holder_asset_new);
 
     // XXX fix me this cannot fail
     dispatch_notice_internal::<T>(
@@ -586,7 +562,7 @@ pub fn extract_internal<T: Config>(
                         parent: eth_parent_hash,
                         asset: eth_asset,
                         account: eth_account,
-                        amount: amount.1,
+                        amount: amount.value,
                     }),
                     _ => Err(Reason::AssetExtractionNotSupported),
                 }?,
@@ -600,7 +576,7 @@ pub fn extract_internal<T: Config>(
 pub fn extract_cash_internal<T: Config>(
     holder: ChainAccount,
     recipient: ChainAccount,
-    amount_or_principal: Either<Quantity, CashPrincipal>, // XXX
+    amount_or_principal: Either<CashQuantity, CashPrincipal>, // XXX
 ) -> Result<(), Reason> {
     let index: CashIndex = GlobalCashIndex::get();
     // XXX Some topics about `Either`, principal_positive and inputs here
@@ -614,9 +590,9 @@ pub fn extract_cash_internal<T: Config>(
         .try_into()
         .map_err(|_| Reason::NegativePrincipalExtraction)?;
 
-    require_min_tx_value!(value(amount)?);
+    require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_cash(&holder, amount.value())?,
+        has_liquidity_to_reduce_cash::<T>(holder, amount)?,
         Reason::InsufficientLiquidity
     );
 
@@ -658,7 +634,7 @@ pub fn extract_cash_internal<T: Config>(
 }
 
 pub fn transfer_internal<T: Config>(
-    asset: ChainAsset,
+    asset: AssetInfo,
     sender: ChainAccount,
     recipient: ChainAccount,
     amount: AssetQuantity,
@@ -668,19 +644,14 @@ pub fn transfer_internal<T: Config>(
 
     // XXX check asset matches amount asset?
     require!(sender != recipient, Reason::SelfTransfer);
-    require_min_tx_value!(value(amount)?);
+    require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_asset_with_fee(
-            &sender,
-            &asset,
-            amount.value(),
-            TRANSFER_FEE.value()
-        )?,
+        has_liquidity_to_reduce_asset_with_fee::<T>(sender, asset, amount, TRANSFER_FEE)?,
         Reason::InsufficientLiquidity
     );
 
-    let sender_asset = AssetBalances::get(asset, sender);
-    let recipient_asset = AssetBalances::get(asset, recipient);
+    let sender_asset = AssetBalances::get(asset.asset, sender);
+    let recipient_asset = AssetBalances::get(asset.asset, recipient);
     let sender_cash_principal = CashPrincipals::get(sender);
     let miner_cash_principal = CashPrincipals::get(miner);
 
@@ -689,7 +660,7 @@ pub fn transfer_internal<T: Config>(
         withdraw_and_borrow_amount(sender_asset, amount);
     let (recipient_repay_amount, recipient_supply_amount) =
         repay_and_supply_amount(recipient_asset, amount);
-    let (sender_withdraw_principal, sender_borrow_principal) =
+    let (_sender_withdraw_principal, sender_borrow_principal) =
         withdraw_and_borrow_principal(sender_cash_principal, fee_principal);
     let (miner_repay_principal, _miner_supply_principal) =
         repay_and_supply_principal(miner_cash_principal, fee_principal);
@@ -700,12 +671,12 @@ pub fn transfer_internal<T: Config>(
     let recipient_asset_new = add_amount_to_balance(recipient_asset, amount)?;
 
     let total_supply_new = sub_amount_from_raw(
-        add_amount_to_raw(TotalSupplyAssets::get(asset), recipient_supply_amount)?,
+        add_amount_to_raw(TotalSupplyAssets::get(asset.asset), recipient_supply_amount)?,
         sender_withdraw_amount,
         Reason::InsufficientTotalFunds,
     )?;
     let total_borrow_new = sub_amount_from_raw(
-        add_amount_to_raw(TotalBorrowAssets::get(asset), sender_borrow_amount)?,
+        add_amount_to_raw(TotalBorrowAssets::get(asset.asset), sender_borrow_amount)?,
         recipient_repay_amount,
         Reason::RepayTooMuch,
     )?;
@@ -716,7 +687,7 @@ pub fn transfer_internal<T: Config>(
     )?;
 
     let (sender_cash_principal_post, sender_last_index_post) = effect_of_asset_interest_internal(
-        asset,
+        asset.asset,
         sender,
         sender_asset,
         sender_asset_new,
@@ -724,24 +695,24 @@ pub fn transfer_internal<T: Config>(
     )?;
     let (recipient_cash_principal_post, recipient_last_index_post) =
         effect_of_asset_interest_internal(
-            asset,
+            asset.asset,
             recipient,
             recipient_asset,
             recipient_asset_new,
             CashPrincipals::get(recipient),
         )?;
 
-    LastIndices::insert(asset, sender, sender_last_index_post);
-    LastIndices::insert(asset, recipient, recipient_last_index_post);
+    LastIndices::insert(asset.asset, sender, sender_last_index_post);
+    LastIndices::insert(asset.asset, recipient, recipient_last_index_post);
     CashPrincipals::insert(sender, sender_cash_principal_post);
     CashPrincipals::insert(recipient, recipient_cash_principal_post);
     CashPrincipals::insert(miner, miner_cash_principal_new);
-    TotalSupplyAssets::insert(asset, total_supply_new);
-    TotalBorrowAssets::insert(asset, total_borrow_new);
+    TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    set_asset_balance_internal(asset, sender, sender_asset_new);
-    set_asset_balance_internal(asset, recipient, recipient_asset_new);
+    set_asset_balance_internal(asset.asset, sender, sender_asset_new);
+    set_asset_balance_internal(asset.asset, recipient, recipient_asset_new);
 
     Ok(()) // XXX events?
 }
@@ -756,9 +727,9 @@ pub fn transfer_cash_principal_internal<T: Config>(
     let amount = index.as_hold_amount(principal)?;
 
     require!(sender != recipient, Reason::SelfTransfer);
-    require_min_tx_value!(value(amount)?);
+    require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_cash(&sender, amount.add(TRANSFER_FEE)?.value())?,
+        has_liquidity_to_reduce_cash::<T>(sender, amount.add(TRANSFER_FEE)?)?,
         Reason::InsufficientLiquidity
     );
 
@@ -768,7 +739,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
 
     let fee_principal = index.as_hold_principal(TRANSFER_FEE)?;
     let principal_with_fee = principal.add(fee_principal)?;
-    let (sender_withdraw_principal, sender_borrow_principal) =
+    let (_sender_withdraw_principal, sender_borrow_principal) =
         withdraw_and_borrow_principal(sender_cash_principal, principal_with_fee);
     let (recipient_repay_principal, _recipient_supply_principal) =
         repay_and_supply_principal(recipient_cash_principal, principal);
@@ -794,29 +765,29 @@ pub fn transfer_cash_principal_internal<T: Config>(
 }
 
 pub fn liquidate_internal<T: Config>(
-    asset: ChainAsset,
-    collateral_asset: ChainAsset,
+    asset: AssetInfo,
+    collateral_asset: AssetInfo,
     liquidator: ChainAccount,
     borrower: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
     require!(borrower != liquidator, Reason::SelfTransfer);
     require!(asset != collateral_asset, Reason::InKindLiquidation);
-    require_min_tx_value!(value(amount)?);
+    require_min_tx_value!(get_value::<T>(amount)?);
 
-    let liquidator_asset = AssetBalances::get(asset, liquidator);
-    let borrower_asset = AssetBalances::get(asset, borrower);
-    let liquidator_collateral_asset = AssetBalances::get(collateral_asset, liquidator);
-    let borrower_collateral_asset = AssetBalances::get(collateral_asset, borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * price::<T>(asset) / price::<T>(collateral_asset);
+    let liquidator_asset = AssetBalances::get(asset.asset, liquidator);
+    let borrower_asset = AssetBalances::get(asset.asset, borrower);
+    let liquidator_collateral_asset = AssetBalances::get(collateral_asset.asset, liquidator);
+    let borrower_collateral_asset = AssetBalances::get(collateral_asset.asset, borrower);
+    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units()) / get_price::<T>(collateral_asset.units());
 
     require!(
-        has_liquidity_to_reduce_asset_with_added_collateral(
-            &liquidator,
-            &asset,
-            amount.value(),
-            &collateral_asset,
-            seize_amount.value()
+        has_liquidity_to_reduce_asset_with_added_collateral::<T>(
+            liquidator,
+            asset,
+            amount,
+            collateral_asset,
+            seize_amount,
         )?,
         Reason::InsufficientLiquidity
     );
@@ -838,32 +809,35 @@ pub fn liquidate_internal<T: Config>(
         add_amount_to_balance(liquidator_collateral_asset, seize_amount)?;
 
     let total_supply_new = sub_amount_from_raw(
-        TotalSupplyAssets::get(asset),
+        TotalSupplyAssets::get(asset.asset),
         liquidator_withdraw_amount,
         Reason::InsufficientTotalFunds,
     )?;
     let total_borrow_new = sub_amount_from_raw(
-        add_amount_to_raw(TotalBorrowAssets::get(asset), liquidator_borrow_amount)?,
+        add_amount_to_raw(
+            TotalBorrowAssets::get(asset.asset),
+            liquidator_borrow_amount,
+        )?,
         borrower_repay_amount,
         Reason::RepayTooMuch,
     )?;
     let total_collateral_supply_new = sub_amount_from_raw(
         add_amount_to_raw(
-            TotalSupplyAssets::get(collateral_asset),
+            TotalSupplyAssets::get(collateral_asset.asset),
             liquidator_collateral_supply_amount,
         )?,
         borrower_collateral_withdraw_amount,
         Reason::InsufficientTotalFunds,
     )?;
     let total_collateral_borrow_new = sub_amount_from_raw(
-        TotalBorrowAssets::get(collateral_asset),
+        TotalBorrowAssets::get(collateral_asset.asset),
         liquidator_collateral_repay_amount,
         Reason::RepayTooMuch,
     )?;
 
     let (borrower_cash_principal_post, borrower_last_index_post) =
         effect_of_asset_interest_internal(
-            asset,
+            asset.asset,
             borrower,
             borrower_asset,
             borrower_asset_new,
@@ -871,7 +845,7 @@ pub fn liquidate_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_last_index_post) =
         effect_of_asset_interest_internal(
-            asset,
+            asset.asset,
             liquidator,
             liquidator_asset,
             liquidator_asset_new,
@@ -879,7 +853,7 @@ pub fn liquidate_internal<T: Config>(
         )?;
     let (borrower_cash_principal_post, borrower_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset,
+            collateral_asset.asset,
             borrower,
             borrower_collateral_asset,
             borrower_collateral_asset_new,
@@ -887,37 +861,41 @@ pub fn liquidate_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset,
+            collateral_asset.asset,
             liquidator,
             liquidator_collateral_asset,
             liquidator_collateral_asset_new,
             liquidator_cash_principal_post,
         )?;
 
-    LastIndices::insert(asset, borrower, borrower_last_index_post);
-    LastIndices::insert(asset, liquidator, liquidator_last_index_post);
+    LastIndices::insert(asset.asset, borrower, borrower_last_index_post);
+    LastIndices::insert(asset.asset, liquidator, liquidator_last_index_post);
     LastIndices::insert(
-        collateral_asset,
+        collateral_asset.asset,
         borrower,
         borrower_collateral_last_index_post,
     );
     LastIndices::insert(
-        collateral_asset,
+        collateral_asset.asset,
         liquidator,
         liquidator_collateral_last_index_post,
     );
     CashPrincipals::insert(borrower, borrower_cash_principal_post);
     CashPrincipals::insert(liquidator, liquidator_cash_principal_post);
-    TotalSupplyAssets::insert(asset, total_supply_new);
-    TotalBorrowAssets::insert(asset, total_borrow_new);
-    TotalSupplyAssets::insert(collateral_asset, total_collateral_supply_new);
-    TotalBorrowAssets::insert(collateral_asset, total_collateral_borrow_new);
+    TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
+    TotalSupplyAssets::insert(collateral_asset.asset, total_collateral_supply_new);
+    TotalBorrowAssets::insert(collateral_asset.asset, total_collateral_borrow_new);
 
-    set_asset_balance_internal(asset, borrower, borrower_asset_new);
-    set_asset_balance_internal(asset, liquidator, liquidator_asset_new);
-    set_asset_balance_internal(collateral_asset, borrower, borrower_collateral_asset_new);
+    set_asset_balance_internal(asset.asset, borrower, borrower_asset_new);
+    set_asset_balance_internal(asset.asset, liquidator, liquidator_asset_new);
     set_asset_balance_internal(
-        collateral_asset,
+        collateral_asset.asset,
+        borrower,
+        borrower_collateral_asset_new,
+    );
+    set_asset_balance_internal(
+        collateral_asset.asset,
         liquidator,
         liquidator_collateral_asset_new,
     );
@@ -926,7 +904,7 @@ pub fn liquidate_internal<T: Config>(
 }
 
 pub fn liquidate_cash_principal_internal<T: Config>(
-    collateral_asset: ChainAsset,
+    collateral_asset: AssetInfo,
     liquidator: ChainAccount,
     borrower: ChainAccount,
     principal: CashPrincipal,
@@ -935,21 +913,20 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     let amount = index.as_hold_amount(principal)?;
 
     require!(borrower != liquidator, Reason::SelfTransfer);
-    require_min_tx_value!(value(amount)?);
+    require_min_tx_value!(get_value::<T>(amount)?);
 
     let liquidator_cash_principal = CashPrincipals::get(liquidator);
     let borrower_cash_principal = CashPrincipals::get(borrower);
-    let liquidator_collateral_asset = AssetBalances::get(collateral_asset, liquidator);
-    let borrower_collateral_asset = AssetBalances::get(collateral_asset, borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * price::<T>(CASH) / price::<T>(collateral_asset);
+    let liquidator_collateral_asset = AssetBalances::get(collateral_asset.asset, liquidator);
+    let borrower_collateral_asset = AssetBalances::get(collateral_asset.asset, borrower);
+    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(CASH) / get_price::<T>(collateral_asset.units());
 
     require!(
-        // xxx: how much collateral is added ?????
-        has_liquidity_to_reduce_cash_with_added_collateral(
-            &liquidator,
-            &collateral_asset,
-            liquidator_collateral_asset as u128,
-            amount.value(),
+        has_liquidity_to_reduce_cash_with_added_collateral::<T>(
+            liquidator,
+            amount,
+            collateral_asset,
+            seize_amount,
         )?,
         Reason::InsufficientLiquidity
     );
@@ -978,21 +955,21 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     )?;
     let total_collateral_supply_new = sub_amount_from_raw(
         add_amount_to_raw(
-            TotalSupplyAssets::get(collateral_asset),
+            TotalSupplyAssets::get(collateral_asset.asset),
             liquidator_collateral_supply_amount,
         )?,
         borrower_collateral_withdraw_amount,
         Reason::InsufficientTotalFunds,
     )?;
     let total_collateral_borrow_new = sub_amount_from_raw(
-        TotalBorrowAssets::get(collateral_asset),
+        TotalBorrowAssets::get(collateral_asset.asset),
         liquidator_collateral_repay_amount,
         Reason::RepayTooMuch,
     )?;
 
     let (borrower_cash_principal_post, borrower_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset,
+            collateral_asset.asset,
             borrower,
             borrower_collateral_asset,
             borrower_collateral_asset_new,
@@ -1000,7 +977,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset,
+            collateral_asset.asset,
             liquidator,
             liquidator_collateral_asset,
             liquidator_collateral_asset_new,
@@ -1008,24 +985,28 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         )?;
 
     LastIndices::insert(
-        collateral_asset,
+        collateral_asset.asset,
         borrower,
         borrower_collateral_last_index_post,
     );
     LastIndices::insert(
-        collateral_asset,
+        collateral_asset.asset,
         liquidator,
         liquidator_collateral_last_index_post,
     );
     CashPrincipals::insert(borrower, borrower_cash_principal_post);
     CashPrincipals::insert(liquidator, liquidator_cash_principal_post);
     TotalCashPrincipal::put(total_cash_principal_new);
-    TotalSupplyAssets::insert(collateral_asset, total_collateral_supply_new);
-    TotalBorrowAssets::insert(collateral_asset, total_collateral_borrow_new);
+    TotalSupplyAssets::insert(collateral_asset.asset, total_collateral_supply_new);
+    TotalBorrowAssets::insert(collateral_asset.asset, total_collateral_borrow_new);
 
-    set_asset_balance_internal(collateral_asset, borrower, borrower_collateral_asset_new);
     set_asset_balance_internal(
-        collateral_asset,
+        collateral_asset.asset,
+        borrower,
+        borrower_collateral_asset_new,
+    );
+    set_asset_balance_internal(
+        collateral_asset.asset,
         liquidator,
         liquidator_collateral_asset_new,
     );
@@ -1034,7 +1015,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
 }
 
 pub fn liquidate_cash_collateral_internal<T: Config>(
-    asset: ChainAsset,
+    asset: AssetInfo,
     liquidator: ChainAccount,
     borrower: ChainAccount,
     amount: AssetQuantity,
@@ -1042,21 +1023,21 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     let index = GlobalCashIndex::get();
 
     require!(borrower != liquidator, Reason::SelfTransfer);
-    require_min_tx_value!(value(amount)?);
+    require_min_tx_value!(get_value::<T>(amount)?);
 
-    let liquidator_asset = AssetBalances::get(asset, liquidator);
-    let borrower_asset = AssetBalances::get(asset, borrower);
+    let liquidator_asset = AssetBalances::get(asset.asset, liquidator);
+    let borrower_asset = AssetBalances::get(asset.asset, borrower);
     let liquidator_cash_principal = CashPrincipals::get(liquidator);
     let borrower_cash_principal = CashPrincipals::get(borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * price::<T>(asset) / price::<T>(CASH);
+    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units()) / get_price::<T>(CASH);
     let seize_principal = index.as_hold_principal(seize_amount)?;
 
     require!(
-        has_liquidity_to_reduce_asset_with_added_cash(
-            &liquidator,
-            &asset,
-            amount.value(),
-            seize_amount.value()
+        has_liquidity_to_reduce_asset_with_added_cash::<T>(
+            liquidator,
+            asset,
+            amount,
+            seize_amount
         )?,
         Reason::InsufficientLiquidity
     );
@@ -1067,8 +1048,11 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
         withdraw_and_borrow_amount(borrower_asset, amount);
     let (borrower_collateral_withdraw_principal, _borrower_collateral_borrow_principal) =
         withdraw_and_borrow_principal(borrower_cash_principal, seize_principal);
-    let (liquidator_collateral_repay_principal, liquidator_collateral_supply_principal) =
-        repay_and_supply_principal(liquidator_cash_principal, seize_principal);
+    let (liquidator_collateral_repay_principal, _liquidator_collateral_supply_principal) =
+        repay_and_supply_principal(
+            liquidator_cash_principal,
+            borrower_collateral_withdraw_principal,
+        );
 
     let borrower_asset_new = add_amount_to_balance(borrower_asset, amount)?;
     let liquidator_asset_new = sub_amount_from_balance(liquidator_asset, amount)?;
@@ -1078,12 +1062,15 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
         add_principal_to_balance(liquidator_cash_principal, seize_principal)?;
 
     let total_supply_new = sub_amount_from_raw(
-        TotalSupplyAssets::get(asset),
+        TotalSupplyAssets::get(asset.asset),
         liquidator_withdraw_amount,
         Reason::InsufficientTotalFunds,
     )?;
     let total_borrow_new = sub_amount_from_raw(
-        add_amount_to_raw(TotalBorrowAssets::get(asset), liquidator_borrow_amount)?,
+        add_amount_to_raw(
+            TotalBorrowAssets::get(asset.asset),
+            liquidator_borrow_amount,
+        )?,
         borrower_repay_amount,
         Reason::RepayTooMuch,
     )?;
@@ -1095,127 +1082,133 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
 
     let (borrower_cash_principal_post, borrower_last_index_post) =
         effect_of_asset_interest_internal(
-            asset,
+            asset.asset,
             borrower,
             borrower_asset,
             borrower_asset_new,
-            CashPrincipals::get(borrower),
+            borrower_cash_principal_new,
         )?;
     let (liquidator_cash_principal_post, liquidator_last_index_post) =
         effect_of_asset_interest_internal(
-            asset,
+            asset.asset,
             liquidator,
             liquidator_asset,
             liquidator_asset_new,
-            CashPrincipals::get(liquidator),
+            liquidator_cash_principal_new,
         )?;
 
-    LastIndices::insert(asset, borrower, borrower_last_index_post);
-    LastIndices::insert(asset, liquidator, liquidator_last_index_post);
+    LastIndices::insert(asset.asset, borrower, borrower_last_index_post);
+    LastIndices::insert(asset.asset, liquidator, liquidator_last_index_post);
     CashPrincipals::insert(borrower, borrower_cash_principal_post);
     CashPrincipals::insert(liquidator, liquidator_cash_principal_post);
-    TotalSupplyAssets::insert(asset, total_supply_new);
-    TotalBorrowAssets::insert(asset, total_borrow_new);
+    TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    set_asset_balance_internal(asset, borrower, borrower_asset_new);
-    set_asset_balance_internal(asset, liquidator, liquidator_asset_new);
+    set_asset_balance_internal(asset.asset, borrower, borrower_asset_new);
+    set_asset_balance_internal(asset.asset, liquidator, liquidator_asset_new);
 
     Ok(()) // XXX events?
 }
 
 // Liquidity Checks //
 
-fn has_liquidity_to_reduce_asset(
-    account: &ChainAccount,
-    asset: &ChainAsset,
-    amount: AssetAmount,
+/// Calculates if an account will remain solvent after reducing asset by amount.
+pub fn has_liquidity_to_reduce_asset<T: Config>(
+    account: ChainAccount,
+    asset: AssetInfo,
+    amount: AssetQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .asset_balance_decrease(asset, amount)?
-        .get_liquidity()?;
-
-    Ok(liquidity.value() > 0)
+    let liquidity = Portfolio::from_storage::<T>(account)?
+        .asset_change(asset, amount.as_decrease()?)?
+        .get_liquidity::<T>()?;
+    Ok(liquidity.value > 0)
 }
 
-fn has_liquidity_to_reduce_with_fee(
-    account: &ChainAccount,
-    asset: &ChainAsset,
-    amount: AssetAmount,
-    fee: CashAmount,
+/// Calculates if an account will remain solvent after reducing asset by amount and paying a CASH fee.
+pub fn has_liquidity_to_reduce_asset_with_fee<T: Config>(
+    account: ChainAccount,
+    asset: AssetInfo,
+    amount: AssetQuantity,
+    fee: CashQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .asset_balance_decrease(asset, amount)?
-        .cash_balance_decrease(fee)?
-        .get_liquidity()?;
-
-    Ok(liquidity.value() > 0)
+    let liquidity = Portfolio::from_storage::<T>(account)?
+        .asset_change(asset, amount.as_decrease()?)?
+        .cash_change(fee.as_decrease()?)?
+        .get_liquidity::<T>()?;
+    Ok(liquidity.value > 0)
 }
 
-fn has_liquidity_to_reduce_cash(
-    account: &ChainAccount,
-    amount_to_reduce: CashAmount,
+/// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of asset collateral.
+pub fn has_liquidity_to_reduce_asset_with_added_collateral<T: Config>(
+    account: ChainAccount,
+    asset: AssetInfo,
+    amount: AssetQuantity,
+    collateral_asset: AssetInfo,
+    collateral_amount: AssetQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .cash_balance_decrease(amount_to_reduce)?
-        .get_liquidity()?;
-    Ok(liquidity.value() > 0)
+    let liquidity = Portfolio::from_storage::<T>(account)?
+        .asset_change(asset, amount.as_decrease()?)?
+        .asset_change(collateral_asset, collateral_amount.as_increase()?)?
+        .get_liquidity::<T>()?;
+    Ok(liquidity.value > 0)
 }
 
-fn has_liquidity_to_reduce_asset_with_added_collateral(
-    account: &ChainAccount,
-    asset: &ChainAsset,
-    amount: AssetAmount,
-    collateral_asset: &ChainAsset,
-    collateral_amount: AssetAmount,
+/// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of CASH collateral.
+pub fn has_liquidity_to_reduce_asset_with_added_cash<T: Config>(
+    account: ChainAccount,
+    asset: AssetInfo,
+    amount: AssetQuantity,
+    cash_amount: CashQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .asset_balance_decrease(asset, amount)?
-        .asset_balance_increase(collateral_asset, collateral_amount)?
-        .get_liquidity()?;
-    Ok(liquidity.value() > 0)
+    let liquidity = Portfolio::from_storage::<T>(account)?
+        .asset_change(asset, amount.as_decrease()?)?
+        .cash_change(cash_amount.as_increase()?)?
+        .get_liquidity::<T>()?;
+    Ok(liquidity.value > 0)
 }
 
-fn has_liquidity_to_reduce_asset_with_added_cash(
-    account: &ChainAccount,
-    asset: &ChainAsset,
-    amount: AssetAmount,
-    collateral_amount: CashAmount,
+/// Calculates if an account will remain solvent after reducing CASH by amount.
+pub fn has_liquidity_to_reduce_cash<T: Config>(
+    account: ChainAccount,
+    amount: CashQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .asset_balance_decrease(asset, amount)?
-        .cash_balance_increase(collateral_amount)?
-        .get_liquidity()?;
-
-    Ok(liquidity.value() > 0)
+    let liquidity = Portfolio::from_storage::<T>(account)?
+        .cash_change(amount.as_decrease()?)?
+        .get_liquidity::<T>()?;
+    Ok(liquidity.value > 0)
 }
 
-fn has_liquidity_to_reduce_asset_with_fee(
-    account: &ChainAccount,
-    asset: &ChainAsset,
-    amount: AssetAmount,
-    fee: CashAmount,
+/// Calculates if an account will remain solvent after reducing CASH by amount and adding an amount of asset collateral.
+pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
+    account: ChainAccount,
+    amount: CashQuantity,
+    collateral_asset: AssetInfo,
+    collateral_amount: AssetQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .asset_balance_decrease(asset, amount)?
-        .cash_balance_decrease(fee)?
-        .get_liquidity()?;
-
-    Ok(liquidity.value() > 0)
+    let liquidity = Portfolio::from_storage::<T>(account)?
+        .cash_change(amount.as_decrease()?)?
+        .asset_change(collateral_asset, collateral_amount.as_increase()?)?
+        .get_liquidity::<T>()?;
+    Ok(liquidity.value > 0)
 }
 
-fn has_liquidity_to_reduce_cash_with_added_collateral(
-    account: &ChainAccount,
-    asset: &ChainAsset,
-    amount: AssetAmount,
-    cash_decrease: CashAmount,
-) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage(account)?
-        .asset_balance_increase(asset, amount)?
-        .cash_balance_decrease(cash_decrease)?
-        .get_liquidity()?;
+/// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
+pub fn get_cash_principal_with_asset_interest(
+    account: ChainAccount,
+) -> Result<CashPrincipal, Reason> {
+    let mut principal = CashPrincipals::get(account);
+    for (asset, _) in AssetsWithNonZeroBalance::iter_prefix(account) {
+        let balance = AssetBalances::get(asset, account);
+        (principal, _) =
+            effect_of_asset_interest_internal(asset, account, balance, balance, principal)?;
+    }
+    Ok(principal)
+}
 
-    Ok(liquidity.value() > 0)
+/// Calculates the current total CASH value of the account, including all interest from non-CASH markets.
+pub fn get_cash_balance_with_asset_interest(account: ChainAccount) -> Result<Balance, Reason> {
+    Ok(GlobalCashIndex::get().as_balance(get_cash_principal_with_asset_interest(account)?)?)
 }
 
 // Asset Interest //
@@ -1278,7 +1271,6 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), R
             _ => (),
         }
     }
-
     Ok(())
 }
 
@@ -1369,14 +1361,14 @@ pub fn exec_trx_request_internal<T: Config>(
 
 /// Block initialization step that can fail
 pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
-    let now: Timestamp = now::<T>();
+    let now: Timestamp = get_now::<T>();
     let previous: Timestamp = LastBlockTimestamp::get();
 
     let change_in_time = now
         .checked_sub(previous)
         .ok_or(Reason::TimeTravelNotAllowed)?;
 
-    let weight = on_initialize(change_in_time)?;
+    let weight = on_initialize::<T>(change_in_time)?;
 
     LastBlockTimestamp::put(now);
 
@@ -1384,38 +1376,39 @@ pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight,
 }
 
 /// Block initialization step that can fail
-pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights::Weight, Reason> {
-    let mut cash_principal_supply_increase = CashPrincipal::ZERO;
-    let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
-
-    let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
+pub fn on_initialize<T: Config>(
+    change_in_time: Timestamp,
+) -> Result<frame_support::weights::Weight, Reason> {
     let cash_index = GlobalCashIndex::get();
 
     // Iterate through listed assets, adding the CASH principal they generated/paid last block
-    for (asset, symbol) in AssetSymbols::iter() {
-        let (asset_cost, asset_yield) = get_rates(&asset)?;
-        let asset_price = Prices::get(&symbol); // XXX this should use price fn since CASH price
+    let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
+    let mut cash_principal_supply_increase = CashPrincipal::ZERO;
+    let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
+    for (asset, asset_info) in SupportedAssets::iter() {
+        let asset_units = asset_info.units();
+        let price_asset = get_price::<T>(asset_units); // XXX 2 uses price(UNITS) for cash, price(asset) for everything else (currently chain asset)
+        let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
 
+        // XXX use unsigned cash principal
         let cash_borrow_principal_per =
-            compute_cash_principal_per(asset_cost, change_in_time, cash_index, asset_price)?;
+            compute_cash_principal_per(asset_cost, change_in_time, cash_index, price_asset)?; // XXX not using price cash?
         let cash_hold_principal_per =
-            compute_cash_principal_per(asset_yield, change_in_time, cash_index, asset_price)?;
+            compute_cash_principal_per(asset_yield, change_in_time, cash_index, price_asset)?; // XXX not using price cash?
 
-        let current_supply_index = SupplyIndices::get(&asset);
-        let current_borrow_index = BorrowIndices::get(&asset);
-        let new_supply_index = increment_index(current_supply_index, cash_hold_principal_per)?;
-        let new_borrow_index = increment_index(current_borrow_index, cash_borrow_principal_per)?;
+        let supply_index = SupplyIndices::get(&asset);
+        let borrow_index = BorrowIndices::get(&asset);
+        let supply_index_new = supply_index.increment(cash_hold_principal_per)?;
+        let borrow_index_new = borrow_index.increment(cash_borrow_principal_per)?;
 
-        let supply_asset = get_total_supply_assets(&asset)?;
-        let borrow_asset = get_total_borrow_assets(&asset)?;
-
+        let supply_asset = Quantity::new(TotalSupplyAssets::get(asset), asset_units);
+        let borrow_asset = Quantity::new(TotalBorrowAssets::get(asset), asset_units);
         cash_principal_supply_increase = cash_principal_supply_increase
-            .add(supply_asset.as_cash_principal(cash_hold_principal_per)?)?;
-
+            .add(supply_asset.mul_cash_principal_per(cash_hold_principal_per)?)?;
         cash_principal_borrow_increase = cash_principal_borrow_increase
-            .add(borrow_asset.as_cash_principal(cash_borrow_principal_per)?)?;
+            .add(borrow_asset.mul_cash_principal_per(cash_borrow_principal_per)?)?;
 
-        asset_updates.push((asset.clone(), new_supply_index, new_borrow_index));
+        asset_updates.push((asset.clone(), supply_index_new, borrow_index_new));
     }
 
     // Pay miners and update the CASH interest index on CASH itself
@@ -1432,7 +1425,7 @@ pub fn on_initialize(change_in_time: Timestamp) -> Result<frame_support::weights
     let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&miner);
     let miner_cash_principal_new = miner_cash_principal_old.add(miner_spread_principal)?;
 
-    // * WARNING - BEGIN STORAGE all checks and failures must happen above
+    // * WARNING - BEGIN STORAGE ALL CHECKS AND FAILURES MUST HAPPEN ABOVE * //
 
     for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
         SupplyIndices::insert(asset.clone(), new_supply_index);
@@ -1560,13 +1553,7 @@ pub fn process_chain_event_internal<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chains::{Chain, Ethereum};
-    use crate::mock::*;
-    use crate::rates::{InterestRateModel, Utilization};
-    use crate::symbol::USD;
-    use crate::tests::{get_eth, initialize_storage};
-    use crate::types::LiquidityFactor;
-    use crate::{AssetsWithNonZeroBalance, LiquidityFactors};
+    use crate::{chains::*, mock::*, rates::*, symbol::*, tests::*, types::*};
 
     #[test]
     fn test_helpers() {
@@ -1575,30 +1562,30 @@ mod tests {
         assert_eq!(neg_balance(-100), 100);
         assert_eq!(pos_balance(100), 100);
 
-        let amount = Quantity(USD, 100);
+        let amount = Quantity::new(100, USD);
         assert_eq!(
             repay_and_supply_amount(0, amount),
-            (Quantity(USD, 0), amount)
+            (Quantity::new(0, USD), amount)
         );
         assert_eq!(
             repay_and_supply_amount(-50, amount),
-            (Quantity(USD, 50), Quantity(USD, 50))
+            (Quantity::new(50, USD), Quantity::new(50, USD))
         );
         assert_eq!(
             repay_and_supply_amount(-100, amount),
-            (amount, Quantity(USD, 0))
+            (amount, Quantity::new(0, USD))
         );
         assert_eq!(
             withdraw_and_borrow_amount(0, amount),
-            (Quantity(USD, 0), amount)
+            (Quantity::new(0, USD), amount)
         );
         assert_eq!(
             withdraw_and_borrow_amount(50, amount),
-            (Quantity(USD, 50), Quantity(USD, 50))
+            (Quantity::new(50, USD), Quantity::new(50, USD))
         );
         assert_eq!(
             withdraw_and_borrow_amount(100, amount),
-            (amount, Quantity(USD, 0))
+            (amount, Quantity::new(0, USD))
         );
 
         let principal = CashPrincipal(100);
@@ -1631,14 +1618,14 @@ mod tests {
     #[test]
     fn test_extract_internal_min_value() {
         let asset = ChainAsset::Eth([238; 20]);
+        let asset_info = AssetInfo::minimal(asset, ETH).unwrap();
         let holder = ChainAccount::Eth([0; 20]);
         let recipient = ChainAccount::Eth([0; 20]);
 
         new_test_ext().execute_with(|| {
-            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
-            let symbol = symbol(&asset).expect("asset not found");
-            let quantity = Quantity::from_nominal(symbol, "5.0");
-            Prices::insert(symbol, 100_000); // $0.10
+            SupportedAssets::insert(&asset, asset_info);
+            Prices::insert(asset_info.ticker, 100_000); // $0.10
+            let quantity = get_quantity::<Test>(asset, 5_000_000_000_000_000_000).unwrap();
             let asset_balances_pre = AssetBalances::get(asset, holder);
             let total_supply_pre = TotalSupplyAssets::get(asset);
             let total_borrows_pre = TotalBorrowAssets::get(asset);
@@ -1651,7 +1638,7 @@ mod tests {
             let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
                 AccountNotices::iter().collect();
 
-            let res = extract_internal::<Test>(asset, holder, recipient, quantity);
+            let res = extract_internal::<Test>(asset_info, holder, recipient, quantity);
 
             assert_eq!(res, Err(Reason::MinTxValueNotMet));
 
@@ -1684,20 +1671,22 @@ mod tests {
     fn test_extract_internal_sufficient_value() {
         let eth_asset = [238; 20];
         let asset = ChainAsset::Eth(eth_asset);
+        let asset_info = AssetInfo {
+            liquidity_factor: LiquidityFactor::from_nominal("1"),
+            ..AssetInfo::minimal(asset, ETH).unwrap()
+        };
         let eth_holder = [0; 20];
         let eth_recipient = [0; 20];
         let holder = ChainAccount::Eth(eth_holder);
         let recipient = ChainAccount::Eth(eth_recipient);
 
         new_test_ext().execute_with(|| {
-            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
-            let symbol = symbol(&asset).expect("asset not found");
-            let quantity = Quantity::from_nominal(symbol, "50.0");
-            Prices::insert(symbol, 100_000); // $0.10
-            LiquidityFactors::insert(symbol, LiquidityFactor::from_nominal("1"));
-            let hodl_balance = quantity.value() * 5;
-            AssetBalances::insert(asset, holder, hodl_balance as i128);
-            AssetsWithNonZeroBalance::insert(holder, vec![asset]);
+            SupportedAssets::insert(&asset, asset_info);
+            Prices::insert(asset_info.ticker, 100_000); // $0.10
+            let quantity = get_quantity::<Test>(asset, 50_000_000_000_000_000_000).unwrap();
+            let hodl_balance = quantity.value * 5;
+            AssetBalances::insert(asset, holder, hodl_balance as AssetBalance);
+            AssetsWithNonZeroBalance::insert(holder, asset, ());
             TotalSupplyAssets::insert(&asset, hodl_balance);
 
             let asset_balances_pre = AssetBalances::get(asset, holder);
@@ -1712,7 +1701,7 @@ mod tests {
             let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
                 AccountNotices::iter().collect();
 
-            let res = extract_internal::<Test>(asset, holder, recipient, quantity);
+            let res = extract_internal::<Test>(asset_info, holder, recipient, quantity);
 
             assert_eq!(res, Ok(()));
 
@@ -1792,20 +1781,22 @@ mod tests {
     fn test_extract_internal_notice_ids() {
         let eth_asset = [238; 20];
         let asset = ChainAsset::Eth(eth_asset);
+        let asset_info = AssetInfo {
+            liquidity_factor: LiquidityFactor::from_nominal("1"),
+            ..AssetInfo::minimal(asset, ETH).unwrap()
+        };
         let eth_holder = [0; 20];
         let eth_recipient = [0; 20];
         let holder = ChainAccount::Eth(eth_holder);
         let recipient = ChainAccount::Eth(eth_recipient);
 
         new_test_ext().execute_with(|| {
-            AssetSymbols::insert(&asset, Symbol::new("ETH", 18));
-            let symbol = symbol(&asset).expect("asset not found");
-            let quantity = Quantity::from_nominal(symbol, "50.0");
-            Prices::insert(symbol, 100_000); // $0.10
-            LiquidityFactors::insert(symbol, LiquidityFactor::from_nominal("1"));
-            let hodl_balance = quantity.value() * 5;
-            AssetBalances::insert(asset, holder, hodl_balance as i128);
-            AssetsWithNonZeroBalance::insert(holder, vec![asset]);
+            SupportedAssets::insert(&asset, asset_info);
+            Prices::insert(asset_info.ticker, 100_000); // $0.10
+            let quantity = get_quantity::<Test>(asset, 50_000_000_000_000_000_000).unwrap();
+            let hodl_balance = quantity.value * 5;
+            AssetBalances::insert(asset, holder, hodl_balance as AssetBalance);
+            AssetsWithNonZeroBalance::insert(holder, asset, ());
             TotalSupplyAssets::insert(&asset, hodl_balance);
 
             let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
@@ -1818,7 +1809,7 @@ mod tests {
 
             assert_eq!(LatestNotice::get(ChainId::Eth), None);
             assert_eq!(
-                extract_internal::<Test>(asset, holder, recipient, quantity),
+                extract_internal::<Test>(asset_info, holder, recipient, quantity),
                 Ok(())
             );
 
@@ -1854,7 +1845,7 @@ mod tests {
                 Some((NoticeId(0, 1), expected_notice.hash()))
             );
             assert_eq!(
-                extract_internal::<Test>(asset, holder, recipient, quantity),
+                extract_internal::<Test>(asset_info, holder, recipient, quantity),
                 Ok(())
             );
 
@@ -1916,7 +1907,7 @@ mod tests {
         let asset_rate = APR::from_nominal("0.30"); // 30% per year
         let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
         let cash_index = CashIndex::from_nominal("1.5"); // current index value 1.5
-        let price_asset: AssetPrice = 1500_000000; // $1,500
+        let price_asset = Price::from_nominal(CASH.ticker, "1500"); // $1,500
 
         let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
         let expected = CashPrincipal::from_nominal("150"); // from hand calc
@@ -1930,7 +1921,7 @@ mod tests {
         let asset_rate = APR::from_nominal("0.1225");
         let dt = MILLISECONDS_PER_YEAR / 4;
         let cash_index = CashIndex::from_nominal("1.123");
-        let price_asset: AssetPrice = 1450_000000;
+        let price_asset = Price::from_nominal(CASH.ticker, "1450");
 
         let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
         let expected = CashPrincipal::from_nominal("39.542520"); // from hand calc
@@ -1961,10 +1952,10 @@ mod tests {
     fn test_get_utilization() {
         new_test_ext().execute_with(|| {
             initialize_storage();
-            let asset = get_eth();
+            let asset = eth_asset();
             TotalSupplyAssets::insert(&asset, 100);
             TotalBorrowAssets::insert(&asset, 50);
-            let utilization = crate::core::get_utilization(&asset).unwrap();
+            let utilization = crate::core::get_utilization::<Test>(&asset).unwrap();
             assert_eq!(utilization, Utilization::from_nominal("0.5"));
         });
     }
@@ -1973,16 +1964,21 @@ mod tests {
     fn test_get_borrow_rate() {
         new_test_ext().execute_with(|| {
             initialize_storage();
-            let asset = get_eth();
             let kink_rate = 105;
-            let expected_model = InterestRateModel::new_kink(100, kink_rate, 5000, 202);
-            crate::ReserveFactor::insert(&asset, crate::rates::ReserveFactor::from_nominal("0.5"));
+            let asset = eth_asset();
+            let asset_info = AssetInfo {
+                rate_model: InterestRateModel::new_kink(0, kink_rate, 5000, 202),
+                reserve_factor: ReserveFactor::from_nominal("0.5"),
+                ..AssetInfo::minimal(asset, ETH).unwrap()
+            };
+
+            SupportedAssets::insert(&asset, asset_info);
             TotalSupplyAssets::insert(&asset, 100);
             TotalBorrowAssets::insert(&asset, 50);
 
-            CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
+            CashModule::set_rate_model(Origin::root(), asset.clone(), asset_info.rate_model)
                 .unwrap();
-            let (borrow_rate, supply_rate) = crate::core::get_rates(&asset).unwrap();
+            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(&asset).unwrap();
 
             assert_eq!(borrow_rate, kink_rate.into());
             // 50% utilization and 50% reserve factor
@@ -1994,28 +1990,26 @@ mod tests {
     fn test_on_initialize() {
         new_test_ext().execute_with(|| {
             let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
-            let asset = get_eth();
-            let symbol = Symbol::new("ETH", 18);
+            let asset = eth_asset();
+            let asset_info = AssetInfo {
+                rate_model: InterestRateModel::new_kink(0, 2500, 5000, 5000),
+                reserve_factor: ReserveFactor::from_nominal("0.02"),
+                ..AssetInfo::minimal(asset, ETH).unwrap()
+            };
             let change_in_time = MILLISECONDS_PER_YEAR / 4; // 3 months go by
-            let model = InterestRateModel::new_kink(0, 2500, 5000, 5000);
 
-            ReserveFactor::insert(
-                asset.clone(),
-                crate::rates::ReserveFactor::from_nominal("0.02"),
-            );
-            RateModels::insert(asset.clone(), model);
+            SupportedAssets::insert(&asset, asset_info);
             GlobalCashIndex::put(CashIndex::from_nominal("1.123"));
-            AssetSymbols::insert(asset.clone(), symbol);
-            SupplyIndices::insert(asset.clone(), AssetIndex::from_nominal("1234"));
-            BorrowIndices::insert(asset.clone(), AssetIndex::from_nominal("1345"));
-            TotalSupplyAssets::insert(asset.clone(), AssetQuantity::from_nominal(symbol, "300").1);
-            TotalBorrowAssets::insert(asset.clone(), AssetQuantity::from_nominal(symbol, "150").1);
+            SupplyIndices::insert(&asset, AssetIndex::from_nominal("1234"));
+            BorrowIndices::insert(&asset, AssetIndex::from_nominal("1345"));
+            TotalSupplyAssets::insert(asset.clone(), asset_info.as_quantity_nominal("300").value);
+            TotalBorrowAssets::insert(asset.clone(), asset_info.as_quantity_nominal("150").value);
             CashYield::put(APR::from_nominal("0.24")); // 24% APR big number for easy to see interest
             TotalCashPrincipal::put(CashPrincipal::from_nominal("450000")); // 450k cash principal
-            CashPrincipals::insert(miner.clone(), CashPrincipal::from_nominal("1"));
-            Prices::insert(symbol, 1450_000000 as AssetPrice); // $1450 eth
+            CashPrincipals::insert(&miner, CashPrincipal::from_nominal("1"));
+            Prices::insert(asset_info.ticker, 1450_000000 as AssetPrice); // $1450 eth
 
-            let result = on_initialize(change_in_time);
+            let result = on_initialize::<Test>(change_in_time);
             assert_eq!(result, Ok(0u64));
 
             assert_eq!(
@@ -2045,7 +2039,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let expected = 123;
             <pallet_timestamp::Module<Test>>::set_timestamp(expected);
-            let actual = now::<Test>();
+            let actual = get_now::<Test>();
             assert_eq!(actual, expected);
         });
     }

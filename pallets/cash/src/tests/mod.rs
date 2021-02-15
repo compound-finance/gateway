@@ -1,18 +1,16 @@
-use crate::{chains::*, core::*, mock::*, rates::*, reason::Reason, symbol::*, *};
+use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
 use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
 use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
-use sp_core::offchain::{
-    testing::{PoolState, TestOffchainExt, TestTransactionPoolExt},
-    OffchainExt, TransactionPoolExt,
-};
 
-const ETH: Symbol = Symbol::new("ETH", 18);
+pub const ETH: Units = Units::from_ticker_str("ETH", 18);
 
-fn _andrew() -> ChainAccount {
-    ChainAccount::Eth([123; 20])
+pub fn eth_asset() -> ChainAsset {
+    ChainAsset::Eth(
+        <Ethereum as Chain>::str_to_address("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
+    )
 }
 
 #[test]
@@ -34,36 +32,49 @@ fn it_fails_exec_trx_request_signed() {
 pub fn initialize_storage() {
     runtime_interfaces::set_validator_config_dev_defaults();
     CashModule::initialize_assets(vec![
-        ConfigAsset {
-            symbol: FromStr::from_str("ETH/18").unwrap(),
-            asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
+        AssetInfo {
             liquidity_factor: FromStr::from_str("7890").unwrap(),
+            ..AssetInfo::minimal(
+                FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
+                FromStr::from_str("ETH/18").unwrap(),
+            )
+            .unwrap()
         },
-        ConfigAsset {
-            symbol: FromStr::from_str("USDC/6").unwrap(),
-            asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
+        AssetInfo {
+            ticker: FromStr::from_str("USD").unwrap(),
             liquidity_factor: FromStr::from_str("7890").unwrap(),
+            ..AssetInfo::minimal(
+                FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
+                FromStr::from_str("USDC/6").unwrap(),
+            )
+            .unwrap()
         },
     ]);
-    CashModule::initialize_validators(
-        //accountId32s
+    CashModule::initialize_reporters(
         vec![
-            AccountId32::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY")
-                .unwrap()
-                .into(),
-            AccountId32::from_str("5FfBQ3kwXrbdyoqLPvcXRp7ikWydXawpNs2Ceu3WwFdhZ8W4")
-                .unwrap()
-                .into(),
-        ],
-        // eth keys
-        vec![
-            ("6a72a2f14577D9Cd0167801EFDd54a07B40d2b61".into(),), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
-            ("8ad1b2918c34ee5d3e881a57c68574ea9dbecb81".into(),),
-        ],
+            "0x85615b076615317c80f14cbad6501eec031cd51c",
+            "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
+        ]
+        .try_into()
+        .unwrap(),
     );
-    CashModule::initialize_reporters(vec![
-        "85615b076615317c80f14cbad6501eec031cd51c".into(),
-        "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
+    CashModule::initialize_validators(vec![
+        ValidatorKeys {
+            substrate_id: AccountId32::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY")
+                .unwrap(),
+            eth_address: <Ethereum as Chain>::str_to_address(
+                "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61",
+            )
+            .unwrap(), // pk: 50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374
+        },
+        ValidatorKeys {
+            substrate_id: AccountId32::from_str("5FfBQ3kwXrbdyoqLPvcXRp7ikWydXawpNs2Ceu3WwFdhZ8W4")
+                .unwrap(),
+            eth_address: <Ethereum as Chain>::str_to_address(
+                "0x8ad1b2918c34ee5d3e881a57c68574ea9dbecb81",
+            )
+            .unwrap(),
+        },
     ]);
 }
 
@@ -94,8 +105,7 @@ fn process_eth_event_happy_path() {
             signature
         ));
 
-        let event_state = CashModule::event_states(event_id);
-        match event_state {
+        match CashModule::event_state(event_id) {
             EventState::Pending { signers } => {
                 assert_eq!(signers.len(), 1);
                 assert_eq!(
@@ -217,8 +227,8 @@ fn test_post_price_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         CashModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
-        let eth_price = CashModule::price(ETH);
-        let eth_price_time = CashModule::price_time(ETH);
+        let eth_price = CashModule::price(ETH.ticker);
+        let eth_price_time = CashModule::price_time(ETH.ticker);
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
     });
@@ -258,8 +268,8 @@ fn test_post_price_stale_price() {
                               // post once
         CashModule::post_price(Origin::none(), test_payload.clone(), test_signature.clone())
             .unwrap();
-        let eth_price = CashModule::price(ETH);
-        let eth_price_time = CashModule::price_time(ETH);
+        let eth_price = CashModule::price(ETH.ticker);
+        let eth_price_time = CashModule::price_time(ETH.ticker);
         assert_eq!(eth_price, 732580000);
         assert_eq!(eth_price_time, 1609340760);
         // try to post the same thing again
@@ -268,23 +278,15 @@ fn test_post_price_stale_price() {
     });
 }
 
-pub fn get_eth() -> ChainAsset {
-    ChainAsset::Eth(
-        <[u8; 20]>::try_from(hex::decode("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap())
-            .unwrap(),
-    )
-}
-
 #[test]
 fn test_set_interest_rate_model() {
     new_test_ext().execute_with(|| {
         initialize_storage();
-        let asset = get_eth();
+        let asset = eth_asset();
         let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
-        CashModule::update_interest_rate_model(Origin::root(), asset.clone(), expected_model)
-            .unwrap();
-        let actual_model = CashModule::model(asset);
-        assert_eq!(actual_model, expected_model);
+        CashModule::set_rate_model(Origin::root(), asset.clone(), expected_model).unwrap();
+        let asset_info = CashModule::asset(asset).expect("no asset");
+        assert_eq!(asset_info.rate_model, expected_model);
     });
 }
 

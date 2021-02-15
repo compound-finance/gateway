@@ -1,13 +1,15 @@
-use crate::reason::MathError;
 /// Interest rate related calculations and utilities are concentrated here
-use crate::types::{
-    uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint, MILLISECONDS_PER_YEAR,
-};
 use codec::{Decode, Encode};
-use our_std::Debuggable;
+use our_std::{Deserialize, RuntimeDebug, Serialize};
+
+use crate::{
+    params::MILLISECONDS_PER_YEAR,
+    reason::MathError,
+    types::{uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint},
+};
 
 /// Error enum for interest rates
-#[derive(Debuggable, PartialEq, Eq, Encode, Decode, Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum RatesError {
     UtilizationZeroSupplyError,
     UtilizationBorrowedIsMoreThanSupplied,
@@ -21,7 +23,8 @@ pub enum RatesError {
 }
 
 /// Annualized interest rate
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
+#[derive(Serialize, Deserialize)] // used in config
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct APR(pub Uint);
 
 impl From<Uint> for APR {
@@ -32,21 +35,19 @@ impl From<Uint> for APR {
 
 impl APR {
     pub const DECIMALS: u8 = 4;
-
-    pub(crate) const fn from_nominal(s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        APR(amount)
-    }
-
     pub const ZERO: APR = APR::from_nominal("0");
+    pub const MAX: APR = APR::from_nominal("0.35"); // 35%
 
-    const MAX: APR = APR::from_nominal("0.35"); // 35%
+    pub const fn from_nominal(s: &'static str) -> Self {
+        APR(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
 
     fn as_f64(self) -> f64 {
         (self.0 as f64) / 10f64.powf(Self::DECIMALS as f64)
     }
 
     /// exp{r * dt} where dt is change in time in seconds
+    // XXX why is this an index, should it be a CashIndexDelta or something?
     pub fn over_time(self, dt: Timestamp) -> Result<CashIndex, MathError> {
         let increment = (self.as_f64() * (dt as f64) / (MILLISECONDS_PER_YEAR as f64)).exp()
             * 10f64.powf(CashIndex::DECIMALS as f64);
@@ -57,7 +58,6 @@ impl APR {
         if increment > (Uint::max_value() as f64) {
             return Err(MathError::Overflow);
         }
-
         Ok(CashIndex(increment as Uint))
     }
 }
@@ -68,31 +68,9 @@ impl Default for APR {
     }
 }
 
-/// Utilization rate for a given market.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
-pub struct Utilization(Uint);
-
-impl From<Uint> for Utilization {
-    fn from(x: u128) -> Self {
-        Utilization(x)
-    }
-}
-
-impl Utilization {
-    pub const DECIMALS: u8 = 4;
-
-    pub(crate) const fn from_nominal(s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        Utilization(amount)
-    }
-
-    const ONE: Utilization = Utilization::from_nominal("1");
-
-    const ZERO: Utilization = Utilization::from_nominal("0");
-}
-
-/// XXX consider renaming, it is now more like a miner fee
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
+/// XXX rename this
+#[derive(Serialize, Deserialize)] // used in config
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct ReserveFactor(Uint);
 
 impl From<Uint> for ReserveFactor {
@@ -103,22 +81,38 @@ impl From<Uint> for ReserveFactor {
 
 impl ReserveFactor {
     pub const DECIMALS: u8 = 4;
+    pub const ZERO: ReserveFactor = ReserveFactor::from_nominal("0");
+    pub const ONE: ReserveFactor = ReserveFactor::from_nominal("1");
 
-    pub(crate) const fn from_nominal(s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        ReserveFactor(amount)
+    pub const fn from_nominal(s: &'static str) -> Self {
+        ReserveFactor(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
-
-    const ZERO: ReserveFactor = ReserveFactor::from_nominal("0");
-
-    const ONE: ReserveFactor = ReserveFactor::from_nominal("1");
-
-    const DEFAULT: ReserveFactor = Self::ZERO;
 }
 
 impl Default for ReserveFactor {
     fn default() -> Self {
-        ReserveFactor::DEFAULT
+        ReserveFactor::ZERO
+    }
+}
+
+/// Utilization rate for a given market.
+#[derive(Serialize, Deserialize)] // used in config
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct Utilization(Uint);
+
+impl From<Uint> for Utilization {
+    fn from(x: u128) -> Self {
+        Utilization(x)
+    }
+}
+
+impl Utilization {
+    pub const DECIMALS: u8 = 4;
+    pub const ZERO: Utilization = Utilization::from_nominal("0");
+    pub const ONE: Utilization = Utilization::from_nominal("1");
+
+    pub const fn from_nominal(s: &'static str) -> Self {
+        Utilization(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 }
 
@@ -156,7 +150,8 @@ pub fn get_utilization(
 ///
 /// In the future we may support serde serialization and deserialization of this struct
 /// for the purpose of inclusion in the genesis configuration chain_spec file.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
+#[derive(Serialize, Deserialize)] // used in config
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub enum InterestRateModel {
     Kink {
         zero_rate: APR,
@@ -308,11 +303,14 @@ impl InterestRateModel {
         borrow_rate: Uint,
         reserve_factor: Uint,
         utilization: Uint,
-    ) -> Option<Uint> {
+    ) -> Result<Uint, MathError> {
         // Borrow Rate * (1-reserve factor) * utilization
 
         // (1-reserve factor)
-        let reserve_multiplier = ReserveFactor::ONE.0.checked_sub(reserve_factor)?;
+        let reserve_multiplier = ReserveFactor::ONE
+            .0
+            .checked_sub(reserve_factor)
+            .ok_or(MathError::Underflow)?;
 
         // Borrow Rate * (1-reserve factor)
         let acc = crate::types::mul(
@@ -332,7 +330,7 @@ impl InterestRateModel {
             APR::DECIMALS,
         )?;
 
-        Some(acc)
+        Ok(acc)
     }
 
     /// Get the (borrow_rate, supply_rate) pair, they're often needed at the same time.
@@ -346,8 +344,7 @@ impl InterestRateModel {
         // unsafe version Borrow Rate * (1-reserve factor) * utilization
         let supply_rate =
             Self::borrow_rate_to_supply_rate(borrow_rate.0, reserve_factor.0, utilization.0)
-                .ok_or(RatesError::Overflowed)?;
-
+                .map_err(|_| RatesError::Overflowed)?;
         Ok((borrow_rate, APR(supply_rate)))
     }
 

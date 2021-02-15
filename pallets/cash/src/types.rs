@@ -1,25 +1,30 @@
-use crate::symbol::static_pow10;
+use codec::{Decode, Encode};
+use our_std::{
+    convert::{TryFrom, TryInto},
+    Deserialize, RuntimeDebug, Serialize,
+};
+
 use crate::{
     chains::{Chain, ChainAsset, Ethereum},
+    rates::{InterestRateModel, ReserveFactor},
     reason::{MathError, Reason},
-    symbol::{Symbol, CASH, USD},
+    symbol::{static_pow10, Symbol, Ticker, Units, CASH, USD},
+    SubstrateId,
 };
-use codec::{Decode, Encode};
-use our_std::{convert::TryFrom, Deserialize, RuntimeDebug, Serialize};
 
 // Type aliases //
 
 /// Type for representing a percentage/fractional, often between [0, 100].
 pub type Bips = u128;
 
+/// Type for representing a number of decimal places.
+pub type Decimals = u8;
+
 /// Type for a nonce.
 pub type Nonce = u32;
 
 /// Type for representing time.
 pub type Timestamp = u128; // XXX u64?
-
-/// Number of seconds in a year
-pub const MILLISECONDS_PER_YEAR: Timestamp = 31557600000; // todo: xxx finalize this number
 
 /// Type of the largest possible signed integer.
 pub type Int = i128;
@@ -51,27 +56,59 @@ pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 /// Type for representing an amount of USD.
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
-/// Type for a set of open price feed reporters.
-pub type ReporterSet = Vec<<Ethereum as Chain>::Address>;
+/// Type for an open price feed reporter.
+pub type Reporter = <Ethereum as Chain>::Address;
 
-/// Type for signature used to verify that a signed payload comes from a validator.
-pub type ValidatorSig = <Ethereum as Chain>::Signature;
+/// Type for a set of open price feed reporters.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Default, RuntimeDebug)]
+pub struct ReporterSet(pub Vec<Reporter>);
+
+impl ReporterSet {
+    pub fn contains(&self, reporter: Reporter) -> bool {
+        self.0.iter().any(|e| e.as_slice() == reporter.as_slice())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl<'a> TryFrom<Vec<&'a str>> for ReporterSet {
+    type Error = Reason;
+    fn try_from(strings: Vec<&'a str>) -> Result<ReporterSet, Self::Error> {
+        let mut reporters = Vec::with_capacity(strings.len());
+        for string in strings {
+            reporters.push(<Ethereum as Chain>::str_to_address(string)?)
+        }
+        Ok(ReporterSet(reporters))
+    }
+}
+
+/// Type for enumerating sessions.
+pub type SessionIndex = u32;
 
 /// Type for an address used to identify a validator.
 pub type ValidatorIdentity = <Ethereum as Chain>::Address;
 
-/// Type for representing the keys to sign notices
+/// Type for signature used to verify that a signed payload comes from a validator.
+pub type ValidatorSig = <Ethereum as Chain>::Signature;
+
+/// Type for representing the keys to sign notices.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct ChainKeys {
+pub struct ValidatorKeys {
+    pub substrate_id: SubstrateId,
     pub eth_address: <Ethereum as Chain>::Address,
 }
 
-pub type SessionIndex = u32;
+/// Type for referring to either an asset or CASH.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum CashOrChainAsset {
+    Cash,
+    ChainAsset(ChainAsset),
+}
 
-/// Type for a set of validator identities.
-pub type ValidatorSet = Vec<ValidatorIdentity>; // XXX whats our set type? ordered Vec?
-
-/// LiquidationFactor for a given market.
+/// LiquidityFactor for a given market.
+#[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct LiquidityFactor(pub Uint);
 
@@ -82,16 +119,15 @@ impl From<Uint> for LiquidityFactor {
 }
 
 impl LiquidityFactor {
-    pub const DECIMALS: u8 = 4;
-
-    pub(crate) const fn from_nominal(s: &'static str) -> Self {
-        let amount = uint_from_string_with_decimals(Self::DECIMALS, s);
-        LiquidityFactor(amount)
-    }
-
+    pub const DECIMALS: Decimals = 4;
     pub const ZERO: LiquidityFactor = LiquidityFactor::from_nominal("0");
+    pub const ONE: LiquidityFactor = LiquidityFactor::from_nominal("1");
 
-    const ONE: LiquidityFactor = LiquidityFactor::from_nominal("1");
+    /// Get a liquidity factor from a string.
+    /// Only for use in const contexts.
+    pub const fn from_nominal(s: &'static str) -> Self {
+        LiquidityFactor(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
 }
 
 impl Default for LiquidityFactor {
@@ -117,74 +153,259 @@ impl From<LiquidityFactor> for String {
 }
 
 /// Type for representing a quantity, potentially of any symbol.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct ConfigAsset {
-    #[serde(deserialize_with = "deserialize_from_str")]
-    #[serde(serialize_with = "serialize_into_str")]
-    pub symbol: Symbol,
-
-    #[serde(deserialize_with = "deserialize_from_str")]
-    #[serde(serialize_with = "serialize_into_str")]
+#[derive(Serialize, Deserialize)] // used in config
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct AssetInfo {
     pub asset: ChainAsset,
-
-    #[serde(deserialize_with = "deserialize_from_str")]
-    #[serde(serialize_with = "serialize_into_str")]
+    pub decimals: Decimals,
     pub liquidity_factor: LiquidityFactor,
+    pub rate_model: InterestRateModel,
+    pub reserve_factor: ReserveFactor,
+    pub supply_cap: AssetAmount,
+    pub symbol: Symbol,
+    pub ticker: Ticker,
 }
 
-// For using in GenesisConfig / ChainSpec JSON.
-// XXX move
-use our_std::{fmt::Display, str::FromStr};
-use serde::{de, Deserializer, Serializer};
+impl AssetInfo {
+    pub fn minimal(asset: ChainAsset, units: Units) -> Result<Self, Reason> {
+        Ok(AssetInfo {
+            asset,
+            decimals: units.decimals,
+            liquidity_factor: LiquidityFactor::default(),
+            rate_model: InterestRateModel::default(),
+            reserve_factor: ReserveFactor::default(),
+            supply_cap: AssetAmount::default(),
+            symbol: Symbol(units.ticker.0),
+            ticker: units.ticker,
+        })
+    }
 
-fn deserialize_from_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-where
-    T: FromStr,
-    T::Err: Display,
-    D: Deserializer<'de>,
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-    T::from_str(&s).map_err(de::Error::custom)
+    pub const fn units(self) -> Units {
+        Units::new(self.ticker, self.decimals)
+    }
+
+    pub const fn as_balance(self, amount: AssetBalance) -> Balance {
+        Balance::new(amount, self.units())
+    }
+
+    pub const fn as_balance_nominal(self, s: &'static str) -> Balance {
+        Balance::from_nominal(s, self.units())
+    }
+
+    pub const fn as_quantity(self, amount: AssetAmount) -> Quantity {
+        Quantity::new(amount, self.units())
+    }
+
+    pub const fn as_quantity_nominal(self, s: &'static str) -> Quantity {
+        Quantity::from_nominal(s, self.units())
+    }
 }
 
-fn serialize_into_str<T, S>(val: &T, serializer: S) -> Result<S::Ok, S::Error>
-where
-    T: Copy + Into<String>,
-    S: Serializer,
-{
-    let s: String = (*val).into();
-    serializer.serialize_str(&s)
-}
+// XXX ideally we should really impl Ord ourselves for these
+//  and should assert ticker/units is same when comparing
+//   would have to panic, though not for partial ord
 
-/// Type for a set of configuration values
-pub type ConfigSet<T> = Vec<T>;
-
-/// Type for a set of configuration strings
-pub type ConfigSetString = ConfigSet<String>;
-
-// XXX ord should really assert symbol is same for these
-
-/// Type for representing a price (in USD), bound to its symbol.
+/// Type for representing a price (in USD), bound to its ticker.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct Price(pub Symbol, pub AssetPrice);
+pub struct Price {
+    pub ticker: Ticker,
+    pub value: AssetPrice,
+}
 
-/// Type for representing a quantity of an asset, bound to its symbol.
+impl Price {
+    pub const DECIMALS: Decimals = USD.decimals; // Note: must be >= USD.decimals
+
+    pub const fn new(ticker: Ticker, value: AssetPrice) -> Self {
+        Price { ticker, value }
+    }
+
+    /// Get a price from a string.
+    /// Only for use in const contexts.
+    pub const fn from_nominal(ticker: Ticker, s: &'static str) -> Self {
+        Price::new(ticker, uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+}
+
+/// Type for representing a quantity of an asset, bound to its ticker and number of decimals.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct Quantity(pub Symbol, pub AssetAmount);
+pub struct Quantity {
+    pub value: AssetAmount,
+    pub units: Units,
+}
+
+impl Quantity {
+    pub const fn new(value: AssetAmount, units: Units) -> Self {
+        Quantity { value, units }
+    }
+
+    /// Get a quantity from a string.
+    /// Only for use in const contexts.
+    pub const fn from_nominal(s: &'static str, units: Units) -> Self {
+        Quantity::new(uint_from_string_with_decimals(units.decimals, s), units)
+    }
+
+    pub fn as_decrease(self) -> Result<Balance, MathError> {
+        Ok(Balance::new(
+            -self.value.try_into().map_err(|_| MathError::Overflow)?,
+            self.units,
+        ))
+    }
+
+    pub fn as_increase(self) -> Result<Balance, MathError> {
+        Ok(Balance::new(
+            self.value.try_into().map_err(|_| MathError::Overflow)?,
+            self.units,
+        ))
+    }
+
+    // Quantity<U> + Quantity<U> -> Quantity<U>
+    pub fn add(self, rhs: Quantity) -> Result<Quantity, MathError> {
+        if self.units != rhs.units {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Quantity::new(
+            self.value
+                .checked_add(rhs.value)
+                .ok_or(MathError::Overflow)?,
+            self.units,
+        ))
+    }
+
+    // Quantity<U.T> * Price<T> -> Quantity<{ USD }>
+    pub fn mul_price(self, rhs: Price) -> Result<Quantity, MathError> {
+        if self.units.ticker != rhs.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        let result = mul(
+            self.value,
+            self.units.decimals,
+            rhs.value,
+            Price::DECIMALS,
+            USD.decimals,
+        )?;
+        Ok(Quantity::new(result as AssetAmount, USD))
+    }
+
+    // Quantity<{ USD }> / Price<T> -> Quantity<U.T>
+    pub fn div_price(self, rhs: Price, units: Units) -> Result<Quantity, MathError> {
+        if self.units != USD {
+            return Err(MathError::PriceNotUSD);
+        }
+        if rhs.value == 0 {
+            return Err(MathError::DivisionByZero);
+        }
+        if rhs.ticker != units.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        let result = div(
+            self.value,
+            self.units.decimals,
+            rhs.value,
+            Price::DECIMALS,
+            units.decimals,
+        )?;
+        Ok(Quantity::new(result as AssetAmount, units))
+    }
+
+    // Quantity<U> * (CashPrincipal / Quantity<U>) -> CashPrincipal
+    pub fn mul_cash_principal_per(self, per: CashPrincipal) -> Result<CashPrincipal, MathError> {
+        let raw = mul(
+            Uint::try_from(per.0).map_err(|_| MathError::SignMismatch)?, // XXX unsigned cash principal
+            self.units.decimals,
+            self.value,
+            CashPrincipal::DECIMALS,
+            CashPrincipal::DECIMALS,
+        )?;
+        Ok(CashPrincipal(
+            Int::try_from(raw).map_err(|_| MathError::Overflow)?,
+        ))
+    }
+}
+
+/// Type for representing a signed balance of an asset, bound to its ticker and number of decimals.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+pub struct Balance {
+    pub value: AssetBalance,
+    pub units: Units,
+}
+
+impl Balance {
+    pub const fn new(value: AssetBalance, units: Units) -> Self {
+        Balance { value, units }
+    }
+
+    /// Get a quantity from a string.
+    /// Only for use in const contexts.
+    pub const fn from_nominal(s: &'static str, units: Units) -> Self {
+        Balance::new(int_from_string_with_decimals(units.decimals, s), units)
+    }
+
+    // Balance<U> + Balance<U> -> Balance<U>
+    pub fn add(self, delta: Balance) -> Result<Balance, MathError> {
+        if self.units.ticker != delta.units.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Balance::new(
+            self.value
+                .checked_add(delta.value)
+                .ok_or(MathError::Overflow)?,
+            self.units,
+        ))
+    }
+
+    // Balance<U.T> * Price<T> -> Balance<{ USD }>
+    pub fn mul_price(self, rhs: Price) -> Result<Balance, MathError> {
+        if self.units.ticker != rhs.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        let result = mul_int(
+            self.value,
+            self.units.decimals,
+            rhs.value.try_into().map_err(|_| MathError::Overflow)?,
+            Price::DECIMALS,
+            USD.decimals,
+        )?;
+        Ok(Balance::new(result, USD))
+    }
+
+    // Balance<U> / LiquidityFactor -> Balance<U>
+    pub fn div_factor(self, rhs: LiquidityFactor) -> Result<Balance, MathError> {
+        let result = div_int(
+            self.value,
+            self.units.decimals,
+            rhs.0.try_into().map_err(|_| MathError::Overflow)?,
+            LiquidityFactor::DECIMALS,
+            self.units.decimals,
+        )?;
+        Ok(Balance::new(result, self.units))
+    }
+
+    // Balance<U> * LiquidityFactor -> Balance<U>
+    pub fn mul_factor(self, rhs: LiquidityFactor) -> Result<Balance, MathError> {
+        let result = mul_int(
+            self.value,
+            self.units.decimals,
+            rhs.0.try_into().map_err(|_| MathError::Overflow)?,
+            LiquidityFactor::DECIMALS,
+            self.units.decimals,
+        )?;
+        Ok(Balance::new(result, self.units))
+    }
+}
 
 /// Type for representing an amount of CASH Principal.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
 pub struct CashPrincipal(pub Int);
 
 impl CashPrincipal {
-    pub const DECIMALS: u8 = CASH.decimals();
+    pub const DECIMALS: Decimals = CASH.decimals;
+    pub const ZERO: CashPrincipal = CashPrincipal(0);
 
     /// Get a CASH index from a string.
+    /// Only for use in const contexts.
     pub const fn from_nominal(s: &'static str) -> Self {
         CashPrincipal(int_from_string_with_decimals(Self::DECIMALS, s))
     }
-
-    pub const ZERO: CashPrincipal = CashPrincipal(0);
 
     pub fn add(self: Self, rhs: Self) -> Result<Self, MathError> {
         Ok(CashPrincipal(
@@ -197,10 +418,6 @@ impl CashPrincipal {
             self.0.checked_sub(rhs.0).ok_or(MathError::Underflow)?,
         ))
     }
-
-    pub fn negate(self) -> Self {
-        CashPrincipal(self.0 * -1)
-    }
 }
 
 /// Type for representing a multiplicative index on Compound Chain.
@@ -208,13 +425,22 @@ impl CashPrincipal {
 pub struct CashIndex(pub Uint);
 
 impl CashIndex {
-    pub const DECIMALS: u8 = 4;
-
+    pub const DECIMALS: Decimals = 4;
     pub const ONE: CashIndex = CashIndex(static_pow10(Self::DECIMALS));
 
     /// Get a CASH index from a string.
+    /// Only for use in const contexts.
     pub const fn from_nominal(s: &'static str) -> Self {
         CashIndex(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+
+    // CashPrincipal * CashIndex -> Balance<{ CASH }>
+    pub fn as_balance(self, rhs: CashPrincipal) -> Result<Balance, MathError> {
+        let result = rhs
+            .0
+            .checked_mul(self.0.try_into().map_err(|_| MathError::Overflow)?)
+            .ok_or(MathError::Overflow)?;
+        Ok(Balance::new(result / (CashIndex::ONE.0 as Int), CASH))
     }
 
     // CashPrincipal(-) * CashIndex -> Quantity<{ CASH }>
@@ -223,7 +449,7 @@ impl CashIndex {
             let result = ((-rhs.0) as AssetAmount)
                 .checked_mul(self.0)
                 .ok_or(MathError::Overflow)?;
-            Ok(Quantity(CASH, result / CashIndex::ONE.0))
+            Ok(Quantity::new(result / CashIndex::ONE.0, CASH))
         } else {
             Err(MathError::SignMismatch)
         }
@@ -235,7 +461,7 @@ impl CashIndex {
             let result = (rhs.0 as AssetAmount)
                 .checked_mul(self.0)
                 .ok_or(MathError::Overflow)?;
-            Ok(Quantity(CASH, result / CashIndex::ONE.0))
+            Ok(Quantity::new(result / CashIndex::ONE.0, CASH))
         } else {
             Err(MathError::SignMismatch)
         }
@@ -243,20 +469,27 @@ impl CashIndex {
 
     // Quantity<{ CASH }> / CashIndex -> CashPrincipal(-)
     pub fn as_debt_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
-        let amount = rhs.1.checked_div(self.0).ok_or(MathError::DivisionByZero)?;
+        let amount = rhs
+            .value
+            .checked_div(self.0)
+            .ok_or(MathError::DivisionByZero)?;
         let signed = -Int::try_from(amount).or(Err(MathError::Overflow))?;
         Ok(CashPrincipal(signed))
     }
 
     // Quantity<{ CASH }> / CashIndex -> CashPrincipal(+)
     pub fn as_hold_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
-        let amount = rhs.1.checked_div(self.0).ok_or(MathError::DivisionByZero)?;
+        let amount = rhs
+            .value
+            .checked_div(self.0)
+            .ok_or(MathError::DivisionByZero)?;
         let signed = Int::try_from(amount).or(Err(MathError::Overflow))?;
         Ok(CashPrincipal(signed))
     }
 
     /// Push the index forward by an index increment, multiplicative in the case of CashIndex
     /// New index = Old index * increment
+    // XXX why is increment also an index? I think this should be its own type?
     pub fn increment(self, rhs: CashIndex) -> Result<CashIndex, MathError> {
         let raw = self
             .0
@@ -289,9 +522,10 @@ where
 pub struct AssetIndex(pub Uint);
 
 impl AssetIndex {
-    pub const DECIMALS: u8 = CASH.decimals();
+    pub const DECIMALS: Decimals = CashPrincipal::DECIMALS; // Note: decimals must match
 
     /// Get an asset index from a string.
+    /// Only for use in const contexts.
     pub const fn from_nominal(s: &'static str) -> Self {
         AssetIndex(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
@@ -308,6 +542,14 @@ impl AssetIndex {
                 .ok_or(MathError::Overflow)?,
         ))
     }
+
+    pub fn increment(self, rhs: CashPrincipal) -> Result<AssetIndex, MathError> {
+        // XXX accept UnsignedCashPrincipal
+        let unsigned: Uint = rhs.0.try_into().map_err(|_| MathError::SignMismatch)?;
+        Ok(AssetIndex(
+            self.0.checked_add(unsigned).ok_or(MathError::Overflow)?,
+        ))
+    }
 }
 
 impl Default for AssetIndex {
@@ -319,12 +561,12 @@ impl Default for AssetIndex {
 /// A helper function for from_nominal on Quantity and Price.
 ///
 /// Only for use in const contexts.
-pub const fn uint_from_string_with_decimals(decimals: u8, s: &'static str) -> Uint {
-    let int_version = int_from_string_with_decimals(decimals, s);
-    int_version as Uint
+pub const fn uint_from_string_with_decimals(decimals: Decimals, s: &'static str) -> Uint {
+    int_from_string_with_decimals(decimals, s) as Uint
 }
 
-pub const fn int_from_string_with_decimals(decimals: u8, s: &'static str) -> Int {
+/// Only for use in const contexts.
+pub const fn int_from_string_with_decimals(decimals: Decimals, s: &'static str) -> Int {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
     let mut provided_fractional_digits = 0;
@@ -365,7 +607,6 @@ pub const fn int_from_string_with_decimals(decimals: u8, s: &'static str) -> Int
         let _should_overflow = byte + (u8::max_value() - b'9');
 
         qty += (byte_as_num as Int) * tenpow;
-
         tenpow *= 10;
         if i == 0 {
             break;
@@ -383,83 +624,52 @@ pub const fn int_from_string_with_decimals(decimals: u8, s: &'static str) -> Int
     }
 
     let number_of_zeros_to_scale_up = decimals - provided_fractional_digits;
-
     if number_of_zeros_to_scale_up == 0 {
         return qty;
     }
 
     let scalar = static_pow10(number_of_zeros_to_scale_up) as i128;
-
     qty * scalar
 }
 
-impl Price {
-    pub const DECIMALS: u8 = USD.decimals(); // Note: must be >= USD.decimals()
-
-    pub const fn symbol(&self) -> Symbol {
-        self.0
-    }
-
-    pub const fn value(&self) -> AssetPrice {
-        self.1
-    }
-
-    /// Get a price from a string.
-    pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
-        Price(symbol, uint_from_string_with_decimals(Self::DECIMALS, s))
-    }
-
-    pub const CASH_ONE: Price = Price::from_nominal(crate::symbol::CASH, "1");
-}
-
-impl Quantity {
-    pub const fn symbol(&self) -> Symbol {
-        self.0
-    }
-
-    pub const fn value(&self) -> AssetAmount {
-        self.1
-    }
-
-    /// Get a quantity from a string.
-    pub(crate) const fn from_nominal(symbol: Symbol, s: &'static str) -> Self {
-        Quantity(symbol, uint_from_string_with_decimals(symbol.decimals(), s))
-    }
-
-    /// Quantity<S> + Quantity<S> -> Quantity<S>
-    pub fn add(self, other: Quantity) -> Result<Quantity, MathError> {
-        if self.symbol() != other.symbol() {
-            return Err(MathError::SymbolMismatch);
-        }
-        Ok(Quantity(
-            self.symbol(),
-            self.value()
-                .checked_add(other.value())
-                .ok_or(MathError::Overflow)?,
-        ))
-    }
-
-    /// Quantity * CashPrincipal (per unit quantity) -> CashPrincipal (total)
-    /// used for computing interest on interest during on_initialize
-    pub fn as_cash_principal(
-        self,
-        cash_principal_per: CashPrincipal,
-    ) -> Result<CashPrincipal, MathError> {
-        let converted_cash_principal_per =
-            Uint::try_from(cash_principal_per.0).map_err(|_| MathError::Overflow)?;
-
-        let raw = mul(
-            converted_cash_principal_per,
-            CashPrincipal::DECIMALS,
-            self.value(),
-            self.symbol().decimals(),
-            CashPrincipal::DECIMALS,
-        )
+/// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
+/// the output number of decimals.
+///
+/// Not recommended to use directly, to be used in SafeMath implementations.
+pub fn mul(
+    a: Uint,
+    a_decimals: Decimals,
+    b: Uint,
+    b_decimals: Decimals,
+    out_decimals: Decimals,
+) -> Result<Uint, MathError> {
+    let all_numerator_decimals = a_decimals
+        .checked_add(b_decimals)
         .ok_or(MathError::Overflow)?;
-
-        let converted_raw = Int::try_from(raw).map_err(|_| MathError::Overflow)?;
-
-        Ok(CashPrincipal(converted_raw))
+    if all_numerator_decimals > out_decimals {
+        // scale down
+        let scale_decimals = all_numerator_decimals
+            .checked_sub(out_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10u128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        Ok(a.checked_mul(b)
+            .ok_or(MathError::Overflow)?
+            .checked_div(scale)
+            .ok_or(MathError::DivisionByZero)?)
+    } else {
+        // scale up
+        let scale_decimals = out_decimals
+            .checked_sub(all_numerator_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10u128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        Ok(a.checked_mul(b)
+            .ok_or(MathError::Overflow)?
+            .checked_mul(scale)
+            .ok_or(MathError::Overflow)?)
     }
 }
 
@@ -467,39 +677,40 @@ impl Quantity {
 /// the output number of decimals.
 ///
 /// Not recommended to use directly, to be used in SafeMath implementations.
-pub fn mul(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
-    let all_numerator_decimals = a_decimals.checked_add(b_decimals)?;
-
+pub fn mul_int(
+    a: Int,
+    a_decimals: u8,
+    b: Int,
+    b_decimals: u8,
+    out_decimals: u8,
+) -> Result<Int, MathError> {
+    let all_numerator_decimals = a_decimals
+        .checked_add(b_decimals)
+        .ok_or(MathError::Overflow)?;
     if all_numerator_decimals > out_decimals {
         // scale down
-        let scale_decimals = all_numerator_decimals.checked_sub(out_decimals)?;
-        let scale = 10u128.checked_pow(scale_decimals as u32)?;
-        a.checked_mul(b)?.checked_div(scale)
+        let scale_decimals = all_numerator_decimals
+            .checked_sub(out_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10i128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        Ok(a.checked_mul(b)
+            .ok_or(MathError::Overflow)?
+            .checked_div(scale)
+            .ok_or(MathError::DivisionByZero)?)
     } else {
         // scale up
-        let scale_decimals = out_decimals.checked_sub(all_numerator_decimals)?;
-        let scale = 10u128.checked_pow(scale_decimals as u32)?;
-        a.checked_mul(b)?.checked_mul(scale)
-    }
-}
-
-/// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
-/// the output number of decimals.
-///
-/// Not recommended to use directly, to be used in SafeMath implementations.
-pub fn mul_int(a: Int, a_decimals: u8, b: Int, b_decimals: u8, out_decimals: u8) -> Option<Int> {
-    let all_numerator_decimals = a_decimals.checked_add(b_decimals)?;
-
-    if all_numerator_decimals > out_decimals {
-        // scale down
-        let scale_decimals = all_numerator_decimals.checked_sub(out_decimals)?;
-        let scale = 10i128.checked_pow(scale_decimals as u32)?;
-        a.checked_mul(b)?.checked_div(scale)
-    } else {
-        // scale up
-        let scale_decimals = out_decimals.checked_sub(all_numerator_decimals)?;
-        let scale = 10i128.checked_pow(scale_decimals as u32)?;
-        a.checked_mul(b)?.checked_mul(scale)
+        let scale_decimals = out_decimals
+            .checked_sub(all_numerator_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10i128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        Ok(a.checked_mul(b)
+            .ok_or(MathError::Overflow)?
+            .checked_mul(scale)
+            .ok_or(MathError::Overflow)?)
     }
 }
 
@@ -507,18 +718,40 @@ pub fn mul_int(a: Int, a_decimals: u8, b: Int, b_decimals: u8, out_decimals: u8)
 /// the output number of decimals.
 ///
 /// Not recommended to use directly, to be used in SafeMath implementations.
-pub fn div(a: Uint, a_decimals: u8, b: Uint, b_decimals: u8, out_decimals: u8) -> Option<Uint> {
-    let denom_decimals = b_decimals.checked_add(out_decimals)?;
+pub fn div(
+    a: Uint,
+    a_decimals: Decimals,
+    b: Uint,
+    b_decimals: Decimals,
+    out_decimals: Decimals,
+) -> Result<Uint, MathError> {
+    let denom_decimals = b_decimals
+        .checked_add(out_decimals)
+        .ok_or(MathError::Overflow)?;
     if denom_decimals > a_decimals {
         // scale up
-        let scale_decimals = denom_decimals.checked_sub(a_decimals)?;
-        let scale = 10u128.checked_pow(scale_decimals as u32)?;
-        a.checked_mul(scale)?.checked_div(b)
+        let scale_decimals = denom_decimals
+            .checked_sub(a_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10u128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        Ok(a.checked_mul(scale)
+            .ok_or(MathError::Overflow)?
+            .checked_div(b)
+            .ok_or(MathError::DivisionByZero)?)
     } else {
         // scale down
-        let scale_decimals = a_decimals.checked_sub(denom_decimals)?;
-        let scale = 10u128.checked_pow(scale_decimals as u32)?;
-        a.checked_div(b)?.checked_div(scale)
+        let scale_decimals = a_decimals
+            .checked_sub(denom_decimals)
+            .ok_or(MathError::Underflow)?;
+        let scale = 10u128
+            .checked_pow(scale_decimals as u32)
+            .ok_or(MathError::Overflow)?;
+        Ok(a.checked_div(b)
+            .ok_or(MathError::DivisionByZero)?
+            .checked_div(scale)
+            .ok_or(MathError::DivisionByZero)?)
     }
 }
 
@@ -544,10 +777,10 @@ pub fn div_int(
         let scale = 10i128
             .checked_pow(scale_decimals as u32)
             .ok_or(MathError::Overflow)?;
-        a.checked_mul(scale)
+        Ok(a.checked_mul(scale)
             .ok_or(MathError::Overflow)?
             .checked_div(b)
-            .ok_or(MathError::DivisionByZero)
+            .ok_or(MathError::DivisionByZero)?)
     } else {
         // scale down
         let scale_decimals = a_decimals
@@ -556,83 +789,10 @@ pub fn div_int(
         let scale = 10i128
             .checked_pow(scale_decimals as u32)
             .ok_or(MathError::Overflow)?;
-        a.checked_div(b)
+        Ok(a.checked_div(b)
             .ok_or(MathError::DivisionByZero)?
             .checked_div(scale)
-            .ok_or(MathError::DivisionByZero)
-    }
-}
-
-// XXX kinda sucks to import this to use?
-//  and do we even want to overload types?
-pub trait SafeMul<Rhs = Self> {
-    /// The resulting type after multiplying
-    type Output;
-
-    /// multiply self by the "right hand side" (RHS)
-    fn mul(self, rhs: Rhs) -> Result<Self::Output, MathError>;
-}
-
-// Price<S> * Quantity<S> -> Quantity<{ USD }>
-impl SafeMul<Quantity> for Price {
-    type Output = Quantity;
-
-    fn mul(self, rhs: Quantity) -> Result<Self::Output, MathError> {
-        if self.symbol() != rhs.symbol() {
-            return Err(MathError::SymbolMismatch);
-        }
-        let result = mul(
-            self.value(),
-            Price::DECIMALS,
-            rhs.value(),
-            rhs.symbol().decimals(),
-            USD.decimals(),
-        )
-        .ok_or(MathError::Overflow)?;
-
-        Ok(Quantity(USD, result as AssetAmount))
-    }
-}
-
-// Quantity<S> * Price<S> -> Quantity<{ USD }>
-impl SafeMul<Price> for Quantity {
-    type Output = Quantity;
-
-    fn mul(self, rhs: Price) -> Result<Self::Output, MathError> {
-        // in this case, multiplication is transitive (unlike matrix multiplication for example)
-        rhs.mul(self)
-    }
-}
-
-pub trait SafeDiv<Rhs = Self> {
-    /// The resulting type after dividing
-    type Output;
-
-    /// divide self by the "right hand side" (RHS)
-    fn div(self, rhs: Rhs) -> Result<Self::Output, MathError>;
-}
-
-// Quantity<{ USD }> / Price<S> -> Quantity<S>
-impl SafeDiv<Price> for Quantity {
-    type Output = Quantity;
-
-    fn div(self, rhs: Price) -> Result<Self::Output, MathError> {
-        if self.symbol() != USD {
-            return Err(MathError::PriceNotUSD);
-        }
-        if rhs.value() == 0 {
-            return Err(MathError::DivisionByZero);
-        }
-        let result = div(
-            self.value(),
-            self.symbol().decimals(),
-            rhs.value(),
-            Price::DECIMALS,
-            rhs.symbol().decimals(),
-        )
-        .ok_or(MathError::Overflow)?;
-
-        Ok(Quantity(rhs.symbol(), result as AssetAmount))
+            .ok_or(MathError::DivisionByZero)?)
     }
 }
 
@@ -641,14 +801,11 @@ mod tests {
     use super::*;
     use crate::symbol::*;
 
-    const ETH: Symbol = Symbol(
-        ['E' as u8, 'T' as u8, 'H' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        18,
-    );
+    const ETH: Units = Units::from_ticker_str("ETH", 18);
 
     #[test]
     fn test_scale_codec() {
-        let a = Quantity::from_nominal(CASH, "3");
+        let a = Quantity::from_nominal("3", CASH);
         let encoded = a.encode();
         let decoded = Decode::decode(&mut encoded.as_slice());
         let b = decoded.expect("value did not decode");
@@ -657,107 +814,107 @@ mod tests {
 
     #[test]
     fn test_from_nominal_with_all_decimals() {
-        let a = Quantity::from_nominal(CASH, "123.456789");
-        let b = Quantity(CASH, 123456789);
+        let a = Quantity::from_nominal("123.456789", CASH);
+        let b = Quantity::new(123456789, CASH);
         assert_eq!(a, b);
     }
 
     #[test]
     fn test_from_nominal_with_less_than_all_decimals() {
-        let a = Quantity::from_nominal(CASH, "123.4");
-        let b = Quantity(CASH, CASH.one() * 1234 / 10);
+        let a = Quantity::from_nominal("123.4", CASH);
+        let b = Quantity::new(CASH.one() * 1234 / 10, CASH);
         assert_eq!(a, b);
     }
 
     #[test]
     fn test_from_nominal_with_no_decimals() {
-        let a = Quantity::from_nominal(CASH, "123");
-        let b = Quantity(CASH, CASH.one() * 123);
+        let a = Quantity::from_nominal("123", CASH);
+        let b = Quantity::new(CASH.one() * 123, CASH);
         assert_eq!(a, b);
     }
 
     #[test]
     #[should_panic]
     fn test_from_nominal_input_string_value_out_of_range_high() {
-        Quantity::from_nominal(CASH, ":");
+        Quantity::from_nominal(":", CASH);
     }
 
     #[test]
     #[should_panic]
     fn test_from_nominal_input_string_value_out_of_range_low() {
-        Quantity::from_nominal(CASH, "/");
+        Quantity::from_nominal("/", CASH);
     }
 
     #[test]
     #[should_panic]
     fn test_from_nominal_multiple_radix() {
-        Quantity::from_nominal(CASH, "12.34.56");
+        Quantity::from_nominal("12.34.56", CASH);
     }
 
     #[test]
     #[should_panic]
     fn test_from_nominal_only_radix() {
-        Quantity::from_nominal(CASH, ".");
+        Quantity::from_nominal(".", CASH);
     }
 
     #[test]
     #[should_panic]
     fn test_from_nominal_only_radix_multiple() {
-        Quantity::from_nominal(CASH, "...");
+        Quantity::from_nominal("...", CASH);
     }
 
     #[test]
     fn test_mul_with_scale_output_equal() {
         let result = mul(2000, 3, 30000, 4, 7);
-        assert_eq!(result, Some(60000000));
+        assert_eq!(result, Ok(60000000));
     }
 
     #[test]
     fn test_mul_with_scale_output_up() {
         let result = mul(2000, 3, 30000, 4, 8);
-        assert_eq!(result, Some(600000000));
+        assert_eq!(result, Ok(600000000));
     }
 
     #[test]
     fn test_mul_with_scale_output_down() {
         let result = mul(2000, 3, 30000, 4, 6);
-        assert_eq!(result, Some(6000000));
+        assert_eq!(result, Ok(6000000));
     }
 
     #[test]
     fn test_div_with_scale_output_equal() {
         let result = div(2000, 3, 30000, 4, 7);
-        assert_eq!(result, Some(6666666));
+        assert_eq!(result, Ok(6666666));
     }
 
     #[test]
     fn test_div_with_scale_output_up() {
         let result = div(2000, 3, 30000, 4, 8);
-        assert_eq!(result, Some(66666666));
+        assert_eq!(result, Ok(66666666));
     }
 
     #[test]
     fn test_div_with_scale_output_down() {
         let result = div(2000, 3, 30000, 4, 6);
-        assert_eq!(result, Some(666666));
+        assert_eq!(result, Ok(666666));
     }
 
     #[test]
-    fn test_price_times_quantity() {
-        let price = Price::from_nominal(ETH, "1500");
-        let quantity = Quantity::from_nominal(ETH, "5.5");
-        let result = price.mul(quantity).unwrap();
-        let expected = Quantity::from_nominal(USD, "8250");
+    fn test_quantity_times_price() {
+        let price = Price::from_nominal(ETH.ticker, "1500");
+        let quantity = Quantity::from_nominal("5.5", ETH);
+        let result = quantity.mul_price(price).unwrap();
+        let expected = Quantity::from_nominal("8250", USD);
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_quantity_over_price() {
         // same as example above just inverted
-        let price = Price::from_nominal(ETH, "1500");
-        let value = Quantity::from_nominal(USD, "8250");
-        let number_of_eth = value.div(price).unwrap();
-        let expected_number_of_eth = Quantity::from_nominal(ETH, "5.5");
+        let price = Price::from_nominal(ETH.ticker, "1500");
+        let value = Quantity::from_nominal("8250", USD);
+        let number_of_eth = value.div_price(price, ETH).unwrap();
+        let expected_number_of_eth = Quantity::from_nominal("5.5", ETH);
         assert_eq!(number_of_eth, expected_number_of_eth);
     }
 
@@ -772,49 +929,49 @@ mod tests {
             index.as_debt_amount(pprincipal),
             Err(MathError::SignMismatch)
         );
-        assert_eq!(pquantity, Quantity::from_nominal(CASH, "101"));
+        assert_eq!(pquantity, Quantity::from_nominal("101", CASH));
         assert_eq!(
             index.as_hold_amount(nprincipal),
             Err(MathError::SignMismatch)
         );
-        assert_eq!(nquantity, Quantity::from_nominal(CASH, "101"));
+        assert_eq!(nquantity, Quantity::from_nominal("101", CASH));
     }
 
     #[test]
     fn test_mul_overflow() {
         let result = mul(Uint::max_value() / 2 + 1, 0, 2, 0, 0);
-        assert_eq!(result, None);
+        assert_eq!(result, Err(MathError::Overflow));
     }
 
     #[test]
     fn test_mul_overflow_boundary() {
         let result = mul(Uint::max_value(), 0, 1, 0, 0);
-        assert_eq!(result, Some(Uint::max_value()));
+        assert_eq!(result, Ok(Uint::max_value()));
     }
 
     #[test]
     fn test_mul_overflow_boundary_2() {
         // note max value is odd thus truncated here and we lose a digit
         let result = mul(Uint::max_value() / 2, 0, 2, 0, 0);
-        assert_eq!(result, Some(Uint::max_value() - 1));
+        assert_eq!(result, Ok(Uint::max_value() - 1));
     }
 
     #[test]
     fn test_div_by_zero() {
         let result = div(1, 0, 0, 0, 0);
-        assert_eq!(result, None);
+        assert_eq!(result, Err(MathError::DivisionByZero));
     }
 
     #[test]
     fn test_div_overflow_decimals() {
-        let result = div(1, 0, 1, 0, u8::max_value());
-        assert_eq!(result, None);
+        let result = div(1, 0, 1, 0, Decimals::max_value());
+        assert_eq!(result, Err(MathError::Overflow));
     }
 
     #[test]
     fn test_div_overflow_decimals_2() {
-        let result = div(1, u8::max_value(), 1, 0, 0);
-        assert_eq!(result, None);
+        let result = div(1, Decimals::max_value(), 1, 0, 0);
+        assert_eq!(result, Err(MathError::Overflow));
     }
 
     #[test]

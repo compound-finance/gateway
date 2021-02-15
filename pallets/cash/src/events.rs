@@ -110,31 +110,13 @@ pub fn encode_block_hex(block_number: u64) -> String {
     format!("{:#X}", block_number)
 }
 
-fn hex_to_u32(hex_data: String) -> Result<u32, EventError> {
-    let without_prefix = hex_data.trim_start_matches("0x");
-    let u32_data =
-        u32::from_str_radix(without_prefix, 16).map_err(|_| EventError::ErrorDecodingHex)?;
-    Ok(u32_data)
-}
-
 #[cfg(test)]
 pub mod tests {
 
     use crate::mock::*;
     use crate::*;
+    use our_std::convert::*;
     use sp_core::offchain::testing;
-
-    #[test]
-    fn test_hex_to_u32_success() {
-        let expected = 6008149;
-        let actual = events::hex_to_u32("0x5bad55".to_string()).unwrap();
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_hex_to_u32_fail() {
-        assert_eq!(events::hex_to_u32("".to_string()).is_err(), true)
-    }
 
     pub fn get_mockup_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
         // Set up config values

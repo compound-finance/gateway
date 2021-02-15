@@ -1,6 +1,6 @@
 use crate::{
     chains::{ChainHash, ChainId},
-    core::{dispatch_notice_internal, now},
+    core::{dispatch_notice_internal, get_now},
     notices::{FutureYieldNotice, Notice},
     params::MIN_NEXT_SYNC_TIME,
     rates::APR,
@@ -31,7 +31,7 @@ fn get_cash_yield_index_after<T: Config>(change_in_time: Timestamp) -> Result<Ca
 }
 
 pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Result<(), Reason> {
-    let now: Timestamp = now::<T>();
+    let now: Timestamp = get_now::<T>();
     let change_in_time = next_apr_start
         .checked_sub(now)
         .ok_or(Reason::TimeTravelNotAllowed)?;
