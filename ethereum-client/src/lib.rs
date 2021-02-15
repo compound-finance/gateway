@@ -330,22 +330,4 @@ mod tests {
         assert!(actual.error.is_none());
         // todo : assert all the fields, but i inspected it, it is working fine.....
     }
-
-    // #[test]
-    // fn test_decode_events() {
-    //     // from https://kovan.etherscan.io/tx/0x1276fa72a2d8efec8e127dac6e57eb678e706cb4fbdd1b311bda75d2691b1941#eventlog
-    //     const DATA_FIELD: &str = r#"0x000000000000000000000000d87ba7a50b2e7e660f678a895e4b72e7cb4ccd9c000000000000000000000000b819706e897eacf235cdb5048962bd65873202c400000000000000000000000000000000000000000000000000000000018cba80"#;
-    //     let actual = decode_events(
-    //         String::from(DATA_FIELD),
-    //         vec![
-    //             ethabi::param_type::ParamType::Address,
-    //             ethabi::param_type::ParamType::Address,
-    //             ethabi::param_type::ParamType::Uint(256),
-    //         ],
-    //     );
-    //     if actual.is_err() {
-    //         println!("{}", actual.err().unwrap());
-    //         assert!(false);
-    //     }
-    // }
 }

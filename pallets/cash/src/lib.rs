@@ -246,27 +246,6 @@ decl_error! {
         /// Error returned when fetching starport info
         HttpFetchingError,
 
-        /// Error when processing `Lock` event while sending `process_eth_event` extrinsic
-        ProcessLockEventError,
-
-        /// Error sending `process_eth_event` extrinsic
-        OffchainUnsignedLockTxError,
-
-        /// Error decoding payload
-        SignedPayloadError,
-
-        /// Public key doesn't belong to known validator
-        UnknownValidator,
-
-        /// Validator has already signed and submitted this payload
-        AlreadySigned,
-
-        /// Fetched Ethereum event type is not known
-        UnknownEthEventType, // XXX needed per-chain?
-
-        /// Error decoding Ethereum event
-        DecodeEthereumEventError,
-
         /// An error related to the oracle
         OpenOracleError,
 
