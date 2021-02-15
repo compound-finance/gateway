@@ -18,6 +18,7 @@ const baseScenInfo = {
     "wbtc",
     "usdc",
   ],
+  eth_supply_cap: 1000000,
   chain_spec: { // TODO: Allow override of chain spec?
     base_chain: "local",
     use_temp: true,

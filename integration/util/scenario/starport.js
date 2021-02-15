@@ -45,6 +45,12 @@ class Starport {
     }
   }
 
+  async setSupplyCap(token, amount) {
+    let weiAmount = token.toWeiAmount(amount);
+
+    return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.ctx.eth.root() });
+  }
+
   async executeProposal(title, extrinsics, awaitEvent = true) {
     let encodedCalls = extrinsics.map(encodeCall);
     let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root() });

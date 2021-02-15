@@ -111,7 +111,7 @@ describe('Starport', () => {
     it('should lock an asset', async () => {
       await send(tokenA, "allocateTo", [account1, e18(10)]);
       await send(tokenA, "approve", [starport._address, e18(10)], { from: account1 });
-      await send(starport, "setSupplyCap_", [tokenA._address, e18(10)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenA._address, e18(10)], { from: root });
 
       const lockAmount = e18(1);
       const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
@@ -131,7 +131,7 @@ describe('Starport', () => {
     it('should fail to lock when supply cap exceeded', async () => {
       await send(tokenA, "allocateTo", [account1, e18(10)]);
       await send(tokenA, "approve", [starport._address, e18(10)], { from: account1 });
-      await send(starport, "setSupplyCap_", [tokenA._address, e18(1)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenA._address, e18(1)], { from: root });
 
       const lockAmount = e18(2);
       const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
@@ -145,7 +145,7 @@ describe('Starport', () => {
     it('should fail to lock when supply cap exceeded by second lock', async () => {
       await send(tokenA, "allocateTo", [account1, e18(10)]);
       await send(tokenA, "approve", [starport._address, e18(10)], { from: account1 });
-      await send(starport, "setSupplyCap_", [tokenA._address, e18(1)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenA._address, e18(1)], { from: root });
 
       const lockAmount = e18(1);
       await send(starport, 'lock', [lockAmount, tokenA._address], { from: account1 });
@@ -155,7 +155,7 @@ describe('Starport', () => {
     it('should lock a non-standard asset', async () => {
       await send(tokenNS, "transfer", [account1, e18(10)], { from: root });
       await send(tokenNS, "approve", [starport._address, e18(10)], { from: account1 });
-      await send(starport, "setSupplyCap_", [tokenNS._address, e18(10)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenNS._address, e18(10)], { from: root });
 
       const lockAmount = e18(1);
       const balancePre = bigInt(await call(tokenNS, 'balanceOf', [account1]));
@@ -175,7 +175,7 @@ describe('Starport', () => {
     it('should lock a fee token', async () => {
       await send(tokenFee, "transfer", [account1, e18(10)], { from: root });
       await send(tokenFee, "approve", [starport._address, e18(10)], { from: account1 });
-      await send(starport, "setSupplyCap_", [tokenFee._address, e18(10)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenFee._address, e18(10)], { from: root });
 
       const lockAmount = e18(1);
       const lockReceiptAmount = e18(1) / 2n;
@@ -196,7 +196,7 @@ describe('Starport', () => {
     it('should not calculate supply cap against fee', async () => {
       await send(tokenFee, "transfer", [account1, e18(10)], { from: root });
       await send(tokenFee, "approve", [starport._address, e18(10)], { from: account1 });
-      await send(starport, "setSupplyCap_", [tokenFee._address, e18(1)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenFee._address, e18(1)], { from: root });
 
       const lockAmount = e18(2);
       const lockReceiptAmount = e18(2) / 2n;
@@ -248,7 +248,7 @@ describe('Starport', () => {
     it('should lock eth via lockEth()', async () => {
       const lockAmount = e18(1);
       const starportEthPre = await web3.eth.getBalance(starport._address);
-      await send(starport, "setSupplyCap_", [ETH_ADDRESS, e18(1)], { from: account1 });
+      await send(starport, "setSupplyCap", [ETH_ADDRESS, e18(1)], { from: root });
 
       expect(starportEthPre).toEqualNumber(0);
 
@@ -266,7 +266,7 @@ describe('Starport', () => {
     it('should enforce supply cap for Eth', async () => {
       const lockAmount = e18(2);
       const starportEthPre = await web3.eth.getBalance(starport._address);
-      await send(starport, "setSupplyCap_", [ETH_ADDRESS, e18(1)], { from: account1 });
+      await send(starport, "setSupplyCap", [ETH_ADDRESS, e18(1)], { from: root });
 
       expect(starportEthPre).toEqualNumber(0);
 
@@ -279,7 +279,7 @@ describe('Starport', () => {
     it('fallback lock Eth', async () => {
       const lockAmount = e18(1);
       const starportEthPre = await web3.eth.getBalance(starport._address);
-      await send(starport, "setSupplyCap_", [ETH_ADDRESS, e18(1)], { from: account1 });
+      await send(starport, "setSupplyCap", [ETH_ADDRESS, e18(1)], { from: root });
 
       expect(starportEthPre).toEqualNumber(0);
 
@@ -960,7 +960,7 @@ describe('Starport', () => {
       expect(await call(starport, 'eraId')).toEqualNumber(0);
       expect(await call(starport, 'supplyCaps', [tokenA._address])).toEqualNumber(0);
 
-      const tx = await send(starport, 'setSupplyCap_', [tokenA._address, 500]);
+      const tx = await send(starport, 'setSupplyCap', [tokenA._address, 500], { from: root });
 
       expect(await call(starport, 'supplyCaps', [tokenA._address])).toEqualNumber(500);
       expect(await call(starport, 'eraId')).toEqualNumber(0);
@@ -1010,11 +1010,11 @@ describe('Starport', () => {
     });
 
     it('should fail when not called by self', async () => {
-      await expect(call(starport, 'setSupplyCap', [tokenA._address, 500])).rejects.toRevert('revert Call must originate locally');
+      await expect(call(starport, 'setSupplyCap', [tokenA._address, 500], { from: account1 })).rejects.toRevert('revert Call must originate locally or from admin');
     });
 
     it('should fail when cash token is passed in', async () => {
-      await expect(call(starport, 'setSupplyCap_', [cash._address, 500])).rejects.toRevert('revert Cash does not accept supply cap');
+      await expect(call(starport, 'setSupplyCap', [cash._address, 500], { from: root })).rejects.toRevert('revert Cash does not accept supply cap');
     });
   });
 });

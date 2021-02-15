@@ -53,11 +53,6 @@ contract StarportHarness is Starport {
 		Starport(this).changeAuthorities(newAuthorities);
 	}
 
-	/// Harness to call `setSupplyCap` with this as `msg.sender`
-	function setSupplyCap_(address asset, uint supplyCap) external {
-		Starport(this).setSupplyCap(asset, supplyCap);
-	}
-
 	/// Simple function to test notices
 	function count_() public returns (uint) {
 		return counter += 1;

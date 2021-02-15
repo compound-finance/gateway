@@ -273,7 +273,7 @@ contract Starport {
      * @param supplyCap The cap to put on the asset, in its native token units.
      */
     function setSupplyCap(address asset, uint supplyCap) external {
-        require(msg.sender == address(this), "Call must originate locally");
+        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
         require(asset != address(cash), "Cash does not accept supply cap");
 
         emit NewSupplyCap(asset, supplyCap);

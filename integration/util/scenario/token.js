@@ -49,6 +49,13 @@ class Token {
     return this.toTokenAmount(balanceWei);
   }
 
+  async setSupplyCap(tokenAmount) {
+    if (!this.ctx.starport) {
+      throw new Error(`Ctx: starport must be set before using set supply cap`);
+    }
+    this.ctx.starport.setSupplyCap(this, tokenAmount);
+  }
+
   async setBalance(actorLookup, tokenAmount) {
     let weiAmount = this.toWeiAmount(tokenAmount);
     if (!this.ctx.actors) {
@@ -141,37 +148,43 @@ function tokenInfoMap(ctx) {
       build: 'zrx.json',
       contract: 'ZRXToken',
       decimals: 18,
-      constructorArgs: [],
+      constructor_args: [],
+      supply_cap: 1000000
     },
     dai: {
       build: 'dai.json',
       contract: 'Dai',
       decimals: 18,
-      constructorArgs: [0] // TODO: ChainId
+      constructor_args: [0], // TODO: ChainId
+      supply_cap: 1000000
     },
     comp: {
       build: 'compound.json',
       contract: 'Comp',
       decimals: 18,
-      constructorArgs: [accounts[0]]
+      constructor_args: [accounts[0]],
+      supply_cap: 1000000
     },
     bat: {
       build: 'bat.json',
       contract: 'BAToken',
       decimals: 18,
-      constructorArgs: ['0x0000000000000000000000000000000000000000', accounts[0], 0, 0]
+      constructor_args: ['0x0000000000000000000000000000000000000000', accounts[0], 0, 0],
+      supply_cap: 1000000
     },
     wbtc: {
       build: 'wbtc.json',
       contract: 'WBTC',
       decimals: 8,
-      constructorArgs: []
+      constructor_args: [],
+      supply_cap: 1000000
     },
     usdc: {
       build: 'FiatTokenV1.json',
       contract: 'FiatTokenV1',
       decimals: 6,
-      constructorArgs: [],
+      constructor_args: [],
+      supply_cap: 1000000,
       afterDeploy: async (contract, owner) => {
         await contract.methods.initialize(
           "USD Coin",
@@ -202,7 +215,7 @@ async function buildToken(ticker, tokenInfo, ctx) {
   ctx.log(`Deploying ${ticker}...`);
 
   let owner = ctx.eth.defaultFrom;
-  let tokenContract = await ctx.eth.__deployContract(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructorArgs, {from: owner});
+  let tokenContract = await ctx.eth.__deployContract(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, {from: owner});
   if (typeof (tokenInfo.afterDeploy) === 'function') {
     await tokenInfo.afterDeploy(tokenContract, owner);
   }
@@ -218,6 +231,10 @@ async function buildToken(ticker, tokenInfo, ctx) {
     }, Promise.resolve(undefined));
   }
 
+  if (tokenInfo.supply_cap) {
+    await token.setSupplyCap(tokenInfo.supply_cap);
+  }
+
   return token;
 }
 
@@ -225,7 +242,7 @@ async function getTokensInfo(tokensInfoHash, ctx) {
   return await instantiateInfo(tokensInfoHash, 'Token', 'token', tokenInfoMap(ctx));
 };
 
-async function buildTokens(tokensInfoHash, ctx) {
+async function buildTokens(tokensInfoHash, scenInfo, ctx) {
   ctx.log("Deploying Erc20 Tokens...");
 
   let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
@@ -236,7 +253,11 @@ async function buildTokens(tokensInfoHash, ctx) {
     ];
   }, Promise.resolve([]));
 
-  tokens.push(new EtherToken(ctx));
+  let etherToken = new EtherToken(ctx);
+  tokens.push(etherToken);
+  if (scenInfo.eth_supply_cap) {
+    await etherToken.setSupplyCap(scenInfo.eth_supply_cap);
+  }
   tokens.push(ctx.cashToken);
 
   return new Tokens(tokens, ctx);
