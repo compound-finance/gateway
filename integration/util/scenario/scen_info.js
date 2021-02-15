@@ -25,7 +25,11 @@ const baseScenInfo = {
     props: {}
   },
   starport: {},
-  cash_token: {},
+  cash_token: {
+    initial_yield_index: '10000'
+  },
+  initial_yield: 300, // [env=INITIAL_YIELD]
+  initial_yield_start: null, // defaults to current time [env=INITIAL_YIELD_START]
   contracts_dir: null, // [env=BUILD_DIR]
   log_level: 'info', // [env=LOG]
   link_validator: true, // abort if validator panics [env=LINK_VALIDATOR]

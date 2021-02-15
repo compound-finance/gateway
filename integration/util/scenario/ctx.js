@@ -17,6 +17,19 @@ const { buildPrices } = require('./price');
 class Ctx {
   constructor(scenInfo) {
     this.scenInfo = scenInfo;
+    this.startTime = Math.floor(new Date() / 1000);
+  }
+
+  __startTime() {
+    return this.startTime;
+  }
+
+  __initialYield() {
+    return process.env['INITIAL_YIELD'] || this.scenInfo['initial_yield'] || 0;
+  }
+
+  __initialYieldStart() {
+    return process.env['INITIAL_YIELD_START'] || this.scenInfo['initial_yield_start'] || this.startTime;
   }
 
   __getContractsDir() {

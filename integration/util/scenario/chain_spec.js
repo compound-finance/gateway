@@ -42,6 +42,13 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     asset: `eth:${token.ethAddress()}`
   }));
 
+  let initialYieldConfig = {};
+  if (ctx.__initialYield() > 0) {
+    initialYieldConfig = {
+      initialYield: [ctx.__initialYield(), ctx.__initialYieldStart()]
+    };
+  }
+
   return {
     name: 'Integration Test Network',
     properties: {
@@ -53,7 +60,8 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         palletCash: {
           validatorIds,
           validatorKeys: chain_keys,
-          assets
+          assets,
+          ...initialYieldConfig
         },
         palletSession: {
           keys: session_args

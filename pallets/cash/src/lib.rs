@@ -213,11 +213,13 @@ decl_storage! {
         config(validator_ids): Vec<[u8;32]>;
         config(validator_keys): Vec<(String,)>;
         config(reporters): ConfigSetString;
+        config(initial_yield): Option<(u128, u128)>;
         config(assets): Vec<ConfigAsset>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
             Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
+            Module::<T>::initialize_yield(config.initial_yield);
         })
     }
 }
@@ -638,6 +640,14 @@ impl<T: Config> Module<T> {
         let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
             .expect("Could not deserialize validators from genesis config");
         PriceReporters::put(converted);
+    }
+
+    /// Set the initial cash yield, if provided
+    fn initialize_yield(initial_yield_config: Option<(u128, u128)>) {
+        if let Some((initial_yield, initial_yield_start)) = initial_yield_config {
+            CashYield::put(APR(initial_yield));
+            LastBlockTimestamp::put(initial_yield_start);
+        }
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed
