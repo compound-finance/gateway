@@ -26,7 +26,7 @@ contract Starport {
     event Unlock(address account, uint amount, address asset);
     event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
-    event Gov(bytes[] extrinsics);
+    event ExecuteProposal(string title, bytes[] extrinsics);
 
     constructor(ICash cash_, address admin_, address[] memory authorities_) {
         cash = cash_;
@@ -131,14 +131,14 @@ contract Starport {
     }
 
     /**
-     * @notice Executes governance action on Compound Chain
+     * @notice Executes governance proposal on Compound Chain
      * @dev This must be called from the admin, which should be the Compound Timelock
      * @param extrinsics SCALE-encoded extrinsics that can execute on Compound Chain
      */
-    function gov(bytes[] calldata extrinsics) external {
+    function executeProposal(string calldata title, bytes[] calldata extrinsics) external {
         require(msg.sender == admin, "Call must originate from admin");
 
-        emit Gov(extrinsics);
+        emit ExecuteProposal(title, extrinsics);
     }
 
     /*

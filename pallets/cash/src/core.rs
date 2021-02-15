@@ -374,7 +374,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                     .. // XXX do we want to use index?
                 } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity(CASH, amount)),
 
-                ethereum_client::events::EthereumEvent::Gov { extrinsics } => dispatch_extrinsics_internal::<T>(extrinsics),
+                ethereum_client::events::EthereumEvent::ExecuteProposal { title: _title, extrinsics } => dispatch_extrinsics_internal::<T>(extrinsics),
             }
         }
     }

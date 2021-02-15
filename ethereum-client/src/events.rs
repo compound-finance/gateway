@@ -14,7 +14,8 @@ pub enum EthereumEvent {
         amount: u128,
         principal: u128,
     },
-    Gov {
+    ExecuteProposal {
+        title: String,
         extrinsics: Vec<Vec<u8>>,
     },
 }
@@ -64,18 +65,25 @@ lazy_static! {
         anonymous: false
     };
     static ref LOCK_CASH_EVENT_TOPIC: ethabi::Hash = LOCK_CASH_EVENT.signature();
-    static ref GOV_EVENT: ethabi::Event = ethabi::Event {
-        name: String::from("Gov"),
-        inputs: vec![ethabi::EventParam {
-            name: String::from("extrinsics"),
-            kind: ethabi::param_type::ParamType::Array(Box::new(
-                ethabi::param_type::ParamType::Bytes
-            )),
-            indexed: false
-        }],
+    static ref EXECUTE_PROPOSAL_EVENT: ethabi::Event = ethabi::Event {
+        name: String::from("ExecuteProposal"),
+        inputs: vec![
+            ethabi::EventParam {
+                name: String::from("title"),
+                kind: ethabi::param_type::ParamType::String,
+                indexed: false
+            },
+            ethabi::EventParam {
+                name: String::from("extrinsics"),
+                kind: ethabi::param_type::ParamType::Array(Box::new(
+                    ethabi::param_type::ParamType::Bytes
+                )),
+                indexed: false
+            }
+        ],
         anonymous: false
     };
-    static ref GOV_EVENT_TOPIC: ethabi::Hash = GOV_EVENT.signature();
+    static ref EXECUTE_PROPOSAL_EVENT_TOPIC: ethabi::Hash = EXECUTE_PROPOSAL_EVENT.signature();
 }
 
 fn parse_lock_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
@@ -118,9 +126,12 @@ fn parse_lock_cash_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
     }
 }
 
-fn parse_gov_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
+fn parse_execute_proposal_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
     match &log.params[..] {
         [ethabi::LogParam {
+            value: ethabi::token::Token::String(title),
+            ..
+        }, ethabi::LogParam {
             value: ethabi::token::Token::Array(extrinsics_tokens),
             ..
         }] => {
@@ -132,7 +143,10 @@ fn parse_gov_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
                     _ => Err(EventError::InvalidLogParams),
                 })
                 .collect::<Result<Vec<Vec<u8>>, _>>()?;
-            Ok(EthereumEvent::Gov { extrinsics })
+            Ok(EthereumEvent::ExecuteProposal {
+                title: title.into(),
+                extrinsics,
+            })
         }
         _ => Err(EventError::InvalidLogParams),
     }
@@ -186,15 +200,15 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
             .map_err(|_| EventError::ErrorParsingLog)?;
 
         parse_lock_cash_log(log)
-    } else if *topic_hash == *GOV_EVENT_TOPIC {
-        let log: ethabi::Log = GOV_EVENT
+    } else if *topic_hash == *EXECUTE_PROPOSAL_EVENT_TOPIC {
+        let log: ethabi::Log = EXECUTE_PROPOSAL_EVENT
             .parse_log(ethabi::RawLog {
                 topics: topic_hashes,
                 data: decode_hex(&data)?,
             })
             .map_err(|_| EventError::ErrorParsingLog)?;
 
-        parse_gov_log(log)
+        parse_execute_proposal_log(log)
     } else {
         Err(EventError::UnknownEventTopic)
     }
@@ -207,13 +221,14 @@ mod tests {
     #[test]
     fn test_decode_gov_event() {
         let topics = vec![String::from(
-            "0x2fc017b3ca22b5e8804469e4fe91441dd93d2fb0fec4ab720883556aec5f667e",
+            "0x97b9e105962881d0aea472b7f0335a84c21cce09bc7917f3db0ea5e4b23116e8",
         )];
         let data =
-            String::from("0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000003010203000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030405060000000000000000000000000000000000000000000000000000000000");
+            String::from("0x0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000094d7920416374696f6e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000003010203000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030405060000000000000000000000000000000000000000000000000000000000");
         assert_eq!(
             decode_event(topics, data),
-            Ok(EthereumEvent::Gov {
+            Ok(EthereumEvent::ExecuteProposal {
+                title: String::from("My Action"),
                 extrinsics: vec![vec![1, 2, 3], vec![4, 5, 6]]
             })
         )

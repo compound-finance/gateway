@@ -235,18 +235,19 @@ describe('Starport', () => {
     });
   });
 
-  describe('#gov', () => {
-    it('should emit gov event', async () => {
+  describe('#executeProposal', () => {
+    it('should emit ExecuteProposal event', async () => {
       const extrinsics = ["0x010203", "0x040506"]
-      const tx = await send(starport, 'gov', [extrinsics], { from: root });
-      expect(tx.events.Gov.returnValues).toMatchObject({
+      const tx = await send(starport, 'executeProposal', ["My Action", extrinsics], { from: root });
+      expect(tx.events.ExecuteProposal.returnValues).toMatchObject({
+        title: "My Action",
         extrinsics
       });
     });
 
     it('should fail if not from admin', async () => {
       const extrinsics = ["0x11", "0x22"]
-      await expect(send(starport, 'gov', [extrinsics], { from: account1 })).rejects.toRevert('revert Call must originate from admin');
+      await expect(send(starport, 'executeProposal', ["Action", extrinsics], { from: account1 })).rejects.toRevert('revert Call must originate from admin');
     });
   });
 

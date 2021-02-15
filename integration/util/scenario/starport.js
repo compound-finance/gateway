@@ -45,9 +45,9 @@ class Starport {
     }
   }
 
-  async gov(extrinsics, awaitEvent = true) {
+  async executeProposal(title, extrinsics, awaitEvent = true) {
     let encodedCalls = extrinsics.map(encodeCall);
-    let result = await this.starport.methods.gov(encodedCalls).send({ from: this.ctx.eth.root() });
+    let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root() });
     let event;
     if (awaitEvent) {
       event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
