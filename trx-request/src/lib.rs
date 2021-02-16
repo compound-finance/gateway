@@ -36,6 +36,7 @@ pub enum Account {
 #[derive(PartialEq, Eq, Debug)]
 pub enum TrxRequest {
     Extract(Amount, Asset, Account),
+    Transfer(Amount, Asset, Account),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -122,7 +123,20 @@ fn parse_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
 
             Ok(TrxRequest::Extract(amount, asset, account))
         }
-        _ => Err(ParseError::InvalidArgs("extract", 2, args.len())),
+        _ => Err(ParseError::InvalidArgs("Extract", 2, args.len())),
+    }
+}
+
+fn parse_transfer<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
+    match args {
+        [amount_token, asset_token, account_token] => {
+            let amount = parse_amount(amount_token)?;
+            let asset = parse_asset(asset_token)?;
+            let account = parse_account(account_token)?;
+
+            Ok(TrxRequest::Transfer(amount, asset, account))
+        }
+        _ => Err(ParseError::InvalidArgs("Transfer", 2, args.len())),
     }
 }
 
@@ -144,6 +158,9 @@ fn parse<'a>(tokens: Lexer<'a, Token<'a>>) -> Result<TrxRequest, ParseError<'a>>
     match &token_vec[..] {
         [Token::LeftDelim, Token::Identifier("Extract"), args @ .., Token::RightDelim] => {
             parse_extract(args)
+        }
+        [Token::LeftDelim, Token::Identifier("Transfer"), args @ .., Token::RightDelim] => {
+            parse_transfer(args)
         }
         [Token::LeftDelim, Token::Identifier(fun), .., Token::RightDelim] => {
             Err(ParseError::UnknownFunction(fun))
@@ -208,6 +225,12 @@ mod tests {
       parse_extract_hex:
         "(Extract 0x0100 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
           256,
+          Asset::Eth(ETH),
+          Account::Eth(ALAN)
+        )),
+      parse_transfer:
+        "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Transfer(
+          3,
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
