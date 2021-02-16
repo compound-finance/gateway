@@ -6,13 +6,13 @@ const { log, error } = require('../util/log');
 const { u8aToHex } = require('@polkadot/util');
 const { signAndSend } = require('../util/substrate');
 
+// relies upon short session period runtime/src for debug mode 
 async function waitUntilSession(num, api) {
   const timer = ms => new Promise(res => setTimeout(res, ms));
   const checkIdx = async () => {
     const idx = (await api.query.session.currentIndex()).toNumber();
     if (idx <= num) {
       await timer(2000);
-      console.log("waiting", idx)
       await checkIdx();
     }
   };
@@ -76,16 +76,33 @@ describe('authorities tests', () => {
     );
     const newAuths = [[keyring.decodeAddress(aliceInitId), { eth_address: aliceInitEthKey }]];
     const sudoPair = keyring.addFromUri('//Alice');
-    const tx = api.tx.sudo.sudo(api.tx.cash.changeAuthorities(newAuths));
-    await signAndSend(tx, sudoPair, api);
+    expect(sudoPair.address).toEqual(toSS58(await api.query.sudo.key()));
 
-    const nextAuths = await api.query.cash.nextValidators.entries();
-    const [pendingAuth0, pendingChainkeys0] = nextAuths[0];
-    expect(toSS58(pendingAuth0.args[0])).toEqual(aliceInitId);
-    expect(u8aToHex(pendingChainkeys0.unwrap().eth_address)).toEqual(aliceInitEthKey);
+    const unsub = await api.tx.sudo.sudo(api.tx.cash.changeAuthorities(newAuths)).signAndSend(sudoPair, ({ events = [], status }) => {
+      console.log('Transaction status:', status.type);
+      if (status.isInBlock) {
+        console.log('Completed at block hash', status.asInBlock.toHex());
+        console.log('Events:');
+        events.forEach(({ phase, event: { data, method, section } }) => {
+          console.log('HERE:', phase.toString(), `${section} ${method} `, data.toString());
+        });
+      } else if (status.isFinalized) {
+        console.log("FINALIZED:", events);// never hit this
+        unsub();
+      }
+    });
+    // await signAndSend(tx, sudoPair, api);
 
-    // relies upon session period of 1 set in runtime/src for debug mode 
+    console.log("next sess idx", (await api.query.cash.nextSessionIndex()).toNumber());
+    const queued = await api.query.cash.nextValidators.entries();
+    expect(queued.length).toEqual(1);
+    // const [pendingAuth0, pendingChainkeys0] = queued[0];
+    // expect(toSS58(pendingAuth0.args[0])).toEqual(aliceInitId);
+    // expect(u8aToHex(pendingChainkeys0.unwrap().eth_address)).toEqual(aliceInitEthKey);
+
     await waitUntilSession(4, api);
+    const nextAuths = await api.query.cash.nextValidators.entries();
+    expect(nextAuths).toEqual([]);
 
     const afterAuthRaw = await api.query.cash.validators.entries();
     const afterAuths = afterAuthRaw.map(([valIdRaw, chainKeys]) =>
@@ -95,11 +112,13 @@ describe('authorities tests', () => {
       ]
     );
 
+    console.log("next sess idx", (await api.query.cash.nextSessionIndex()).toNumber());
+
     expect(afterAuths).toEqual(
       [[aliceInitId, aliceInitEthKey]]
     );
 
-    expect([]).toEqual(await api.query.cash.nextValidators.entries());
+    // expect([]).toEqual(await api.query.cash.nextValidators.entries());
 
     // const newValidators = await api.query.session.validators().map(e => toSS58(e));
     // console.log(newValidators);
