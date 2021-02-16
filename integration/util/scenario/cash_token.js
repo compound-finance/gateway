@@ -16,10 +16,6 @@ class CashToken extends Token {
     return this.cashToken.methods.getCashIndex().call();
   }
 
-  async cashIndex() {
-    return this.cashToken.methods.getCashIndex().call();
-  }
-
   async getCashPrincipal(actorLookup) {
     let actor = this.ctx.actors.get(actorLookup);
     return Number(await this.token.methods.cashPrincipal(actor.ethAddress()).call());
@@ -37,7 +33,9 @@ class CashToken extends Token {
 
 async function buildCashToken(cashTokenInfo, ctx, owner) {
   ctx.log("Deploying cash token...");
-  let cashToken = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'CashToken', [owner])
+  let initial_yield_index = cashTokenInfo.initial_yield_index;
+
+  let cashToken = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'CashToken', [owner, ctx.__initialYield(), initial_yield_index, ctx.__initialYieldStart()]);
 
   return new CashToken(cashToken, owner, ctx);
 }

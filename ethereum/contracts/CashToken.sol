@@ -24,10 +24,11 @@ contract CashToken is ICash {
     uint public totalCashPrincipal;
     mapping (address => uint128) public cashPrincipal;
 
-	constructor(address starport) {
+	constructor(address starport, uint128 initialYield, uint128 initialYieldIndex, uint initialYieldStart) {
         admin = starport;
-        cashYieldStartAt = block.timestamp;
-        cashYieldAndIndex = CashYieldAndIndex({yield: 0, index: 1e4});
+        // Note: we don't check that this is in the past, but calls will revert until it is.
+        cashYieldStartAt = initialYieldStart;
+        cashYieldAndIndex = CashYieldAndIndex({yield: initialYield, index: initialYieldIndex});
 	}
 
     function mint(address account, uint128 principal) external override returns (uint) {

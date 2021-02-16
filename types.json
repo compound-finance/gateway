@@ -241,7 +241,7 @@
     }
   },
 
-  "Source5": "ReasonRS",
+  "Source6": "ReasonRS",
   "TrxReqParseError": {
     "_enum": [
       "NotImplemented",
@@ -297,7 +297,8 @@
       "TimeTravelNotAllowed": "",
       "TrxRequestParseError": "TrxReqParseError",
       "UnknownValidator": "",
-      "ValidatorAlreadySigned": ""
+      "ValidatorAlreadySigned": "",
+      "SetYieldNextError": "SetYieldNextError"
     }
   },
   "MathError": {
@@ -311,7 +312,7 @@
     ]
   },
 
-  "Source6": "EventsRS",
+  "Source7": "EventsRS",
   "EventInfo": {
     "latest_eth_block": "u64",
     "events": "Vec<(ChainLogId, ChainLogEvent)>"
@@ -338,7 +339,7 @@
     }
   },
 
-  "Source7": "EthereumClientRS",
+  "Source8": "EthereumClientRS",
   "EthereumLogEvent": {
     "block_hash": "[u8; 32]",
     "block_number": "u64",
@@ -361,6 +362,14 @@
       "Gov": {
         "extrinsics": "Vec<Vec<u8>>"
       }
+    }
+  },
+
+  "Source9": "SetYieldNextRS",
+  "SetYieldNextError": {
+    "_enum": {
+      "TimestampTooSoonToNow": "",
+      "TimestampTooSoonToNext": ""
     }
   }
 }

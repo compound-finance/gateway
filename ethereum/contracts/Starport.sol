@@ -26,6 +26,7 @@ contract Starport {
     event Unlock(address account, uint amount, address asset);
     event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
+    event SetFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart);
     event ExecuteProposal(string title, bytes[] extrinsics);
     event NewSupplyCap(address asset, uint supplyCap);
 
@@ -279,6 +280,20 @@ contract Starport {
         emit NewSupplyCap(asset, supplyCap);
 
         supplyCaps[asset] = supplyCap;
+    }
+
+    /**
+     * @notice Sets the yield of the CASH token for some future time.
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @param nextCashYield The yield to set
+     * @param nextCashYieldIndex The pre-calculated index at change-over for error correction
+     * @param nextCashYieldStart When the yield change-over should occur
+     */
+    function setFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart) external {
+        require(msg.sender == address(this), "Call must originate locally");
+
+        emit SetFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
+        cash.setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
     }
 
     /**

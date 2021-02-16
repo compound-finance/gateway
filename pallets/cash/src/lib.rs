@@ -59,6 +59,7 @@ pub mod chains;
 pub mod converters;
 pub mod core;
 pub mod events;
+pub mod internal;
 pub mod log;
 pub mod notices;
 pub mod oracle;
@@ -213,14 +214,18 @@ decl_storage! {
         config(validator_ids): Vec<[u8;32]>;
         config(validator_keys): Vec<(String,)>;
         config(reporters): ConfigSetString;
+        config(initial_yield): Option<(u128, u128)>;
         config(assets): Vec<ConfigAsset>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
             Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
+            Module::<T>::initialize_yield(config.initial_yield);
         })
     }
 }
+
+/* ::EVENTS:: */
 
 decl_event!(
     pub enum Event {
@@ -243,6 +248,8 @@ decl_event!(
         ExecutedGovernance(Vec<(Vec<u8>, bool)>),
     }
 );
+
+/* ::ERRORS:: */
 
 decl_error! {
     pub enum Error for Module<T: Config> {
@@ -310,7 +317,10 @@ decl_error! {
         TrxRequestError,
 
         /// Error when processing chain event
-        ErrorProcessingChainEvent
+        ErrorProcessingChainEvent,
+
+        /// Error when setting a future yield rate
+        SetYieldNextFailure
     }
 }
 
@@ -362,6 +372,9 @@ impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
     }
 }
 
+/* ::MODULE:: */
+/* ::EXTRINSICS:: */
+
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -390,6 +403,18 @@ decl_module! {
         pub fn update_interest_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Self::update_interest_rate_model_internal(asset, model)?;
+            Ok(())
+        }
+
+        /// Set the cash yield rate at some point in the future
+        #[weight = 0]
+        pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            cash_err!(
+                crate::internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start),
+                <Error<T>>::SetYieldNextFailure
+            )?;
+
             Ok(())
         }
 
@@ -638,6 +663,14 @@ impl<T: Config> Module<T> {
         let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
             .expect("Could not deserialize validators from genesis config");
         PriceReporters::put(converted);
+    }
+
+    /// Set the initial cash yield, if provided
+    fn initialize_yield(initial_yield_config: Option<(u128, u128)>) {
+        if let Some((initial_yield, initial_yield_start)) = initial_yield_config {
+            CashYield::put(APR(initial_yield));
+            LastBlockTimestamp::put(initial_yield_start);
+        }
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed

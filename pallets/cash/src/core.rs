@@ -45,6 +45,7 @@ use frame_support::sp_runtime::traits::Convert;
 use frame_support::traits::UnfilteredDispatchable;
 use our_std::convert::TryInto;
 
+#[macro_export]
 macro_rules! require {
     ($expr:expr, $reason:expr) => {
         if !$expr {
@@ -53,6 +54,7 @@ macro_rules! require {
     };
 }
 
+#[macro_export]
 macro_rules! require_min_tx_value {
     ($value:expr) => {
         require!($value >= MIN_TX_VALUE, Reason::MinTxValueNotMet);
@@ -77,7 +79,7 @@ pub fn try_chain_asset_account(
     }
 }
 
-fn now<T: Config>() -> Timestamp {
+pub fn now<T: Config>() -> Timestamp {
     let now = <pallet_timestamp::Module<T>>::get();
     T::TimeConverter::convert(now)
 }
@@ -380,7 +382,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
     }
 }
 
-fn dispatch_notice_internal<T: Config>(
+pub fn dispatch_notice_internal<T: Config>(
     chain_id: ChainId,
     recipient_opt: Option<ChainAccount>,
     notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,

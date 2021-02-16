@@ -1,4 +1,6 @@
 const {
+  e18,
+  fromNow,
   sendRPC,
   ETH_ZERO_ADDRESS
 } = require('./utils');
@@ -7,9 +9,8 @@ describe('CashToken', () => {
   let cash;
   let [root, admin, account1, account2, account3] = saddle.accounts;
 
-
   beforeEach(async () => {
-    cash = await deploy('CashToken', [admin], {from: root});
+    cash = await deploy('CashToken', [admin, 0, 1e6, fromNow(0)], {from: root});
   });
 
   describe('#constructor', () => {
