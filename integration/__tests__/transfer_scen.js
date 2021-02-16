@@ -31,7 +31,18 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
     skip: true,
     name: "Transfer Cash",
     scenario: async ({ ashley, bert, zrx, chain, starport, cash }) => {
-      let notice = await ashley.extract(50, cash);
+      let notice = await ashley.transfer(50, cash);
+      expect(await cash.getCashPrincipal(ashley)).toEqual(5000); // ??
+      expect(await ashley.tokenBalance(cash)).toEqual(50);
+      expect(await ashley.chainBalance(cash)).toEqual(-50);
+      expect(await bert.chainBalance(cash)).toEqual(50);
+    }
+  },
+  {
+    skip: true,
+    name: "Transfer Cash Max",
+    scenario: async ({ ashley, bert, zrx, chain, starport, cash }) => {
+      let notice = await ashley.transfer('Max', cash);
       expect(await cash.getCashPrincipal(ashley)).toEqual(5000); // ??
       expect(await ashley.tokenBalance(cash)).toEqual(50);
       expect(await ashley.chainBalance(cash)).toEqual(-50);

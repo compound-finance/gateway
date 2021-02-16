@@ -53,6 +53,8 @@ pub enum Reason {
     UnknownValidator,
     ValidatorAlreadySigned,
     SetYieldNextError(SetYieldNextError),
+    MaxForNonCashAsset,
+    MaxWithNegativeCashPrincipal,
 }
 
 impl From<MathError> for Reason {
