@@ -28,6 +28,18 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
+    name: "Extract via Starport Action",
+    scenario: async ({ ashley, zrx, chain, starport, log }) => {
+      await ashley.execTrxRequest(ashley.extractTrxReq(50, zrx));
+      let notice = await chain.waitForNotice();
+      let signatures = await chain.getNoticeSignatures(notice);
+      expect(await ashley.tokenBalance(zrx)).toEqual(900);
+      await starport.invoke(notice, signatures);
+      expect(await ashley.tokenBalance(zrx)).toEqual(950);
+      expect(await ashley.chainBalance(zrx)).toEqual(50);
+    }
+  },
+  {
     skip: true,
     name: "Extract Cash",
     scenario: async ({ ashley, zrx, chain, starport, cash }) => {

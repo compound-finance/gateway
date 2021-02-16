@@ -14,6 +14,10 @@ pub enum EthereumEvent {
         amount: u128,
         principal: u128,
     },
+    ExecTrxRequest {
+        account: [u8; 20],
+        trx_request: String,
+    },
     ExecuteProposal {
         title: String,
         extrinsics: Vec<Vec<u8>>,
@@ -65,6 +69,23 @@ lazy_static! {
         anonymous: false
     };
     static ref LOCK_CASH_EVENT_TOPIC: ethabi::Hash = LOCK_CASH_EVENT.signature();
+    static ref EXEC_TRX_REQUEST_EVENT: ethabi::Event = ethabi::Event {
+        name: String::from("ExecTrxRequest"),
+        inputs: vec![
+            ethabi::EventParam {
+                name: String::from("account"),
+                kind: ethabi::param_type::ParamType::Address,
+                indexed: false
+            },
+            ethabi::EventParam {
+                name: String::from("title"),
+                kind: ethabi::param_type::ParamType::String,
+                indexed: false
+            },
+        ],
+        anonymous: false
+    };
+    static ref EXEC_TRX_REQUEST_EVENT_TOPIC: ethabi::Hash = EXEC_TRX_REQUEST_EVENT.signature();
     static ref EXECUTE_PROPOSAL_EVENT: ethabi::Event = ethabi::Event {
         name: String::from("ExecuteProposal"),
         inputs: vec![
@@ -121,6 +142,22 @@ fn parse_lock_cash_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
             holder: holder.into(),
             amount: amount.try_into().map_err(|_| EventError::Overflow)?,
             principal: principal.try_into().map_err(|_| EventError::Overflow)?,
+        }),
+        _ => Err(EventError::InvalidLogParams),
+    }
+}
+
+fn parse_exec_trx_request_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
+    match &log.params[..] {
+        [ethabi::LogParam {
+            value: ethabi::token::Token::Address(account),
+            ..
+        }, ethabi::LogParam {
+            value: ethabi::token::Token::String(trx_request),
+            ..
+        }] => Ok(EthereumEvent::ExecTrxRequest {
+            account: (*account).into(),
+            trx_request: trx_request.into(),
         }),
         _ => Err(EventError::InvalidLogParams),
     }
@@ -200,6 +237,15 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
             .map_err(|_| EventError::ErrorParsingLog)?;
 
         parse_lock_cash_log(log)
+    } else if *topic_hash == *EXEC_TRX_REQUEST_EVENT_TOPIC {
+        let log: ethabi::Log = EXEC_TRX_REQUEST_EVENT
+            .parse_log(ethabi::RawLog {
+                topics: topic_hashes,
+                data: decode_hex(&data)?,
+            })
+            .map_err(|_| EventError::ErrorParsingLog)?;
+
+        parse_exec_trx_request_log(log)
     } else if *topic_hash == *EXECUTE_PROPOSAL_EVENT_TOPIC {
         let log: ethabi::Log = EXECUTE_PROPOSAL_EVENT
             .parse_log(ethabi::RawLog {
@@ -217,6 +263,28 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Note: these tests just come from copying and pasting `starport.js` unit test data.
+    #[test]
+    fn test_decode_exec_trx_request_event() {
+        let topics = vec![String::from(
+            "0xc25618d2506dbaa46f0a3819f68074c34ed888161951d0d833fea35b82a4faa9",
+        )];
+        let data =
+            String::from("0x00000000000000000000000028056190d4a5905caf3647c5987c4f26e0d9d935000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000412845787472616374203130302043415348204574683a3078323830353631393044344135393035636166333634374335393837433466323645304439443933352900000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(
+            decode_event(topics, data),
+            Ok(EthereumEvent::ExecTrxRequest {
+                account: [
+                    40, 5, 97, 144, 212, 165, 144, 92, 175, 54, 71, 197, 152, 124, 79, 38, 224,
+                    217, 217, 53
+                ],
+                trx_request: String::from(
+                    "(Extract 100 CASH Eth:0x28056190D4A5905caf3647C5987C4f26E0D9D935)"
+                ),
+            })
+        )
+    }
 
     #[test]
     fn test_decode_gov_event() {

@@ -21,16 +21,15 @@ use frame_support::storage::{
 use crate::portfolio::Portfolio;
 use crate::{
     chains::{
-        CashAsset, Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount,
-        ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum,
+        Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainHash,
+        ChainId, ChainSignature, ChainSignatureList, Ethereum,
     },
     events::{ChainLogEvent, ChainLogId, EventState},
-    log, notices,
+    internal, log, notices,
     notices::{
         CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
     },
     params::{MIN_TX_VALUE, TRANSFER_FEE},
-    reason,
     reason::{MathError, Reason},
     symbol::{Symbol, CASH},
     types::{
@@ -39,9 +38,9 @@ use crate::{
     },
     AccountNotices, AssetBalances, AssetSymbols, AssetsWithNonZeroBalance, BorrowIndices, Call,
     CashPrincipals, CashYield, ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex,
-    LastBlockTimestamp, LastIndices, LatestNotice, Module, Nonces, NoticeHashes, NoticeStates,
-    Notices, Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices,
-    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
+    LastBlockTimestamp, LastIndices, LatestNotice, Module, NoticeHashes, NoticeStates, Notices,
+    Prices, RateModels, ReserveFactor, SubmitTransaction, SupplyIndices, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 use codec::{Decode, Encode};
 use either::{Either, Left, Right};
@@ -380,6 +379,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 } => lock_cash_internal::<T>(ChainAccount::Eth(holder), Quantity(CASH, amount)),
 
                 ethereum_client::events::EthereumEvent::ExecuteProposal { title: _title, extrinsics } => dispatch_extrinsics_internal::<T>(extrinsics),
+                ethereum_client::events::EthereumEvent::ExecTrxRequest { account, trx_request } => internal::exec_trx_request::exec_trx_request::<T>(&trx_request[..], ChainAccount::Eth(account), None)
             }
         }
     }
@@ -1362,35 +1362,7 @@ pub fn exec_trx_request_internal<T: Config>(
     // Build Account=(Chain, Recover(Chain, Signature, NoncedRequest))
     let sender = signature.recover_account(&prepend_nonce(&request, nonce)[..])?;
 
-    // Match TrxReqagainst known Transaction Requests
-    let trx_request = trx_request::parse_request(request_str)
-        .map_err(|e| Reason::TrxRequestParseError(reason::to_parse_error(e)))?;
-
-    // Read Require Nonce=NonceAccount+1
-    let current_nonce = Nonces::get(sender);
-    require!(
-        nonce == current_nonce,
-        Reason::IncorrectNonce(nonce, current_nonce)
-    );
-
-    match trx_request {
-        trx_request::TrxRequest::Extract(amount, asset, account) => match CashAsset::from(asset) {
-            CashAsset::Cash => {
-                extract_cash_internal::<T>(sender, account.into(), Left(Quantity(CASH, amount)))?;
-            }
-            CashAsset::Asset(chain_asset) => {
-                let symbol = symbol(&chain_asset).ok_or(Reason::AssetNotSupported)?;
-                let quantity = Quantity(symbol, amount.into());
-
-                extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
-            }
-        },
-    }
-
-    // Update user nonce
-    Nonces::insert(sender, current_nonce + 1);
-
-    Ok(())
+    internal::exec_trx_request::exec_trx_request::<T>(request_str, sender, Some(nonce))
 }
 
 // Dispatch Extrinsic Lifecycle //

@@ -23,6 +23,7 @@ contract Starport {
 
     event Lock(address asset, address holder, uint amount);
     event LockCash(address holder, uint amount, uint128 principal);
+    event ExecTrxRequest(address account, string trxRequest);
     event Unlock(address account, uint amount, address asset);
     event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
@@ -65,6 +66,15 @@ contract Starport {
     function lockEth() public payable {
         require(address(this).balance <= supplyCaps[ETH_ADDRESS], "Supply Cap Exceeded");
         emit Lock(ETH_ADDRESS, msg.sender, msg.value);
+    }
+
+    /*
+     * @notice Emits an event s.t. a given trx request will execute as if called by `msg.sender`
+     * @dev Externally-owned accounts may call `execTrxRequest` with a signed message to avoid Ethereum fees.
+     * @param trxRequest An ASCII-encoded transaction request
+     */
+    function execTrxRequest(string calldata trxRequest) public payable {
+        emit ExecTrxRequest(msg.sender, trxRequest);
     }
 
     /**

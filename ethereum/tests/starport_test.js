@@ -299,6 +299,19 @@ describe('Starport', () => {
     });
   });
 
+  describe('#execTrxRequest', () => {
+    it('should emit ExecTrxRequest event', async () => {
+      let trxRequest = `(Extract 100 CASH Eth:${account1})`;
+      const tx = await send(starport, 'execTrxRequest', [trxRequest], { from: account1 });
+      console.log({tx: tx.events.ExecTrxRequest});
+      console.log({tx: tx.events.ExecTrxRequest.raw});
+      expect(tx.events.ExecTrxRequest.returnValues).toMatchObject({
+        account: account1,
+        trxRequest
+      });
+    });
+  });
+
   describe('#executeProposal', () => {
     it('should emit ExecuteProposal event', async () => {
       const extrinsics = ["0x010203", "0x040506"]

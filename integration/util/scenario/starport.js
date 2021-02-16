@@ -68,6 +68,21 @@ class Starport {
     return await this.starport.methods.isNoticeUsed(noticeHash).call();
   }
 
+  async execTrxRequest(actorLookup, trxReq, awaitEvent = true) {
+    let actor = this.ctx.actors.get(actorLookup);
+
+    let event;
+    let tx = this.starport.methods.execTrxRequest(trxReq).send({ from: actor.ethAddress() });
+    if (awaitEvent) {
+      // TODO: Pass in log id?
+      event = await this.ctx.chain.waitForChainProcessed();
+    }
+    return {
+      tx,
+      event
+    };
+  }
+
   async invoke(notice, signaturePairs) {
     let encoded = notice.EncodedNotice;
     let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());

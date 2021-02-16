@@ -115,12 +115,23 @@ class Actor {
       let token = this.ctx.tokens.get(asset);
       let weiAmount = token.toWeiAmount(amount);
 
-      let trxReq = this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
+      let trxReq = this.extractTrxReq(amount, asset, recipient);
 
       this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
 
       return await this.runTrxRequest(trxReq);
     });
+  }
+
+  async execTrxRequest(trxRequest, awaitEvent = true) {
+    return await this.ctx.starport.execTrxRequest(this, trxRequest, awaitEvent);
+  }
+
+  extractTrxReq(amount, asset, recipient = null) {
+    let token = this.ctx.tokens.get(asset);
+    let weiAmount = token.toWeiAmount(amount);
+
+    return this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this)
   }
 }
 
