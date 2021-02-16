@@ -8,7 +8,6 @@ import "./ICash.sol";
  * @title Compound Chain Starport
  * @author Compound Finance
  * @notice Contract to link Ethereum to Compound Chain
- * @dev XXX Many TODOs
  */
 contract Starport {
     ICash immutable public cash;
@@ -17,6 +16,7 @@ contract Starport {
     address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
     address[] public authorities;
+    mapping(address => uint) public supplyCaps;
 
     uint public eraId; // TODO: could bitpack here and use uint32
     mapping(bytes32 => bool) public isNoticeUsed;
@@ -27,6 +27,7 @@ contract Starport {
     event UnlockCash(address account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
     event ExecuteProposal(string title, bytes[] extrinsics);
+    event NewSupplyCap(address asset, uint supplyCap);
 
     constructor(ICash cash_, address admin_, address[] memory authorities_) {
         cash = cash_;
@@ -47,7 +48,6 @@ contract Starport {
      * @param asset The asset to lock in the Starport
      */
     function lock(uint amount, address asset) public {
-        // TODO: Check Supply Cap
         require(asset != ETH_ADDRESS, "Please use lockEth");
 
         if (asset == address(cash)) {
@@ -62,7 +62,7 @@ contract Starport {
      * @dev Use `lock` to lock CASH or collateral assets.
      */
     function lockEth() public payable {
-        // TODO: Check Supply Cap
+        require(address(this).balance <= supplyCaps[ETH_ADDRESS], "Supply Cap Exceeded");
         emit Lock(ETH_ADDRESS, msg.sender, msg.value);
     }
 
@@ -79,6 +79,7 @@ contract Starport {
     // Internal function for locking non-ETH collateral assets
     function lockAssetInternal(uint amount, address asset) internal {
         uint amountTransferred = transferAssetIn(msg.sender, amount, asset);
+        require(IERC20(asset).balanceOf(address(this)) <= supplyCaps[asset], "Supply Cap Exceeded");
         emit Lock(asset, msg.sender, amountTransferred);
     }
 
@@ -262,6 +263,22 @@ contract Starport {
         emit ChangeAuthorities(newAuthorities);
 
         authorities = newAuthorities;
+    }
+
+    /**
+     * @notice Sets the supply cap for a given asset.
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @dev Note: supply caps start at zero. This must be called to allow an asset to be locked in the Starport.
+     * @param asset The asset to set the supply cap for. This may be Ether Token but may not be CASH.
+     * @param supplyCap The cap to put on the asset, in its native token units.
+     */
+    function setSupplyCap(address asset, uint supplyCap) external {
+        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
+        require(asset != address(cash), "Cash does not accept supply cap");
+
+        emit NewSupplyCap(asset, supplyCap);
+
+        supplyCaps[asset] = supplyCap;
     }
 
     /**
