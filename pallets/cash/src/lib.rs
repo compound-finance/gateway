@@ -201,8 +201,8 @@ decl_storage! {
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
-        config(initial_yield): Option<(APR, Timestamp)>;
         config(reporters): ReporterSet;
+        config(initial_yield): u128;
         config(validators): Vec<ValidatorKeys>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
@@ -632,11 +632,8 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial cash yield, if provided
-    fn initialize_yield(initial_yield_config: Option<(APR, Timestamp)>) {
-        if let Some((initial_yield, initial_yield_start)) = initial_yield_config {
-            CashYield::put(initial_yield);
-            LastBlockTimestamp::put(initial_yield_start);
-        }
+    fn initialize_yield(initial_yield_config: u128) {
+        CashYield::put(APR(initial_yield_config));
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed

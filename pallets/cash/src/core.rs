@@ -1363,6 +1363,17 @@ pub fn exec_trx_request_internal<T: Config>(
 pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
     let now: Timestamp = get_now::<T>();
     let previous: Timestamp = LastBlockTimestamp::get();
+    // xxx re-evaluate how we do time, we don't really want this to be zero but there may
+    // not actually be any good way to do "current" time per-se so what we have here is more like
+    // the last block's time and the block before
+    if now == 0 {
+        return Err(Reason::TimeTravelNotAllowed);
+    }
+    if previous == 0 {
+        // this is the first time we have seen a valid time, set it
+        LastBlockTimestamp::put(now);
+        return Ok(0);
+    }
 
     let change_in_time = now
         .checked_sub(previous)
@@ -1413,10 +1424,16 @@ pub fn on_initialize<T: Config>(
 
     // Pay miners and update the CASH interest index on CASH itself
     let cash_yield: APR = CashYield::get();
+    if cash_yield == APR::ZERO {
+        log!("Cash yield is zero. No interest earned on cash in this block.");
+    }
     let cash_index_old: CashIndex = GlobalCashIndex::get();
     let total_cash_principal: CashPrincipal = TotalCashPrincipal::get();
 
     let increment = cash_yield.over_time(change_in_time)?;
+    if increment == CashIndex::ONE {
+        log!("Index increment is One. No interest on cash earned in this block!")
+    }
     let cash_index_new = cash_index_old.increment(increment)?;
     let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
     let miner_spread_principal =

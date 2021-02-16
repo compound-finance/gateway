@@ -205,7 +205,6 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
-            initial_yield: None,
             last_block_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
@@ -248,6 +247,9 @@ fn testnet_genesis(
                     eth_address: v.1,
                 })
                 .collect::<Vec<_>>(),
+
+
+            initial_yield: 8000,
         }),
     }
 }
