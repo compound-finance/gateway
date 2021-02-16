@@ -8,7 +8,7 @@ pub const ETH_FINALIZATION_BLOCKS: u32 = 30; // XXX
 
 /// Minimum amount of time (milliseconds) into the future that a synchronized change may be scheduled for.
 /// Must be sufficient time to propagate changes to L1s before they occur.
-pub const MIN_NEXT_SYNC_TIME: u32 = 24 * 60 * 60 * 1000; // XXX
+pub const MIN_NEXT_SYNC_TIME: u128 = 24 * 60 * 60 * 1000; // XXX
 
 pub const MIN_VALIDATOR_COUNT: u32 = 4; // XXX needed? in the way of dev?
 

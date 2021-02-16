@@ -59,6 +59,7 @@ pub mod chains;
 pub mod converters;
 pub mod core;
 pub mod events;
+pub mod internal;
 pub mod log;
 pub mod notices;
 pub mod oracle;
@@ -224,6 +225,8 @@ decl_storage! {
     }
 }
 
+/* ::EVENTS:: */
+
 decl_event!(
     pub enum Event {
         /// XXX -- For testing
@@ -245,6 +248,8 @@ decl_event!(
         ExecutedGovernance(Vec<(Vec<u8>, bool)>),
     }
 );
+
+/* ::ERRORS:: */
 
 decl_error! {
     pub enum Error for Module<T: Config> {
@@ -312,7 +317,10 @@ decl_error! {
         TrxRequestError,
 
         /// Error when processing chain event
-        ErrorProcessingChainEvent
+        ErrorProcessingChainEvent,
+
+        /// Error when setting a future yield rate
+        SetYieldNextFailure
     }
 }
 
@@ -364,6 +372,9 @@ impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
     }
 }
 
+/* ::MODULE:: */
+/* ::EXTRINSICS:: */
+
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -392,6 +403,18 @@ decl_module! {
         pub fn update_interest_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Self::update_interest_rate_model_internal(asset, model)?;
+            Ok(())
+        }
+
+        /// Set the cash yield rate at some point in the future
+        #[weight = 0]
+        pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            cash_err!(
+                crate::internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start),
+                <Error<T>>::SetYieldNextFailure
+            )?;
+
             Ok(())
         }
 

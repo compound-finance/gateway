@@ -1,4 +1,5 @@
 use crate::chains::ChainId;
+use crate::internal::set_yield_next::SetYieldNextError;
 use crate::notices::NoticeId;
 use crate::rates::RatesError;
 use crate::types::Nonce;
@@ -50,6 +51,7 @@ pub enum Reason {
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
     ValidatorAlreadySigned,
+    SetYieldNextError(SetYieldNextError),
 }
 
 impl From<MathError> for Reason {
