@@ -1,15 +1,16 @@
 use crate::{
     chains::{CashAsset, ChainAccount},
-    core::{extract_cash_internal, extract_internal, symbol},
+    core,
+    core::symbol,
     reason,
     reason::Reason,
     require,
     symbol::CASH,
     types::{Nonce, Quantity},
-    Config, Nonces,
+    Config, GlobalCashIndex, Nonces,
 };
 use either::Left;
-use frame_support::storage::StorageMap;
+use frame_support::storage::{StorageMap, StorageValue};
 
 pub fn exec_trx_request<T: Config>(
     request_str: &str,
@@ -32,13 +33,30 @@ pub fn exec_trx_request<T: Config>(
     match trx_request {
         trx_request::TrxRequest::Extract(amount, asset, account) => match CashAsset::from(asset) {
             CashAsset::Cash => {
-                extract_cash_internal::<T>(sender, account.into(), Left(Quantity(CASH, amount)))?;
+                core::extract_cash_internal::<T>(
+                    sender,
+                    account.into(),
+                    Left(Quantity(CASH, amount)),
+                )?;
             }
             CashAsset::Asset(chain_asset) => {
                 let symbol = symbol(&chain_asset).ok_or(Reason::AssetNotSupported)?;
                 let quantity = Quantity(symbol, amount.into());
 
-                extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
+                core::extract_internal::<T>(chain_asset, sender, account.into(), quantity)?;
+            }
+        },
+        trx_request::TrxRequest::Transfer(amount, asset, account) => match CashAsset::from(asset) {
+            CashAsset::Cash => {
+                let index = GlobalCashIndex::get(); // XXX This is re-loaded in `transfer_cash_principal_internal`
+                let principal = index.as_hold_principal(Quantity(CASH, amount))?; // XXX We later re-calcuate the amount
+                core::transfer_cash_principal_internal::<T>(sender, account.into(), principal)?;
+            }
+            CashAsset::Asset(chain_asset) => {
+                let symbol = symbol(&chain_asset).ok_or(Reason::AssetNotSupported)?;
+                let quantity = Quantity(symbol, amount.into());
+
+                core::transfer_internal::<T>(chain_asset, sender, account.into(), quantity)?;
             }
         },
     }

@@ -133,6 +133,19 @@ class Actor {
 
     return this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this)
   }
+
+  async transfer(amount, asset, recipient) {
+    return await this.declare("transfer", [amount, asset, "to", recipient], async () => {
+      let token = this.ctx.tokens.get(asset);
+      let weiAmount = token.toWeiAmount(amount);
+
+      let trxReq = this.ctx.generateTrxReq("Transfer", weiAmount, token, recipient);
+
+      this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
+
+      return await this.runTrxRequest(trxReq);
+    });
+  }
 }
 
 class Actors {
