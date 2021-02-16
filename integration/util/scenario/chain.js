@@ -1,4 +1,4 @@
-const { sendAndWaitForEvents, waitForEvent } = require('../substrate');
+const { sendAndWaitForEvents, waitForEvent, getEventData } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
 const {
   getNoticeChainId,
@@ -28,6 +28,15 @@ class Chain {
 
   async waitForEthProcessFailure(onFinalize = true) {
     return this.waitForEvent('cash', 'FailedProcessingEthEvent', onFinalize);
+  }
+
+  async waitForChainProcessed(onFinalize = true, failureEvent = null) {
+    // TODO: Match transaction id?
+    return await waitForEvent(this.api(), 'cash', 'ProcessedChainEvent', onFinalize, failureEvent);
+  }
+
+  async waitForNotice(onFinalize = true, failureEvent = null) {
+    return getEventData(await waitForEvent(this.api(), 'cash', 'Notice', onFinalize, failureEvent));
   }
 
   async getNoticeChain(notice) {
