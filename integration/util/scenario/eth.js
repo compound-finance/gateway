@@ -30,7 +30,7 @@ class Eth {
       contractArgs
     );
 
-    this.ctx.log(`${contractName} deployed to ${contract._address}`);
+    this.ctx.log(`${contractName} deployed to ${contract._address} with args ${JSON.stringify(contractArgs)}`);
 
     return contract;
   }
@@ -52,6 +52,10 @@ class Eth {
     const address = this.web3.utils.sha3(
       RLP.encode([this.defaultFrom, nonce + skip])).slice(12).substring(14);
     return this.web3.utils.toChecksumAddress(`0x${address}`);
+  }
+
+  async timestamp() {
+    return (await this.web3.eth.getBlock("pending")).timestamp;
   }
 
   async teardown() {

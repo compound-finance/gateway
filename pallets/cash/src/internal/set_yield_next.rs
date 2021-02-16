@@ -19,7 +19,7 @@ pub enum SetYieldNextError {
     TimestampTooSoonToNext,
 }
 
-fn get_cash_yield_index_at<T: Config>(change_in_time: Timestamp) -> Result<CashIndex, Reason> {
+fn get_cash_yield_index_after<T: Config>(change_in_time: Timestamp) -> Result<CashIndex, Reason> {
     let cash_yield: APR = CashYield::get();
     let cash_index_old: CashIndex = GlobalCashIndex::get();
 
@@ -54,7 +54,7 @@ pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Re
     );
 
     // Read NextYieldIndex=GetCashYieldIndexAt(NextAPRStart)
-    let next_yield_index: CashIndex = get_cash_yield_index_at::<T>(change_in_time)?;
+    let next_yield_index: CashIndex = get_cash_yield_index_after::<T>(change_in_time)?;
 
     // Set CashYieldNext=(NextAPR, NextAPRStart)
     CashYieldNext::put((next_apr, next_apr_start));
