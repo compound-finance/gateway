@@ -13,7 +13,7 @@ pub type Amount = u128;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum MaxAmount {
-    Amt(Amount),
+    Amount(Amount),
     Max,
 }
 
@@ -35,8 +35,8 @@ pub enum Account {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum TrxRequest {
-    Extract(Amount, Asset, Account),
-    Transfer(Amount, Asset, Account),
+    Extract(MaxAmount, Asset, Account),
+    Transfer(MaxAmount, Asset, Account),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -57,6 +57,13 @@ fn parse_amount<'a>(t: &Token) -> Result<Amount, ParseError<'a>> {
         Token::Integer(Some(v)) => Ok(*v),
         Token::Hex(Some(v)) => Ok(hex_util::hex_to_u128(v).ok_or(ParseError::InvalidAmount)?),
         _ => Err(ParseError::InvalidAmount), // TODO: Debug here?
+    }
+}
+
+fn parse_max_amount<'a>(t: &Token) -> Result<MaxAmount, ParseError<'a>> {
+    match t {
+        Token::Identifier("Max") | Token::Identifier("MAX") => Ok(MaxAmount::Max),
+        els => Ok(MaxAmount::Amount(parse_amount(els)?)),
     }
 }
 
@@ -117,11 +124,11 @@ fn parse_asset<'a>(t: &Token<'a>) -> Result<Asset, ParseError<'a>> {
 fn parse_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
     match args {
         [amount_token, asset_token, account_token] => {
-            let amount = parse_amount(amount_token)?;
+            let max_amount = parse_max_amount(amount_token)?;
             let asset = parse_asset(asset_token)?;
             let account = parse_account(account_token)?;
 
-            Ok(TrxRequest::Extract(amount, asset, account))
+            Ok(TrxRequest::Extract(max_amount, asset, account))
         }
         _ => Err(ParseError::InvalidArgs("Extract", 2, args.len())),
     }
@@ -130,11 +137,11 @@ fn parse_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
 fn parse_transfer<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
     match args {
         [amount_token, asset_token, account_token] => {
-            let amount = parse_amount(amount_token)?;
+            let max_amount = parse_max_amount(amount_token)?;
             let asset = parse_asset(asset_token)?;
             let account = parse_account(account_token)?;
 
-            Ok(TrxRequest::Transfer(amount, asset, account))
+            Ok(TrxRequest::Transfer(max_amount, asset, account))
         }
         _ => Err(ParseError::InvalidArgs("Transfer", 2, args.len())),
     }
@@ -206,34 +213,53 @@ mod tests {
         "(MyFun 3 Eth:0x55)" => Err(ParseError::UnknownFunction("MyFun")),
       parse_extract:
         "(Extract 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          3,
+          MaxAmount::Amount(3),
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
       parse_extract_cash_in_caps:
         "(Extract 3 CASH Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          3,
+          MaxAmount::Amount(3),
           Asset::Cash,
           Account::Eth(ALAN)
         )),
       parse_extract_cash_in_camel:
         "(Extract 3 Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          3,
+          MaxAmount::Amount(3),
           Asset::Cash,
           Account::Eth(ALAN)
         )),
       parse_extract_hex:
         "(Extract 0x0100 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          256,
+          MaxAmount::Amount(256),
           Asset::Eth(ETH),
+          Account::Eth(ALAN)
+        )),
+      parse_extract_max:
+        "(Extract Max Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+          MaxAmount::Max,
+          Asset::Cash,
+          Account::Eth(ALAN)
+        )),
+      parse_extract_max_caps:
+        "(Extract MAX Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
+          MaxAmount::Max,
+          Asset::Cash,
           Account::Eth(ALAN)
         )),
       parse_transfer:
         "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Transfer(
-          3,
+          MaxAmount::Amount(3),
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
+      parse_transfer_max:
+        "(Transfer Max Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Transfer(
+          MaxAmount::Max,
+          Asset::Eth(ETH),
+          Account::Eth(ALAN)
+        )),
+      // TODO: Should we prohibit non-Cash from being Maxable?
       parse_fail_no_zero_ex:
         "(Extract 3 Eth:xxeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
       parse_fail_invalid_amount_invalid:

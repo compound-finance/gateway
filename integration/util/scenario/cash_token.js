@@ -12,6 +12,14 @@ class CashToken extends Token {
     return `CASH`;
   }
 
+  toWeiAmount(tokenAmount) {
+    if (tokenAmount === 'Max' || tokenAmount === 'MAX') {
+      return tokenAmount;
+    } else {
+      super.toWeiAmount(tokenAmount)
+    }
+  }
+
   async cashIndex() {
     return this.cashToken.methods.getCashIndex().call();
   }

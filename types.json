@@ -299,7 +299,9 @@
       "TrxRequestParseError": "TrxReqParseError",
       "UnknownValidator": "",
       "ValidatorAlreadySigned": "",
-      "SetYieldNextError": "SetYieldNextError"
+      "SetYieldNextError": "SetYieldNextError",
+      "MaxForNonCashAsset": "",
+      "MaxWithNegativeCashPrincipal": ""
     }
   },
   "MathError": {
