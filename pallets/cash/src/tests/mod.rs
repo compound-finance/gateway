@@ -1,4 +1,5 @@
 use crate::{chains::*, core::*, mock::*, rates::*, reason::Reason, symbol::*, *};
+use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
 use sp_core::crypto::AccountId32;
@@ -36,10 +37,12 @@ pub fn initialize_storage() {
         ConfigAsset {
             symbol: FromStr::from_str("ETH/18").unwrap(),
             asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
+            liquidity_factor: FromStr::from_str("7890").unwrap(),
         },
         ConfigAsset {
             symbol: FromStr::from_str("USDC/6").unwrap(),
             asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
+            liquidity_factor: FromStr::from_str("7890").unwrap(),
         },
     ]);
     CashModule::initialize_validators(

@@ -274,6 +274,7 @@
       "InsufficientChainCash": "",
       "InsufficientLiquidity": "",
       "InsufficientTotalFunds": "",
+      "InvalidLiquidityFactor": "",
       "InvalidSignature": "",
       "InvalidSymbol": "",
       "InvalidUTF8": "",
@@ -371,5 +372,7 @@
       "TimestampTooSoonToNow": "",
       "TimestampTooSoonToNext": ""
     }
-  }
+  },
+  "Source10": "AccountRS",
+  "LiquidityFactor": "u128"
 }

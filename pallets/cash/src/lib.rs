@@ -24,7 +24,7 @@ use crate::types::{
     ConfigAsset, ConfigSetString, EncodedNotice, Nonce, ReporterSet, SessionIndex, Timestamp,
     ValidatorSig,
 };
-use codec::{alloc::string::String, Decode, Encode};
+use codec::alloc::string::String;
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, Parameter};
 use frame_system::{
     ensure_none, ensure_root,
@@ -64,6 +64,7 @@ pub mod log;
 pub mod notices;
 pub mod oracle;
 pub mod params;
+pub mod portfolio;
 pub mod rates;
 pub mod reason;
 pub mod symbol;
@@ -155,13 +156,18 @@ decl_storage! {
         /// The mapping of asset balances, by asset and account.
         AssetBalances get(fn asset_balance): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetBalance;
 
+        /// Assets with non-zero balance
+        AssetsWithNonZeroBalance get(fn assets_with_non_zero_balance): map hasher(blake2_128_concat) ChainAccount => Vec<ChainAsset>;
+
         /// The mapping of asset indices, by asset and account.
         LastIndices get(fn last_indices): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
 
         // XXX break into separate storage
         //  liquidity factor, supply cap, etc.
         /// The asset metadata to be synced with the starports.
-        AssetMetadata get (fn asset_metadata): map hasher(blake2_128_concat) ChainAsset => ();
+        AssetMetadata get(fn asset_metadata): map hasher(blake2_128_concat) ChainAsset => ();
+
+        LiquidityFactors get(fn liquidation_factors): map hasher(blake2_128_concat) Symbol => crate::types::LiquidityFactor;
 
         /// Mapping of assets to symbols, which determines if an asset is supported.
         AssetSymbols get(fn asset_symbol): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
@@ -398,6 +404,15 @@ decl_module! {
             Ok(())
         }
 
+
+        /// Set the price using the open price feed.
+        #[weight = 0]
+        pub fn set_liquidity_factor(origin, symbol: Symbol, liquidity_factor: crate::types::LiquidityFactor) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            LiquidityFactors::insert(symbol, liquidity_factor);
+            Ok(())
+        }
+
         /// Update the interest rate model for a given asset. This is only called by governance
         #[weight = 0]
         pub fn update_interest_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
@@ -619,6 +634,7 @@ impl<T: Config> Module<T> {
             // TODO: specify rate model in ConfigAsset
             RateModels::insert(&asset.asset, InterestRateModel::default());
             AssetSymbols::insert(&asset.asset, asset.symbol);
+            LiquidityFactors::insert(&asset.symbol, asset.liquidity_factor);
         }
     }
 

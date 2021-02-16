@@ -16,8 +16,6 @@ let pricePayloads = {
   }
 };
 
-// TODO: Make sure OCW aren't trying to pull in real prices
-
 buildScenarios('Prices Scenarios', prices_scen_info, [
   {
     name: "Prices from Storage",

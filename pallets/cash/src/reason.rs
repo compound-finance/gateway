@@ -27,6 +27,7 @@ pub enum Reason {
     InsufficientChainCash,
     InsufficientLiquidity,
     InsufficientTotalFunds,
+    InvalidLiquidityFactor,
     InvalidSignature,
     InvalidSymbol,
     InvalidUTF8,

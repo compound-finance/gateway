@@ -39,7 +39,8 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   );
   let assets = tokens.all().map((token) => ({
     symbol: `${token.symbol.toUpperCase()}/${token.decimals}`,
-    asset: `eth:${token.ethAddress()}`
+    asset: `eth:${token.ethAddress()}`,
+    liquidity_factor: `6543`,
   }));
 
   let initialYieldConfig = {};
