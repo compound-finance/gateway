@@ -1,6 +1,7 @@
 const { debug, log, error } = require('../log');
 const { merge, sleep } = require('../util');
 const path = require('path');
+const { declare } = require('./declare');
 
 const { baseScenInfo } = require('./scen_info');
 const { buildEth } = require('./eth');
@@ -84,6 +85,10 @@ class Ctx {
 
   api() {
     return this.validators.api();
+  }
+
+  declare(declareInfo, ...args) {
+    return declare(this, declareInfo, ...args);
   }
 
   getTestObject() {
