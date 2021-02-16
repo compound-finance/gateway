@@ -1,5 +1,4 @@
 const {
-  years,
   buildScenarios,
 } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');

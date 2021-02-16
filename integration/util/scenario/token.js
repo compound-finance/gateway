@@ -42,6 +42,14 @@ class Token {
     return undec(weiAmount, this.decimals);
   }
 
+  show() {
+    return this.symbol;
+  }
+
+  showAmount(weiAmount) {
+    return `${this.toTokenAmount(weiAmount)} ${this.symbol}`;
+  }
+
   async getBalance(actorLookup) {
     let actor = this.ctx.actors.get(actorLookup);
     let balanceWei = await this.token.methods.balanceOf(actor.ethAddress()).call();

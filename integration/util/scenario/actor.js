@@ -5,12 +5,18 @@ const { sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
 const { CashToken } = require('./cash_token');
 
+
 class Actor {
   constructor(name, ethAddress, chainKey, ctx) {
     this.name = name;
     this.__ethAddress = ethAddress;
     this.chainKey = chainKey;
     this.ctx = ctx;
+    this.nextId = 0;
+  }
+
+  show() {
+    return this.name;
   }
 
   ethAddress() {
@@ -27,6 +33,21 @@ class Actor {
 
   toTrxArg() {
     return `Eth:${this.ethAddress()}`;
+  }
+
+  declareInfo() {
+    return {
+      active: "I am going to",
+      past: "I just did",
+      failed: "I failed to",
+      colorId: [...this.name].reduce((acc, el) => el.charCodeAt(0) + acc, 0),
+      id: this.nextId++,
+      name: this.name
+    };
+  }
+
+  declare(...args) {
+    return this.ctx.declare(this.declareInfo(), ...args);
   }
 
   async nonce() {
@@ -80,22 +101,26 @@ class Actor {
   }
 
   async lock(amount, asset, awaitEvent = true) {
-    let lockRes = await this.ctx.starport.lock(this, amount, asset);
-    if (awaitEvent) {
-      await this.ctx.chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
-    }
-    return lockRes;
+    return await this.declare("lock", [amount, asset], async () => {
+      let lockRes = await this.ctx.starport.lock(this, amount, asset);
+      if (awaitEvent) {
+        await this.ctx.chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
+      }
+      return lockRes;
+    });
   }
 
   async extract(amount, asset, recipient = null) {
-    let token = this.ctx.tokens.get(asset);
-    let weiAmount = token.toWeiAmount(amount);
+    return await this.declare("extract", [amount, asset, "for", recipient || "myself"], async () => {
+      let token = this.ctx.tokens.get(asset);
+      let weiAmount = token.toWeiAmount(amount);
 
-    let trxReq = this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
+      let trxReq = this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
 
-    this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
+      this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
 
-    return await this.runTrxRequest(trxReq);
+      return await this.runTrxRequest(trxReq);
+    });
   }
 }
 

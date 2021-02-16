@@ -1,5 +1,5 @@
 const { buildCtx } = require('./scenario/ctx');
-const { merge } = require('./util');
+const { merge, sleep } = require('./util');
 
 async function expectRevert(fn, reason) {
   // TODO: Expectation
@@ -72,4 +72,5 @@ module.exports = {
   merge,
   expectRevert,
   buildScenarios,
+  sleep,
 };

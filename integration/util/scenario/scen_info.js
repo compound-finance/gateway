@@ -24,6 +24,7 @@ const baseScenInfo = {
     use_temp: true,
     props: {}
   },
+  declare_opts: {},
   starport: {},
   cash_token: {
     initial_yield_index: '10000'
