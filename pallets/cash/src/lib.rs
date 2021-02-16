@@ -24,7 +24,7 @@ use crate::types::{
     ConfigAsset, ConfigSetString, EncodedNotice, Nonce, ReporterSet, SessionIndex, Timestamp,
     ValidatorSig,
 };
-use codec::{alloc::string::String, Decode, Encode};
+use codec::alloc::string::String;
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch, Parameter};
 use frame_system::{
     ensure_none, ensure_root,

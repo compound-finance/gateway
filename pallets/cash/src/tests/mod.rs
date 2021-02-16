@@ -1,4 +1,5 @@
 use crate::{chains::*, core::*, mock::*, rates::*, reason::Reason, symbol::*, *};
+use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
 use sp_core::crypto::AccountId32;

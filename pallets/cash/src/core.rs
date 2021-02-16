@@ -811,11 +811,6 @@ pub fn liquidate_internal<T: Config>(
     let seize_amount = amount; // XXX * liquidation_incentive * price::<T>(asset) / price::<T>(collateral_asset);
 
     require!(
-        /*account: &ChainAccount,
-        asset: &ChainAsset,
-        amount: AssetAmount,
-        collateral_asset: &ChainAsset,
-        collateral_amount: AssetAmount,*/
         has_liquidity_to_reduce_asset_with_added_collateral(
             &liquidator,
             &asset,
