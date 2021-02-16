@@ -58,7 +58,7 @@ describe('Starport', () => {
     const cashAddress = getNextContractAddress(root, rootNonce + 1);
 
     starport = await deploy('StarportHarness', [cashAddress, root, authorityAddresses]);
-    cash = await deploy('CashToken', [starport._address]);
+    cash = await deploy('CashToken', [starport._address, 0, 1e4, fromNow(0)]);
 
     // Give some 100e6 CASH to account1
     let mintPrincipal = await cash.methods.amountToPrincipal(e6(100)).call();
