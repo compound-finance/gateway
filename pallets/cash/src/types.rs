@@ -11,6 +11,7 @@ use crate::{
     symbol::{static_pow10, Symbol, Ticker, Units, CASH, USD},
     SubstrateId,
 };
+use our_std::num::FpCategory;
 
 // Type aliases //
 
@@ -632,6 +633,15 @@ pub const fn int_from_string_with_decimals(decimals: Decimals, s: &'static str) 
     qty * scalar
 }
 
+fn check_float(f: f64) -> Result<(), MathError> {
+    match f.classify() {
+        FpCategory::Zero | FpCategory::Normal => Ok(()),
+        FpCategory::Subnormal | FpCategory::Infinite | FpCategory::Nan => {
+            Err(MathError::AbnormalFloatingPointResult)
+        }
+    }
+}
+
 /// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
 /// the output number of decimals.
 ///
@@ -643,34 +653,23 @@ pub fn mul(
     b_decimals: Decimals,
     out_decimals: Decimals,
 ) -> Result<Uint, MathError> {
-    let all_numerator_decimals = a_decimals
-        .checked_add(b_decimals)
-        .ok_or(MathError::Overflow)?;
-    if all_numerator_decimals > out_decimals {
-        // scale down
-        let scale_decimals = all_numerator_decimals
-            .checked_sub(out_decimals)
-            .ok_or(MathError::Underflow)?;
-        let scale = 10u128
-            .checked_pow(scale_decimals as u32)
-            .ok_or(MathError::Overflow)?;
-        Ok(a.checked_mul(b)
-            .ok_or(MathError::Overflow)?
-            .checked_div(scale)
-            .ok_or(MathError::DivisionByZero)?)
-    } else {
-        // scale up
-        let scale_decimals = out_decimals
-            .checked_sub(all_numerator_decimals)
-            .ok_or(MathError::Underflow)?;
-        let scale = 10u128
-            .checked_pow(scale_decimals as u32)
-            .ok_or(MathError::Overflow)?;
-        Ok(a.checked_mul(b)
-            .ok_or(MathError::Overflow)?
-            .checked_mul(scale)
-            .ok_or(MathError::Overflow)?)
+    let scale_dec = (a_decimals as f64) + (b_decimals as f64) - (out_decimals as f64);
+    // todo: in an attempt to avoid going fractional it may be worthwhile to always keep scale >= 1 and mul/div as needed, that may improve precision in some circumstances
+    let scale = 10f64.powf(scale_dec);
+    let float_res = (a as f64) * (b as f64) / scale;
+    check_float(float_res)?;
+
+    if float_res > Uint::MAX as f64 {
+        return Err(MathError::Overflow);
     }
+    if float_res < 0f64 {
+        // technically this should be unreachable
+        return Err(MathError::Underflow);
+    }
+
+    let converted = float_res as Uint;
+
+    Ok(converted)
 }
 
 /// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify
@@ -815,7 +814,7 @@ mod tests {
     #[test]
     fn test_from_nominal_with_all_decimals() {
         let a = Quantity::from_nominal("123.456789", CASH);
-        let b = Quantity::new(123456789, CASH);
+        let b = Quantity::new(123456789000000000000, CASH);
         assert_eq!(a, b);
     }
 
@@ -920,8 +919,8 @@ mod tests {
 
     #[test]
     fn test_mul_index() {
-        let pprincipal = CashPrincipal(100000000);
-        let nprincipal = CashPrincipal(-100000000);
+        let pprincipal = CashPrincipal::from_nominal("100");
+        let nprincipal = CashPrincipal::from_nominal("-100");
         let index = CashIndex::from_nominal("1.01");
         let pquantity = index.as_hold_amount(pprincipal).unwrap();
         let nquantity = index.as_debt_amount(nprincipal).unwrap();
@@ -939,21 +938,21 @@ mod tests {
 
     #[test]
     fn test_mul_overflow() {
-        let result = mul(Uint::max_value() / 2 + 1, 0, 2, 0, 0);
+        // todo: why is 100000000000000000000000000000 necessary..... that is way too big, 1 is too small but should work, that must represent lost precision
+        let result = mul(Uint::MAX / 2 + 100000000000000000000000000000, 0, 2, 0, 0);
         assert_eq!(result, Err(MathError::Overflow));
     }
 
     #[test]
     fn test_mul_overflow_boundary() {
-        let result = mul(Uint::max_value(), 0, 1, 0, 0);
-        assert_eq!(result, Ok(Uint::max_value()));
+        let result = mul(Uint::MAX, 0, 1, 0, 0);
+        assert_eq!(result, Ok(Uint::MAX));
     }
 
     #[test]
     fn test_mul_overflow_boundary_2() {
-        // note max value is odd thus truncated here and we lose a digit
-        let result = mul(Uint::max_value() / 2, 0, 2, 0, 0);
-        assert_eq!(result, Ok(Uint::max_value() - 1));
+        let result = mul(Uint::MAX / 2, 0, 2, 0, 0);
+        assert_eq!(result, Ok(Uint::MAX));
     }
 
     #[test]

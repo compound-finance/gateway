@@ -55,7 +55,7 @@ impl APR {
             // this can happen when increment is + infinity for example
             return Err(MathError::AbnormalFloatingPointResult);
         }
-        if increment > (Uint::max_value() as f64) {
+        if increment > (Uint::MAX as f64) {
             return Err(MathError::Overflow);
         }
         Ok(CashIndex(increment as Uint))
@@ -407,20 +407,20 @@ mod test {
                 message: "Borrowed can not be more than supplied",
             },
             UtilizationTestCase {
-                supplied: Uint::max_value(),
-                borrowed: Uint::max_value(),
+                supplied: Uint::MAX,
+                borrowed: Uint::MAX,
                 expected: Err(RatesError::Overflowed),
                 message: "These numbers are vastly too large to compute the utilization",
             },
             UtilizationTestCase {
-                supplied: Uint::max_value() / Utilization::ONE.0 + 1,
-                borrowed: Uint::max_value() / Utilization::ONE.0 + 1,
+                supplied: Uint::MAX / Utilization::ONE.0 + 1,
+                borrowed: Uint::MAX / Utilization::ONE.0 + 1,
                 expected: Err(RatesError::Overflowed),
                 message: "These numbers are only just too large to compute the utilization",
             },
             UtilizationTestCase {
-                supplied: Uint::max_value() / Utilization::ONE.0,
-                borrowed: Uint::max_value() / Utilization::ONE.0,
+                supplied: Uint::MAX / Utilization::ONE.0,
+                borrowed: Uint::MAX / Utilization::ONE.0,
                 expected: Ok(Utilization::ONE),
                 message: "These are the largest numbers we can use to compute the utilization",
             },
@@ -644,7 +644,7 @@ mod test {
         let r = APR::from_nominal("0.2"); // 20% per year
         let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
         let actual = r.over_time(dt).unwrap(); // compounded continuously
-        let expected = CashIndex::from_nominal("1.1051"); // from google sheets
+        let expected = CashIndex::from_nominal("1.105170918075647744"); // from google sheets
         assert_eq!(actual, expected);
     }
 }

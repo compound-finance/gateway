@@ -168,38 +168,23 @@ fn compute_cash_principal_per_internal(
     cash_index: Uint,
     price_asset: AssetPrice,
 ) -> Option<Uint> {
-// as cannot panic here u8 -> i32 is safe, beware of changes in the future to u8 above
-    let numerator_decimals = (APR::DECIMALS.checked_add(Price::DECIMALS)?) as i32;
-    let denominator_decimals = CashIndex::DECIMALS as i32;
-    let output_decimals = AssetIndex::DECIMALS as i32;
-    let scale_decimals = output_decimals
-        .checked_sub(numerator_decimals)?
-        .checked_add(denominator_decimals)?;
+    let asset_rate = asset_rate as f64;
+    let dt = dt as f64;
+    let cash_index = cash_index as f64;
+    let price_asset = price_asset as f64;
+    let ms_per_year = MILLISECONDS_PER_YEAR as f64;
 
-    let raw = if scale_decimals < 0 {
-        // scale down
-        // `as` is safe here due to above non-negativity check and will not panic.
-        // scale down last for best precision
-        let scalar = 10u128.checked_pow((-1 * scale_decimals) as u32)?;
-        asset_rate
-            .checked_mul(dt)?
-            .checked_mul(price_asset)?
-            .checked_div(cash_index)?
-            .checked_div(MILLISECONDS_PER_YEAR)?
-            .checked_div(scalar)?
-    } else {
-        // scale up, be sure to scale up first to avoid truncation at 0
-        // for this calculation overflow due to prescale is not a problem
-        let scalar = 10u128.checked_pow(scale_decimals as u32)?;
-        asset_rate
-            .checked_mul(scalar)?
-            .checked_mul(dt)?
-            .checked_mul(price_asset)?
-            .checked_div(cash_index)?
-            .checked_div(MILLISECONDS_PER_YEAR)?
-    };
+    let numerator_decimals = (APR::DECIMALS.checked_add(Price::DECIMALS)?) as f64;
+    let denominator_decimals = CashIndex::DECIMALS as f64;
+    let output_decimals = AssetIndex::DECIMALS as f64;
+    let scale_decimals = output_decimals + denominator_decimals - numerator_decimals;
+    let scale = 10f64.powf(scale_decimals);
 
-    Some(raw)
+    let as_float = asset_rate * dt * price_asset * scale / cash_index / ms_per_year;
+
+    let as_int = as_float as Uint;
+
+    Some(as_int)
 }
 
 pub fn compute_cash_principal_per(
@@ -1944,15 +1929,8 @@ mod tests {
         let price_asset = Price::from_nominal(CASH.ticker, "1450");
 
         let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
-        let expected = CashPrincipal::from_nominal("39.542520"); // from hand calc
+        let expected = CashPrincipal::from_nominal("39.542520035618873344"); // from hand calc
         assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_foo() {
-        let x = 12345678f64;
-        let y= x.log10();
-        assert_eq!(y, 0f64);
     }
 
     #[test]
@@ -2056,22 +2034,20 @@ mod tests {
 
             assert_eq!(
                 SupplyIndices::get(&asset),
-                AssetIndex::from_nominal("1273.542520")
+                AssetIndex::from_nominal("1273.542520035618873344")
             );
             assert_eq!(
                 BorrowIndices::get(&asset),
-                AssetIndex::from_nominal("1425.699020")
+                AssetIndex::from_nominal("1425.699020480854851584")
             );
-            assert_eq!(GlobalCashIndex::get(), CashIndex::from_nominal("1.1924"));
-            // todo: it looks like some precision is getting lost should be 462104.853072
+            assert_eq!(GlobalCashIndex::get(), CashIndex::from_nominal("1.192442441770438848"));
             assert_eq!(
                 TotalCashPrincipal::get(),
-                CashPrincipal::from_nominal("462104.853000")
+                CashPrincipal::from_nominal("462104.853072128226885632")
             );
-            // todo: same here, should be 243.097061
             assert_eq!(
                 CashPrincipals::get(&miner),
-                CashPrincipal::from_nominal("243.097000")
+                CashPrincipal::from_nominal("243.097061442564915200")
             );
         });
     }
