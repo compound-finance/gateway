@@ -153,7 +153,7 @@ fn scale_multiple_terms(
         .checked_sub(numerator_decimals)?
         .checked_add(denominator_decimals)?;
     if scale_decimals < 0 {
-        // as is safe here due to above non-negativity check and will not panic.
+
         let scalar = 10u128.checked_pow((-1 * scale_decimals) as u32)?;
         unscaled.checked_div(scalar)
     } else {
@@ -168,18 +168,38 @@ fn compute_cash_principal_per_internal(
     cash_index: Uint,
     price_asset: AssetPrice,
 ) -> Option<Uint> {
-    let unscaled = asset_rate
-        .checked_mul(dt)?
-        .checked_mul(price_asset)?
-        .checked_div(cash_index)?
-        .checked_div(MILLISECONDS_PER_YEAR)?;
+// as cannot panic here u8 -> i32 is safe, beware of changes in the future to u8 above
+    let numerator_decimals = (APR::DECIMALS.checked_add(Price::DECIMALS)?) as i32;
+    let denominator_decimals = CashIndex::DECIMALS as i32;
+    let output_decimals = AssetIndex::DECIMALS as i32;
+    let scale_decimals = output_decimals
+        .checked_sub(numerator_decimals)?
+        .checked_add(denominator_decimals)?;
 
-    scale_multiple_terms(
-        unscaled,
-        APR::DECIMALS + Price::DECIMALS,
-        CashIndex::DECIMALS,
-        AssetIndex::DECIMALS,
-    )
+    let raw = if scale_decimals < 0 {
+        // scale down
+        // `as` is safe here due to above non-negativity check and will not panic.
+        // scale down last for best precision
+        let scalar = 10u128.checked_pow((-1 * scale_decimals) as u32)?;
+        asset_rate
+            .checked_mul(dt)?
+            .checked_mul(price_asset)?
+            .checked_div(cash_index)?
+            .checked_div(MILLISECONDS_PER_YEAR)?
+            .checked_div(scalar)?
+    } else {
+        // scale up, be sure to scale up first to avoid truncation at 0
+        // for this calculation overflow due to prescale is not a problem
+        let scalar = 10u128.checked_pow(scale_decimals as u32)?;
+        asset_rate
+            .checked_mul(scalar)?
+            .checked_mul(dt)?
+            .checked_mul(price_asset)?
+            .checked_div(cash_index)?
+            .checked_div(MILLISECONDS_PER_YEAR)?
+    };
+
+    Some(raw)
 }
 
 pub fn compute_cash_principal_per(
@@ -1925,6 +1945,28 @@ mod tests {
 
         let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
         let expected = CashPrincipal::from_nominal("39.542520"); // from hand calc
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_foo() {
+        let x = 12345678f64;
+        let y= x.log10();
+        assert_eq!(y, 0f64);
+    }
+
+    #[test]
+    fn test_compute_cash_principal_per_realistic_underflow_case() {
+        // a unit test related to previous unexpected larger scope test of on_initialize
+        // This case showed that we should have more decimals on CASH token to avoid 0 interest
+        // showing for common cases. We want "number go up" technology.
+        let asset_rate = APR::from_nominal("0.156");
+        let dt = 6000;
+        let cash_index = CashIndex::from_nominal("4.629065392511782467");
+        let price_asset = Price::from_nominal(CASH.ticker, "0.313242");
+
+        let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
+        let expected = CashPrincipal::from_nominal("0.000000002008426366"); // from hand calc
         assert_eq!(actual, expected);
     }
 
