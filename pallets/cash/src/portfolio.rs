@@ -77,255 +77,177 @@ impl Portfolio {
     }
 }
 
-// XXX fix/convert these tests
-// #[cfg(test)]
-// pub mod tests {
-//     use super::*;
-//     use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::types::Price;
+    use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
 
-//     #[test]
-//     fn test_from_storage() {
-//         new_test_ext().execute_with(|| {
-//             let asset1 = ChainAsset::Eth([238; 20]);
-//             let asset2 = ChainAsset::Eth([100; 20]);
-//             let account = ChainAccount::Eth([0; 20]);
-//             let asset1_symbol = Symbol::new("ETH", 18);
-//             let asset2_symbol = Symbol::new("COMP", 6);
-//             let asset1_balance =
-//                 Quantity::from_nominal(asset1_symbol, "11.123456789").1 as AssetBalance;
-//             let cash_principal = CashPrincipal::from_nominal("100");
+    struct TestAsset {
+        asset: u8,
+        ticker: &'static str,
+        decimals: u8,
+        balance: &'static str,
+        price: &'static str,
+        liquidity_factor: &'static str,
+    }
 
-//             // could also set CashPrincipals
-//             Prices::insert(asset1_symbol, 1451_123456); // $1451.123456
-//             Prices::insert(asset2_symbol, 500_789123); // $1451.123456
-//             AssetSymbols::insert(&asset1, asset1_symbol);
-//             AssetSymbols::insert(&asset2, asset2_symbol);
-//             AssetsWithNonZeroBalance::insert(account.clone(), vec![asset1.clone(), asset2.clone()]);
+    struct GetLiquidityTestCase {
+        cash_index: &'static str,
+        cash_principal: Option<&'static str>,
+        expected_liquidity: Result<&'static str, Reason>,
+        test_assets: Vec<TestAsset>,
+        error_message: &'static str,
+    }
 
-//             AssetBalances::insert(asset1.clone(), account.clone(), asset1_balance);
-//             CashPrincipals::insert(&account, cash_principal);
+    fn test_get_liquidity_test_case(case: GetLiquidityTestCase) {
+        // todo: xxx finish this test
+        new_test_ext().execute_with(|| {
+            let account = ChainAccount::Eth([0; 20]);
 
-//             let expected = Portfolio {
-//                 positions: vec![
-//                     SignedQuantity(asset1_symbol, asset1_balance),
-//                     SignedQuantity(asset2_symbol, 0),
-//                 ],
-//                 cash_principal: cash_principal,
-//             };
+            for asset_case in case.test_assets {
+                let asset = ChainAsset::Eth([asset_case.asset; 20]);
+                let decimals = asset_case.decimals;
+                let liquidity_factor = LiquidityFactor::from_nominal(asset_case.liquidity_factor);
+                let reserve_factor: ReserveFactor = Default::default();
+                let rate_model: InterestRateModel = Default::default();
+                let supply_cap = AssetAmount::MAX;
+                let symbol = Symbol::new(&asset_case.ticker);
+                let ticker = Ticker::new(&asset_case.ticker);
 
-//             let actual = Portfolio::from_storage(&account).unwrap();
-//             assert_eq!(actual, expected);
+                let asset_info = AssetInfo {
+                    asset,
+                    decimals,
+                    liquidity_factor,
+                    reserve_factor,
+                    rate_model,
+                    supply_cap,
+                    symbol,
+                    ticker,
+                };
+                SupportedAssets::insert(asset, asset_info);
 
-//             // test seen
-//             let change_in_balance = SignedQuantity(asset1_symbol, asset1_balance);
-//             let actual = actual.asset_balance_change(change_in_balance).unwrap();
-//             let expected = Portfolio {
-//                 positions: vec![
-//                     SignedQuantity(asset1_symbol, asset1_balance * 2),
-//                     SignedQuantity(asset2_symbol, 0),
-//                 ],
-//                 cash_principal: cash_principal,
-//             };
-//             assert_eq!(actual, expected);
+                let price = Price::from_nominal(ticker, asset_case.price);
+                Prices::insert(ticker, price.value);
 
-//             // test not seen
-//             let asset3_symbol = Symbol::new("FOO", 6);
-//             let asset3_balance = SignedQuantity(asset3_symbol, 1234567);
-//             let actual = actual.asset_balance_change(asset3_balance).unwrap();
-//             let expected = Portfolio {
-//                 positions: vec![
-//                     SignedQuantity(asset1_symbol, asset1_balance * 2),
-//                     SignedQuantity(asset2_symbol, 0),
-//                     asset3_balance,
-//                 ],
-//                 cash_principal: cash_principal,
-//             };
-//             assert_eq!(actual, expected);
+                let units = Units::from_ticker_str(&asset_case.ticker, asset_case.decimals);
 
-//             // test modify cash
-//             let change_in_principal = CashPrincipal::from_nominal("123456");
-//             let actual = actual.cash_principal_change(change_in_principal).unwrap();
-//             let expected = Portfolio {
-//                 positions: vec![
-//                     SignedQuantity(asset1_symbol, asset1_balance * 2),
-//                     SignedQuantity(asset2_symbol, 0),
-//                     asset3_balance,
-//                 ],
-//                 cash_principal: cash_principal.add(change_in_principal).unwrap(),
-//             };
-//             assert_eq!(actual, expected);
-//         });
-//     }
+                let balance = Balance::from_nominal(asset_case.balance, units);
+                AssetBalances::insert(&asset, &account, balance.value);
+                AssetsWithNonZeroBalance::insert(&account, &asset, ());
+            }
 
-//     struct TestAsset {
-//         asset: u8,
-//         ticker: &'static str,
-//         decimals: u8,
-//         balance: &'static str,
-//         price: &'static str,
-//         liquidity_factor: &'static str,
-//     }
+            GlobalCashIndex::put(CashIndex::from_nominal(case.cash_index));
+            if let Some(cash_principal) = case.cash_principal {
+                CashPrincipals::insert(&account, CashPrincipal::from_nominal(cash_principal));
+            }
 
-//     struct GetLiquidityTestCase {
-//         cash_index: &'static str,
-//         cash_principal: Option<&'static str>,
-//         expected_liquidity: Result<&'static str, Reason>,
-//         test_assets: Vec<TestAsset>,
-//         error_message: &'static str,
-//     }
+            let actual = Portfolio::from_storage::<Test>(account)
+                .unwrap()
+                .get_liquidity::<Test>();
+            let expected = match case.expected_liquidity {
+                Ok(liquidity_str) => Ok(Balance::from_nominal(liquidity_str, USD)),
+                Err(e) => Err(e),
+            };
 
-//     fn test_get_liquidity_test_case(case: GetLiquidityTestCase) {
-//         // todo: xxx finish this test
-//         new_test_ext().execute_with(|| {
-//             let account = ChainAccount::Eth([0; 20]);
-//             let mut assets_with_nonzero_balances = Vec::new();
+            assert_eq!(expected, actual, "{}", case.error_message);
+        });
+    }
 
-//             for asset_case in case.test_assets {
-//                 let asset = ChainAsset::Eth([asset_case.asset; 20]);
-//                 assets_with_nonzero_balances.push(asset);
+    fn get_test_liquidity_cases() -> Vec<GetLiquidityTestCase> {
+        // todo: xxx finish these test cases
+        vec![
+            GetLiquidityTestCase {
+                cash_index: "1",
+                cash_principal: None,
+                expected_liquidity: Ok("0"),
+                test_assets: vec![],
+                error_message: "Empty account has zero liquidity",
+            },
+            GetLiquidityTestCase {
+                cash_index: "1.1234",
+                cash_principal: Some("123.123456"),
+                expected_liquidity: Ok("138.316890"),
+                test_assets: vec![],
+                error_message: "Cash only applies principal correctly",
+            },
+            GetLiquidityTestCase {
+                cash_index: "1.1234",
+                cash_principal: Some("-123.123456"),
+                expected_liquidity: Ok("-138.316890"),
+                test_assets: vec![],
+                error_message: "Negative cash is negative liquidity",
+            },
+            GetLiquidityTestCase {
+                cash_index: "1.1234",
+                cash_principal: None,
+                expected_liquidity: Ok("82556.557312"), // last digit calcs as a 3 in gsheet
+                test_assets: vec![TestAsset {
+                    asset: 1,
+                    ticker: "abc",
+                    decimals: 6,
+                    balance: "123.123456",
+                    price: "987.654321",
+                    liquidity_factor: "0.6789",
+                }],
+                error_message: "Singe asset supplied liquidity",
+            },
+            GetLiquidityTestCase {
+                cash_index: "1.1234",
+                cash_principal: None,
+                expected_liquidity: Ok("-21.261329"), // sheet says -21.261334 diff -0.0000052
+                test_assets: vec![
+                    TestAsset {
+                        asset: 1,
+                        ticker: "abc",
+                        decimals: 6,
+                        balance: "123.123456",
+                        price: "987.654321",
+                        liquidity_factor: "0.6789",
+                    },
+                    TestAsset {
+                        asset: 2,
+                        ticker: "def",
+                        decimals: 6,
+                        balance: "-12.123456",
+                        price: "987.654321",
+                        liquidity_factor: "0.1450",
+                    },
+                ],
+                error_message: "Slightly undercollateralized account",
+            },
+            GetLiquidityTestCase {
+                cash_index: "1.1234",
+                cash_principal: Some("123.123456"),
+                expected_liquidity: Ok("117.055561"),
+                test_assets: vec![
+                    TestAsset {
+                        asset: 1,
+                        ticker: "abc",
+                        decimals: 6,
+                        balance: "123.123456",
+                        price: "987.654321",
+                        liquidity_factor: "0.6789",
+                    },
+                    TestAsset {
+                        asset: 2,
+                        ticker: "def",
+                        decimals: 6,
+                        balance: "-12.123456",
+                        price: "987.654321",
+                        liquidity_factor: "0.1450",
+                    },
+                ],
+                error_message:
+                    "Slightly undercollateralized by assets but with some offsetting positive cash",
+            },
+        ]
+    }
 
-//                 let symbol = Symbol::new(&asset_case.ticker, asset_case.decimals);
-//                 let price = Price::from_nominal(symbol, asset_case.price);
-
-//                 AssetSymbols::insert(&asset, symbol);
-//                 Prices::insert(&symbol, price.value());
-//                 let balance = SignedQuantity::from_nominal(symbol, asset_case.balance);
-//                 AssetBalances::insert(&asset, &account, balance.value());
-//                 LiquidityFactors::insert(
-//                     &symbol,
-//                     LiquidityFactor::from_nominal(asset_case.liquidity_factor),
-//                 )
-//             }
-//             AssetsWithNonZeroBalance::insert(&account, assets_with_nonzero_balances);
-
-//             GlobalCashIndex::put(CashIndex::from_nominal(case.cash_index));
-//             if let Some(cash_principal) = case.cash_principal {
-//                 CashPrincipals::insert(&account, CashPrincipal::from_nominal(cash_principal));
-//             }
-
-//             let actual = Portfolio::from_storage(&account).unwrap().get_liquidity();
-//             let expected = match case.expected_liquidity {
-//                 Ok(liquidity_str) => Ok(SignedQuantity::from_nominal(USD, liquidity_str)),
-//                 Err(e) => Err(e),
-//             };
-
-//             assert_eq!(expected, actual, "{}", case.error_message);
-//         });
-//     }
-
-//     fn get_test_liquidity_cases() -> Vec<GetLiquidityTestCase> {
-//         // todo: xxx finish these test cases
-//         vec![
-//             /*GetLiquidityTestCase {
-//                 cash_index: "1",
-//                 cash_principal: None,
-//                 expected_liquidity: Ok("0"),
-//                 test_assets: vec![],
-//                 error_message: "Empty account has zero liquidity",
-//             },
-//             GetLiquidityTestCase {
-//                 cash_index: "1.1234",
-//                 cash_principal: Some("123.123456"),
-//                 expected_liquidity: Ok("138.316890"),
-//                 test_assets: vec![],
-//                 error_message: "Cash only applies principal correctly",
-//             },
-//             GetLiquidityTestCase {
-//                 cash_index: "1.1234",
-//                 cash_principal: Some("-123.123456"),
-//                 expected_liquidity: Ok("-138.316890"),
-//                 test_assets: vec![],
-//                 error_message: "Negative cash is negative liquidity",
-//             },
-//             GetLiquidityTestCase {
-//                 cash_index: "1.1234",
-//                 cash_principal: None,
-//                 expected_liquidity: Ok("82556.557312"), // last digit calcs as a 3 in gsheet
-//                 test_assets: vec![TestAsset {
-//                     asset: 1,
-//                     ticker: "abc",
-//                     decimals: 6,
-//                     balance: "123.123456",
-//                     price: "987.654321",
-//                     liquidity_factor: "0.6789",
-//                 }],
-//                 error_message: "Singe asset supplied liquidity",
-//             },*/
-//             GetLiquidityTestCase {
-//                 cash_index: "1.1234",
-//                 cash_principal: None,
-//                 expected_liquidity: Ok("-21.261329"), // sheet says -21.261334 diff -0.0000052
-//                 test_assets: vec![
-//                     TestAsset {
-//                         asset: 1,
-//                         ticker: "abc",
-//                         decimals: 6,
-//                         balance: "123.123456",
-//                         price: "987.654321",
-//                         liquidity_factor: "0.6789",
-//                     },
-//                     TestAsset {
-//                         asset: 2,
-//                         ticker: "def",
-//                         decimals: 6,
-//                         balance: "-12.123456",
-//                         price: "987.654321",
-//                         liquidity_factor: "0.1450",
-//                     },
-//                 ],
-//                 error_message: "Slightly undercollateralized account",
-//             },
-//             GetLiquidityTestCase {
-//                 cash_index: "1.1234",
-//                 cash_principal: Some("123.123456"),
-//                 expected_liquidity: Ok("117.055561"),
-//                 test_assets: vec![
-//                     TestAsset {
-//                         asset: 1,
-//                         ticker: "abc",
-//                         decimals: 6,
-//                         balance: "123.123456",
-//                         price: "987.654321",
-//                         liquidity_factor: "0.6789",
-//                     },
-//                     TestAsset {
-//                         asset: 2,
-//                         ticker: "def",
-//                         decimals: 6,
-//                         balance: "-12.123456",
-//                         price: "987.654321",
-//                         liquidity_factor: "0.1450",
-//                     },
-//                 ],
-//                 error_message:
-//                     "Slightly undercollateralized by assets but with some offsetting positive cash",
-//             },
-//         ]
-//     }
-
-//     #[test]
-//     fn test_get_liquidity_all_cases() {
-//         get_test_liquidity_cases()
-//             .drain(..)
-//             .for_each(test_get_liquidity_test_case);
-//     }
-
-//     #[test]
-//     fn test_usd_value() {
-//         let quantity = SignedQuantity::from_nominal(CASH, "123.123456");
-//         let price = Price::from_nominal(CASH, "7.890123");
-//         let actual = quantity.usd_value(price);
-//         let expected = Ok(SignedQuantity::from_nominal(USD, "971.459212"));
-//         assert_eq!(actual, expected);
-//     }
-
-//     #[test]
-//     fn test_cash_principal_to_cash_balance_signed_quantity() {
-//         let cash_principal = CashPrincipal::from_nominal("456.789012");
-//         let cash_index = CashIndex::from_nominal("1.2345");
-
-//         let actual = cash_principal_to_cash_balance_signed_quantity(cash_principal, cash_index);
-//         let expected = Ok(SignedQuantity::from_nominal(CASH, "563.906035"));
-//         assert_eq!(actual, expected);
-//     }
-// }
+    #[test]
+    fn test_get_liquidity_all_cases() {
+        get_test_liquidity_cases()
+            .drain(..)
+            .for_each(test_get_liquidity_test_case);
+    }
+}
