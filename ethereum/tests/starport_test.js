@@ -30,6 +30,13 @@ describe('Starport', () => {
   let eraIndex;
   let parentHash;
 
+  function hashNotice(notice) {
+    if (typeof(notice) !== 'string' || notice.slice(0, 2) !== '0x') {
+      throw new Error(`Excepted encoded notice, got: ${JSON.stringify(notice)}`);
+    }
+    return web3.utils.keccak256(notice);
+  }
+
   function buildNotice(call, opts = {}) {
     if (opts.newEra) {
       eraId++;
@@ -45,12 +52,13 @@ describe('Starport', () => {
     let encoded = `${ETH_HEADER}${eraHeader.slice(2)}${encodedCall.slice(2)}`;
 
     // Set new parent hash
-    parentHash = web3.utils.keccak256(encoded);
+    parentHash = hashNotice(encoded);
 
     return encoded;
   }
 
   let testUnlockNotice;
+  let testUnlockNoticeHash;
   let testChangeAuthoritiesNotice;
 
   beforeEach(async () => {
@@ -73,6 +81,7 @@ describe('Starport', () => {
     parentHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
     testUnlockNotice = buildNotice(starport.methods.unlock(tokenA._address, 1000, accounts[2]));
+    testUnlockNoticeHash = hashNotice(testUnlockNotice);
     testChangeAuthoritiesNotice = buildNotice(starport.methods.changeAuthorities([accounts[2], accounts[3]]));
   });
 
@@ -303,8 +312,6 @@ describe('Starport', () => {
     it('should emit ExecTrxRequest event', async () => {
       let trxRequest = `(Extract 100 CASH Eth:${account1})`;
       const tx = await send(starport, 'execTrxRequest', [trxRequest], { from: account1 });
-      console.log({tx: tx.events.ExecTrxRequest});
-      console.log({tx: tx.events.ExecTrxRequest.raw});
       expect(tx.events.ExecTrxRequest.returnValues).toMatchObject({
         account: account1,
         trxRequest
@@ -328,27 +335,27 @@ describe('Starport', () => {
     });
   });
 
-  describe('#checkNoticeSignerAuthorized', () => {
+  describe('#checkNoticeSignerAuthorized_', () => {
     it('should authorize message', async () => {
       const signatures = signAll(testUnlockNotice, authorityWallets);
-      await call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures]);
+      await call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures]);
     });
 
     it('should not authorize duplicate sigs', async () => {
       const duplicateAccounts = Array(3).fill(authorityWallets[0]);
       const signatures = signAll(testUnlockNotice, duplicateAccounts);
-      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Duplicated authority signer');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Duplicated authority signer');
     });
 
     it('should not authorize with too few signatures', async () => {
       const signatures = [sign(testUnlockNotice, authorityWallets[0]).signature];
-      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Below quorum threshold');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Below quorum threshold');
     });
 
     it('should not authorize with an unauthorized signer', async () => {
       const badAccounts = nRandomWallets(2);
       const signatures = signAll(testUnlockNotice, badAccounts);
-      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNotice, authorityAddresses, signatures])).rejects.toRevert('revert Unauthorized authority signer');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Unauthorized authority signer');
     });
   });
 
@@ -360,6 +367,14 @@ describe('Starport', () => {
       expect(await call(starport, 'invoke', [notice, signatures])).toEqual(
         '0x0000000000000000000000000000000000000000000000000000000000000001'
       );
+      let tx = await send(starport, 'invoke', [notice, signatures]);
+
+      expect(tx.events.NoticeInvoked.returnValues).toMatchObject({
+        eraId: "0",
+        eraIndex: "3",
+        noticeHash: hashNotice(notice),
+        result: "0x0000000000000000000000000000000000000000000000000000000000000001"
+      });
     });
 
     it('should invoke simple signed message to start next era', async () => {
@@ -444,6 +459,15 @@ describe('Starport', () => {
       expect(await call(starport, 'invoke', [notice1, signatures1])).toEqual(
         '0x0000000000000000000000000000000000000000000000000000000000000002'
       );
+
+      let tx = await send(starport, 'invoke', [notice1, signatures1]);
+
+      expect(tx.events.NoticeInvoked.returnValues).toMatchObject({
+        eraId: "0",
+        eraIndex: "4",
+        noticeHash: hashNotice(notice1),
+        result: "0x0000000000000000000000000000000000000000000000000000000000000002"
+      });
     });
 
     it('should not authorize message without current eraId', async () => {
@@ -487,12 +511,22 @@ describe('Starport', () => {
       await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Invalid header[3]');
     });
 
-    it('should fail when passed twice', async () => {
+    it('should no-op and emit event when passed twice', async () => {
       let notice = buildNotice(starport.methods.count_());
       let signatures = signAll(notice, authorityWallets);
 
       await send(starport, 'invoke', [notice, signatures]);
-      await expect(call(starport, 'invoke', [notice, signatures])).rejects.toRevert('revert Notice can not be reused');
+
+      expect(await starport.methods.counter().call()).toEqualNumber(1);
+
+      await expect(await call(starport, 'invoke', [notice, signatures])).toEqual(null)
+      let tx = await send(starport, 'invoke', [notice, signatures]);
+
+      expect(tx.events.NoticeReplay.returnValues).toMatchObject({
+        noticeHash: hashNotice(notice)
+      });
+
+      expect(await starport.methods.counter().call()).toEqualNumber(1); // Idempotent
     });
 
     it('should fail with shortened header', async () => {
@@ -621,8 +655,16 @@ describe('Starport', () => {
       );
       await send(starport, 'invoke', [notice, signatures]);
 
-      await expect(call(starport, 'invokeChain', [notice, []]))
-        .rejects.toRevert('revert Target notice can not be reused');
+      expect(await starport.methods.counter().call()).toEqualNumber(1);
+
+      await expect(await call(starport, 'invokeChain', [notice, []])).toEqual(null)
+      let tx = await send(starport, 'invokeChain', [notice, []]);
+
+      expect(tx.events.NoticeReplay.returnValues).toMatchObject({
+        noticeHash: hashNotice(notice)
+      });
+
+      expect(await starport.methods.counter().call()).toEqualNumber(1); // Idempotent
     });
 
     it('should chain notices across an era', async () => {
@@ -708,8 +750,17 @@ describe('Starport', () => {
       );
       await send(starport, 'invokeChain', [notice0, [notice1]]);
 
-      await expect(call(starport, 'invokeChain', [notice0, [notice1]]))
-        .rejects.toRevert('revert Target notice can not be reused');
+      // This is this is this
+      expect(await starport.methods.counter().call()).toEqualNumber(2);
+
+      await expect(await call(starport, 'invokeChain', [notice0, [notice1]])).toEqual(null)
+      let tx = await send(starport, 'invokeChain', [notice0, [notice1]]);
+
+      expect(tx.events.NoticeReplay.returnValues).toMatchObject({
+        noticeHash: hashNotice(notice0)
+      });
+
+      expect(await starport.methods.counter().call()).toEqualNumber(2); // Idempotent
     });
 
     it('should reject notice if mismatched head notice', async () => {
