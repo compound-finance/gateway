@@ -360,6 +360,8 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
 
                 ethereum_client::events::EthereumEvent::ExecTrxRequest { account, trx_request } =>
                     internal::exec_trx_request::exec_trx_request::<T>(&trx_request[..], ChainAccount::Eth(account), None),
+
+                ethereum_client::events::EthereumEvent::NoticeInvoked { era_id, era_index, notice_hash, result } => internal::notices::handle_notice_invoked::<T>(ChainId::Eth, NoticeId(era_id, era_index), ChainHash::Eth(notice_hash), result),
             }
         }
     }

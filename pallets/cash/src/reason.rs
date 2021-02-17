@@ -55,6 +55,7 @@ pub enum Reason {
     SetYieldNextError(SetYieldNextError),
     MaxForNonCashAsset,
     MaxWithNegativeCashPrincipal,
+    MismatchedNoticeHash,
 }
 
 impl From<MathError> for Reason {

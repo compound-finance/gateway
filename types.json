@@ -312,7 +312,8 @@
       "ValidatorAlreadySigned": "",
       "SetYieldNextError": "SetYieldNextError",
       "MaxForNonCashAsset": "",
-      "MaxWithNegativeCashPrincipal": ""
+      "MaxWithNegativeCashPrincipal": "",
+      "MismatchedNoticeHash": "",
     }
   },
   "MathError": {

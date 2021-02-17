@@ -21,7 +21,7 @@ contract Starport {
     uint public eraId; // TODO: could bitpack here and use uint32
     mapping(bytes32 => bool) public isNoticeInvoked;
 
-    event NoticeInvoked(uint eraId, uint eraIndex, bytes32 noticeHash, bytes result);
+    event NoticeInvoked(uint32 eraId, uint32 eraIndex, bytes32 noticeHash, bytes result);
     event NoticeReplay(bytes32 noticeHash);
 
     event Lock(address asset, address holder, uint amount);
@@ -233,7 +233,7 @@ contract Starport {
             require(false, _getRevertMsg(callResult));
         }
 
-        emit NoticeInvoked(noticeEraId, noticeEraIndex, noticeHash, callResult);
+        emit NoticeInvoked(uint32(noticeEraId), uint32(noticeEraIndex), noticeHash, callResult);
 
         return callResult;
     }
