@@ -9,7 +9,9 @@ module.exports = {
   extra_build_files: [],                                // Additional build files to deep merge
   coverage_dir: "coverage",                             // Directory to place coverage files
   coverage_ignore: [],                                  // List of files to ignore for coverage
-  contracts: "contracts/*.sol contracts/test/*.sol",    // Glob to match contract files
+  contracts: ["contracts/*.sol",
+              "contracts/vendor/**/*.sol",
+              "contracts/test/*.sol"].join(" "),        // Glob to match contract files
   tests: ['**/tests/*test.js'],
   trace: false,                                         // Compile with debug artifacts
   networks: {                                           // Define configuration for each network
