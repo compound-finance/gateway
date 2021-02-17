@@ -14,6 +14,10 @@ class Chain {
     this.ctx = ctx;
   }
 
+  toSS58 (arr) {
+    return this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
+  }
+
   api() {
     return this.ctx.api();
   }
@@ -124,13 +128,13 @@ class Chain {
     return model.toJSON();
   }
 
+
   async pendingCashValidators() {
     let vals = await this.ctx.api().query.cash.nextValidators.entries();
-    const toSS58 = (arr) => this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
-        toSS58(valIdRaw.args[0]),
-        u8aToHex(chainKeys.unwrap().eth_address)
+        this.toSS58(valIdRaw.args[0]),
+        {eth_address: u8aToHex(chainKeys.unwrap().eth_address)}
       ]
     );
     return authData;
@@ -138,23 +142,26 @@ class Chain {
 
   async cashValidators() {
     let vals = await this.ctx.api().query.cash.validators.entries();
-    const toSS58 = (arr) => this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
-        toSS58(valIdRaw.args[0]),
-        u8aToHex(chainKeys.unwrap().eth_address)
+        this.toSS58(valIdRaw.args[0]),
+        {eth_address: u8aToHex(chainKeys.unwrap().eth_address)}
       ]
     );
     return authData;
+  }
+
+  async sessionValidators() {
+    let vals = await this.ctx.api().query.session.validators();
+  return vals.map((valIdRaw) => this.toSS58(valIdRaw));
   }
   
   async waitUntilSession(num) {
     const timer = ms => new Promise(res => setTimeout(res, ms));
     const checkIdx = async () => {
       const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
-      console.log("INDEX:", idx);
       if (idx <= num) {
-        await timer(2000);
+        await timer(1000);
         await checkIdx();
       }
     };
