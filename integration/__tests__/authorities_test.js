@@ -35,8 +35,8 @@ describe('authorities tests', () => {
     web3;
 
   let aliceInitId = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
-  let bobInitId = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty";
   let aliceInitEthKey = "0x6a72a2f14577d9cd0167801efdd54a07b40d2b61";
+  let bobInitId = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty";
   let bobInitEthKey = "0x8ad1b2918c34ee5d3e881a57c68574ea9dbecb81";
 
   // https://github.com/paritytech/substrate/blob/caff191bc1bfa48688037c6024ee3a2a1cbeb084/primitives/finality-grandpa/src/lib.rs#L62

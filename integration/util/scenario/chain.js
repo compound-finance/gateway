@@ -1,5 +1,6 @@
 const { sendAndWaitForEvents, waitForEvent, getEventData } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
+const { u8aToHex } = require('@polkadot/util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -122,7 +123,45 @@ class Chain {
     let model = await this.ctx.api().query.cash.rateModels(token.toChainAsset());
     return model.toJSON();
   }
+
+  async pendingCashValidators() {
+    let vals = await this.ctx.api().query.cash.nextValidators.entries();
+    const toSS58 = (arr) => this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
+    const authData = vals.map(([valIdRaw, chainKeys]) =>
+      [
+        toSS58(valIdRaw.args[0]),
+        u8aToHex(chainKeys.unwrap().eth_address)
+      ]
+    );
+    return authData;
+  }
+
+  async cashValidators() {
+    let vals = await this.ctx.api().query.cash.validators.entries();
+    const toSS58 = (arr) => this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
+    const authData = vals.map(([valIdRaw, chainKeys]) =>
+      [
+        toSS58(valIdRaw.args[0]),
+        u8aToHex(chainKeys.unwrap().eth_address)
+      ]
+    );
+    return authData;
+  }
+  
+  async waitUntilSession(num) {
+    const timer = ms => new Promise(res => setTimeout(res, ms));
+    const checkIdx = async () => {
+      const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
+      console.log("INDEX:", idx);
+      if (idx <= num) {
+        await timer(2000);
+        await checkIdx();
+      }
+    };
+    await checkIdx();
+  }
 }
+
 
 function buildChain(ctx) {
   return new Chain(ctx);
