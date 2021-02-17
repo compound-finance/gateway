@@ -13,7 +13,7 @@ pub struct Symbol(pub [u8; WIDTH], pub u8);
 // Define symbols used directly by the chain itself
 
 /// Symbol for CASH.
-pub const CASH: Symbol = Symbol::new("CASH", 6);
+pub const CASH: Symbol = Symbol::new("CASH", 18);
 
 /// Symbol for USD.
 pub const USD: Symbol = Symbol::new("USD", 6);

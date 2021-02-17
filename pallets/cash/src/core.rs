@@ -157,11 +157,32 @@ fn compute_cash_principal_per_internal(
     cash_index: Uint,
     price_asset: Uint,
 ) -> Option<Uint> {
-    let unscaled = asset_rate
-        .checked_mul(dt)?
-        .checked_mul(price_asset)?
-        .checked_div(cash_index)?
-        .checked_div(MILLISECONDS_PER_YEAR)?;
+    // as cannot panic here u8 -> i32 is safe, beware of changes in the future to u8 above
+    let numerator_decimals = (APR::DECIMALS + Price::DECIMALS) as i32;
+    let denominator_decimals = CashIndex::DECIMALS as i32;
+    let output_decimals = AssetIndex::DECIMALS as i32;
+    let scale_decimals = output_decimals
+        .checked_sub(numerator_decimals)?
+        .checked_add(denominator_decimals)?;
+
+    let res = if scale_decimals < 0 {
+        // as is safe here due to above non-negativity check and will not panic.
+        let scalar = 10u128.checked_pow((-1 * scale_decimals) as u32)?;
+        asset_rate
+            .checked_mul(dt)?
+            .checked_mul(price_asset)?
+            .checked_div(cash_index)?
+            .checked_div(MILLISECONDS_PER_YEAR)?
+            .checked_div(scalar)?
+    } else {
+        let scalar = 10u128.checked_pow(scale_decimals as u32)?;
+        asset_rate
+            .checked_mul(scalar)?
+            .checked_mul(dt)?
+            .checked_mul(price_asset)?
+            .checked_div(cash_index)?
+            .checked_div(MILLISECONDS_PER_YEAR)?
+    };
 
     log!(
         "compute_cash_principal_per_internal({}, {}, {}, {})={} [unscaled]",
@@ -169,15 +190,10 @@ fn compute_cash_principal_per_internal(
         dt,
         price_asset,
         cash_index,
-        unscaled
+        res
     );
 
-    scale_multiple_terms(
-        unscaled,
-        APR::DECIMALS + Price::DECIMALS,
-        CashIndex::DECIMALS,
-        AssetIndex::DECIMALS,
-    )
+    Some(res)
 }
 
 pub fn compute_cash_principal_per(
