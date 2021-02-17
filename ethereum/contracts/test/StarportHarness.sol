@@ -17,11 +17,11 @@ contract StarportHarness is Starport {
 
 	/// Harness to call `checkNoticeSignerAuthorized`
 	function checkNoticeSignerAuthorized_(
-        bytes calldata notice,
+        bytes32 noticeHash,
         address[] memory authorities_,
         bytes[] calldata signatures
-    ) external view {
-		return checkNoticeSignerAuthorized(notice, authorities_, signatures);
+    ) external pure {
+		return checkNoticeSignerAuthorized(noticeHash, authorities_, signatures);
 	}
 
 	/// Harness to call `mint` on Cash Token
