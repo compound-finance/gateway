@@ -3,6 +3,7 @@
 #![feature(associated_type_defaults)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(const_panic)]
+#![feature(destructuring_assignment)]
 #![feature(str_split_once)]
 
 #[macro_use]
@@ -18,10 +19,10 @@ use crate::events::{ChainLogEvent, ChainLogId, EventState};
 use crate::notices::{Notice, NoticeId, NoticeState};
 use crate::rates::{InterestRateModel, APR};
 use crate::reason::Reason;
-use crate::symbol::Symbol;
+use crate::symbol::Ticker;
 use crate::types::{
-    AssetAmount, AssetBalance, AssetIndex, AssetPrice, Bips, CashIndex, CashPrincipal, ChainKeys,
-    ConfigAsset, ConfigSetString, EncodedNotice, Nonce, ReporterSet, SessionIndex, Timestamp,
+    AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, Bips, CashIndex, CashPrincipal,
+    EncodedNotice, LiquidityFactor, Nonce, ReporterSet, SessionIndex, Timestamp, ValidatorKeys,
     ValidatorSig,
 };
 use codec::alloc::string::String;
@@ -30,11 +31,7 @@ use frame_system::{
     ensure_none, ensure_root,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use our_std::{
-    convert::{TryFrom, TryInto},
-    if_std, str,
-    vec::Vec,
-};
+use our_std::{if_std, str, vec::Vec};
 use sp_core::crypto::AccountId32;
 use sp_runtime::{
     offchain::{
@@ -67,6 +64,7 @@ pub mod params;
 pub mod portfolio;
 pub mod rates;
 pub mod reason;
+pub mod serdes;
 pub mod symbol;
 pub mod trx_req;
 pub mod types;
@@ -79,6 +77,9 @@ mod tests;
 
 #[cfg(test)]
 mod testdata;
+
+/// Type for linking sessions to validators.
+pub type SubstrateId = AccountId32;
 
 // OCW storage constants
 pub const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereum_events";
@@ -112,10 +113,10 @@ decl_storage! {
         NextSessionIndex get(fn get_next_session_index): SessionIndex;
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
-        NextValidators get(fn next_validators) : map hasher(blake2_128_concat) AccountId32 => Option<ChainKeys>;
+        NextValidators get(fn next_validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// The current set of allowed validators, and their associated keys.
-        Validators get(fn validators) : map hasher(blake2_128_concat) AccountId32 => Option<ChainKeys>;
+        Validators get(fn validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// An index to track interest earned by CASH holders and owed by CASH borrowers.
         GlobalCashIndex get(fn cash_index): CashIndex;
@@ -156,33 +157,23 @@ decl_storage! {
         /// The mapping of asset balances, by asset and account.
         AssetBalances get(fn asset_balance): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetBalance;
 
-        /// Assets with non-zero balance
-        AssetsWithNonZeroBalance get(fn assets_with_non_zero_balance): map hasher(blake2_128_concat) ChainAccount => Vec<ChainAsset>;
+        /// The index of assets with non-zero balance for each account.
+        AssetsWithNonZeroBalance get(fn assets_with_non_zero_balance): double_map hasher(blake2_128_concat) ChainAccount, hasher(blake2_128_concat) ChainAsset => ();
 
         /// The mapping of asset indices, by asset and account.
-        LastIndices get(fn last_indices): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
-
-        // XXX break into separate storage
-        //  liquidity factor, supply cap, etc.
-        /// The asset metadata to be synced with the starports.
-        AssetMetadata get(fn asset_metadata): map hasher(blake2_128_concat) ChainAsset => ();
-
-        LiquidityFactors get(fn liquidation_factors): map hasher(blake2_128_concat) Symbol => crate::types::LiquidityFactor;
-
-        /// Mapping of assets to symbols, which determines if an asset is supported.
-        AssetSymbols get(fn asset_symbol): map hasher(blake2_128_concat) ChainAsset => Option<Symbol>;
+        LastIndices get(fn last_index): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
 
         /// The mapping of (status of) events witnessed on a given chain, by event id.
-        EventStates get(fn event_states): map hasher(blake2_128_concat) ChainLogId => EventState;
+        EventStates get(fn event_state): map hasher(blake2_128_concat) ChainLogId => EventState;
 
         /// Notices contain information which can be synced to Starports
-        Notices get(fn notices): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
+        Notices get(fn notice): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
 
         /// Notice IDs, indexed by the hash of the notice itself
-        NoticeHashes get(fn notice_hashes): map hasher(blake2_128_concat) ChainHash => Option<NoticeId>;
+        NoticeHashes get(fn notice_hash): map hasher(blake2_128_concat) ChainHash => Option<NoticeId>;
 
         /// The state of a notice in regards to signing and execution, as tracked by the chain
-        NoticeStates get(fn notice_states): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => NoticeState;
+        NoticeStates get(fn notice_state): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => NoticeState;
 
         /// The most recent notice emitted for a given chain
         LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
@@ -191,42 +182,33 @@ decl_storage! {
         AccountNotices get(fn account_notices): map hasher(blake2_128_concat) ChainAccount => Vec<NoticeId>;
 
         /// The last used nonce for each account, initialized at zero.
-        Nonces get(fn nonces): map hasher(blake2_128_concat) ChainAccount => Nonce;
+        Nonces get(fn nonce): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
-        /// The mapping of interest rate models, by asset.
-        RateModels get(fn model): map hasher(blake2_128_concat) ChainAsset => InterestRateModel;
-
-        /// Mapping of latest prices for each asset symbol.
-        Prices get(fn price): map hasher(blake2_128_concat) Symbol => AssetPrice;
+        /// Mapping of latest prices for each price ticker.
+        Prices get(fn price): map hasher(blake2_128_concat) Ticker => AssetPrice;
 
         /// Mapping of assets to the last time their price was updated.
-        PriceTimes get(fn price_time): map hasher(blake2_128_concat) Symbol => Timestamp;
+        PriceTimes get(fn price_time): map hasher(blake2_128_concat) Ticker => Timestamp;
 
         /// Ethereum addresses of open oracle price reporters.
         PriceReporters get(fn reporters): ReporterSet; // XXX if > 1, how are we combining?
 
-        /// Mapping of strings to symbols (valid asset symbols indexed by ticker string).
-        Symbols get(fn symbol): map hasher(blake2_128_concat) String => Option<Symbol>;
+        /// The asset metadata for each supported asset, which will also be synced with the starports.
+        SupportedAssets get(fn asset): map hasher(blake2_128_concat) ChainAsset => Option<AssetInfo>;
 
-        /// XXX Consider renaming this, this is more like a miner fee now
-        ReserveFactor get(fn reserve_factors): map hasher(blake2_128_concat) ChainAsset => crate::rates::ReserveFactor;
-
-        // PriceReporter;
-        // PriceKeyMapping;
-        // XXX delete me (part of magic extract)
-        pub CashBalance get(fn cash_balance): map hasher(blake2_128_concat) ChainAccount => Option<AssetAmount>;
+        /// Mapping of strings to tickers (valid tickers indexed by ticker string).
+        Tickers get(fn ticker): map hasher(blake2_128_concat) String => Option<Ticker>;
     }
     add_extra_genesis {
-        config(validator_ids): Vec<[u8;32]>;
-        config(validator_keys): Vec<(String,)>;
-        config(reporters): ConfigSetString;
-        config(initial_yield): Option<(u128, u128)>;
-        config(assets): Vec<ConfigAsset>;
+        config(assets): Vec<AssetInfo>;
+        config(initial_yield): Option<(APR, Timestamp)>;
+        config(reporters): ReporterSet;
+        config(validators): Vec<ValidatorKeys>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
-            Module::<T>::initialize_validators(config.validator_ids.clone(), config.validator_keys.clone());
-            Module::<T>::initialize_yield(config.initial_yield);
+            Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_yield(config.initial_yield.clone());
         })
     }
 }
@@ -274,6 +256,9 @@ decl_error! {
         /// Open oracle cannot parse the message
         OpenOracleErrorInvalidMessage,
 
+        /// Open oracle cannot parse the ticker
+        OpenOracleErrorInvalidTicker,
+
         /// Open oracle cannot update price due to stale price
         OpenOracleErrorStalePrice,
 
@@ -288,9 +273,6 @@ decl_error! {
 
         /// Open oracle offchain worker made an attempt to update the price but failed in the extrinsic
         OpenOraclePostPriceExtrinsicError,
-
-        /// An unsupported symbol was provided to the oracle.
-        OpenOracleErrorInvalidSymbol,
 
         /// An error related to the chain_spec file contents
         GenesisConfigError,
@@ -345,9 +327,9 @@ macro_rules! r#cash_err {
     };
 }
 
-impl<T: Config> pallet_session::SessionManager<AccountId32> for Module<T> {
+impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
     // return validator set to use in the next session (aura and grandpa also stage new auths associated w these accountIds)
-    fn new_session(session_index: SessionIndex) -> Option<Vec<AccountId32>> {
+    fn new_session(session_index: SessionIndex) -> Option<Vec<SubstrateId>> {
         if NextValidators::iter().count() != 0 {
             NextSessionIndex::put(session_index);
             Some(NextValidators::iter().map(|x| x.0).collect::<Vec<_>>())
@@ -407,17 +389,17 @@ decl_module! {
 
         /// Set the price using the open price feed.
         #[weight = 0]
-        pub fn set_liquidity_factor(origin, symbol: Symbol, liquidity_factor: crate::types::LiquidityFactor) -> dispatch::DispatchResult {
+        pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            LiquidityFactors::insert(symbol, liquidity_factor);
+            Self::set_liquidity_factor_internal(asset, factor)?;
             Ok(())
         }
 
         /// Update the interest rate model for a given asset. This is only called by governance
         #[weight = 0]
-        pub fn update_interest_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
+        pub fn set_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            Self::update_interest_rate_model_internal(asset, model)?;
+            Self::set_rate_model_internal(asset, model)?;
             Ok(())
         }
 
@@ -461,16 +443,16 @@ decl_module! {
         }
 
         #[weight = 0] // XXX
-        pub fn change_authorities(origin, keys: Vec<(AccountId32, ChainKeys)>) -> dispatch::DispatchResult {
-            // TODO: assert root only
+        pub fn change_authorities(origin, keys: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
 
-            for (id, _chain_keys) in <NextValidators>::iter() {
-                <NextValidators>::take(id);
+            for (substrate_id, _chain_keys) in <NextValidators>::iter() {
+                <NextValidators>::take(substrate_id);
             }
 
-            for (id, chain_keys) in &keys {
-                <NextValidators>::take(id);
-                <NextValidators>::insert(&id, chain_keys);
+            for chain_keys in &keys {
+                <NextValidators>::take(&chain_keys.substrate_id);
+                <NextValidators>::insert(&chain_keys.substrate_id, chain_keys);
             }
 
             Ok(())
@@ -515,20 +497,40 @@ impl<T: Config> Module<T> {
         }
     }
 
-    /// Update the interest rate model
-    fn update_interest_rate_model_internal(
+    /// Update the liquidity factor for an asset.
+    fn set_liquidity_factor_internal(
+        asset: ChainAsset,
+        factor: LiquidityFactor,
+    ) -> Result<(), Error<T>> {
+        let asset_info = SupportedAssets::get(asset).ok_or(<Error<T>>::AssetNotSupported)?;
+        SupportedAssets::insert(
+            &asset,
+            AssetInfo {
+                liquidity_factor: factor,
+                ..asset_info
+            },
+        );
+        Ok(())
+    }
+
+    /// Update the interest rate model for an asset.
+    fn set_rate_model_internal(
         asset: ChainAsset,
         model: InterestRateModel,
     ) -> Result<(), Error<T>> {
-        cash_err!(
-            crate::core::check_asset_supported(&asset),
-            <Error<T>>::AssetNotSupported
-        )?;
+        let asset_info = SupportedAssets::get(asset).ok_or(<Error<T>>::AssetNotSupported)?;
+        // XXX err pattern?
         cash_err!(
             model.check_parameters(),
             <Error<T>>::InterestRateModelInvalidParameters
         )?;
-        RateModels::insert(&asset, model);
+        SupportedAssets::insert(
+            &asset,
+            AssetInfo {
+                rate_model: model,
+                ..asset_info
+            },
+        );
         Ok(())
     }
 
@@ -552,11 +554,7 @@ impl<T: Config> Module<T> {
             compound_crypto::eth_recover(&hashed, &parsed_sig, true),
             <Error<T>>::OpenOracleErrorInvalidSignature
         )?;
-        let reporters = PriceReporters::get();
-        if !reporters
-            .iter()
-            .any(|e| e.as_slice() == recovered.as_slice())
-        {
+        if !PriceReporters::get().contains(recovered) {
             return Err(<Error<T>>::OpenOracleErrorInvalidReporter);
         }
 
@@ -566,9 +564,9 @@ impl<T: Config> Module<T> {
             <Error<T>>::OpenOracleErrorInvalidMessage
         )?;
 
-        let symbol = cash_err!(
-            Symbols::get(parsed.key.clone()).ok_or(<Error<T>>::OpenOracleErrorInvalidSymbol),
-            <Error<T>>::OpenOracleErrorInvalidSymbol
+        let ticker: Ticker = cash_err!(
+            str::FromStr::from_str(&parsed.key),
+            <Error<T>>::OpenOracleErrorInvalidTicker
         )?;
 
         log!(
@@ -581,9 +579,9 @@ impl<T: Config> Module<T> {
         // returns Default::default(). Thus, we explicitly check if the key for the ticker is supported
         // or not.
 
-        if PriceTimes::contains_key(&symbol) {
+        if PriceTimes::contains_key(&ticker) {
             // it has been updated at some point, make sure we are updating to a more recent price
-            let last_updated = PriceTimes::get(&symbol);
+            let last_updated = PriceTimes::get(&ticker);
             if parsed.timestamp <= last_updated {
                 return Err(<Error<T>>::OpenOracleErrorStalePrice);
             }
@@ -591,100 +589,52 @@ impl<T: Config> Module<T> {
 
         // WARNING begin storage - all checks must happen above
 
-        Prices::insert(&symbol, parsed.value as u128);
-        PriceTimes::insert(&symbol, parsed.timestamp as u128);
+        Prices::insert(&ticker, parsed.value as u128);
+        PriceTimes::insert(&ticker, parsed.timestamp as u128);
 
         // todo: update storage
         Ok(())
     }
 
-    /// Convert from the chain spec file format hex encoded strings into the local storage format, binary blob
-    fn hex_string_vec_to_binary_vec<U: TryFrom<Vec<u8>>>(
-        data: Vec<String>,
-    ) -> Result<Vec<U>, Error<T>> {
-        let mut converted: Vec<U> = Vec::new();
-        for record in data {
-            let decoded = hex::decode(&record).map_err(|_| <Error<T>>::GenesisConfigError)?;
-            let converted_validator: U = decoded
-                .try_into()
-                .map_err(|_| <Error<T>>::GenesisConfigError)?;
-            converted.push(converted_validator);
-        }
-        Ok(converted)
-    }
-
     // XXX expose price(String) fn
 
-    /// Initializes a set of assets from a config value.
-    ///
-    /// * AssetMetadata // XXX set directly to liquidity factors, supply caps, etc.
-    /// * AssetSymbols
-    /// * RateModels
-    /// * Symbols
-    ///
-    fn initialize_assets(assets: Vec<ConfigAsset>) {
+    /// Initializes the set of supported assets from a config value.
+    fn initialize_assets(assets: Vec<AssetInfo>) {
         for asset in assets {
-            let ticker = asset.symbol.ticker();
-            if let Some(symbol) = Symbols::get(&ticker) {
-                assert!(symbol == asset.symbol, "Different symbols for same ticker");
-            } else {
-                Symbols::insert(ticker, asset.symbol);
-            }
-
-            // TODO: specify rate model in ConfigAsset
-            RateModels::insert(&asset.asset, InterestRateModel::default());
-            AssetSymbols::insert(&asset.asset, asset.symbol);
-            LiquidityFactors::insert(&asset.symbol, asset.liquidity_factor);
+            SupportedAssets::insert(&asset.asset, asset);
         }
     }
 
-    /// Set the initial set of validators from the genesis config
-    /// Set next validators, bc they will become "current validators" upon session 0 start
-    fn initialize_validators(ids: Vec<[u8; 32]>, keys: Vec<(String,)>) {
+    /// Set the initial set of validators from the genesis config.
+    /// NextValidators will become current Validators upon first session start.
+    fn initialize_validators(validators: Vec<ValidatorKeys>) {
         assert!(
-            !ids.is_empty(),
+            !validators.is_empty(),
             "Validators must be set in the genesis config"
         );
-
-        assert!(
-            <NextValidators>::iter().count() == 0 || <Validators>::iter().count() == 0,
-            "Validators are already set but they should only be set in the genesis config."
-        );
-        for (acc_id_bytes, key_tuple) in ids.iter().zip(keys.iter()) {
-            log!("Adding Validator {}", hex::encode(acc_id_bytes));
-            let acc_id: AccountId32 = AccountId32::new(*acc_id_bytes);
-
-            let eth_address: [u8; 20] = hex::decode(&key_tuple.0)
-                .unwrap_or_else(|_| panic!("Ecsda key could not be decoded"))
-                .try_into()
-                .expect("Ecsda public key not 20 bytes");
+        for validator_keys in validators {
+            log!("Adding validator with keys: {:?}", validator_keys);
             assert!(
-                <Validators>::get(&acc_id) == None,
+                <Validators>::get(&validator_keys.substrate_id) == None,
                 "Duplicate validator keys in genesis config"
             );
-            <Validators>::insert(acc_id, ChainKeys { eth_address });
+            <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
         }
     }
 
     /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_reporters(reporters: ConfigSetString) {
+    fn initialize_reporters(reporters: ReporterSet) {
         assert!(
             !reporters.is_empty(),
             "Open price feed price reporters must be set in the genesis config"
         );
-        assert!(
-            PriceReporters::get().is_empty(),
-            "Price reporters are already set but they should only be set in the genesis config."
-        );
-        let converted: Vec<[u8; 20]> = Self::hex_string_vec_to_binary_vec(reporters)
-            .expect("Could not deserialize validators from genesis config");
-        PriceReporters::put(converted);
+        PriceReporters::put(reporters);
     }
 
     /// Set the initial cash yield, if provided
-    fn initialize_yield(initial_yield_config: Option<(u128, u128)>) {
+    fn initialize_yield(initial_yield_config: Option<(APR, Timestamp)>) {
         if let Some((initial_yield, initial_yield_start)) = initial_yield_config {
-            CashYield::put(APR(initial_yield));
+            CashYield::put(initial_yield);
             LastBlockTimestamp::put(initial_yield_start);
         }
     }

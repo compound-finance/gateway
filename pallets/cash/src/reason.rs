@@ -12,12 +12,13 @@ use trx_request;
 pub enum Reason {
     AssetExtractionNotSupported, // XXX temporary?
     AssetNotSupported,
-    AssetSymbolNotFound,
     BadAccount,
     BadAddress,
     BadAsset,
     BadChainId,
     BadSymbol,
+    BadTicker,
+    BadUnits,
     ChainMismatch,
     CryptoError(compound_crypto::CryptoError),
     FailedToSubmitExtrinsic,
@@ -29,7 +30,6 @@ pub enum Reason {
     InsufficientTotalFunds,
     InvalidLiquidityFactor,
     InvalidSignature,
-    InvalidSymbol,
     InvalidUTF8,
     KeyNotFound,
     MathError(MathError),
@@ -75,6 +75,18 @@ impl From<RatesError> for Reason {
     }
 }
 
+impl From<TrxReqParseError> for Reason {
+    fn from(err: TrxReqParseError) -> Self {
+        Reason::TrxRequestParseError(err)
+    }
+}
+
+impl From<trx_request::ParseError<'_>> for Reason {
+    fn from(err: trx_request::ParseError<'_>) -> Self {
+        Reason::TrxRequestParseError(err.into())
+    }
+}
+
 impl our_std::fmt::Display for Reason {
     fn fmt(&self, f: &mut our_std::fmt::Formatter) -> our_std::fmt::Result {
         write!(f, "{:?}", self)
@@ -84,13 +96,13 @@ impl our_std::fmt::Display for Reason {
 /// Type for reporting failures from calculations.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum MathError {
+    AbnormalFloatingPointResult,
+    DivisionByZero,
     Overflow,
     Underflow,
     SignMismatch,
-    SymbolMismatch,
     PriceNotUSD,
-    DivisionByZero,
-    AbnormalFloatingPointResult,
+    UnitsMismatch,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
@@ -106,16 +118,20 @@ pub enum TrxReqParseError {
     InvalidChainAccount,
 }
 
-pub fn to_parse_error(err: trx_request::ParseError) -> TrxReqParseError {
-    match err {
-        trx_request::ParseError::NotImplemented => TrxReqParseError::NotImplemented,
-        trx_request::ParseError::LexError(_) => TrxReqParseError::LexError,
-        trx_request::ParseError::InvalidAmount => TrxReqParseError::InvalidAmount,
-        trx_request::ParseError::InvalidAddress => TrxReqParseError::InvalidAddress,
-        trx_request::ParseError::InvalidArgs(_, _, _) => TrxReqParseError::InvalidArgs,
-        trx_request::ParseError::UnknownFunction(_) => TrxReqParseError::UnknownFunction,
-        trx_request::ParseError::InvalidExpression => TrxReqParseError::InvalidExpression,
-        trx_request::ParseError::InvalidChain(_) => TrxReqParseError::InvalidChain,
-        trx_request::ParseError::InvalidChainAccount(_) => TrxReqParseError::InvalidChainAccount,
+impl From<trx_request::ParseError<'_>> for TrxReqParseError {
+    fn from(err: trx_request::ParseError) -> Self {
+        match err {
+            trx_request::ParseError::NotImplemented => TrxReqParseError::NotImplemented,
+            trx_request::ParseError::LexError(_) => TrxReqParseError::LexError,
+            trx_request::ParseError::InvalidAmount => TrxReqParseError::InvalidAmount,
+            trx_request::ParseError::InvalidAddress => TrxReqParseError::InvalidAddress,
+            trx_request::ParseError::InvalidArgs(_, _, _) => TrxReqParseError::InvalidArgs,
+            trx_request::ParseError::UnknownFunction(_) => TrxReqParseError::UnknownFunction,
+            trx_request::ParseError::InvalidExpression => TrxReqParseError::InvalidExpression,
+            trx_request::ParseError::InvalidChain(_) => TrxReqParseError::InvalidChain,
+            trx_request::ParseError::InvalidChainAccount(_) => {
+                TrxReqParseError::InvalidChainAccount
+            }
+        }
     }
 }

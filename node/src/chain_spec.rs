@@ -2,8 +2,11 @@ use compound_chain_runtime::{
     opaque, wasm_binary_unwrap, AccountId, AuraConfig, CashConfig, GenesisConfig, GrandpaConfig,
     SessionConfig, Signature, SudoConfig, SystemConfig,
 };
-use our_std::str::FromStr;
-use pallet_cash::types::ConfigAsset;
+use our_std::{convert::TryInto, str::FromStr};
+use pallet_cash::{
+    chains::{Chain, Ethereum},
+    types::{AssetInfo, ValidatorKeys},
+};
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
@@ -34,10 +37,15 @@ where
     AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
+// XXX just construct ValidatorKeys here and should include aura/grandpa?
 /// Generate various keys from seed
-pub fn authority_keys_from_seed(seed: &str) -> (AccountId, AuraId, GrandpaId) {
+pub fn authority_keys_from_seed(
+    seed: &str,
+    identity: &str,
+) -> (AccountId, <Ethereum as Chain>::Address, AuraId, GrandpaId) {
     (
         get_account_id_from_seed::<sr25519::Public>(seed),
+        <Ethereum as Chain>::str_to_address(identity).unwrap(),
         get_from_seed::<AuraId>(seed),
         get_from_seed::<GrandpaId>(seed),
     )
@@ -57,7 +65,10 @@ fn get_properties() -> sc_service::Properties {
 fn development_genesis() -> GenesisConfig {
     testnet_genesis(
         // Initial PoA authorities
-        vec![authority_keys_from_seed("Alice")],
+        vec![authority_keys_from_seed(
+            "Alice",
+            "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7",
+        )],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
         true,
@@ -89,8 +100,8 @@ fn local_testnet_genesis() -> GenesisConfig {
     testnet_genesis(
         // Initial PoA authorities
         vec![
-            authority_keys_from_seed("Alice"),
-            authority_keys_from_seed("Bob"),
+            authority_keys_from_seed("Alice", "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7"),
+            authority_keys_from_seed("Bob", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
         ],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -123,9 +134,9 @@ fn staging_testnet_genesis() -> GenesisConfig {
     testnet_genesis(
         // Initial PoA authorities
         vec![
-            authority_keys_from_seed("Alice"),
-            authority_keys_from_seed("Bob"),
-            authority_keys_from_seed("Charlie"),
+            authority_keys_from_seed("Alice", "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7"),
+            authority_keys_from_seed("Bob", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
+            authority_keys_from_seed("Charlie", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
         ],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -156,7 +167,7 @@ pub fn staging_testnet_config() -> ChainSpec {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-    initial_authorities: Vec<(AccountId, AuraId, GrandpaId)>,
+    initial_authorities: Vec<(AccountId, <Ethereum as Chain>::Address, AuraId, GrandpaId)>,
     root_key: AccountId,
     _enable_println: bool,
 ) -> GenesisConfig {
@@ -185,8 +196,8 @@ fn testnet_genesis(
                         x.0.clone(),
                         x.0.clone(),
                         opaque::SessionKeys {
-                            aura: x.1.clone(),
-                            grandpa: x.2.clone(),
+                            aura: x.2.clone(),
+                            grandpa: x.3.clone(),
                         },
                     )
                 })
@@ -194,42 +205,49 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
+            initial_yield: None,
             last_block_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
                 .as_millis(),
-            assets: vec![
-                ConfigAsset {
-                    symbol: FromStr::from_str("ETH/18").unwrap(),
-                    asset: FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
-                        .unwrap(),
-                    liquidity_factor: FromStr::from_str("6789").unwrap(),
-                },
-                ConfigAsset {
-                    symbol: FromStr::from_str("USDC/6").unwrap(),
-                    asset: FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
-                        .unwrap(),
-                    liquidity_factor: FromStr::from_str("6789").unwrap(),
-                },
-            ],
-            // turn account_id of ss58 to [u8 32]s
-            validator_ids: initial_authorities
-                .iter()
-                .map(|x| <[u8; 32]>::from(x.0.clone()))
-                .collect::<Vec<_>>(),
 
-            // tuple representation of ChainKeys struct (substrate doesnt know how to decode the struct representation). just eth addrs
-            validator_keys: vec![
-                ("c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7".into(),),
-                ("435228f5ad6fc8ce7b4398456a72a2f14577d9cd".into(),),
+            assets: vec![
+                AssetInfo {
+                    liquidity_factor: FromStr::from_str("6789").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+                            .unwrap(),
+                        FromStr::from_str("ETH/18").unwrap(),
+                    )
+                    .unwrap()
+                },
+                AssetInfo {
+                    ticker: FromStr::from_str("USD").unwrap(),
+                    liquidity_factor: FromStr::from_str("6789").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                            .unwrap(),
+                        FromStr::from_str("USDC/6").unwrap(),
+                    )
+                    .unwrap()
+                },
             ],
 
             reporters: vec![
-                "85615b076615317c80f14cbad6501eec031cd51c".into(),
-                "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC".into(),
-            ],
+                "0x85615b076615317c80f14cbad6501eec031cd51c",
+                "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
+            ]
+            .try_into()
+            .unwrap(),
 
-            initial_yield: None,
+            // XXX initial authorities should just be Vec<ValidatorKeys>?
+            validators: initial_authorities
+                .iter()
+                .map(|v| ValidatorKeys {
+                    substrate_id: v.0.clone(),
+                    eth_address: v.1,
+                })
+                .collect::<Vec<_>>(),
         }),
     }
 }
@@ -307,7 +325,10 @@ pub(crate) mod tests {
 
     fn local_testnet_genesis_instant_single() -> GenesisConfig {
         testnet_genesis(
-            vec![authority_keys_from_seed("Alice")],
+            vec![authority_keys_from_seed(
+                "Alice",
+                "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd",
+            )],
             get_account_id_from_seed::<sr25519::Public>("Alice"),
             false,
         )

@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 const util = require('util');
 const child_process = require('child_process');
 const execFile = util.promisify(child_process.execFile);
-const { merge, stripHexPrefix } = require('../util');
+const { merge } = require('../util');
 const { getValidatorsInfo } = require('./validator');
 
 class ChainSpec {
@@ -28,19 +28,28 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
 
   // aurakey == validator id, account id
-  let session_args = validatorsInfo.map(([_, el]) => [el.aura_key, el.aura_key, {aura: el.aura_key, grandpa: el.grandpa_key}]);
+  let session_args = validatorsInfo.map(([_, v]) => [v.aura_key, v.aura_key, {aura: v.aura_key, grandpa: v.grandpa_key}]);
+  let validators = validatorsInfo.map(([_, v]) => ({
+      substrate_id: Array.from(ctx.actors.keyring.decodeAddress(v.aura_key)), // from ss58 str => byte array
+      eth_address: v.eth_account
+  }));
 
-  let validatorIds = validatorsInfo.map(([_, el]) =>
-    Array.from(ctx.actors.keyring.decodeAddress(el.aura_key))// from ss58 str => byte array
-  );
-
-  let chain_keys = validatorsInfo.map(([_, validator]) =>
-    [stripHexPrefix(validator.eth_account)]
-  );
   let assets = tokens.all().map((token) => ({
-    symbol: `${token.symbol.toUpperCase()}/${token.decimals}`,
-    asset: `eth:${token.ethAddress()}`,
-    liquidity_factor: `6543`,
+    asset: `Eth:${token.ethAddress()}`,
+    decimals: token.decimals,
+    symbol: token.symbol.toUpperCase(),
+    ticker: token.symbol.toUpperCase(), // XXX how to set price ticker in integration tests?
+    liquidity_factor: 6543,
+    rate_model: {
+      Kink: {
+        zero_rate: 0,
+        kink_rate: 500,
+        kink_utilization: 8000,
+        full_rate: 2000
+      }
+    },
+    reserve_factor: 1000,
+    supply_cap: 0
   }));
 
   let initialYieldConfig = {};
@@ -59,10 +68,9 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     genesis: {
       runtime: {
         palletCash: {
-          validatorIds,
-          validatorKeys: chain_keys,
           assets,
-          ...initialYieldConfig
+          ...initialYieldConfig,
+          validators,
         },
         palletSession: {
           keys: session_args

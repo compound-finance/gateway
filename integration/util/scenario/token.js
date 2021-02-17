@@ -95,12 +95,12 @@ class Token {
     }
   }
 
-  async getSymbol() {
-    return (await this.ctx.api().query.cash.assetSymbols(this.toChainAsset())).unwrap();
+  async getAsset() {
+    return (await this.ctx.api().query.cash.supportedAssets(this.toChainAsset())).unwrap();
   }
 
   async getPrice() {
-    return Number(await this.ctx.api().query.cash.prices(await this.getSymbol()));
+    return Number(await this.ctx.api().query.cash.prices((await this.getAsset()).ticker));
   }
 }
 

@@ -829,6 +829,7 @@ dependencies = [
  "frame-benchmarking-cli",
  "frame-system",
  "futures 0.3.8",
+ "hex",
  "jsonrpc-core",
  "our-std",
  "pallet-cash",

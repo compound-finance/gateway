@@ -23,30 +23,26 @@ function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = nul
 }
 
 function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = true) {
-  return new Promise((resolve, reject) => {
-    let unsub;
-    let id = trxId++;
-    let debugMsg = (msg) => {
+  return new Promise(async (resolve, reject) => {
+    const  id = trxId++;
+    const debugMsg = (msg) => {
       debug(() => `sendAndWaitForEvents[id=${id}] - ${msg}`);
     }
 
-    call.send(({ events = [], status }) => {
-      debugMsg(`Current status is ${status}`);
+    const doResolve = async (events) => {
+      await unsub(); // Note: unsub isn't apparently working, but we are calling it
 
-      let doResolve = (events) => {
-        unsub(); // Note: unsub isn't apparently working, but we are calling it
-
-        let failures = events
+      const failures = events
           .filter(({ event }) =>
             api.events.system.ExtrinsicFailed.is(event)
           )
-          // we know that data for system.ExtrinsicFailed is
-          // (DispatchError, DispatchInfo)
+      // we know that data for system.ExtrinsicFailed is
+      // (DispatchError, DispatchInfo)
           .map(({ event: { data: [error, info] } }) => {
             debug(() => `sendAndWaitForEvents[id=${id}] - Failing call: ${JSON.stringify(call)} ${call.toString()}`);
 
             if (call.method && call.method.callIndex && call.method.callIndex.length === 2) {
-              let [failModule, failExtrinsic] = call.method.callIndex;
+              const [failModule, failExtrinsic] = call.method.callIndex;
 
               debug(() => `sendAndWaitForEvents[id=${id}] - Hint: check module #${failModule}'s #${failExtrinsic} extrinsic`);
             }
@@ -63,12 +59,15 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
             }
           });
 
-        if (rejectOnFailure && failures.length > 0) {
-          reject(failures[0]);
-        } else {
-          resolve(events);
-        }
-      };
+      if (rejectOnFailure && failures.length > 0) {
+        reject(failures[0]);
+      } else {
+        resolve(events);
+      }
+    };
+
+    const unsub = await call.send(({ events = [], status }) => {
+      debugMsg(`Current status is ${status}`);
 
       if (status.isInBlock) {
         debugMsg(`Transaction included at blockHash ${status.asInBlock}`);
@@ -83,7 +82,7 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
       } else if (status.isInvalid) {
         reject("Transaction failed (Invalid)");
       }
-    }).then((unsub_) => unsub = unsub_);
+    });
 
     debugMsg(`Submitted unsigned transaction...`);
   });
