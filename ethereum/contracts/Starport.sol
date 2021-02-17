@@ -12,7 +12,7 @@ import "./ICash.sol";
 contract Starport {
     ICash immutable public cash;
 
-    address public admin;
+    address immutable public admin;
     address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
     address[] public authorities;
@@ -34,12 +34,9 @@ contract Starport {
     event ExecuteProposal(string title, bytes[] extrinsics);
     event NewSupplyCap(address asset, uint supplyCap);
 
-    constructor(ICash cash_, address admin_, address[] memory authorities_) {
+    constructor(ICash cash_, address admin_) {
         cash = cash_;
         admin = admin_;
-        authorities = authorities_;
-
-        emit ChangeAuthorities(authorities_);
     }
 
     /**
@@ -273,11 +270,12 @@ contract Starport {
 
     /**
      * @notice Rotates authorities which can be used to sign notices for the Staport
-     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain or by the admin.
      * @param newAuthorities The new authorities which may sign notices for execution by the Starport
      */
     function changeAuthorities(address[] calldata newAuthorities) external {
-        require(msg.sender == address(this), "Call must originate locally");
+        // TODO: Test change here
+        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
         require(newAuthorities.length > 0, "New authority set can not be empty");
 
         emit ChangeAuthorities(newAuthorities);
@@ -287,12 +285,13 @@ contract Starport {
 
     /**
      * @notice Sets the supply cap for a given asset.
-     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain or by the admin.
      * @dev Note: supply caps start at zero. This must be called to allow an asset to be locked in the Starport.
      * @param asset The asset to set the supply cap for. This may be Ether Token but may not be CASH.
      * @param supplyCap The cap to put on the asset, in its native token units.
      */
     function setSupplyCap(address asset, uint supplyCap) external {
+        // TODO: Test change here
         require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
         require(asset != address(cash), "Cash does not accept supply cap");
 
@@ -303,13 +302,14 @@ contract Starport {
 
     /**
      * @notice Sets the yield of the CASH token for some future time.
-     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain.
+     * @dev This must be called from `invoke` via passing in a signed notice from Compound Chain or by the admin.
      * @param nextCashYield The yield to set
      * @param nextCashYieldIndex The pre-calculated index at change-over for error correction
      * @param nextCashYieldStart When the yield change-over should occur
      */
     function setFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart) external {
-        require(msg.sender == address(this), "Call must originate locally");
+        // TODO: Test change here
+        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
 
         emit SetFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
         cash.setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);

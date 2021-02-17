@@ -16,12 +16,15 @@ const {
 } = require('./utils');
 
 describe('Starport', () => {
+  let proxyAdmin;
+  let starportImpl;
+  let proxy;
   let starport;
   let cash;
   let tokenA;
   let tokenFee;
   let tokenNS;
-  let [root, account1, account2] = saddle.accounts;
+  let [defaultFrom, root, account1, account2] = saddle.accounts;
 
   const authorityWallets = nRandomWallets(3);
   const authorityAddresses = authorityWallets.map(acct => acct.address);
@@ -63,18 +66,27 @@ describe('Starport', () => {
 
   beforeEach(async () => {
     const rootNonce = await web3.eth.getTransactionCount(root);
-    const cashAddress = getNextContractAddress(root, rootNonce + 1);
+    const cashAddress = getNextContractAddress(root, rootNonce + 4);
 
-    starport = await deploy('StarportHarness', [cashAddress, root, authorityAddresses]);
-    cash = await deploy('CashToken', [starport._address, 0, 1e4, fromNow(0)]);
+    proxyAdmin = await deploy('ProxyAdmin', [], { from: root });
+    starportImpl = await deploy('StarportHarness', [cashAddress, root], { from: root });
+    proxy = await deploy('TransparentUpgradeableProxy', [
+      starportImpl._address,
+      proxyAdmin._address,
+      "0x"
+    ], { from: root });
+    starport = await saddle.getContractAt('StarportHarness', proxy._address);
+    await starport.methods.changeAuthorities(authorityAddresses).send({ from: root });
+    cash = await deploy('CashToken', [starport._address, 0, 1e4, fromNow(0)], { from: root });
+    expect(cash._address).toMatchAddress(cashAddress); // Make sure we counted correctly above
 
     // Give some 100e6 CASH to account1
     let mintPrincipal = await cash.methods.amountToPrincipal(e6(100)).call();
     await starport.methods.mint_(account1, mintPrincipal).send({ from: root });
 
-    tokenA = await deploy('FaucetToken', [e18(100), "tokenA", 18, "TKNA"]);
-    tokenFee = await deploy('FeeToken', [e18(100), "tokenFee", 18, "TFEE"]);
-    tokenNS = await deploy('NonStandardToken', [e18(100), "tokenNS", 18, "TNS"]);
+    tokenA = await deploy('FaucetToken', [e18(100), "tokenA", 18, "TKNA"], { from: root });
+    tokenFee = await deploy('FeeToken', [e18(100), "tokenFee", 18, "TFEE"], { from: root });
+    tokenNS = await deploy('NonStandardToken', [e18(100), "tokenNS", 18, "TNS"], { from: root });
 
     eraId = 0;
     eraIndex = 0;
