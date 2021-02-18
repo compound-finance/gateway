@@ -1,6 +1,5 @@
 const { sendAndWaitForEvents, waitForEvent, getEventData } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
-const { u8aToHex } = require('@polkadot/util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -9,6 +8,10 @@ const {
   getRawHash,
 } = require('./types');
 
+const { u8aToHex } = require('@polkadot/util');
+const { xxhashAsHex } = require('@polkadot/util-crypto');
+const web3 = require('web3');
+
 class Chain {
   constructor(ctx) {
     this.ctx = ctx;
@@ -16,6 +19,17 @@ class Chain {
 
   toSS58 (arr) {
     return this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
+  }
+
+  toEthAddress(u8arr) {
+    return web3.utils.toChecksumAddress(u8aToHex(u8arr));
+  }
+
+  // https://www.shawntabrizi.com/substrate/querying-substrate-storage-via-rpc/
+  getStorageKey(moduleName, valueName) {
+    let moduleHash = xxhashAsHex(moduleName, 128);
+    let functionHash = xxhashAsHex(valueName, 128); 
+    return moduleHash + functionHash.slice(2);
   }
 
   api() {
@@ -134,7 +148,7 @@ class Chain {
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
         this.toSS58(valIdRaw.args[0]),
-        {eth_address: u8aToHex(chainKeys.unwrap().eth_address)}
+        {eth_address: this.toEthAddress(chainKeys.unwrap().eth_address)}
       ]
     );
     return authData;
@@ -145,7 +159,7 @@ class Chain {
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
         this.toSS58(valIdRaw.args[0]),
-        {eth_address: u8aToHex(chainKeys.unwrap().eth_address)}
+        {eth_address: this.toEthAddress(chainKeys.unwrap().eth_address)}
       ]
     );
     return authData;
@@ -153,7 +167,21 @@ class Chain {
 
   async sessionValidators() {
     let vals = await this.ctx.api().query.session.validators();
-  return vals.map((valIdRaw) => this.toSS58(valIdRaw));
+    return vals.map((valIdRaw) => this.toSS58(valIdRaw));
+  }
+
+  async getGrandpaAuthorities() {
+    const grandpaStorageKey = ':grandpa_authorities';
+    const grandpaAuthorities = await this.ctx.api().rpc.state.getStorage(grandpaStorageKey);
+    const auths = this.ctx.api().createType('VersionedAuthorityList', grandpaAuthorities.value).authorityList;
+    return auths.map(e => this.toSS58(e[0]));
+  }
+
+  async getAuraAuthorites() {
+    const auraAuthStorageKey = this.getStorageKey("Aura", "Authorities");
+    const rawAuths = await this.ctx.api().rpc.state.getStorage(auraAuthStorageKey);
+    const auths = this.ctx.api().createType('Authorities', rawAuths.value);
+    return auths.map(e => this.ctx.actors.keyring.encodeAddress(e));
   }
   
   async waitUntilSession(num) {

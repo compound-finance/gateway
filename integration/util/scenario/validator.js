@@ -240,6 +240,7 @@ async function buildValidators(validatorsInfoHash, ctx) {
   let validators = new Validators(validatorsList, ctx);
   await validators.start();
 
+  validators.validatorInfoMap = validatorInfoMap;
   return validators;
 }
 

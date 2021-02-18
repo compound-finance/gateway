@@ -1,5 +1,5 @@
 const {
-  buildScenarios, expectRevert,
+  buildScenarios
 } = require('../util/scenario');
 const { decodeCall } = require('../util/substrate');
 
@@ -28,24 +28,29 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
   },
   {
     name: "Update Auth",
-    scenario: async ({ ctx, chain, starport }) => {
-      let aliceInitId = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
-      let aliceInitEthKey = "0x6a72a2f14577d9cd0167801efdd54a07b40d2b61";
-      const newAuthsRaw = [[ctx.actors.keyring.decodeAddress(aliceInitId), { eth_address: aliceInitEthKey }]];
+    scenario: async ({ ctx, chain, starport, validators }) => {
+      const alice = validators.validatorInfoMap.alice;
+      const alice_account_id = alice.aura_key;
+      const newAuthsRaw = [[ctx.actors.keyring.decodeAddress(alice_account_id), { eth_address: alice.eth_account }]];
       let extrinsic = ctx.api().tx.cash.changeAuthorities(newAuthsRaw);
       await starport.executeProposal("Update authorities", [extrinsic]);
       const pending = await chain.pendingCashValidators();
 
-      const newAuths = [[aliceInitId, { eth_address: aliceInitEthKey }]];
+      const newAuths = [[alice_account_id, { eth_address: alice.eth_account }]];
       expect(pending).toEqual(newAuths);
 
-      await chain.waitUntilSession(2);
+      await chain.waitUntilSession(3);
       const newVals = await chain.cashValidators();
       expect(newVals).toEqual(newAuths);
 
       const newSessionAuths = await chain.sessionValidators();
-      expect(newSessionAuths).toEqual([aliceInitId]);
-      await chain.getGrandpaAuthorities();
+      expect(newSessionAuths).toEqual([alice_account_id]);
+      
+      const grandpaAuths = await chain.getGrandpaAuthorities();
+      expect(grandpaAuths).toEqual([alice.grandpa_key]);
+
+      const auraAuths = await chain.getAuraAuthorites();
+      expect(auraAuths).toEqual([alice.aura_key]);
     }
   },
   {

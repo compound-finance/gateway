@@ -378,5 +378,10 @@
   "Source10": "AccountRS",
   "LiquidityFactor": "u128",
   "Address": "MultiAddress",
-  "LookupSource": "MultiAddress"
+  "LookupSource": "MultiAddress",
+  "VersionedAuthorityList": {
+    "version": "u8",
+    "authorityList": "AuthorityList"
+  },
+  "Authorities": "Vec<AccountId32>"
 }

@@ -145,13 +145,6 @@ pub fn native_version() -> NativeVersion {
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
-// // shorter session period in debug mode for testing
-// #[cfg(debug_assertions)]
-// const PERIOD: BlockNumber = 1;
-
-// #[cfg(not(debug_assertions))]
-// const PERIOD: BlockNumber = 10000;
-
 parameter_types! {
     pub const Version: RuntimeVersion = VERSION;
     pub const BlockHashCount: BlockNumber = 2400;/// We allow for 2 seconds of compute with a 6 second average block time.
@@ -160,7 +153,7 @@ parameter_types! {
     pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
         ::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
     pub const SS58Prefix: u8 = 42;
-    pub const Period: BlockNumber = 1;
+    pub const Period: BlockNumber = 2;// XXX TODO only use a short period during testing
     pub const Offset: BlockNumber = 0;
 }
 
