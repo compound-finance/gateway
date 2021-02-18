@@ -970,7 +970,7 @@ describe('Starport', () => {
       const authoritiesBefore = await call(starport, 'getAuthorities');
       expect(authoritiesBefore).toEqual(authorityAddresses);
 
-      const tx = await send(starport, 'changeAuthorities_', [nextAuthorities]);
+      const tx = await send(starport, 'changeAuthorities', [nextAuthorities], { from: root });
 
       const authoritiesAfter = await call(starport, 'getAuthorities');
       expect(authoritiesAfter).toEqual(nextAuthorities);
@@ -1023,12 +1023,12 @@ describe('Starport', () => {
       });
     });
 
-    it('should fail when not called by self', async () => {
-      await expect(call(starport, 'changeAuthorities', [[]])).rejects.toRevert('revert Call must originate locally');
+    it('should fail when not called by self or admin', async () => {
+      await expect(call(starport, 'changeAuthorities', [[]])).rejects.toRevert('revert Call must be by notice or admin');
     });
 
     it('should fail when no authorities are passed in', async () => {
-      await expect(call(starport, 'changeAuthorities_', [[]])).rejects.toRevert('revert New authority set can not be empty');
+      await expect(call(starport, 'changeAuthorities', [[]], { from: root })).rejects.toRevert('revert New authority set can not be empty');
     });
   });
 
@@ -1086,8 +1086,8 @@ describe('Starport', () => {
       });
     });
 
-    it('should fail when not called by self', async () => {
-      await expect(call(starport, 'setSupplyCap', [tokenA._address, 500], { from: account1 })).rejects.toRevert('revert Call must originate locally or from admin');
+    it('should fail when not called by self or admin' , async () => {
+      await expect(call(starport, 'setSupplyCap', [tokenA._address, 500])).rejects.toRevert('revert Call must be by notice or admin');
     });
 
     it('should fail when cash token is passed in', async () => {
@@ -1111,7 +1111,7 @@ describe('Starport', () => {
         index: "0",
       });
 
-      const tx = await send(starport, 'setFutureYield_', [nextCashYield, nextCashYieldIndex, nextCashYieldStart]);
+      const tx = await send(starport, 'setFutureYield', [nextCashYield, nextCashYieldIndex, nextCashYieldStart], { from: root });
 
       expect(tx.events.SetFutureYield.returnValues).toMatchObject({
         nextCashYield: nextCashYield.toString(),
@@ -1178,8 +1178,8 @@ describe('Starport', () => {
       });
     });
 
-    it('should fail when not called by self', async () => {
-      await expect(call(starport, 'setFutureYield', [1, 2, 3])).rejects.toRevert('revert Call must originate locally');
+    it('should fail when not called by self or admin', async () => {
+      await expect(call(starport, 'setFutureYield', [1, 2, 3])).rejects.toRevert('revert Call must be by notice or admin');
     });
   });
 });

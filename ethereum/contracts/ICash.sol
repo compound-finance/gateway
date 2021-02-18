@@ -33,4 +33,5 @@ interface ICash is IERC20 {
 interface INonStandardERC20 {
     function transfer(address recipient, uint256 amount) external;
     function transferFrom(address sender, address recipient, uint256 amount) external;
+    function balanceOf(address account) external view returns (uint256);
 }
