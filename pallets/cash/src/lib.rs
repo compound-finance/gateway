@@ -31,7 +31,7 @@ use frame_system::{
     ensure_none, ensure_root,
     offchain::{CreateSignedTransaction, SubmitTransaction},
 };
-use our_std::{if_std, str, vec::Vec};
+use our_std::{str, vec::Vec};
 use sp_core::crypto::AccountId32;
 use sp_runtime::{
     offchain::{
@@ -107,10 +107,11 @@ pub trait Config:
 
 decl_storage! {
     trait Store for Module<T: Config> as Cash {
-        /// The timestamp of the previous block (or defaults to timestamp of the genesis block).
-        LastBlockTimestamp get(fn last_block_timestamp) config(): Timestamp;
+        /// The timestamp of the previous block (or initialized to yield start defined in genesis).
+        LastYieldTimestamp get(fn last_yield_timestamp) config(): Timestamp;
 
-        NextSessionIndex get(fn get_next_session_index): SessionIndex;
+        /// The upcoming session at which to tell the sessions pallet to rotate the validators.
+        NextSessionIndex get(fn next_session_index): SessionIndex;
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
         NextValidators get(fn next_validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
@@ -125,7 +126,7 @@ decl_storage! {
         CashYieldNext get(fn cash_yield_next): Option<(APR, Timestamp)>;
 
         /// The current APR on CASH held, and the base rate paid by borrowers.
-        CashYield get(fn cash_yield): APR;
+        CashYield get(fn cash_yield) config(): APR;
 
         /// The liquidation incentive on seized collateral (e.g. 8% = 800 bips).
         GlobalLiquidationIncentive get(fn liquidation_incentive): Bips;
@@ -201,14 +202,12 @@ decl_storage! {
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
-        config(initial_yield): Option<(APR, Timestamp)>;
         config(reporters): ReporterSet;
         config(validators): Vec<ValidatorKeys>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_reporters(config.reporters.clone());
             Module::<T>::initialize_validators(config.validators.clone());
-            Module::<T>::initialize_yield(config.initial_yield.clone());
         })
     }
 }
@@ -636,14 +635,6 @@ impl<T: Config> Module<T> {
             "Open price feed price reporters must be set in the genesis config"
         );
         PriceReporters::put(reporters);
-    }
-
-    /// Set the initial cash yield, if provided
-    fn initialize_yield(initial_yield_config: Option<(APR, Timestamp)>) {
-        if let Some((initial_yield, initial_yield_start)) = initial_yield_config {
-            CashYield::put(initial_yield);
-            LastBlockTimestamp::put(initial_yield_start);
-        }
     }
 
     /// Procedure for offchain worker to processes messages coming out of the open price feed

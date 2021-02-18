@@ -17,6 +17,7 @@ use frame_support::storage::{
 use frame_support::traits::UnfilteredDispatchable;
 
 // Import these traits so we can interact with the substrate storage modules.
+use crate::symbol::USD;
 use crate::{
     chains::{
         Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainHash,
@@ -38,11 +39,13 @@ use crate::{
         USDQuantity, Uint, ValidatorIdentity, ValidatorSig,
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, Call, CashPrincipals,
-    CashYield, ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex,
-    LastBlockTimestamp, LastIndices, LatestNotice, Module, NoticeHashes, NoticeStates, Notices,
-    Prices, SubmitTransaction, SupplyIndices, SupportedAssets, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets, Validators,
+    CashYield, ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex, LastIndices,
+    LastYieldTimestamp, LatestNotice, Module, NoticeHashes, NoticeStates, Notices, Prices,
+    SubmitTransaction, SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal,
+    TotalSupplyAssets, Validators,
 };
+use num_bigint::BigUint;
+use num_traits::ToPrimitive;
 
 #[macro_export]
 macro_rules! require {
@@ -139,47 +142,34 @@ pub fn passes_validation_threshold(
     signer_set.len() > validator_set.len() * 2 / 3
 }
 
-fn scale_multiple_terms(
-    unscaled: Uint,
-    numerator_decimals: u8,
-    denominator_decimals: u8,
-    output_decimals: u8,
-) -> Option<Uint> {
-    // as cannot panic here u8 -> i32 is safe, beware of changes in the future to u8 above
-    let numerator_decimals = numerator_decimals as i32;
-    let denominator_decimals = denominator_decimals as i32;
-    let output_decimals = output_decimals as i32;
-    let scale_decimals = output_decimals
-        .checked_sub(numerator_decimals)?
-        .checked_add(denominator_decimals)?;
-    if scale_decimals < 0 {
-        // as is safe here due to above non-negativity check and will not panic.
-        let scalar = 10u128.checked_pow((-1 * scale_decimals) as u32)?;
-        unscaled.checked_div(scalar)
-    } else {
-        let scalar = 10u128.checked_pow(scale_decimals as u32)?;
-        unscaled.checked_mul(scalar)
-    }
-}
-
 fn compute_cash_principal_per_internal(
     asset_rate: Uint,
     dt: Uint,
     cash_index: Uint,
     price_asset: AssetPrice,
+    price_cash: AssetPrice,
 ) -> Option<Uint> {
-    let unscaled = asset_rate
-        .checked_mul(dt)?
-        .checked_mul(price_asset)?
-        .checked_div(cash_index)?
-        .checked_div(MILLISECONDS_PER_YEAR)?;
+    // the pattern is
+    // 1. start with the scale you are going to
+    // 2. multiply all terms
+    // 3. scale up by divisor scales
+    // 4. divide by divisors
+    // 5. scale down by numerator scales
+    let price_scalar = 10u128.pow(USD.decimals as u32);
 
-    scale_multiple_terms(
-        unscaled,
-        APR::DECIMALS + Price::DECIMALS,
-        CashIndex::DECIMALS,
-        AssetIndex::DECIMALS,
-    )
+    let raw_bigint = BigUint::from(AssetIndex::ONE.0) // final precision
+        * asset_rate // numerator stage
+        * dt
+        * price_asset
+        * CashIndex::ONE.0 // divisor scalars
+        * price_scalar
+        / cash_index // divisors
+        / MILLISECONDS_PER_YEAR
+        / price_cash
+        / APR::ONE.0 // numerator scalars
+        / price_scalar;
+
+    raw_bigint.to_u128()
 }
 
 pub fn compute_cash_principal_per(
@@ -187,10 +177,20 @@ pub fn compute_cash_principal_per(
     dt: Timestamp,
     cash_index: CashIndex,
     price_asset: Price,
+    price_cash: Price,
 ) -> Result<CashPrincipal, Reason> {
-    let raw =
-        compute_cash_principal_per_internal(asset_rate.0, dt, cash_index.0, price_asset.value)
-            .ok_or(Reason::MathError(MathError::Overflow))?;
+    if price_cash.ticker != CASH.ticker {
+        return Err(Reason::BadTicker);
+    }
+
+    let raw = compute_cash_principal_per_internal(
+        asset_rate.0,
+        dt,
+        cash_index.0,
+        price_asset.value,
+        price_cash.value,
+    )
+    .ok_or(Reason::MathError(MathError::Overflow))?;
 
     let raw: Int = raw
         .try_into()
@@ -396,7 +396,11 @@ pub fn dispatch_notice_internal<T: Config>(
 }
 
 /// Update the index of which assets an account has non-zero balances in.
-fn set_asset_balance_internal(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
+fn set_asset_balance_internal<T: Config>(
+    asset: ChainAsset,
+    account: ChainAccount,
+    balance: AssetBalance,
+) {
     if balance == 0 {
         AssetsWithNonZeroBalance::remove(account, asset);
     } else {
@@ -469,7 +473,7 @@ pub fn lock_internal<T: Config>(
     TotalSupplyAssets::insert(asset.asset, total_supply_new);
     TotalBorrowAssets::insert(asset.asset, total_borrow_new);
 
-    set_asset_balance_internal(asset.asset, holder, holder_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
 
     // XXX real events
     <Module<T>>::deposit_event(Event::GoldieLocks(asset.asset, holder, amount.value)); // XXX -> raw amount?
@@ -547,7 +551,7 @@ pub fn extract_internal<T: Config>(
     TotalSupplyAssets::insert(asset.asset, total_supply_new);
     TotalBorrowAssets::insert(asset.asset, total_borrow_new);
 
-    set_asset_balance_internal(asset.asset, holder, holder_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
 
     // XXX fix me this cannot fail
     dispatch_notice_internal::<T>(
@@ -713,8 +717,8 @@ pub fn transfer_internal<T: Config>(
     TotalBorrowAssets::insert(asset.asset, total_borrow_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    set_asset_balance_internal(asset.asset, sender, sender_asset_new);
-    set_asset_balance_internal(asset.asset, recipient, recipient_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, sender, sender_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, recipient, recipient_asset_new);
 
     Ok(()) // XXX events?
 }
@@ -889,14 +893,14 @@ pub fn liquidate_internal<T: Config>(
     TotalSupplyAssets::insert(collateral_asset.asset, total_collateral_supply_new);
     TotalBorrowAssets::insert(collateral_asset.asset, total_collateral_borrow_new);
 
-    set_asset_balance_internal(asset.asset, borrower, borrower_asset_new);
-    set_asset_balance_internal(asset.asset, liquidator, liquidator_asset_new);
-    set_asset_balance_internal(
+    set_asset_balance_internal::<T>(asset.asset, borrower, borrower_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, liquidator, liquidator_asset_new);
+    set_asset_balance_internal::<T>(
         collateral_asset.asset,
         borrower,
         borrower_collateral_asset_new,
     );
-    set_asset_balance_internal(
+    set_asset_balance_internal::<T>(
         collateral_asset.asset,
         liquidator,
         liquidator_collateral_asset_new,
@@ -1002,12 +1006,12 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     TotalSupplyAssets::insert(collateral_asset.asset, total_collateral_supply_new);
     TotalBorrowAssets::insert(collateral_asset.asset, total_collateral_borrow_new);
 
-    set_asset_balance_internal(
+    set_asset_balance_internal::<T>(
         collateral_asset.asset,
         borrower,
         borrower_collateral_asset_new,
     );
-    set_asset_balance_internal(
+    set_asset_balance_internal::<T>(
         collateral_asset.asset,
         liquidator,
         liquidator_collateral_asset_new,
@@ -1107,8 +1111,8 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     TotalBorrowAssets::insert(asset.asset, total_borrow_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    set_asset_balance_internal(asset.asset, borrower, borrower_asset_new);
-    set_asset_balance_internal(asset.asset, liquidator, liquidator_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, borrower, borrower_asset_new);
+    set_asset_balance_internal::<T>(asset.asset, liquidator, liquidator_asset_new);
 
     Ok(()) // XXX events?
 }
@@ -1364,16 +1368,23 @@ pub fn exec_trx_request_internal<T: Config>(
 /// Block initialization step that can fail
 pub fn on_initialize_core<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
     let now: Timestamp = get_now::<T>();
-    let previous: Timestamp = LastBlockTimestamp::get();
-
+    let previous: Timestamp = LastYieldTimestamp::get();
+    // xxx re-evaluate how we do time, we don't really want this to be zero but there may
+    // not actually be any good way to do "current" time per-se so what we have here is more like
+    // the last block's time and the block before
+    if now == 0 {
+        return Err(Reason::TimeTravelNotAllowed);
+    }
+    if previous == 0 {
+        // this is the first time we have seen a valid time, set it
+        LastYieldTimestamp::put(now);
+        return Ok(0);
+    }
     let change_in_time = now
         .checked_sub(previous)
         .ok_or(Reason::TimeTravelNotAllowed)?;
-
     let weight = on_initialize::<T>(change_in_time)?;
-
-    LastBlockTimestamp::put(now);
-
+    LastYieldTimestamp::put(now);
     Ok(weight)
 }
 
@@ -1387,16 +1398,29 @@ pub fn on_initialize<T: Config>(
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     let mut cash_principal_supply_increase = CashPrincipal::ZERO;
     let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
+    let price_cash = get_price::<T>(CASH);
+
     for (asset, asset_info) in SupportedAssets::iter() {
         let asset_units = asset_info.units();
         let price_asset = get_price::<T>(asset_units); // XXX 2 uses price(UNITS) for cash, price(asset) for everything else (currently chain asset)
+
         let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
 
         // XXX use unsigned cash principal
-        let cash_borrow_principal_per =
-            compute_cash_principal_per(asset_cost, change_in_time, cash_index, price_asset)?; // XXX not using price cash?
-        let cash_hold_principal_per =
-            compute_cash_principal_per(asset_yield, change_in_time, cash_index, price_asset)?; // XXX not using price cash?
+        let cash_borrow_principal_per = compute_cash_principal_per(
+            asset_cost,
+            change_in_time,
+            cash_index,
+            price_asset,
+            price_cash,
+        )?;
+        let cash_hold_principal_per = compute_cash_principal_per(
+            asset_yield,
+            change_in_time,
+            cash_index,
+            price_asset,
+            price_cash,
+        )?;
 
         let supply_index = SupplyIndices::get(&asset);
         let borrow_index = BorrowIndices::get(&asset);
@@ -1415,10 +1439,16 @@ pub fn on_initialize<T: Config>(
 
     // Pay miners and update the CASH interest index on CASH itself
     let cash_yield: APR = CashYield::get();
+    if cash_yield == APR::ZERO {
+        log!("Cash yield is zero. No interest earned on cash in this block.");
+    }
     let cash_index_old: CashIndex = GlobalCashIndex::get();
     let total_cash_principal: CashPrincipal = TotalCashPrincipal::get();
 
     let increment = cash_yield.over_time(change_in_time)?;
+    if increment == CashIndex::ONE {
+        log!("Index increment is One. No interest on cash earned in this block!")
+    }
     let cash_index_new = cash_index_old.increment(increment)?;
     let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
     let miner_spread_principal =
@@ -1910,8 +1940,11 @@ mod tests {
         let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
         let cash_index = CashIndex::from_nominal("1.5"); // current index value 1.5
         let price_asset = Price::from_nominal(CASH.ticker, "1500"); // $1,500
+        let price_cash = Price::from_nominal(CASH.ticker, "1");
 
-        let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
+        let actual =
+            compute_cash_principal_per(asset_rate, dt, cash_index, price_asset, price_cash)
+                .unwrap();
         let expected = CashPrincipal::from_nominal("150"); // from hand calc
         assert_eq!(actual, expected);
     }
@@ -1924,30 +1957,31 @@ mod tests {
         let dt = MILLISECONDS_PER_YEAR / 4;
         let cash_index = CashIndex::from_nominal("1.123");
         let price_asset = Price::from_nominal(CASH.ticker, "1450");
+        let price_cash = Price::from_nominal(CASH.ticker, "1");
 
-        let actual = compute_cash_principal_per(asset_rate, dt, cash_index, price_asset).unwrap();
-        let expected = CashPrincipal::from_nominal("39.542520"); // from hand calc
+        let actual =
+            compute_cash_principal_per(asset_rate, dt, cash_index, price_asset, price_cash)
+                .unwrap();
+        let expected = CashPrincipal::from_nominal("39.542520035618878005"); // from hand calc
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn test_scale_multiple_terms() {
-        let n1 = 56_789u128; // 3 decimals 56.789
-        let n2 = 12_3456; // 4 decimals 12.3456
-        let d1 = 7_89; // 2 decimals 7.89
-        let unscaled = n1 * n2 / d1;
+    fn test_compute_cash_principal_per_realistic_underflow_case() {
+        // a unit test related to previous unexpected larger scope test of on_initialize
+        // This case showed that we should have more decimals on CASH token to avoid 0 interest
+        // showing for common cases. We want "number go up" technology.
+        let asset_rate = APR::from_nominal("0.156");
+        let dt = 6000;
+        let cash_index = CashIndex::from_nominal("4.629065392511782467");
+        let price_asset = Price::from_nominal(CASH.ticker, "0.313242");
+        let price_cash = Price::from_nominal(CASH.ticker, "1");
 
-        // scale 0 => output decimals = 5
-        let actual = scale_multiple_terms(unscaled, 7, 2, 5).unwrap();
-        assert_eq!(actual, 88_85859);
-
-        // scale > 0 => output decimals > 5, say 8
-        let actual = scale_multiple_terms(unscaled, 7, 2, 8).unwrap();
-        assert_eq!(actual, 88_85859_000); // 3 scale decimals resulting in right trailing zeros
-
-        // scale < 0 => output decimals < 5, say 2
-        let actual = scale_multiple_terms(unscaled, 7, 2, 2).unwrap();
-        assert_eq!(actual, 88_85);
+        let actual =
+            compute_cash_principal_per(asset_rate, dt, cash_index, price_asset, price_cash)
+                .unwrap();
+        let expected = CashPrincipal::from_nominal("0.000000002008426366"); // from hand calc
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -2016,22 +2050,26 @@ mod tests {
 
             assert_eq!(
                 SupplyIndices::get(&asset),
-                AssetIndex::from_nominal("1273.542520")
+                AssetIndex::from_nominal("1273.542520035618878005")
             );
             assert_eq!(
                 BorrowIndices::get(&asset),
-                AssetIndex::from_nominal("1425.699020")
+                AssetIndex::from_nominal("1425.699020480854853072")
             );
-            assert_eq!(GlobalCashIndex::get(), CashIndex::from_nominal("1.1924"));
-            // todo: it looks like some precision is getting lost should be 462104.853072
+            // note - the cash index number below is quite round due to the polynomial nature of
+            // our approximation and the fact that the ratio in this case worked out to be a
+            // base 10 number that terminates in that many digits.
+            assert_eq!(
+                GlobalCashIndex::get(),
+                CashIndex::from_nominal("1.192441828000000000")
+            );
             assert_eq!(
                 TotalCashPrincipal::get(),
-                CashPrincipal::from_nominal("462104.853000")
+                CashPrincipal::from_nominal("462104.853072128227960800")
             );
-            // todo: same here, should be 243.097061
             assert_eq!(
                 CashPrincipals::get(&miner),
-                CashPrincipal::from_nominal("243.097000")
+                CashPrincipal::from_nominal("243.097061442564559300")
             );
         });
     }
@@ -2062,7 +2100,7 @@ mod tests {
             AssetsWithNonZeroBalance::insert(account, asset1, ());
             AssetsWithNonZeroBalance::insert(account, asset2, ());
 
-            set_asset_balance_internal(asset1, account, zero_balance);
+            set_asset_balance_internal::<Test>(asset1, account, zero_balance);
             assert!(
                 !AssetsWithNonZeroBalance::contains_key(account, asset1),
                 "set to zero should be zeroed out"
@@ -2074,7 +2112,7 @@ mod tests {
             assert_eq!(AssetBalances::get(asset1, account), zero_balance);
             assert_eq!(AssetBalances::get(asset2, account), nonzero_balance);
 
-            set_asset_balance_internal(asset3, account, nonzero_balance);
+            set_asset_balance_internal::<Test>(asset3, account, nonzero_balance);
             assert!(
                 !AssetsWithNonZeroBalance::contains_key(account, asset1),
                 "set to zero should be zeroed out"

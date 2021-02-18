@@ -5,11 +5,11 @@ use crate::oracle::OracleError;
 use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
-use our_std::{Debuggable, RuntimeDebug};
+use our_std::RuntimeDebug;
 use trx_request;
 
 /// Type for reporting failures for reasons outside of our control.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
     AssetExtractionNotSupported, // XXX temporary?
     AssetNotSupported,
@@ -29,6 +29,7 @@ pub enum Reason {
     InsufficientChainCash,
     InsufficientLiquidity,
     InsufficientTotalFunds,
+    InvalidAPR,
     InvalidLiquidityFactor,
     InvalidSignature,
     InvalidUTF8,
@@ -109,7 +110,7 @@ pub enum MathError {
     UnitsMismatch,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum TrxReqParseError {
     NotImplemented,
     LexError,

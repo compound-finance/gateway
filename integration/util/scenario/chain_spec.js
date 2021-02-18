@@ -55,7 +55,8 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   let initialYieldConfig = {};
   if (ctx.__initialYield() > 0) {
     initialYieldConfig = {
-      initialYield: [ctx.__initialYield(), ctx.__initialYieldStart()]
+      cashYield: ctx.__initialYield(),
+      lastYieldTimestamp: ctx.__initialYieldStart()
     };
   }
 

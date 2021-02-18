@@ -138,7 +138,7 @@ mod tests {
                 id: expected_notice_id,
                 parent: [0u8; 32],
                 next_cash_yield: 100,
-                next_cash_index: 10000,
+                next_cash_index: 1000000000000000000,
                 next_cash_yield_start: 86400500,
             });
 

@@ -11,6 +11,8 @@ use crate::{
     symbol::{static_pow10, Symbol, Ticker, Units, CASH, USD},
     SubstrateId,
 };
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
 // Type aliases //
 
@@ -309,16 +311,13 @@ impl Quantity {
 
     // Quantity<U> * (CashPrincipal / Quantity<U>) -> CashPrincipal
     pub fn mul_cash_principal_per(self, per: CashPrincipal) -> Result<CashPrincipal, MathError> {
-        let raw = mul(
-            Uint::try_from(per.0).map_err(|_| MathError::SignMismatch)?, // XXX unsigned cash principal
-            self.units.decimals,
-            self.value,
-            CashPrincipal::DECIMALS,
-            CashPrincipal::DECIMALS,
-        )?;
-        Ok(CashPrincipal(
-            Int::try_from(raw).map_err(|_| MathError::Overflow)?,
-        ))
+        let self_scale = 10u128.pow(self.units.decimals as u32);
+        let raw: BigInt = BigInt::from(self.value) * per.0 / self_scale;
+        if let Some(raw) = raw.to_i128() {
+            Ok(CashPrincipal(raw))
+        } else {
+            return Err(MathError::Overflow);
+        }
     }
 }
 
@@ -400,6 +399,7 @@ pub struct CashPrincipal(pub Int);
 impl CashPrincipal {
     pub const DECIMALS: Decimals = CASH.decimals;
     pub const ZERO: CashPrincipal = CashPrincipal(0);
+    pub const ONE: CashPrincipal = CashPrincipal::from_nominal("1");
 
     /// Get a CASH index from a string.
     /// Only for use in const contexts.
@@ -425,7 +425,7 @@ impl CashPrincipal {
 pub struct CashIndex(pub Uint);
 
 impl CashIndex {
-    pub const DECIMALS: Decimals = 4;
+    pub const DECIMALS: Decimals = 18;
     pub const ONE: CashIndex = CashIndex(static_pow10(Self::DECIMALS));
 
     /// Get a CASH index from a string.
@@ -523,6 +523,7 @@ pub struct AssetIndex(pub Uint);
 
 impl AssetIndex {
     pub const DECIMALS: Decimals = CashPrincipal::DECIMALS; // Note: decimals must match
+    pub const ONE: AssetIndex = AssetIndex::from_nominal("1");
 
     /// Get an asset index from a string.
     /// Only for use in const contexts.
@@ -815,7 +816,7 @@ mod tests {
     #[test]
     fn test_from_nominal_with_all_decimals() {
         let a = Quantity::from_nominal("123.456789", CASH);
-        let b = Quantity::new(123456789, CASH);
+        let b = Quantity::new(123456789000000000000, CASH);
         assert_eq!(a, b);
     }
 
@@ -920,8 +921,8 @@ mod tests {
 
     #[test]
     fn test_mul_index() {
-        let pprincipal = CashPrincipal(100000000);
-        let nprincipal = CashPrincipal(-100000000);
+        let pprincipal = CashPrincipal::from_nominal("100");
+        let nprincipal = CashPrincipal::from_nominal("-100");
         let index = CashIndex::from_nominal("1.01");
         let pquantity = index.as_hold_amount(pprincipal).unwrap();
         let nquantity = index.as_debt_amount(nprincipal).unwrap();
