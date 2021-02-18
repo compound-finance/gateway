@@ -1,7 +1,7 @@
 const ganache = require('ganache-core');
 const Web3 = require('web3');
 const RLP = require('rlp');
-const { readContractsFile, deployContract } = require('../ethereum');
+const { readContractsFile, deployContract, getContractAt } = require('../ethereum');
 const { genPort } = require('../util');
 
 class Eth {
@@ -33,6 +33,12 @@ class Eth {
     this.ctx.log(`${contractName} deployed to ${contract._address} with args ${JSON.stringify(contractArgs)}`);
 
     return contract;
+  }
+
+  async __getContractAt(contractsFile, contractName, contractAddress) {
+    let contracts = await readContractsFile(contractsFile);
+
+    return getContractAt(this.web3, contracts, contractName, contractAddress);
   }
 
   async sign(data, actorLookup) {

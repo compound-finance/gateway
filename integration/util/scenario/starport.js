@@ -3,8 +3,11 @@ const { EtherToken } = require('./token');
 const { encodeCall } = require('../substrate');
 
 class Starport {
-  constructor(starport, starportTopics, ctx) {
+  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx) {
     this.starport = starport;
+    this.proxyAdmin = proxyAdmin;
+    this.starportImpl = starportImpl;
+    this.proxy = proxy;
     this.starportTopics = starportTopics;
     this.ctx = ctx;
   }
@@ -104,14 +107,23 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
-  let starport = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'Starport', [ctx.cashToken.ethAddress(), ctx.eth.root(), validators]);
+  // Deploy Proxies and Starport
+  let proxyAdmin = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'ProxyAdmin', [], { from: ctx.eth.root() });
+  let starportImpl = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
+  let proxy = await ctx.eth.__deployContract(ctx.__getContractsFile(), 'TransparentUpgradeableProxy', [
+    starportImpl._address,
+    proxyAdmin._address,
+    "0x"
+  ], { from: ctx.eth.root() });
+  let starport = await ctx.eth.__getContractAt(ctx.__getContractsFile(), 'Starport', proxy._address);
+  await starport.methods.changeAuthorities(validators).send({ from: ctx.eth.root() });
 
   let starportTopics = Object.fromEntries(starport
     ._jsonInterface
     .filter(e => e.type === 'event')
     .map(e => [e.name, e.signature]));
 
-  return new Starport(starport, starportTopics, ctx);
+  return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
 }
 
 module.exports = {
