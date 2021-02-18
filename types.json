@@ -381,6 +381,12 @@
       "ExecuteProposal": {
         "title": "String",
         "extrinsics": "Vec<Vec<u8>>"
+      },
+      "NoticeInvoked": {
+        "era_id": "u32",
+        "era_index": "u32",
+        "notice_hash": "[u8; 32]",
+        "result": "Vec<u8>"
       }
     }
   },

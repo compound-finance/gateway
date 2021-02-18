@@ -406,6 +406,7 @@ fn set_asset_balance_internal<T: Config>(
     } else {
         AssetsWithNonZeroBalance::insert(account, asset, ());
     }
+
     AssetBalances::insert(asset, account, balance);
 }
 
