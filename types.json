@@ -374,7 +374,12 @@
         "amount": "u128",
         "principal": "u128"
       },
-      "Gov": {
+      "ExecTrxRequest": {
+        "account": "[u8; 20]",
+        "trx_request": "String"
+      },
+      "ExecuteProposal": {
+        "title": "String",
         "extrinsics": "Vec<Vec<u8>>"
       }
     }
