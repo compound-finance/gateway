@@ -20,6 +20,8 @@ contract CashToken is ICash {
     uint public nextCashYieldStartAt;
     CashYieldAndIndex public nextCashYieldAndIndex;
 
+    uint public constant SECONDS_PER_YEAR = 31536000;
+
     mapping (address => mapping (address => uint)) public allowances;
     uint public totalCashPrincipal;
     mapping (address => uint128) public cashPrincipal;
@@ -126,17 +128,19 @@ contract CashToken is ICash {
         return 6;
     }
 
-    function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
-        // TODO it needs more work and effort here
-        uint epower = yield * (block.timestamp - startAt);
-        uint eN = 271828;
-        uint eD = 100000;
-        return index * eN ** epower / eD ** epower;
-    }
-
     function amountToPrincipal(uint amount) public view returns (uint128) {
         uint256 principal = amount / getCashIndex();
         require(principal < type(uint128).max, "amountToPrincipal::overflow");
         return uint128(principal);
+    }
+
+    function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
+        return index * exponent(yield, block.timestamp - startAt) / 1e18;
+    }
+
+    // First precision of tayler series
+    function exponent(uint yield, uint time) internal view returns (uint) {
+        uint epower = yield * time * 1e13 / SECONDS_PER_YEAR;
+        return 1e18 + epower;
     }
 }
