@@ -138,9 +138,13 @@ contract CashToken is ICash {
         return index * exponent(yield, block.timestamp - startAt) / 1e18;
     }
 
-    // First precision of tayler series
-    function exponent(uint yield, uint time) internal view returns (uint) {
+    // We use the third degree approximation of Taylor Series
+    // 1 + x/1! + x^2/2! + x^3/3!
+    function exponent(uint yield, uint time) public view returns (uint) {
         uint epower = yield * time * 1e13 / SECONDS_PER_YEAR;
-        return 1e18 + epower;
+        uint first = epower;
+        uint second = epower * epower / 2e18;
+        uint third = epower * epower * epower / 6e36;
+        return 1e18 + first + second + third;
     }
 }

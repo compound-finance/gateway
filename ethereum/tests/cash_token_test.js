@@ -9,8 +9,11 @@ describe('CashToken', () => {
   let cash;
   let [root, admin, account1, account2, account3] = saddle.accounts;
 
+  // 1e18
+  let start_cash_index = '1000000000000000000'
+
   beforeEach(async () => {
-    cash = await deploy('CashToken', [admin, 0, 1e6, fromNow(0)], {from: root});
+    cash = await deploy('CashToken', [admin, 0, start_cash_index, fromNow(0)], {from: root});
   });
 
   describe('#constructor', () => {
@@ -76,17 +79,16 @@ describe('CashToken', () => {
       expect(await call(cash, 'totalSupply')).toEqualNumber(0);
       expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
 
-      const cashIndex = await call(cash, 'getCashIndex');
       const principal = 10e6;
       const tx = await send(cash, 'mint', [account1, principal], { from: admin });
 
-      expect(await call(cash, 'totalSupply')).toEqualNumber(principal * cashIndex);
-      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(principal * cashIndex);
+      expect(await call(cash, 'totalSupply')).toEqualNumber('10000000000000000000000000');
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber('10000000000000000000000000');
 
       expect(tx.events.Transfer.returnValues).toMatchObject({
         from: ETH_ZERO_ADDRESS,
         to: account1,
-        value: (cashIndex * principal).toString()
+        value: '10000000000000000000000000'
       });
     });
 
@@ -126,13 +128,12 @@ describe('CashToken', () => {
     it('should return total supply of cash', async () => {
       expect(await call(cash, 'totalSupply')).toEqualNumber(0);
 
-      const cashIndex = await call(cash, 'getCashIndex');
       const principal1 = 10e6;
       const principal2 = 5e6;
       await send(cash, 'mint', [account1, principal1], { from: admin });
       await send(cash, 'mint', [account2, principal2], { from: admin });
 
-      expect(await call(cash, 'totalSupply')).toEqualNumber((principal1 + principal2) * cashIndex);
+      expect(await call(cash, 'totalSupply')).toEqualNumber('15000000000000000000000000');
     });
   });
 
@@ -141,14 +142,13 @@ describe('CashToken', () => {
       expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
       expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(0);
 
-      const cashIndex = await call(cash, 'getCashIndex');
       const principal1 = 10e6;
       const principal2 = 5e6;
       await send(cash, 'mint', [account1, principal1], { from: admin });
       await send(cash, 'mint', [account2, principal2], { from: admin });
 
-      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(principal1 * cashIndex);
-      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(principal2 * cashIndex);
+      expect(await call(cash, 'balanceOf', [account1])).toEqual('10000000000000000000000000');
+      expect(await call(cash, 'balanceOf', [account2])).toEqual('5000000000000000000000000');
     });
   });
 
@@ -273,5 +273,40 @@ describe('CashToken', () => {
     });
   });
 
-  it.todo('#getCashIndex tests');
+  describe("#getCashIndex tests", () => {
+    it('getCashIndex is growing over time', async() => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      const block = await web3.eth.getBlock(blockNumber);
+      const nextYieldTimestamp = block.timestamp + 1 * 60;
+
+      // Set non-zero cash index
+      await send(cash, 'setFutureYield', [3000, start_cash_index, nextYieldTimestamp], { from: admin });
+
+      await sendRPC(web3, "evm_increaseTime", [2 * 60]);
+      await sendRPC(web3, "evm_mine", []);
+
+      const cashIndex1 = await call(cash, 'getCashIndex');
+
+      await sendRPC(web3, "evm_increaseTime", [10]);
+      await sendRPC(web3, "evm_mine", []);
+
+      // Cash index after 10 seconds
+      const cashIndex2 = await call(cash, 'getCashIndex');
+      expect(cashIndex2).greaterThan(cashIndex1);
+
+      await sendRPC(web3, "evm_increaseTime", [30 * 60]);
+      await sendRPC(web3, "evm_mine", []);
+
+      // Cash index after 30 minutes
+      const cashIndex3 = await call(cash, 'getCashIndex');
+      expect(cashIndex3).greaterThan(cashIndex2);
+
+      await sendRPC(web3, "evm_increaseTime", [24 * 60]);
+      await sendRPC(web3, "evm_mine", []);
+
+      // Cash index after 1 day
+      const cashIndex4 = await call(cash, 'getCashIndex');
+      expect(cashIndex4).greaterThan(cashIndex3);
+    });
+  })
 });
