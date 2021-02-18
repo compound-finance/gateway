@@ -6,9 +6,28 @@ const { canConnectTo } = require('../net');
 const { instantiateInfo } = require('./scen_info');
 const fs = require('fs').promises;
 const path = require('path');
+const chalk = require('chalk');
 
 async function loadTypes(ctx) {
-  return JSON.parse(await fs.readFile(ctx.__typesFile()));
+  let contents = await fs.readFile(ctx.__typesFile());
+  try {
+    return JSON.parse(contents);
+  } catch (e) {
+    let match = /in JSON at position (\d+)/.exec(e.message);
+    if (match) {
+      let pos = Number(match[1]);
+      let show = (start, end) => contents.slice(start, end).toString().replaceAll("\n", "\\n");
+      let colored =
+        chalk.green(show(pos - 20, pos)) +
+        chalk.red(show(pos, pos + 1)) +
+        chalk.green(show(pos + 1, pos + 20));
+
+      ctx.error("JSON Error Around: \n" + chalk.bgWhiteBright(colored));
+      throw new Error(`Error Parsing \`types.json\`: ${e.toString()} [around \`${colored}\`]`);
+    } else {
+      throw new Error(`Error Parsing \`types.json\`: ${e.toString()}`);
+    }
+  }
 }
 
 let validatorInfoMap = {

@@ -402,6 +402,7 @@ fn set_asset_balance_internal(asset: ChainAsset, account: ChainAccount, balance:
     } else {
         AssetsWithNonZeroBalance::insert(account, asset, ());
     }
+
     AssetBalances::insert(asset, account, balance);
 }
 

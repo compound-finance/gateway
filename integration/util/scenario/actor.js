@@ -5,7 +5,6 @@ const { sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
 const { CashToken } = require('./cash_token');
 
-
 class Actor {
   constructor(name, ethAddress, chainKey, ctx) {
     this.name = name;

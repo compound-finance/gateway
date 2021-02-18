@@ -1,5 +1,5 @@
 const { debug, log } = require('./log');
-const { arrayToHex, concatArray } = require('./util');
+const { arrayToHex, concatArray, sleep } = require('./util');
 const types = require('@polkadot/types');
 
 // TODO: Consider moving these vars into ctx
@@ -14,12 +14,17 @@ let callbacks = [];
 // TODO: Refactor here?
 function subscribeEvents(api) {
   api.query.system.events((events) => {
-    events.forEach(({ event }) => {
-      debug(`Found event: ${event.section}:${event.method}`);
+    events.forEach(({ event, phase }) => {
+      debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
     });
+    // TODO: Clean this up
+    sleep(5000).then(() => {
+      // let finalizedEvents = events.filter(({phase}) => phase.Finalization);
+      // debug(`Found ${finalizedEvents.length } finalized event(s)`);
 
-    allEvents = [...allEvents, ...events];
-    callbacks.forEach((callback) => callback(allEvents));
+      allEvents = [...allEvents, ...events];
+      callbacks.forEach((callback) => callback(allEvents));
+    });
   });
 }
 
