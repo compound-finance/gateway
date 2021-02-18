@@ -19,7 +19,10 @@ contract Starport {
     mapping(address => uint) public supplyCaps;
 
     uint public eraId; // TODO: could bitpack here and use uint32
-    mapping(bytes32 => bool) public isNoticeUsed;
+    mapping(bytes32 => bool) public isNoticeInvoked;
+
+    event NoticeInvoked(uint eraId, uint eraIndex, bytes32 noticeHash, bytes result);
+    event NoticeReplay(bytes32 noticeHash);
 
     event Lock(address asset, address holder, uint amount);
     event LockCash(address holder, uint amount, uint128 principal);
@@ -173,9 +176,10 @@ contract Starport {
      * @return The result of the invokation of the action of the notice.
      */
     function invoke(bytes calldata notice, bytes[] calldata signatures) external returns (bytes memory) {
-        checkNoticeSignerAuthorized(notice, authorities, signatures);
+        bytes32 noticeHash = hashNotice(notice);
+        checkNoticeSignerAuthorized(noticeHash, authorities, signatures);
 
-        return invokeNoticeInternal(notice);
+        return invokeNoticeInternal(notice, noticeHash);
     }
 
     /**
@@ -186,17 +190,20 @@ contract Starport {
      * @return The result of the invokation of the action of the notice.
      */
     function invokeChain(bytes calldata notice, bytes[] calldata notices) external returns (bytes memory) {
-        checkNoticeChainAuthorized(notice, notices);
+        bytes32 noticeHash = hashNotice(notice);
+        checkNoticeChainAuthorized(noticeHash, notices);
 
-        return invokeNoticeInternal(notice);
+        return invokeNoticeInternal(notice, noticeHash);
     }
 
     // Invoke without authorization checks used by external functions
-    function invokeNoticeInternal(bytes calldata notice) internal returns (bytes memory) {
-        // XXX Really consider what to do with eraId, eraIndex and parent
-        // TODO: By hash or by (eraId, eraIndex)?
-        // TODO: Should eraId, eraIndex and parent be handled specially?
-        isNoticeUsed[hashNotice(notice)] = true;
+    function invokeNoticeInternal(bytes calldata notice, bytes32 noticeHash) internal returns (bytes memory) {
+        if (isNoticeInvoked[noticeHash]) {
+            emit NoticeReplay(noticeHash);
+            return "";
+        }
+
+        isNoticeInvoked[noticeHash] = true;
 
         require(notice.length >= 100, "Must have full header"); // 4 + 3 * 32
         require(notice[0] == MAGIC_HEADER[0], "Invalid header[0]");
@@ -225,6 +232,8 @@ contract Starport {
         if (!success) {
             require(false, _getRevertMsg(callResult));
         }
+
+        emit NoticeInvoked(noticeEraId, noticeEraIndex, noticeHash, callResult);
 
         return callResult;
     }
@@ -321,20 +330,17 @@ contract Starport {
     /**
      * @notice Checks that the given notice is authorized
      * @dev Notices are authorized by having a quorum of signatures from the `authorities` set
-     * @dev Notices can be separately validated by a notice chain XXX TODO
-     * @dev Reverts if notice is not authorized XXX TODO: Is even useful then?
-     * @param notice The notice to verify authenticity of
-     * @param authorities_ A set of authorities to check the notice against? TODO: Why pass this in?
+     * @dev Notices can be separately validated by a notice chain
+     * @dev Reverts if notice is not authorized
+     * @param noticeHash Hash of the given notice
+     * @param authorities_ A set of authorities to check the notice against
      * @param signatures The signatures to verify
      */
     function checkNoticeSignerAuthorized(
-        bytes calldata notice,
+        bytes32 noticeHash,
         address[] memory authorities_,
         bytes[] calldata signatures
-    ) internal view {
-        bytes32 noticeHash = hashNotice(notice);
-        require(isNoticeUsed[noticeHash] == false, "Notice can not be reused");
-
+    ) internal pure {
         address[] memory sigs = new address[](signatures.length);
         for (uint i = 0; i < signatures.length; i++) {
             address signer = recover(noticeHash, signatures[i]);
@@ -350,22 +356,21 @@ contract Starport {
      * @notice Checks that the given target notice is valid by chaining
      * @dev Notices each contain a hash of the parent, and thus any previous notice can be
      * @dev included by showing a chain of notices connecting to an already accepted notice.
-     * @param target The notice to verify authenticity of
+     * @param targetHash Hash of the target notice to verify
      * @param notices A list of notices where the tail notice must already be accepted in the chain
      */
     function checkNoticeChainAuthorized(
-        bytes calldata target,
+        bytes32 targetHash,
         bytes[] calldata notices
     ) internal view {
-        bytes32 currHash = hashNotice(target);
-        require(isNoticeUsed[currHash] == false, "Target notice can not be reused");
+        bytes32 currHash = targetHash;
 
         for (uint i = 0; i < notices.length; i++) {
             require(getParentHash(notices[i]) == currHash, "Notice hash mismatch");
             currHash = hashNotice(notices[i]);
         }
 
-        require(isNoticeUsed[currHash] == true, "Tail notice must have been accepted");
+        require(isNoticeInvoked[currHash] == true, "Tail notice must have been accepted");
     }
 
     /**

@@ -21,7 +21,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
           full_rate: 1000
         }
       };
-      let extrinsic = ctx.api().tx.cash.updateInterestRateModel(zrx.toChainAsset(), newKink);
+      let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
       await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
       expect(await chain.interestRateModel(zrx)).toEqual(newKink);
     }
@@ -64,13 +64,13 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
           full_rate: 1000
         }
       };
-      let extrinsic = ctx.api().tx.cash.updateInterestRateModel(zrx.toChainAsset(), newKink);
+      let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
       let { event } = await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
       let [[[data]]] = event.data;
 
       expect(decodeCall(ctx.api(), data)).toEqual({
         section: "cash",
-        method: "updateInterestRateModel",
+        method: "setRateModel",
         args: [
           zrx.toChainAsset(true),
           {

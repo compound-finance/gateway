@@ -23,21 +23,21 @@ pub enum ChainId {
 impl ChainId {
     pub fn to_account(self, addr: &str) -> Result<ChainAccount, Reason> {
         match self {
-            ChainId::Comp => Ok(ChainAccount::Comp(Compound::to_address(addr)?)),
-            ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::to_address(addr)?)),
-            ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::to_address(addr)?)),
-            ChainId::Sol => Ok(ChainAccount::Sol(Solana::to_address(addr)?)),
-            ChainId::Tez => Ok(ChainAccount::Tez(Tezos::to_address(addr)?)),
+            ChainId::Comp => Ok(ChainAccount::Comp(Compound::str_to_address(addr)?)),
+            ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::str_to_address(addr)?)),
+            ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::str_to_address(addr)?)),
+            ChainId::Sol => Ok(ChainAccount::Sol(Solana::str_to_address(addr)?)),
+            ChainId::Tez => Ok(ChainAccount::Tez(Tezos::str_to_address(addr)?)),
         }
     }
 
     pub fn to_asset(self, addr: &str) -> Result<ChainAsset, Reason> {
         match self {
-            ChainId::Comp => Ok(ChainAsset::Comp(Compound::to_address(addr)?)),
-            ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::to_address(addr)?)),
-            ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::to_address(addr)?)),
-            ChainId::Sol => Ok(ChainAsset::Sol(Solana::to_address(addr)?)),
-            ChainId::Tez => Ok(ChainAsset::Tez(Tezos::to_address(addr)?)),
+            ChainId::Comp => Ok(ChainAsset::Comp(Compound::str_to_address(addr)?)),
+            ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
+            ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::str_to_address(addr)?)),
+            ChainId::Sol => Ok(ChainAsset::Sol(Solana::str_to_address(addr)?)),
+            ChainId::Tez => Ok(ChainAsset::Tez(Tezos::str_to_address(addr)?)),
         }
     }
 
@@ -117,16 +117,6 @@ impl ChainAccount {
     }
 }
 
-/// Type for an hash tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainHash {
-    Comp(<Compound as Chain>::Hash),
-    Eth(<Ethereum as Chain>::Hash),
-    Dot(<Polkadot as Chain>::Hash),
-    Sol(<Solana as Chain>::Hash),
-    Tez(<Tezos as Chain>::Hash),
-}
-
 // Implement deserialization for ChainAccounts so we can use them in GenesisConfig / ChainSpec JSON.
 //  i.e. "eth:0x..." <> Eth(0x...)
 impl our_std::str::FromStr for ChainAccount {
@@ -150,13 +140,6 @@ impl From<ChainAccount> for String {
             _ => panic!("XXX not implemented"),
         }
     }
-}
-
-/// Type for an asset or CASH
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum CashAsset {
-    Cash,
-    Asset(ChainAsset),
 }
 
 /// Type for an asset tied to a chain.
@@ -249,6 +232,16 @@ impl ChainAccountSignature {
     }
 }
 
+/// Type for an hash tied to a chain.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainHash {
+    Comp(<Compound as Chain>::Hash),
+    Eth(<Ethereum as Chain>::Hash),
+    Dot(<Polkadot as Chain>::Hash),
+    Sol(<Solana as Chain>::Hash),
+    Tez(<Tezos as Chain>::Hash),
+}
+
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
@@ -319,8 +312,9 @@ pub trait Chain {
     fn hash_bytes(data: &[u8]) -> Self::Hash;
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
-    fn to_address(addr: &str) -> Result<Self::Address, Reason>;
     fn signer_address() -> Result<Self::Address, Reason>;
+    fn str_to_address(addr: &str) -> Result<Self::Address, Reason>;
+    fn address_string(address: &Self::Address) -> String;
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -360,11 +354,15 @@ impl Chain for Compound {
         panic!("XXX not implemented");
     }
 
-    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
-    fn signer_address() -> Result<Self::Address, Reason> {
+    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn address_string(_address: &Self::Address) -> String {
         panic!("XXX not implemented");
     }
 }
@@ -401,7 +399,14 @@ impl Chain for Ethereum {
         )?)
     }
 
-    fn to_address(addr: &str) -> Result<Self::Address, Reason> {
+    fn signer_address() -> Result<Self::Address, Reason> {
+        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
+            .ok_or(Reason::KeyNotFound)?;
+        let pubk = runtime_interfaces::keyring_interface::get_public_key(eth_key_id)?;
+        Ok(public_key_bytes_to_eth_address(&pubk))
+    }
+
+    fn str_to_address(addr: &str) -> Result<Self::Address, Reason> {
         if addr.len() == 42 && &addr[0..2] == "0x" {
             if let Ok(bytes) = hex::decode(&addr[2..42]) {
                 if let Ok(address) = bytes.try_into() {
@@ -412,12 +417,8 @@ impl Chain for Ethereum {
         return Err(Reason::BadAddress);
     }
 
-    fn signer_address() -> Result<Self::Address, Reason> {
-        let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id()
-            .ok_or(Reason::KeyNotFound)?;
-        let pubk = runtime_interfaces::keyring_interface::get_public_key(eth_key_id)?;
-
-        Ok(public_key_bytes_to_eth_address(&pubk))
+    fn address_string(address: &Self::Address) -> String {
+        format!("0x{}", hex::encode(address))
     }
 }
 
@@ -443,11 +444,15 @@ impl Chain for Polkadot {
         panic!("XXX not implemented");
     }
 
-    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
-    fn signer_address() -> Result<Self::Address, Reason> {
+    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn address_string(_address: &Self::Address) -> String {
         panic!("XXX not implemented");
     }
 }
@@ -474,11 +479,15 @@ impl Chain for Solana {
         panic!("XXX not implemented");
     }
 
-    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
-    fn signer_address() -> Result<Self::Address, Reason> {
+    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn address_string(_address: &Self::Address) -> String {
         panic!("XXX not implemented");
     }
 }
@@ -505,11 +514,15 @@ impl Chain for Tezos {
         panic!("XXX not implemented");
     }
 
-    fn to_address(_addr: &str) -> Result<Self::Address, Reason> {
+    fn signer_address() -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
-    fn signer_address() -> Result<Self::Address, Reason> {
+    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn address_string(_address: &Self::Address) -> String {
         panic!("XXX not implemented");
     }
 }

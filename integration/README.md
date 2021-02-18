@@ -8,7 +8,7 @@ Integration tests that run the real deal and make sure every component works tog
 First, you'll need to compile Compound Chain (in release mode) and compile the Ethereum contracts.
 
 ```sh
-compound-chain> cargo build --release
+compound-chain> cargo +nightly build
 ```
 
 In the `ethereum` directory, run:

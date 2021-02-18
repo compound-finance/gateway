@@ -114,8 +114,6 @@ class Chain {
     let signaturePairsEth = signaturePairs.asEth;
     let pairs = signaturePairsEth.map((k) => k);
 
-    this.ctx.log(`Notice has ${pairs.length} signature pair(s)...`);
-
     if (pairs.length < opts.signatures) {
       if (opts.retries > 0) {
         await sleep(opts.sleep);
@@ -138,8 +136,8 @@ class Chain {
   }
 
   async interestRateModel(token) {
-    let model = await this.ctx.api().query.cash.rateModels(token.toChainAsset());
-    return model.toJSON();
+    let asset = await this.ctx.api().query.cash.supportedAssets(token.toChainAsset());
+    return asset.rate_model.toJSON();
   }
 
 

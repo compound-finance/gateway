@@ -28,130 +28,123 @@
       },
       "palletCash": {
         "lastBlockTimestamp": 1612400245043,
-        "validatorIds": [
-          [
-            212,
-            53,
-            147,
-            199,
-            21,
-            253,
-            211,
-            28,
-            97,
-            20,
-            26,
-            189,
-            4,
-            169,
-            159,
-            214,
-            130,
-            44,
-            133,
-            88,
-            133,
-            76,
-            205,
-            227,
-            154,
-            86,
-            132,
-            231,
-            165,
-            109,
-            162,
-            125
-          ],
-          [
-            142,
-            175,
-            4,
-            21,
-            22,
-            135,
-            115,
-            99,
-            38,
-            201,
-            254,
-            161,
-            126,
-            37,
-            252,
-            82,
-            135,
-            97,
-            54,
-            147,
-            201,
-            18,
-            144,
-            156,
-            178,
-            38,
-            170,
-            71,
-            148,
-            242,
-            106,
-            72
-          ],
-          [
-            144,
-            181,
-            171,
-            32,
-            92,
-            105,
-            116,
-            201,
-            234,
-            132,
-            27,
-            230,
-            136,
-            134,
-            70,
-            51,
-            220,
-            156,
-            168,
-            163,
-            87,
-            132,
-            62,
-            234,
-            207,
-            35,
-            20,
-            100,
-            153,
-            101,
-            254,
-            34
-          ]
-        ],
-        "validatorKeys": [
-          [
-            "c77494d805d2b455686ba6a6bdf1c68ecf6e1cd7"
-          ],
-          [
-            "435228f5ad6fc8ce7b4398456a72a2f14577d9cd"
-          ]
-        ],
-        "reporters": [
-          "85615b076615317c80f14cbad6501eec031cd51c",
-          "fCEAdAFab14d46e20144F48824d0C09B1a03F2BC"
-        ],
+
         "assets": [
+            {
+              "asset": "ETH:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "decimals": 18,
+              "liquidity_factor": 0,
+              "rate_model": {
+                "Kink": {
+                  "zero_rate": 0,
+                  "kink_rate": 500,
+                  "kink_utilization": 8000,
+                  "full_rate": 2000
+                }
+              },
+              "reserve_factor": 0,
+              "supply_cap": 0,
+              "symbol": "ETH",
+              "ticker": "ETH"
+            },
+            {
+              "asset": "ETH:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+              "decimals": 6,
+              "liquidity_factor": 0,
+              "rate_model": {
+                "Kink": {
+                  "zero_rate": 0,
+                  "kink_rate": 500,
+                  "kink_utilization": 8000,
+                  "full_rate": 2000
+                }
+              },
+              "reserve_factor": 0,
+              "supply_cap": 0,
+              "symbol": "USDC",
+              "ticker": "USD"
+            }
+        ],
+
+        "reporters": [
+          "0x85615b076615317c80f14cbad6501eec031cd51c",
+          "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC"
+        ],
+
+        "validators": [
           {
-            "symbol": "ETH/18",
-            "asset": "ETH:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            "substrate_id": [
+                144,
+                181,
+                171,
+                32,
+                92,
+                105,
+                116,
+                201,
+                234,
+                132,
+                27,
+                230,
+                136,
+                134,
+                70,
+                51,
+                220,
+                156,
+                168,
+                163,
+                87,
+                132,
+                62,
+                234,
+                207,
+                35,
+                20,
+                100,
+                153,
+                101,
+                254,
+                34
+            ],
+            "eth_address": "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7"
           },
           {
-            "symbol": "USDC/6",
-            "asset": "ETH:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            "substrate_id": [
+                212,
+                53,
+                147,
+                199,
+                21,
+                253,
+                211,
+                28,
+                97,
+                20,
+                26,
+                189,
+                4,
+                169,
+                159,
+                214,
+                130,
+                44,
+                133,
+                88,
+                133,
+                76,
+                205,
+                227,
+                154,
+                86,
+                132,
+                231,
+                165,
+                109,
+                162,
+                125
+              ],
+            "eth_address": "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"
           }
         ]
       },
