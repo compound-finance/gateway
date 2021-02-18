@@ -274,8 +274,7 @@ contract Starport {
      * @param newAuthorities The new authorities which may sign notices for execution by the Starport
      */
     function changeAuthorities(address[] calldata newAuthorities) external {
-        // TODO: Test change here
-        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
+        require(msg.sender == address(this) || msg.sender == admin, "Call must be by notice or admin");
         require(newAuthorities.length > 0, "New authority set can not be empty");
 
         emit ChangeAuthorities(newAuthorities);
@@ -291,8 +290,7 @@ contract Starport {
      * @param supplyCap The cap to put on the asset, in its native token units.
      */
     function setSupplyCap(address asset, uint supplyCap) external {
-        // TODO: Test change here
-        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
+        require(msg.sender == address(this) || msg.sender == admin, "Call must be by notice or admin");
         require(asset != address(cash), "Cash does not accept supply cap");
 
         emit NewSupplyCap(asset, supplyCap);
@@ -308,8 +306,7 @@ contract Starport {
      * @param nextCashYieldStart When the yield change-over should occur
      */
     function setFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart) external {
-        // TODO: Test change here
-        require(msg.sender == address(this) || msg.sender == admin, "Call must originate locally or from admin");
+        require(msg.sender == address(this) || msg.sender == admin, "Call must be by notice or admin");
 
         emit SetFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
         cash.setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
