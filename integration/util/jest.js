@@ -9,6 +9,13 @@ let chainEventEqual = (event, eventExpectedArgs) => {
 };
 
 expect.extend({
+  toMatchAddress(actual, expected) {
+    return {
+      pass: actual.toLowerCase() == expected.toLowerCase(),
+      message: () => `expected (${actual}) == (${expected})`
+    }
+  },
+
   toHaveReason(received, reason) {
     if (!received) {
       return {

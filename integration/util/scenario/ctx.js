@@ -153,7 +153,7 @@ async function buildCtx(scenInfo={}) {
 
   // Note: `3` below is the number of transactions we expect to occur between now and when
   //       the Starport token is deployed.
-  //       That's now: deploy Cash Token (1), deploy ProxyAdmin (1), deploy Starport Impl (3).
+  //       That's now: deploy Cash Token (1), deploy ProxyAdmin (2), deploy Starport Impl (3).
   let starportAddress = await ctx.eth.getNextContractAddress(3);
 
   ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
