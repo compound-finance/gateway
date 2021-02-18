@@ -1,10 +1,11 @@
 use crate::Timestamp;
+use codec::{Decode, Encode};
 use our_std::{collections::btree_map::BTreeMap, vec::Vec, Debuggable};
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
 
 /// Errors coming from the price oracle
-#[derive(Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
 pub enum OracleError {
     HexParseError,
     EthAbiParseError,
@@ -13,6 +14,7 @@ pub enum OracleError {
     JsonParseError,
     HttpError,
     InvalidOpenOracleApiResponse,
+    InvalidSymbol,
 }
 
 /// A single decoded message from the price oracle
