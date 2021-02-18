@@ -540,6 +540,14 @@ pub fn extract_cash_principal_internal<T: Config>(
     let index: CashIndex = GlobalCashIndex::get();
     let amount = index.cash_quantity(principal)?;
 
+    log!(
+        "ZZGH index={:?} amount={:?}, principal={:?}",
+        index,
+        amount,
+        principal,
+    );
+    log!("checking min value against {:?}", MIN_TX_VALUE);
+
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
         has_liquidity_to_reduce_cash::<T>(holder, amount)?,

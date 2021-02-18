@@ -40,17 +40,16 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
-    skip: true,
+    only: true,
     name: "Extract Cash",
-    scenario: async ({ ashley, zrx, chain, starport, cash }) => {
-      let notice = getNotice(await ashley.extract(50, cash));
+    scenario: async ({ ashley, zrx, chain, starport, cash, log }) => {
+      let notice = getNotice(await ashley.extract(20, cash));
       let signatures = await chain.getNoticeSignatures(notice);
       expect(await cash.getCashPrincipal(ashley)).toEqual(0);
       expect(await ashley.tokenBalance(cash)).toEqual(0);
-      await starport.invoke(notice, signatures);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(5000);
-      expect(await ashley.tokenBalance(cash)).toEqual(50);
-      expect(await ashley.chainBalance(cash)).toEqual(-50);
+      let tx = await starport.invoke(notice, signatures);
+      expect(await ashley.tokenBalance(cash)).toBeCloseTo(20, 4);
+      expect(await ashley.cash()).toBeCloseTo(-20, 4);
     }
   },
   {

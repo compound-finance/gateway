@@ -28,7 +28,7 @@ contract Starport {
     event LockCash(address holder, uint amount, uint128 principal);
     event ExecTrxRequest(address account, string trxRequest);
     event Unlock(address account, uint amount, address asset);
-    event UnlockCash(address account, uint amount, uint128 principal);
+    event UnlockCash(address account, uint amount, uint128 principal, uint128 cashIndex);
     event ChangeAuthorities(address[] newAuthorities);
     event SetFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart);
     event ExecuteProposal(string title, bytes[] extrinsics);
@@ -265,7 +265,7 @@ contract Starport {
         require(msg.sender == address(this), "Call must originate locally");
 
         uint256 amount = cash.mint(account, principal);
-        emit UnlockCash(account, amount, principal);
+        emit UnlockCash(account, amount, principal, cash.getCashIndex());
     }
 
     /**

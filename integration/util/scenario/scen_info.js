@@ -8,7 +8,7 @@ const baseScenInfo = {
     },
   },
   default_actor: null,
-  actors: ["ashley", "bert"],
+  actors: ["ashley", "bert", "chuck"],
   validators: ["alice", "bob"],
   tokens: [
     "zrx",
@@ -27,7 +27,7 @@ const baseScenInfo = {
   declare_opts: {},
   starport: {},
   cash_token: {
-    initial_yield_index: '10000'
+    initial_yield_index: '1000000000000000000'
   },
   initial_yield: 300, // [env=INITIAL_YIELD]
   initial_yield_start: null, // defaults to current time [env=INITIAL_YIELD_START]

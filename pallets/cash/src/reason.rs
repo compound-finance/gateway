@@ -4,13 +4,14 @@ use crate::notices::NoticeId;
 use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
+use compound_crypto::CryptoError;
 use our_std::RuntimeDebug;
 use trx_request;
 
 /// Type for reporting failures for reasons outside of our control.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
-    AssetExtractionNotSupported, // XXX temporary?
+    AssetExtractionNotSupported,
     AssetNotSupported,
     BadAccount,
     BadAddress,
@@ -20,7 +21,7 @@ pub enum Reason {
     BadTicker,
     BadUnits,
     ChainMismatch,
-    CryptoError(compound_crypto::CryptoError),
+    CryptoError(CryptoError),
     EventAlreadySigned,
     FailedToSubmitExtrinsic,
     FetchError,
@@ -121,8 +122,8 @@ impl From<MathError> for Reason {
     }
 }
 
-impl From<compound_crypto::CryptoError> for Reason {
-    fn from(err: compound_crypto::CryptoError) -> Self {
+impl From<CryptoError> for Reason {
+    fn from(err: CryptoError) -> Self {
         Reason::CryptoError(err)
     }
 }

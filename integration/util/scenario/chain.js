@@ -131,8 +131,7 @@ class Chain {
   }
 
   async cashIndex() {
-    let index = await this.ctx.api().query.cash.globalCashIndex();
-    return index.toNumber();
+    return await this.ctx.api().query.cash.globalCashIndex();
   }
 
   async interestRateModel(token) {
