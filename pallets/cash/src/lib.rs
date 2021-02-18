@@ -53,7 +53,6 @@ pub mod factor;
 pub mod internal;
 pub mod log;
 pub mod notices;
-pub mod oracle;
 pub mod params;
 pub mod portfolio;
 pub mod rates;
@@ -446,6 +445,16 @@ impl<T: Config> Module<T> {
             "Open price feed price reporters must be set in the genesis config"
         );
         PriceReporters::put(reporters);
+    }
+
+    /// Get the liquidity for the given account.
+    pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
+        Ok(core::get_liquidity::<T>(account)?.value)
+    }
+
+    /// Get the price for the given asset.
+    pub fn get_price(ticker: Ticker) -> Result<AssetPrice, Reason> {
+        Ok(core::get_price_by_ticker::<T>(ticker)?.value)
     }
 }
 

@@ -5,8 +5,9 @@ use compound_chain_runtime::{
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
     chains::{Chain, Ethereum},
-    types::{AssetInfo, ValidatorKeys},
+    types::{AssetInfo, Timestamp, ValidatorKeys},
 };
+
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
@@ -208,7 +209,7 @@ fn testnet_genesis(
             last_yield_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
-                .as_millis(),
+                .as_millis() as Timestamp,
 
             assets: vec![
                 AssetInfo {

@@ -128,10 +128,15 @@ pub fn receive_event<T: Config>(
         EventState::Pending { signers } => {
             // XXX sets?
             if signers.contains(&signer) {
-                log!("process_chain_event_internal({}): Validator has already signed this payload {:?}", event_id.show(), signer);
+                log!(
+                    "receive_event_internal({}): Validator has already signed this payload {:?}",
+                    event_id.show(),
+                    signer
+                );
                 return Err(Reason::EventAlreadySigned);
             }
 
+            // XXX BUG this should be a set: as is we will keep appending duplicates to the list, even though we won't count them
             // Add new validator to the signers
             let mut signers_new = signers.clone();
             signers_new.push(signer.clone()); // XXX unique add to set?
@@ -146,7 +151,7 @@ pub fn receive_event<T: Config>(
 
                     Err(reason) => {
                         log!(
-                            "process_chain_event_internal({}) apply failed: {:?}",
+                            "receive_event_internal({}) apply failed: {:?}",
                             event_id.show(),
                             reason
                         );
@@ -159,7 +164,7 @@ pub fn receive_event<T: Config>(
                 }
             } else {
                 log!(
-                    "process_chain_event_internal({}) signer_count={}",
+                    "receive_event_internal({}) signer_count={}",
                     event_id.show(),
                     signers_new.len()
                 );

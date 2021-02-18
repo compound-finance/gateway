@@ -13,9 +13,6 @@ type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
-type FullGrandpaBlockImport =
-    sc_finality_grandpa::GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>;
-type LightClient = sc_service::TLightClient<Block, RuntimeApi, Executor>;
 
 // A `CodeExecutor` which uses the native runtime when the wasm is equivalent to the natively compiled code.
 native_executor_instance!(
@@ -58,11 +55,6 @@ pub fn new_partial(
     >,
     ServiceError,
 > {
-    if config.keystore_remote.is_some() {
-        return Err(ServiceError::Other(format!(
-            "Remote Keystores are not supported."
-        )));
-    }
     let inherent_data_providers = sp_inherents::InherentDataProviders::new();
     inherent_data_providers
         .register_provider(pallet_cash::internal::miner::InherentDataProvider)
@@ -76,6 +68,7 @@ pub fn new_partial(
 
     let transaction_pool = sc_transaction_pool::BasicPool::new_full(
         config.transaction_pool.clone(),
+        config.role.is_authority().into(),
         config.prometheus_registry(),
         task_manager.spawn_handle(),
         client.clone(),
@@ -98,7 +91,7 @@ pub fn new_partial(
         Some(Box::new(grandpa_block_import.clone())),
         client.clone(),
         inherent_data_providers.clone(),
-        &task_manager.spawn_handle(),
+        &task_manager.spawn_essential_handle(),
         config.prometheus_registry(),
         sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
     )?;
@@ -109,13 +102,12 @@ pub fn new_partial(
 
         let finality_proof_provider = sc_finality_grandpa::FinalityProofProvider::new_for_service(
             backend.clone(),
-            client.clone(),
+            Some(shared_authority_set.clone()),
         );
 
         let client = client.clone();
         let pool = transaction_pool.clone();
         let select_chain = select_chain.clone();
-        let keystore = keystore_container.sync_keystore();
         let chain_spec = config.chain_spec.cloned_box();
         let shared_voter_state = sc_finality_grandpa::SharedVoterState::empty();
         let shared_voter_state_copy = shared_voter_state.clone();
@@ -175,8 +167,8 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 
     config
         .network
-        .notifications_protocols
-        .push(sc_finality_grandpa::GRANDPA_PROTOCOL_NAME.into());
+        .extra_sets
+        .push(sc_finality_grandpa::grandpa_peers_set_config());
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
         sc_service::build_network(sc_service::BuildNetworkParams {
@@ -206,7 +198,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     let name = config.network.node_name.clone();
     let enable_grandpa = !config.disable_grandpa;
     let prometheus_registry = config.prometheus_registry().cloned();
-    let telemetry_connection_sinks = sc_service::TelemetryConnectionSinks::default();
 
     // Setup our custom config/communication between node <> OCW
     let properties = config.chain_spec.properties();
@@ -219,21 +210,22 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
         })?;
     runtime_interfaces::config_interface::set(runtime_config);
 
-    sc_service::spawn_tasks(sc_service::SpawnTasksParams {
-        config,
-        backend: backend.clone(),
-        network: network.clone(),
-        client: client.clone(),
-        keystore: keystore_container.sync_keystore(),
-        rpc_extensions_builder: Box::new(rpc_extensions_builder),
-        transaction_pool: transaction_pool.clone().clone(),
-        task_manager: &mut task_manager,
-        on_demand: None,
-        remote_blockchain: None,
-        telemetry_connection_sinks: telemetry_connection_sinks.clone(),
-        network_status_sinks,
-        system_rpc_tx,
-    })?;
+    let (_rpc_handlers, telemetry_connection_notifier) =
+        sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+            config,
+            backend: backend.clone(),
+            network: network.clone(),
+            client: client.clone(),
+            keystore: keystore_container.sync_keystore(),
+            rpc_extensions_builder: Box::new(rpc_extensions_builder),
+            transaction_pool: transaction_pool.clone().clone(),
+            task_manager: &mut task_manager,
+            telemetry_span: None,
+            on_demand: None,
+            remote_blockchain: None,
+            network_status_sinks,
+            system_rpc_tx,
+        })?;
 
     if role.is_authority() {
         let proposer = sc_basic_authorship::ProposerFactory::new(
@@ -281,7 +273,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
             name: Some(name),
             observer_enabled: false,
             keystore,
-            is_authority: role.is_network_authority(),
+            is_authority: role.is_authority(),
         };
 
         // start the full GRANDPA voter
@@ -294,12 +286,14 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
             config: grandpa_config,
             link: grandpa_link,
             network: network,
-            telemetry_on_connect: Some(telemetry_connection_sinks.on_connect_stream()),
+            telemetry_on_connect: telemetry_connection_notifier.map(|x| x.on_connect_stream()),
             voting_rule: sc_finality_grandpa::VotingRulesBuilder::default().build(),
             prometheus_registry,
-            shared_voter_state: shared_voter_state,
+            shared_voter_state,
         };
 
+        // the GRANDPA voter task is considered infallible, i.e.
+        // if it fails we take down the service with it.
         task_manager.spawn_essential_handle().spawn_blocking(
             "grandpa-voter",
             sc_finality_grandpa::run_grandpa_voter(grandpa_params)?,
@@ -317,8 +311,8 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
 
     config
         .network
-        .notifications_protocols
-        .push(sc_finality_grandpa::GRANDPA_PROTOCOL_NAME.into());
+        .extra_sets
+        .push(sc_finality_grandpa::grandpa_peers_set_config());
 
     let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
@@ -347,7 +341,7 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
         Some(Box::new(grandpa_block_import)),
         client.clone(),
         sp_inherents::InherentDataProviders::new(),
-        &task_manager.spawn_handle(),
+        &task_manager.spawn_essential_handle(),
         config.prometheus_registry(),
         sp_consensus::NeverCanAuthor,
     )?;
@@ -383,21 +377,22 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
 
     let rpc_extensions = rpc::create_light(light_deps);
 
-    let rpc_handlers = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
-        remote_blockchain: Some(backend.remote_blockchain()),
-        rpc_extensions_builder: Box::new(sc_service::NoopRpcExtensionBuilder(rpc_extensions)),
-        transaction_pool: transaction_pool.clone(),
-        task_manager: &mut task_manager,
-        on_demand: Some(on_demand),
-        telemetry_connection_sinks: sc_service::TelemetryConnectionSinks::default(),
-        config,
-        client: client.clone(),
-        keystore: keystore_container.sync_keystore(),
-        backend,
-        network: network.clone(),
-        network_status_sinks,
-        system_rpc_tx,
-    })?;
+    let (_rpc_handlers, _telemetry_connection_notifier) =
+        sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+            remote_blockchain: Some(backend.remote_blockchain()),
+            rpc_extensions_builder: Box::new(sc_service::NoopRpcExtensionBuilder(rpc_extensions)),
+            transaction_pool: transaction_pool.clone(),
+            task_manager: &mut task_manager,
+            telemetry_span: None,
+            on_demand: Some(on_demand),
+            config,
+            client: client.clone(),
+            keystore: keystore_container.sync_keystore(),
+            backend,
+            network: network.clone(),
+            network_status_sinks,
+            system_rpc_tx,
+        })?;
 
     Ok(task_manager)
 }

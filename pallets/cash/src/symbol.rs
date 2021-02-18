@@ -42,8 +42,6 @@ impl From<Symbol> for String {
 #[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
 pub struct Ticker(pub [u8; WIDTH]);
 
-pub const USD_TICKER: Ticker = Ticker([b'U', b'S', b'D', 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-
 impl Ticker {
     pub const fn new(ticker_str: &str) -> Self {
         Ticker(str_to_label(ticker_str))

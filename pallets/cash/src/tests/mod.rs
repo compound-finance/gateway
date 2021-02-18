@@ -1,13 +1,51 @@
-use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
+#![allow(non_upper_case_globals)]
+
+use crate::{chains::*, core::*, factor::*, mock::*, rates::*, reason::*, symbol::*, types::*, *};
 use codec::{Decode, Encode};
-use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
+use hex_literal::hex;
 use our_std::str::FromStr;
 use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
 
+pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
+
 pub mod protocol;
 
 pub const ETH: Units = Units::from_ticker_str("ETH", 18);
+pub const Eth: ChainAsset = ChainAsset::Eth(hex!("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"));
+pub const _eth: AssetInfo = AssetInfo {
+    asset: Eth,
+    decimals: ETH.decimals,
+    liquidity_factor: LiquidityFactor::from_nominal("0.8"),
+    rate_model: InterestRateModel::Kink {
+        zero_rate: APR(0),
+        kink_rate: APR(200),
+        kink_utilization: Factor::from_nominal("0.9"),
+        full_rate: APR(5000),
+    },
+    miner_shares: Factor::from_nominal("0.05"),
+    supply_cap: Quantity::from_nominal("1000", ETH).value,
+    symbol: Symbol(ETH.ticker.0),
+    ticker: Ticker(ETH.ticker.0),
+};
+
+pub const UNI: Units = Units::from_ticker_str("UNI", 18);
+pub const Uni: ChainAsset = ChainAsset::Eth(hex!("1f9840a85d5af5bf1d1762f925bdaddc4201f984"));
+pub const uni: AssetInfo = AssetInfo {
+    asset: Uni,
+    decimals: UNI.decimals,
+    liquidity_factor: LiquidityFactor::from_nominal("0.7"),
+    rate_model: InterestRateModel::Kink {
+        zero_rate: APR(0),
+        kink_rate: APR(500),
+        kink_utilization: Factor::from_nominal("0.8"),
+        full_rate: APR(2000),
+    },
+    miner_shares: Factor::from_nominal("0.05"),
+    supply_cap: Quantity::from_nominal("1000", UNI).value,
+    symbol: Symbol(UNI.ticker.0),
+    ticker: Ticker(UNI.ticker.0),
+};
 
 #[macro_export]
 macro_rules! bal {
@@ -21,12 +59,6 @@ macro_rules! qty {
     ($string:expr, $units:expr) => {
         Quantity::from_nominal($string, $units);
     };
-}
-
-pub fn eth_asset() -> ChainAsset {
-    ChainAsset::Eth(
-        <Ethereum as Chain>::str_to_address("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
-    )
 }
 
 pub fn initialize_storage() {
@@ -188,18 +220,6 @@ fn process_eth_event_fails_if_not_validator() {
     });
 }
 
-#[test]
-fn correct_error_for_none_value() {
-    // XXX keep as example for now
-    // new_test_ext().execute_with(|| {
-    //     // Ensure the expected error is thrown when no value is present.
-    //     assert_noop!(
-    //         CashModule::cause_error(Origin::signed(Default::default())),
-    //         Error::<Test>::NoneValue
-    //     );
-    // });
-}
-
 const TEST_OPF_URL: &str = "http://localhost/";
 
 #[test]
@@ -210,7 +230,7 @@ fn test_process_prices_happy_path_makes_required_http_call() {
         uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
-            crate::oracle::tests::API_RESPONSE_TEST_DATA
+            internal::oracle::tests::API_RESPONSE_TEST_DATA
                 .to_owned()
                 .into_bytes(),
         ),
@@ -222,7 +242,7 @@ fn test_process_prices_happy_path_makes_required_http_call() {
     let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
     t.execute_with(|| {
         initialize_storage();
-        internal::oracle::process_prices::<Test>(1u64).unwrap();
+        assert_ok!(internal::oracle::process_prices::<Test>(1u64));
         // sadly, it seems we can not check storage here, but we should at least be able to check that
         // the OCW attempted to call the post_price extrinsic.. that is a todo XXX
     });
@@ -239,7 +259,7 @@ fn test_post_price_happy_path() {
         let eth_price = CashModule::price(ETH.ticker);
         let eth_price_time = CashModule::price_time(ETH.ticker);
         assert_eq!(eth_price, Some(732580000));
-        assert_eq!(eth_price_time, Some(1609340760));
+        assert_eq!(eth_price_time, Some(1609340760000));
     });
 }
 
@@ -289,7 +309,7 @@ fn test_post_price_stale_price() {
         let eth_price = CashModule::price(ETH.ticker);
         let eth_price_time = CashModule::price_time(ETH.ticker);
         assert_eq!(eth_price, Some(732580000));
-        assert_eq!(eth_price_time, Some(1609340760));
+        assert_eq!(eth_price_time, Some(1609340760000));
         // try to post the same thing again
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
         assert_err!(result, Reason::OracleError(OracleError::StalePrice));
@@ -300,10 +320,9 @@ fn test_post_price_stale_price() {
 fn test_set_interest_rate_model() {
     new_test_ext().execute_with(|| {
         initialize_storage();
-        let asset = eth_asset();
         let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
-        CashModule::set_rate_model(Origin::root(), asset.clone(), expected_model).unwrap();
-        let asset_info = CashModule::asset(asset).expect("no asset");
+        CashModule::set_rate_model(Origin::root(), Eth, expected_model).unwrap();
+        let asset_info = CashModule::asset(Eth).expect("no asset");
         assert_eq!(asset_info.rate_model, expected_model);
     });
 }
@@ -319,7 +338,7 @@ fn offchain_worker_test() {
         uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
-            crate::oracle::tests::API_RESPONSE_TEST_DATA
+            internal::oracle::tests::API_RESPONSE_TEST_DATA
                 .to_owned()
                 .into_bytes(),
         ),
@@ -370,7 +389,7 @@ fn offchain_worker_test() {
         for _ in 0..8 {
             let tx = pool_state.write().transactions.pop().unwrap();
             let ex: Extrinsic = Decode::decode(&mut &*tx).unwrap();
-            if let Call::post_price(msg, sig) = ex.call {
+            if let mock::Call::Cash(crate::Call::post_price(msg, sig)) = ex.call {
                 let msg_str: &str = &hex::encode(&msg)[..];
                 let sig_str: &str = &hex::encode(&sig)[..];
                 assert!(messages.contains(&msg_str));
@@ -394,7 +413,7 @@ fn offchain_worker_test() {
         assert_eq!(ex2.signature, None);
         assert_eq!(ex3.signature, None);
 
-        if let Call::receive_event(event_id, event, _signature) = ex1.call {
+        if let mock::Call::Cash(crate::Call::receive_event(event_id, event, _signature)) = ex1.call {
             assert_eq!(event_id, ChainLogId::Eth(3932939, 14)); // TODO: Should this be trx index or log_index?
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [164, 169, 110, 149, 119, 24, 227, 163, 11, 119, 166, 103, 249, 57, 120, 216, 244, 56, 189, 205, 86, 255, 3, 84, 95, 8, 200, 51, 217, 162, 102, 135],
@@ -411,7 +430,7 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let Call::receive_event(event_id, event, _signature) = ex2.call {
+        if let mock::Call::Cash(crate::Call::receive_event(event_id, event, _signature)) = ex2.call {
             assert_eq!(event_id, ChainLogId::Eth(3932897, 1));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [165, 200, 2, 78, 105, 154, 92, 48, 235, 150, 94, 71, 181, 21, 124, 6, 199, 111, 59, 114, 107, 255, 55, 122, 10, 83, 51, 165, 97, 242, 86, 72],
@@ -428,7 +447,7 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let Call::receive_event(event_id, event, _signature) = ex3.call {
+        if let mock::Call::Cash(crate::Call::receive_event(event_id, event, _signature)) = ex3.call {
             assert_eq!(event_id, ChainLogId::Eth(3858223, 0));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [193, 192, 235, 55, 181, 105, 35, 173, 158, 32, 253, 179, 28, 168, 130, 152, 141, 82, 23, 247, 202, 36, 182, 41, 124, 166, 237, 112, 8, 17, 207, 35],

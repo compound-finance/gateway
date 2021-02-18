@@ -1,11 +1,12 @@
-use sp_runtime_interface::pass_by::PassByCodec;
-
 #[macro_use]
 extern crate lazy_static;
+
+use codec::{Decode, Encode};
 use compound_crypto::CryptoError;
+use sp_runtime_interface::pass_by::PassByCodec;
 use std::sync::Mutex;
 
-#[derive(Clone, PassByCodec, codec::Encode, codec::Decode)]
+#[derive(Clone, Decode, Encode, PassByCodec)]
 pub struct Config {
     eth_starport_address: Vec<u8>,
 }
