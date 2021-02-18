@@ -12,7 +12,7 @@ const {
   signAll,
   toPrincipal,
   ETH_HEADER,
-  ETH_ADDRESS
+  ETH_ADDRESS,
 } = require('./utils');
 
 describe('Starport', () => {
@@ -60,6 +60,16 @@ describe('Starport', () => {
     return encoded;
   }
 
+  // Due the transparent proxy, this is the way to read `implementation` and `admin` when calling not as the admin
+  // Note: we could call as the admin, but it's important to know how to read this way, anyway.
+  async function getProxyImplementation(contract) {
+    return await web3.eth.getStorageAt(contract._address, '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc');
+  }
+
+  async function getProxyAdmin(contract) {
+    return await web3.eth.getStorageAt(contract._address, '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103');
+  }
+
   let testUnlockNotice;
   let testUnlockNoticeHash;
   let testChangeAuthoritiesNotice;
@@ -104,6 +114,98 @@ describe('Starport', () => {
       expect(await call(cash, 'admin')).toMatchAddress(starport._address);
     });
   });
+
+  describe('Upgradeable', () => {
+    it('should be upgradeable to new logic', async () => {
+      await starport.methods.count_().send();
+      expect(await starport.methods.counter().call()).toEqualNumber(1);
+      expect(await getProxyImplementation(starport)).toMatchAddress(starportImpl._address);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+      let starportImpl2 = await deploy('StarportHarness2', [cash._address, account1], { from: root });
+      await proxyAdmin.methods.upgrade(starport._address, starportImpl2._address).send({ from: root });
+
+      expect(await getProxyImplementation(starport)).toMatchAddress(starportImpl2._address);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+
+      expect(await starport.methods.cash().call()).toMatchAddress(cash._address);
+      expect(await starport.methods.admin().call()).toEqual(account1);
+      expect(await starport.methods.counter().call()).toEqualNumber(1);
+
+      // We'll need this for new function calls
+      starport = await saddle.getContractAt('StarportHarness2', proxy._address);
+      expect(await starport.methods.mul_(10).call()).toEqualNumber(10);
+    });
+
+    it('should only be upgradeable by the admin', async () => {
+      let starportImpl2 = await deploy('StarportHarness2', [cash._address, account1], { from: root });
+      await expect(proxyAdmin.methods.upgrade(starport._address, starportImpl2._address).send({ from: account1 })).rejects.toRevert('revert Ownable: caller is not the owner');
+      expect(await getProxyImplementation(starport)).toMatchAddress(starportImpl._address);
+    });
+
+    it('should allow initialization during upgrade', async () => {
+      await starport.methods.count_().send();
+      expect(await starport.methods.counter().call()).toEqualNumber(1);
+      let starportImpl2 = await deploy('StarportHarness2', [cash._address, account1], { from: root });
+      await proxyAdmin.methods.upgradeAndCall(
+        starport._address,
+        starportImpl2._address,
+        starportImpl2.methods.initialize_(10).encodeABI()
+      ).send({ from: root });
+      expect(await getProxyImplementation(starport)).toMatchAddress(starportImpl2._address);
+      expect(await starport.methods.counter().call()).toEqualNumber(11);
+      starport = await saddle.getContractAt('StarportHarness2', proxy._address);
+      expect(await starport.methods.mul_(10).call()).toEqualNumber(110);
+    });
+
+    it('should not allow re-initialization during upgrade', async () => {
+      let starportImpl2 = await deploy('StarportHarness2', [cash._address, account1], { from: root });
+      await proxyAdmin.methods.upgradeAndCall(
+        starport._address,
+        starportImpl2._address,
+        starportImpl2.methods.initialize_(10).encodeABI()
+      ).send({ from: root });
+      expect(await starport.methods.counter().call()).toEqualNumber(10);
+      await starport.methods.count_().send();
+      starport = await saddle.getContractAt('StarportHarness2', proxy._address);
+      await expect(starport.methods.initialize_(100).call()).rejects.toRevert("revert cannot reinitialize");
+      expect(await starport.methods.counter().call()).toEqualNumber(11);
+    });
+
+    it('should be able to rotate proxy admin', async () => {
+      expect(await proxyAdmin.methods.getProxyAdmin(starport._address).call()).toMatchAddress(proxyAdmin._address);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+      expect(await starport.methods.admin().call()).toMatchAddress(root);
+      await proxyAdmin.methods.changeProxyAdmin(starport._address, account1).send({ from: root });
+      expect(await getProxyAdmin(starport)).toMatchAddress(account1);
+      expect(await starport.methods.admin().call()).toMatchAddress(root);
+    });
+
+    it('should not allow rotation unless admin', async () => {
+      expect(await proxyAdmin.methods.getProxyAdmin(starport._address).call()).toMatchAddress(proxyAdmin._address);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+      expect(await starport.methods.admin().call()).toMatchAddress(root);
+      await expect(proxyAdmin.methods.changeProxyAdmin(starport._address, account1).send({ from: account1 })).rejects.toRevert("revert Ownable: caller is not the owner");
+      expect(await proxyAdmin.methods.getProxyAdmin(starport._address).call()).toMatchAddress(proxyAdmin._address);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+      expect(await starport.methods.admin().call()).toMatchAddress(root);
+    });
+
+    it('should be able to rotate proxy admin\'s admin', async () => {
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+      await proxyAdmin.methods.transferOwnership(account1).send({ from: root });
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(account1);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+    });
+
+    it('should not be able to rotate proxy admin\'s admin unless from current admin', async () => {
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+      await expect(proxyAdmin.methods.transferOwnership(account1).send({ from: account1 })).rejects.toRevert("revert Ownable: caller is not the owner");;
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
+      expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
+    });
+  })
 
   describe('#getQuorum_', () => {
     it('should calculate quorum correctly', async () => {
