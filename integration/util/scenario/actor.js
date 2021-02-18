@@ -82,21 +82,48 @@ class Actor {
 
   async chainCashPrincipal() {
     let principal = await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
-    return principal.toNumber();
+    return principal.toNumber() * 1e-6; // Scale decimals
   }
 
   async chainCashBalance() {
-    return await this.chainCashPrincipal() * await this.ctx.chain.cashIndex();
+    return
+        await this.chainCashPrincipal()
+      * await this.ctx.chain.cashIndex()
+      * 1e-18;
   }
 
   async chainBalance(tokenLookup) {
     let token = this.ctx.tokens.get(tokenLookup);
     if (token instanceof CashToken) {
-      return token.toTokenAmount(await this.chainCashBalance());
+      return await this.cash();
     } else {
       let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
       return token.toTokenAmount(weiAmount);
     }
+  }
+
+  async cashForToken(token) {
+    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let lastIndex = await this.ctx.api().query.cash.lastIndices(token.toChainAsset(), this.toChainAccount());
+
+    if (assetBalance == 0) {
+      return 0;
+    } else if (assetBalance > 0) {
+      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
+      let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
+      return Number(token.toTokenAmount(assetBalance.toBigInt()) * Number(supplyIndex.toBigInt() - lastIndex.toBigInt())) / 1e18;
+    } else {
+      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
+      let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
+      return Number(token.toTokenAmount(assetBalance.toBigInt()) * Number(borrowIndex.toBigInt() - lastIndex.toBigInt())) / 1e18;
+    }
+  }
+
+  async cash() {
+    // TODO: Use non-zero balances
+    let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
+    console.log({cashForTokens});
+    return await this.chainCashPrincipal() + cashForTokens.reduce((acc, el) => acc + el, 0);
   }
 
   async lock(amount, asset, awaitEvent = true) {
@@ -170,6 +197,9 @@ function actorInfoMap(keyring) {
     },
     bert: {
       key_uri: '//Bob'
+    },
+    chuck: {
+      key_uri: '//Charlie'
     }
   };
 }

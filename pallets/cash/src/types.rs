@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
 use our_std::{
     convert::{TryFrom, TryInto},
-    Deserialize, RuntimeDebug, Serialize,
+    Debuggable, Deserialize, RuntimeDebug, Serialize,
 };
 
 use crate::{
@@ -171,7 +171,7 @@ impl AssetInfo {
 //   would have to panic, though not for partial ord
 
 /// Type for representing a price (in USD), bound to its ticker.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct Price {
     pub ticker: Ticker,
     pub value: AssetPrice,
@@ -201,7 +201,7 @@ impl Price {
 }
 
 /// Type for representing a quantity of an asset, bound to its ticker and number of decimals.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct Quantity {
     pub value: AssetAmount,
     pub units: Units,
@@ -374,7 +374,7 @@ impl Balance {
 }
 
 /// Type for representing a balance of CASH Principal.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, Debuggable)]
 pub struct CashPrincipal(pub AssetBalance);
 
 impl CashPrincipal {
@@ -455,7 +455,7 @@ impl CashPrincipalAmount {
 }
 
 /// Type for representing a multiplicative index on Compound Chain.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct CashIndex(pub Uint);
 pub type CashPerCashPrincipal = CashIndex;
 

@@ -1,5 +1,5 @@
 use codec::{Decode, Encode};
-use our_std::{convert::TryInto, RuntimeDebug};
+use our_std::{convert::TryInto, Debuggable, RuntimeDebug};
 
 use crate::{
     reason::Reason,
@@ -68,7 +68,7 @@ impl From<Ticker> for String {
 }
 
 /// Type for determining whether quantities may be combined.
-#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, Debuggable)]
 pub struct Units {
     pub ticker: Ticker,
     pub decimals: Decimals,
