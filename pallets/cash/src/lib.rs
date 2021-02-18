@@ -416,7 +416,7 @@ decl_module! {
         }
 
         #[weight = 0]
-        pub fn change_authorities(origin, keys: Vec<(AccountId32, ChainKeys)>) -> dispatch::DispatchResult {
+        pub fn change_authorities(origin, keys: Vec<(AccountId32, ValidatorKeys)>) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Self::change_authorities_internal(keys);
             Ok(())
@@ -525,7 +525,7 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
-    fn change_authorities_internal(keys: Vec<(AccountId32, ChainKeys)>) {
+    fn change_authorities_internal(keys: Vec<(AccountId32, ValidatorKeys)>) {
         for (id, _chain_keys) in <NextValidators>::iter() {
             <NextValidators>::take(id);
         }

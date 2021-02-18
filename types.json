@@ -128,9 +128,6 @@
 
   "Source3": "NoticesRS",
   "EncodedNotice": "Vec<u8>",
-  "ChainKeys": {
-    "eth_address": "ValidatorIdentity"
-  },
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",
