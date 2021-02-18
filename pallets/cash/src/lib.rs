@@ -344,7 +344,7 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
         if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
             // delete existing validators
             for kv in <Validators>::iter() {
-                <NextValidators>::take(&kv.0);
+                <Validators>::take(&kv.0);
             }
             // push next validators into current validators
             for (id, chain_keys) in <NextValidators>::iter() {
@@ -415,6 +415,13 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = 0]
+        pub fn change_authorities(origin, keys: Vec<(AccountId32, ValidatorKeys)>) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            Self::change_authorities_internal(keys);
+            Ok(())
+        }
+
         /// Execute a transaction request on behalf of a user
         #[weight = 1]
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
@@ -438,22 +445,6 @@ decl_module! {
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             cash_err!(core::publish_signature_internal(chain_id, notice_id, signature), Error::<T>::PublishSignatureFailure)?;
-
-            Ok(())
-        }
-
-        #[weight = 0] // XXX
-        pub fn change_authorities(origin, keys: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
-            ensure_root(origin)?;
-
-            for (substrate_id, _chain_keys) in <NextValidators>::iter() {
-                <NextValidators>::take(substrate_id);
-            }
-
-            for chain_keys in &keys {
-                <NextValidators>::take(&chain_keys.substrate_id);
-                <NextValidators>::insert(&chain_keys.substrate_id, chain_keys);
-            }
 
             Ok(())
         }
@@ -532,6 +523,17 @@ impl<T: Config> Module<T> {
             },
         );
         Ok(())
+    }
+
+    fn change_authorities_internal(keys: Vec<(AccountId32, ValidatorKeys)>) {
+        for (id, _chain_keys) in <NextValidators>::iter() {
+            <NextValidators>::take(id);
+        }
+
+        for (id, chain_keys) in &keys {
+            <NextValidators>::take(id);
+            <NextValidators>::insert(&id, chain_keys);
+        }
     }
 
     /// Body of the post_price extrinsic

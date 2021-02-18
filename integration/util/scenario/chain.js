@@ -8,9 +8,28 @@ const {
   getRawHash,
 } = require('./types');
 
+const { u8aToHex } = require('@polkadot/util');
+const { xxhashAsHex } = require('@polkadot/util-crypto');
+const web3 = require('web3');
+
 class Chain {
   constructor(ctx) {
     this.ctx = ctx;
+  }
+
+  toSS58 (arr) {
+    return this.ctx.actors.keyring.encodeAddress(new Uint8Array(arr.buffer));
+  }
+
+  toEthAddress(u8arr) {
+    return web3.utils.toChecksumAddress(u8aToHex(u8arr));
+  }
+
+  // https://www.shawntabrizi.com/substrate/querying-substrate-storage-via-rpc/
+  getStorageKey(moduleName, valueName) {
+    let moduleHash = xxhashAsHex(moduleName, 128);
+    let functionHash = xxhashAsHex(valueName, 128); 
+    return moduleHash + functionHash.slice(2);
   }
 
   api() {
@@ -120,7 +139,62 @@ class Chain {
     let asset = await this.ctx.api().query.cash.supportedAssets(token.toChainAsset());
     return asset.rate_model.toJSON();
   }
+
+
+  async pendingCashValidators() {
+    let vals = await this.ctx.api().query.cash.nextValidators.entries();
+    const authData = vals.map(([valIdRaw, chainKeys]) =>
+      [
+        this.toSS58(valIdRaw.args[0]),
+        {eth_address: this.toEthAddress(chainKeys.unwrap().eth_address)}
+      ]
+    );
+    return authData;
+  }
+
+  async cashValidators() {
+    let vals = await this.ctx.api().query.cash.validators.entries();
+    const authData = vals.map(([valIdRaw, chainKeys]) =>
+      [
+        this.toSS58(valIdRaw.args[0]),
+        {eth_address: this.toEthAddress(chainKeys.unwrap().eth_address)}
+      ]
+    );
+    return authData;
+  }
+
+  async sessionValidators() {
+    let vals = await this.ctx.api().query.session.validators();
+    return vals.map((valIdRaw) => this.toSS58(valIdRaw));
+  }
+
+  async getGrandpaAuthorities() {
+    const grandpaStorageKey = ':grandpa_authorities';
+    const grandpaAuthorities = await this.ctx.api().rpc.state.getStorage(grandpaStorageKey);
+    const auths = this.ctx.api().createType('VersionedAuthorityList', grandpaAuthorities.value).authorityList;
+    return auths.map(e => this.toSS58(e[0]));
+  }
+
+  async getAuraAuthorites() {
+    const auraAuthStorageKey = this.getStorageKey("Aura", "Authorities");
+    const rawAuths = await this.ctx.api().rpc.state.getStorage(auraAuthStorageKey);
+    const auths = this.ctx.api().createType('Authorities', rawAuths.value);
+    return auths.map(e => this.ctx.actors.keyring.encodeAddress(e));
+  }
+  
+  async waitUntilSession(num) {
+    const timer = ms => new Promise(res => setTimeout(res, ms));
+    const checkIdx = async () => {
+      const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
+      if (idx <= num) {
+        await timer(1000);
+        await checkIdx();
+      }
+    };
+    await checkIdx();
+  }
 }
+
 
 function buildChain(ctx) {
   return new Chain(ctx);

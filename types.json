@@ -128,9 +128,6 @@
 
   "Source3": "NoticesRS",
   "EncodedNotice": "Vec<u8>",
-  "ChainKeys": {
-    "eth_address": "ValidatorIdentity"
-  },
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",
@@ -390,5 +387,12 @@
     }
   },
   "Source10": "AccountRS",
-  "LiquidityFactor": "u128"
+  "LiquidityFactor": "u128",
+  "Address": "MultiAddress",
+  "LookupSource": "MultiAddress",
+  "VersionedAuthorityList": {
+    "version": "u8",
+    "authorityList": "AuthorityList"
+  },
+  "Authorities": "Vec<AccountId32>"
 }
