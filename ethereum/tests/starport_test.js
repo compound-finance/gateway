@@ -65,8 +65,11 @@ describe('Starport', () => {
     const rootNonce = await web3.eth.getTransactionCount(root);
     const cashAddress = getNextContractAddress(root, rootNonce + 1);
 
+    // 1e18
+    let start_cash_index = '1000000000000000000';
+
     starport = await deploy('StarportHarness', [cashAddress, root, authorityAddresses]);
-    cash = await deploy('CashToken', [starport._address, 0, 1e4, fromNow(0)]);
+    cash = await deploy('CashToken', [starport._address, 0, start_cash_index, fromNow(0)]);
 
     // Give some 100e6 CASH to account1
     let mintPrincipal = await cash.methods.amountToPrincipal(e6(100)).call();
@@ -239,9 +242,10 @@ describe('Starport', () => {
       expect(await call(cash, 'balanceOf', [starport._address])).toEqualNumber(0);
       expect(await call(starport, 'cash')).toMatchAddress(cash._address);
 
+      const cashIndex = await call(cash, 'getCashIndex');
       expect(tx.events.LockCash.returnValues).toMatchObject({
         amount: lockAmount.toString(),
-        principal: toPrincipal(lockAmount).toString(),
+        principal: toPrincipal(lockAmount, cashIndex).toString(),
         holder: account1
       });
     });
@@ -893,7 +897,7 @@ describe('Starport', () => {
       expect(tx.events.UnlockCash.returnValues).toMatchObject({
         account: account2,
         amount: '1000000',
-        principal: '100'
+        principal: '1000000'
       });
 
       expect(Number(await cash.methods.balanceOf(starport._address).call())).toEqual(0);
@@ -1091,7 +1095,7 @@ describe('Starport', () => {
 
       expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
         yield: "0",
-        index: "10000",
+        index: "1000000000000000000", // 1e18
       });
       expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(0);
       expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
@@ -1109,7 +1113,7 @@ describe('Starport', () => {
 
       expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
         yield: "0",
-        index: "10000",
+        index: "1000000000000000000", // 1e18
       });
       expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(nextCashYieldStart);
       expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
@@ -1130,7 +1134,7 @@ describe('Starport', () => {
 
       expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
         yield: "0",
-        index: "10000",
+        index: "1000000000000000000", //1e18
       });
       expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(nextCashYieldStart);
       expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({

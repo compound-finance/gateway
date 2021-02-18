@@ -35,7 +35,7 @@ contract CashToken is ICash {
 
     function mint(address account, uint128 principal) external override returns (uint) {
         require(msg.sender == admin, "Must be admin");
-        uint amount = principal * getCashIndex();
+        uint amount = principal * getCashIndex() / 1e18;
         cashPrincipal[account] += principal;
         totalCashPrincipal = totalCashPrincipal + principal;
         emit Transfer(address(0), account, amount);
@@ -72,11 +72,11 @@ contract CashToken is ICash {
     }
 
     function totalSupply() external view override returns (uint) {
-        return totalCashPrincipal * getCashIndex();
+        return totalCashPrincipal * getCashIndex() / 1e18;
     }
 
     function balanceOf(address account) external view override returns (uint) {
-        return cashPrincipal[account] * getCashIndex();
+        return cashPrincipal[account] * getCashIndex() / 1e18;
     }
 
     function transfer(address recipient, uint amount) external override returns (bool) {
@@ -129,7 +129,7 @@ contract CashToken is ICash {
     }
 
     function amountToPrincipal(uint amount) public view returns (uint128) {
-        uint256 principal = amount / getCashIndex();
+        uint256 principal = amount * 1e18 / getCashIndex();
         require(principal < type(uint128).max, "amountToPrincipal::overflow");
         return uint128(principal);
     }
@@ -141,7 +141,7 @@ contract CashToken is ICash {
     // We use the third degree approximation of Taylor Series
     // 1 + x/1! + x^2/2! + x^3/3!
     function exponent(uint yield, uint time) public view returns (uint) {
-        uint epower = yield * time * 1e13 / SECONDS_PER_YEAR;
+        uint epower = yield * time * 1e14 / SECONDS_PER_YEAR;
         uint first = epower;
         uint second = epower * epower / 2e18;
         uint third = epower * epower * epower / 6e36;
