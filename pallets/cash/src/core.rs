@@ -89,7 +89,9 @@ pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
         CASH => Ok(Price::from_nominal(CASH.ticker, "1.0")),
         _ => Ok(Price::new(
             units.ticker,
-            Prices::get(units.ticker).ok_or(Reason::NoPrice)?,
+            // XXX Prices::get(units.ticker).ok_or(Reason::NoPrice)?,
+            // XXX fix me how to handle no prices during initialization?
+            Prices::get(units.ticker).unwrap_or(0),
         )),
     }
 }
@@ -1283,7 +1285,7 @@ pub fn on_initialize<T: Config>(
 
     for (asset, asset_info) in SupportedAssets::iter() {
         let asset_units = asset_info.units();
-        let price_asset = get_price::<T>(asset_units)?; // XXX 2 uses price(UNITS) for cash, price(asset) for everything else (currently chain asset)
+        let price_asset = get_price::<T>(asset_units)?;
 
         let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
 
