@@ -58,6 +58,9 @@ pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 /// Type for representing an amount of USD.
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
+/// Type for a code hash.
+pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
+
 /// Type for an open price feed reporter.
 pub type Reporter = <Ethereum as Chain>::Address;
 

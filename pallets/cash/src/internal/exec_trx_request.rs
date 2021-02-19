@@ -1,15 +1,39 @@
+use either::{Left, Right};
+use frame_support::storage::{StorageMap, StorageValue};
+
 use crate::{
-    chains::ChainAccount,
+    chains::{ChainAccount, ChainAccountSignature},
     core::{self, get_asset},
-    reason::Reason,
+    log,
+    reason::{MathError, Reason},
     require,
     symbol::CASH,
     types::{CashOrChainAsset, CashPrincipal, Nonce, Quantity},
     CashPrincipals, Config, GlobalCashIndex, Nonces,
 };
-use either::{Left, Right};
-use frame_support::storage::{StorageMap, StorageValue};
+use our_std::str;
 
+pub fn prepend_nonce(payload: &Vec<u8>, nonce: Nonce) -> Vec<u8> {
+    let mut result: Vec<u8> = Vec::new();
+    result.extend_from_slice(nonce.to_string().as_bytes());
+    result.extend_from_slice(b":");
+    result.extend_from_slice(&payload[..]);
+    result
+}
+
+// XXX 2 entry points?
+pub fn exec<T: Config>(
+    request: Vec<u8>,
+    signature: ChainAccountSignature,
+    nonce: Nonce,
+) -> Result<(), Reason> {
+    log!("exec: {}", nonce);
+    let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
+    let sender = signature.recover_account(&prepend_nonce(&request, nonce)[..])?;
+    exec_trx_request::<T>(request_str, sender, Some(nonce))
+}
+
+// TODO: Unit tests!!
 pub fn exec_trx_request<T: Config>(
     request_str: &str,
     sender: ChainAccount,
@@ -37,7 +61,7 @@ pub fn exec_trx_request<T: Config>(
                             let cash_principal_signer = CashPrincipals::get(sender);
                             require!(
                                 cash_principal_signer >= CashPrincipal::ZERO,
-                                Reason::MaxWithNegativeCashPrincipal
+                                MathError::SignMismatch.into() // XXX unsigned cash principal
                             );
 
                             Right(cash_principal_signer)
@@ -80,7 +104,7 @@ pub fn exec_trx_request<T: Config>(
                     // XXX Where should we do this check
                     require!(
                         principal >= CashPrincipal::ZERO,
-                        Reason::MaxWithNegativeCashPrincipal
+                        MathError::SignMismatch.into() // XXX unsigned principal
                     );
                     core::transfer_cash_principal_internal::<T>(sender, account.into(), principal)?;
                 }

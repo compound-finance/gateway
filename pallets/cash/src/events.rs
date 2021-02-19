@@ -57,8 +57,10 @@ pub enum EventError {
     ErrorDecodingHex,
 }
 
+// XXX does this belong here? all very eth specific...
+//  whats the separate with internal?
 /// Fetch all latest Starport events for the offchain worker.
-pub fn fetch_events(from_block: String) -> Result<EventInfo, EventError> {
+pub fn fetch_eth_events(from_block: String) -> Result<EventInfo, EventError> {
     // Get a validator config from runtime-interfaces pallet
     // Use config to get an address for interacting with Ethereum JSON RPC client
     let config = runtime_interfaces::config_interface::get();
@@ -157,7 +159,7 @@ pub mod tests {
 
         let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
         t.execute_with(|| {
-            let events_candidate = events::fetch_events("earliest".to_string());
+            let events_candidate = events::fetch_eth_events("earliest".to_string());
             assert!(events_candidate.is_ok());
             let starport_info = events_candidate.unwrap();
             let latest_eth_block = starport_info.latest_eth_block;
@@ -208,7 +210,7 @@ pub mod tests {
 
         let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
         t.execute_with(|| {
-            let events_candidate = events::fetch_events("earliest".to_string());
+            let events_candidate = events::fetch_eth_events("earliest".to_string());
             assert!(events_candidate.is_ok());
             let event_info = events_candidate.unwrap();
             let latest_eth_block = event_info.latest_eth_block;
