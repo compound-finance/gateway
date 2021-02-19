@@ -23,7 +23,7 @@ impl Config {
 
 pub fn new_config(eth_starport_address: Vec<u8>) -> Config {
     return Config {
-        eth_starport_address: eth_starport_address,
+        eth_starport_address,
     };
 }
 
@@ -58,6 +58,7 @@ const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = compound_crypto::ETH_KEY_ID_ENV_VAR
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str =
     "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27";
+const MINER_ENV_VAR: &str = "MINER";
 const OPF_URL_ENV_VAR: &str = "OPF_URL";
 const OPF_URL_ENV_VAR_DEFAULT: &str = "";
 
@@ -89,6 +90,11 @@ pub trait ValidatorConfigInterface {
     /// Get the open price feed URLs
     fn get_opf_url() -> Option<Vec<u8>> {
         std::env::var(OPF_URL_ENV_VAR).ok().map(Into::into)
+    }
+
+    /// Get the Miner address
+    fn get_miner_address() -> Option<Vec<u8>> {
+        std::env::var(MINER_ENV_VAR).ok().map(Into::into)
     }
 }
 
@@ -146,6 +152,7 @@ pub fn set_validator_config_dev_defaults() {
     set_validator_config_dev_default(ETH_KEY_ID_ENV_VAR, ETH_KEY_ID_ENV_VAR_DEV_DEFAULT);
     set_validator_config_dev_default(ETH_RPC_URL_ENV_VAR, ETH_RPC_URL_ENV_VAR_DEV_DEFAULT);
     set_validator_config_dev_default(OPF_URL_ENV_VAR, OPF_URL_ENV_VAR_DEFAULT);
+    set_validator_config_dev_default(MINER_ENV_VAR, "");
 }
 
 #[cfg(test)]

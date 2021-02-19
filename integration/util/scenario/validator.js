@@ -52,7 +52,7 @@ let validatorInfoMap = {
 };
 
 class Validator {
-  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, chainSpecFile) {
+  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, chainSpecFile) {
     this.ctx = ctx;
     this.name = name;
     this.info = info;
@@ -66,6 +66,7 @@ class Validator {
     this.extraArgs = extraArgs;
     this.validatorArgs = validatorArgs;
     this.ethPrivateKey = ethPrivateKey;
+    this.ethAccount = ethAccount;
     this.chainSpecFile = chainSpecFile;
     this.wsProvider = null;
     this.api = null;
@@ -108,7 +109,8 @@ class Validator {
         ...this.spawnOpts,
         ETH_RPC_URL: this.ctx.eth.web3Url,
         ETH_KEY: this.ethPrivateKey,
-        ETH_KEY_ID: "my_eth_key_id"
+        ETH_KEY_ID: "my_eth_key_id",
+        MINER: `Eth:${this.ethAccount}`
       }
     });
 
@@ -236,13 +238,14 @@ function buildValidator(validatorName, validatorInfo, ctx) {
   let validatorArgs = validatorInfo.spawn_args || [];
 
   let ethPrivateKey = getInfoKey(validatorInfo, 'eth_private_key', `validator ${validatorName}`);
+  let ethAccount = getInfoKey(validatorInfo, 'eth_account', `validator ${validatorName}`);
   if (!ctx.chainSpec) {
     throw new Error(`Must initialize chain spec before starting validator`);
   }
 
   let chainSpecFile = ctx.chainSpec.file();
 
-  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, chainSpecFile);
+  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, chainSpecFile);
 }
 
 async function getValidatorsInfo(validatorsInfoHash, ctx) {

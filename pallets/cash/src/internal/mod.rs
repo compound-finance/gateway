@@ -6,3 +6,4 @@ pub mod next_code;
 pub mod notices;
 pub mod oracle;
 pub mod set_yield_next;
+pub mod miner;

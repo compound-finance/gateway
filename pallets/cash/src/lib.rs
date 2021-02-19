@@ -26,7 +26,7 @@ use crate::types::{
     ValidatorKeys, ValidatorSig,
 };
 use codec::alloc::string::String;
-use frame_support::{decl_event, decl_module, decl_storage, dispatch, Parameter};
+use frame_support::{decl_event, decl_module, decl_storage, dispatch, Parameter, weights::DispatchClass};
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{str, vec::Vec};
 use sp_core::crypto::AccountId32;
@@ -185,6 +185,12 @@ decl_storage! {
 
         /// Mapping of strings to tickers (valid tickers indexed by ticker string).
         Tickers get(fn ticker): map hasher(blake2_128_concat) String => Option<Ticker>;
+
+        /// Miner of the current block.
+        Miner get(fn miner): Option<ChainAccount>;
+
+        /// Validator spread due to miner of last block
+        LastMinerSpreadPrincipal get(fn last_miner_spread_principal): CashPrincipal;
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
@@ -290,6 +296,18 @@ decl_module! {
                     0
                 }
             }
+        }
+
+        /// Sets the miner of the this block via inherent
+        #[weight = (
+            0,
+            DispatchClass::Mandatory
+        )]
+        fn set_miner(origin, miner: ChainAccount) {
+            ensure_none(origin)?;
+
+            log!("set_miner({:?})", miner);
+            Miner::put(miner);
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
@@ -438,13 +456,19 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
+            Call::set_miner(_miner) => {
+                ValidTransaction::with_tag_prefix("CashPallet")
+                    .longevity(10)
+                    .propagate(true)
+                    .build()
+            },
             Call::receive_event(_event_id, _event, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
                     .and_provides(signature)
                     .propagate(true)
                     .build()
-            }
+            },
             Call::exec_trx_request(request, signature, nonce) => {
                 let signer_res = signature.recover_account(
                     &internal::exec_trx_request::prepend_nonce(request, *nonce)[..],
@@ -465,7 +489,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                         .propagate(true)
                         .build(),
                 }
-            }
+            },
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)

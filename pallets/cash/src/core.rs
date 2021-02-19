@@ -38,7 +38,7 @@ use crate::{
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
     CashYield, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
     LastYieldTimestamp, LatestNotice, Module, NoticeHashes, NoticeStates, Notices, Prices,
-    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Miner, LastMinerSpreadPrincipal,
 };
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
@@ -60,6 +60,13 @@ macro_rules! require_min_tx_value {
 }
 
 // Public helper functions //
+
+// Miner might not be set (e.g. in the first block mined), but for accouting
+// purposes, we want some address to make sure all numbers tie out. As such,
+// let's just give the initial rewards to some burn account.
+pub fn get_some_miner<T: Config>() -> ChainAccount {
+    Miner::get().unwrap_or(ChainAccount::Eth([0; 20]))
+}
 
 pub fn try_chain_asset_account(
     asset: ChainAsset,
@@ -648,7 +655,7 @@ pub fn transfer_internal<T: Config>(
     recipient: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
+    let miner = get_some_miner::<T>();
     let index = GlobalCashIndex::get();
 
     // XXX check asset matches amount asset?
@@ -731,7 +738,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
     recipient: ChainAccount,
     principal: CashPrincipal,
 ) -> Result<(), Reason> {
-    let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
+    let miner = get_some_miner::<T>();
     let index: CashIndex = GlobalCashIndex::get();
     let amount = index.as_hold_amount(principal)?;
 
@@ -1336,11 +1343,16 @@ pub fn on_initialize<T: Config>(
     let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
     let miner_spread_principal =
         cash_principal_borrow_increase.sub(cash_principal_supply_increase)?;
-    let miner = ChainAccount::Eth([0; 20]); // todo: xxx how to get the current miner chain account
-    let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&miner);
-    let miner_cash_principal_new = miner_cash_principal_old.add(miner_spread_principal)?;
 
     // * WARNING - BEGIN STORAGE ALL CHECKS AND FAILURES MUST HAPPEN ABOVE * //
+
+    let last_miner = get_some_miner::<T>(); // Miner not yet set for this block, so this is "last miner"
+    let last_miner_spread_principal = LastMinerSpreadPrincipal::get();
+
+    let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&last_miner);
+    let miner_cash_principal_new = miner_cash_principal_old.add(last_miner_spread_principal)?;
+    CashPrincipals::insert(last_miner, miner_cash_principal_new);
+    log!("Miner={:?} received {:?} principal for mining last block", last_miner, last_miner_spread_principal);
 
     for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
         SupplyIndices::insert(asset.clone(), new_supply_index);
@@ -1349,7 +1361,7 @@ pub fn on_initialize<T: Config>(
 
     GlobalCashIndex::put(cash_index_new);
     TotalCashPrincipal::put(total_cash_principal_new);
-    CashPrincipals::insert(miner, miner_cash_principal_new);
+    LastMinerSpreadPrincipal::put(miner_spread_principal);
 
     // todo: xxx support changing cash APRs
     /*
@@ -1846,6 +1858,12 @@ mod tests {
                 TotalCashPrincipal::get(),
                 CashPrincipal::from_nominal("462104.853072128227960800")
             );
+            assert_eq!(
+                CashPrincipals::get(&miner),
+                CashPrincipal::from_nominal("1.000000000000000000")
+            );
+            // Run again to set miner true principal
+            assert_eq!(on_initialize::<Test>(change_in_time), Ok(0));
             assert_eq!(
                 CashPrincipals::get(&miner),
                 CashPrincipal::from_nominal("243.097061442564559300")
