@@ -205,8 +205,8 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
-            initial_yield: None,
-            last_block_timestamp: wasm_timer::SystemTime::now()
+            cash_yield: FromStr::from_str("0").unwrap(),
+            last_yield_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
                 .as_millis(),

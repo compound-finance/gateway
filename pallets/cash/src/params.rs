@@ -7,7 +7,7 @@ use crate::types::{Quantity, Timestamp};
 pub const ETH_FINALIZATION_BLOCKS: u32 = 30; // XXX
 
 /// Number of milliseconds in a year.
-pub const MILLISECONDS_PER_YEAR: Timestamp = 31557600000; // todo: xxx finalize this number
+pub const MILLISECONDS_PER_YEAR: Timestamp = 365 * 24 * 60 * 60 * 1000; // todo: xxx finalize this number
 
 /// Minimum amount of time (milliseconds) into the future that a synchronized change may be scheduled for.
 /// Must be sufficient time to propagate changes to L1s before they occur.
