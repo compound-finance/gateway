@@ -9,22 +9,49 @@ import "./ICash.sol";
  * @notice The Compound Cash Token for Ethereum
  */
 contract CashToken is ICash {
+    // @notice Structure to save gas while storing yield and index
     struct CashYieldAndIndex {
         uint128 yield;
         uint128 index;
     }
 
+    /// @notice The number of seconds in the year, used for Cash index calculations
     uint public constant SECONDS_PER_YEAR = 31536000;
 
+    /// @notice The denomination of Cash index
+    uint public constant indexBaseUnit = 1e18;
+
+    /// @notice The admin of contract, address of `Starport` contract
     address immutable public admin;
+
+    /// @notice The timestamp when current Cash yield and index are activated
     uint public cashYieldStartAt;
+
+    /// @notice The Cash yield and index values
     CashYieldAndIndex public cashYieldAndIndex;
+
+    /// @notice The timestamp when next Cash yield and index should be activated
     uint public nextCashYieldStartAt;
+
+    /// @notice The next Cash yield and index values
     CashYieldAndIndex public nextCashYieldAndIndex;
+
+    /// @notice See {IERC20-allowance}
     mapping (address => mapping (address => uint)) public allowances;
+
+    /// @notice The total amount of minted Cash principal
     uint public totalCashPrincipal;
+
+    /// @notice The amount of cash principal per account
     mapping (address => uint128) public cashPrincipal;
 
+    /**
+     * @notice Initialize Cash token contract
+     * @param starport The address of admin
+     * @param initialYield The initial value for Cash token APY in BPS
+     * @param initialYieldIndex The initial value of Cash index
+     * @param initialYieldStart The timestamp when Cash index and yield were activated on Compounc chain
+     */
 	constructor(address starport, uint128 initialYield, uint128 initialYieldIndex, uint initialYieldStart) {
         admin = starport;
         // Note: we don't check that this is in the past, but calls will revert until it is.
@@ -42,10 +69,11 @@ contract CashToken is ICash {
      * @dev principal is `u128` to be compliant with Compound Chain
      * @param account The owner of minted Cash tokens
      * @param principal The principal amount of minted Cash tokens
+     * @return The minted amount of Cash tokens = principal * index
      */
     function mint(address account, uint128 principal) external override returns (uint) {
         require(msg.sender == admin, "Must be admin");
-        uint amount = principal * getCashIndex() / 1e18;
+        uint amount = principal * getCashIndex() / indexBaseUnit;
         cashPrincipal[account] += principal;
         totalCashPrincipal = totalCashPrincipal + principal;
         emit Transfer(address(0), account, amount);
@@ -58,6 +86,7 @@ contract CashToken is ICash {
      * @dev principal is `u128` to be compliant with Compound Chain
      * @param account The owner of burned Cash tokens
      * @param amount The amount of burned Cash tokens
+     * @return The amount of burned principal = amount / index
      */
     function burn(address account, uint amount) external override returns (uint128) {
         require(msg.sender == admin, "Must be admin");
@@ -93,6 +122,7 @@ contract CashToken is ICash {
      * @notice Get current cash index
      * @dev Since function is `view` and cannot modify storage,
             the check for next index and yield values was added
+     * @return The current cash index, 18 decimals
      */
     function getCashIndex() public view virtual override returns (uint) {
         uint nextAt = nextCashYieldStartAt;
@@ -108,11 +138,11 @@ contract CashToken is ICash {
      */
 
     function totalSupply() external view override returns (uint) {
-        return totalCashPrincipal * getCashIndex() / 1e18;
+        return totalCashPrincipal * getCashIndex() / indexBaseUnit;
     }
 
     function balanceOf(address account) view external override returns (uint) {
-        return cashPrincipal[account] * getCashIndex() / 1e18;
+        return cashPrincipal[account] * getCashIndex() / indexBaseUnit;
     }
 
     function transfer(address recipient, uint amount) external override returns (bool) {
@@ -170,7 +200,7 @@ contract CashToken is ICash {
 
     // Helper function to conver amount to principal using current Cash index
     function amountToPrincipal(uint amount) public view returns (uint128) {
-        uint256 principal = amount * 1e18 / getCashIndex();
+        uint256 principal = amount * indexBaseUnit / getCashIndex();
         require(principal < type(uint128).max, "amountToPrincipal::overflow");
         return uint128(principal);
     }
