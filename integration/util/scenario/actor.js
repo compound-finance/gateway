@@ -108,11 +108,11 @@ class Actor {
     } else if (assetBalance > 0) {
       // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
       let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
-      return Number(assetBalance.toBigInt() * (supplyIndex.toBigInt() - lastIndex.toBigInt()));
+      return Number(token.toTokenAmount(assetBalance.toBigInt()) * Number(supplyIndex.toBigInt() - lastIndex.toBigInt())) / 1e18;
     } else {
       // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
       let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
-      return Number(assetBalance.toBigInt() * (borrowIndex.toBigInt() - lastIndex.toBigInt()));
+      return Number(token.toTokenAmount(assetBalance.toBigInt()) * Number(borrowIndex.toBigInt() - lastIndex.toBigInt())) / 1e18;
     }
   }
 

@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
 use our_std::{
     convert::{TryFrom, TryInto},
-    Deserialize, RuntimeDebug, Serialize,
+    Debuggable, Deserialize, RuntimeDebug, Serialize,
 };
 
 use crate::{
@@ -211,7 +211,7 @@ impl AssetInfo {
 //   would have to panic, though not for partial ord
 
 /// Type for representing a price (in USD), bound to its ticker.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct Price {
     pub ticker: Ticker,
     pub value: AssetPrice,
@@ -232,7 +232,7 @@ impl Price {
 }
 
 /// Type for representing a quantity of an asset, bound to its ticker and number of decimals.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct Quantity {
     pub value: AssetAmount,
     pub units: Units,
@@ -396,7 +396,7 @@ impl Balance {
 }
 
 /// Type for representing an amount of CASH Principal.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, Debuggable)]
 pub struct CashPrincipal(pub Int);
 
 impl CashPrincipal {
@@ -484,6 +484,8 @@ impl CashIndex {
     pub fn as_hold_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
         let amount = rhs
             .value
+            .checked_mul(CashIndex::ONE.0)
+            .ok_or(MathError::Overflow)?
             .checked_div(self.0)
             .ok_or(MathError::DivisionByZero)?;
         let signed = Int::try_from(amount).or(Err(MathError::Overflow))?;

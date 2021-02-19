@@ -21,13 +21,13 @@ async function lockZRX({ ashley, bert, bat, zrx }) {
 
 buildScenarios('Borrow Scenarios', borrow_scen_info, { beforeEach: lockZRX }, [
   {
-    name: "Borrow BAT",
+    name: "Borrow BAT and Garner Interest",
     scenario: async ({ ashley, bert, bat, zrx, chain, starport, log, cash }) => {
-      console.log("ZRX: " + zrx.ethAddress() + " price: " + await zrx.getPrice());
-      console.log("BAT: " + bat.ethAddress() + " price: " + await bat.getPrice());
       let cashBalance0 = await ashley.chainBalance(cash);
       let cashIndex0 = await chain.cashIndex();
       let cash0 = await ashley.cash();
+
+      expect(cash0).toEqual(0);
 
       let notice = getNotice(await ashley.extract(1_000_000, bat));
 
@@ -37,24 +37,24 @@ buildScenarios('Borrow Scenarios', borrow_scen_info, { beforeEach: lockZRX }, [
       expect(await bat.totalChainSupply()).toEqual(2_000_000);
       expect(await bat.totalChainBorrows()).toEqual(1_000_000);
 
-      // TODO: Extract from Starport
-      // let signatures = await chain.getNoticeSignatures(notice);
-      // expect(await ashley.tokenBalance(bat)).toEqual(900);
-      // await starport.invoke(notice, signatures);
-      // expect(await ashley.tokenBalance(bat)).toEqual(950);
+      let signatures = await chain.getNoticeSignatures(notice);
+      await starport.invoke(notice, signatures);
+      expect(await ashley.tokenBalance(bat)).toEqual(1_000_000);
       expect(await ashley.chainBalance(zrx)).toEqual(10_000_000);
       expect(await ashley.chainBalance(bat)).toEqual(-1_000_000);
       let cashBalance1 = await ashley.chainBalance(cash);
       let cashIndex1 = await chain.cashIndex();
       let cash1 = await ashley.cash();
+      expect(cash1).toBeLessThan(0);
+      expect(cash1).toBeGreaterThan(-0.001);
       await sleep(20000);
       let cashBalance2 = await ashley.chainBalance(cash);
       let cashIndex2 = await chain.cashIndex();
       let cash2 = await ashley.cash();
-      log({cashBalance0, cashBalance1, cashBalance2});
-      log({cashIndex0, cashIndex1, cashIndex2});
-      log({cash0, cash1, cash2});
-      log([cashIndex0.toString(), cashIndex1.toString(), cashIndex2.toString()]);
+
+      // Nothing is exact here.
+      expect(cash2).toBeLessThan(cash1);
+      expect(cash2).toBeGreaterThan(-0.01);
     }
   }
 ]);

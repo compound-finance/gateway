@@ -14,7 +14,8 @@ let callbacks = [];
 // TODO: Refactor here?
 function subscribeEvents(api) {
   api.query.system.events((events) => {
-    events.forEach(({ event, phase }) => {
+    events.forEach(({ event, phase }, i) => {
+      debug(events[i]);
       debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
     });
     // TODO: Clean this up
