@@ -4,7 +4,6 @@ use crate::{
     PublicKeyBytes, SignatureBytes, ETH_ADD_TO_V,
 };
 use der_parser::parse_der;
-use futures::executor::block_on;
 use rusoto_core::{Region, RusotoError};
 use rusoto_kms::{GetPublicKeyRequest, Kms, KmsClient, SignError, SignRequest, SignResponse};
 use secp256k1::util::{FULL_PUBLIC_KEY_SIZE, TAG_PUBKEY_FULL};

@@ -2,4 +2,4 @@
 ssh_home: "{{ ansible_env.HOME }}/.ssh"
 git_deploy_key: "{{ ssh_home }}/id_rsa_compound_chain_deploy"
 git_repo: "ssh://git@github.com/compound-finance/compound-chain.git"
-git_branch: "cob/opping"
+git_branch: "master"

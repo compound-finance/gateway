@@ -193,7 +193,7 @@ impl Keyring for InMemoryKeyring {
 }
 
 pub fn keyring() -> Box<dyn Keyring> {
-    let keyring_type : Option<String> = std::env::var("KEYRING_TYPE").ok().into();
+    let keyring_type: Option<String> = std::env::var("KEYRING_TYPE").ok().into();
     let aws_kms = String::from("AWS_KMS");
 
     if keyring_type == Some(aws_kms) {
