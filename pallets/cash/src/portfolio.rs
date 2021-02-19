@@ -63,9 +63,9 @@ impl Portfolio {
 
     /// Get the hypothetical liquidity value.
     pub fn get_liquidity<T: Config>(&self) -> Result<Balance, Reason> {
-        let mut liquidity = self.cash.mul_price(get_price::<T>(CASH))?;
+        let mut liquidity = self.cash.mul_price(get_price::<T>(CASH)?)?;
         for (info, balance) in &self.positions {
-            let price = get_price::<T>(balance.units);
+            let price = get_price::<T>(balance.units)?;
             let worth = (*balance).mul_price(price)?;
             if worth.value >= 0 {
                 liquidity = liquidity.add(worth.mul_factor(info.liquidity_factor)?)?

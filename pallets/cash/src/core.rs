@@ -8,7 +8,7 @@ pub use our_std::{
     str,
 };
 
-use codec::{Decode, Encode};
+use codec::Decode;
 use either::{Either, Left, Right};
 use frame_support::sp_runtime::traits::Convert;
 use frame_support::storage::{
@@ -19,12 +19,9 @@ use frame_support::traits::UnfilteredDispatchable;
 // Import these traits so we can interact with the substrate storage modules.
 use crate::symbol::USD;
 use crate::{
-    chains::{
-        Chain, ChainAccount, ChainAccountSignature, ChainAsset, ChainAssetAccount, ChainHash,
-        ChainId, ChainSignature, ChainSignatureList, Ethereum,
-    },
-    events::{ChainLogEvent, ChainLogId, EventState},
-    internal, log, notices,
+    chains::{ChainAccount, ChainAsset, ChainAssetAccount, ChainHash, ChainId},
+    events::ChainLogEvent,
+    internal, log,
     notices::{
         CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
     },
@@ -35,14 +32,13 @@ use crate::{
     symbol::{Units, CASH},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, AssetQuantity, Balance,
-        CashIndex, CashPrincipal, CashQuantity, Int, Nonce, Price, Quantity, Timestamp,
-        USDQuantity, Uint, ValidatorIdentity, ValidatorSig,
+        CashIndex, CashPrincipal, CashQuantity, Int, Price, Quantity, Timestamp, USDQuantity, Uint,
+        ValidatorIdentity,
     },
-    AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, Call, CashPrincipals,
-    CashYield, ChainCashPrincipals, Config, Event, EventStates, GlobalCashIndex, LastIndices,
+    AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
+    CashYield, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
     LastYieldTimestamp, LatestNotice, Module, NoticeHashes, NoticeStates, Notices, Prices,
-    SubmitTransaction, SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal,
-    TotalSupplyAssets, Validators,
+    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
@@ -87,11 +83,14 @@ pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
     Ok(SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?)
 }
 
-/// Return the USD price associated with the given units. XXX actually asset? or units or both?
-pub fn get_price<T: Config>(units: Units) -> Price {
+/// Return the USD price associated with the given units.
+pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
     match units {
-        CASH => Price::from_nominal(CASH.ticker, "1.0"),
-        _ => Price::new(units.ticker, Prices::get(units.ticker)),
+        CASH => Ok(Price::from_nominal(CASH.ticker, "1.0")),
+        _ => Ok(Price::new(
+            units.ticker,
+            Prices::get(units.ticker).ok_or(Reason::NoPrice)?,
+        )),
     }
 }
 
@@ -104,7 +103,7 @@ pub fn get_quantity<T: Config>(asset: ChainAsset, amount: AssetAmount) -> Result
 
 /// Return the USD value of the asset amount.
 pub fn get_value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, Reason> {
-    Ok(amount.mul_price(get_price::<T>(amount.units))?)
+    Ok(amount.mul_price(get_price::<T>(amount.units)?)?)
 }
 
 /// Return the current utilization for the asset.
@@ -361,7 +360,8 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 ethereum_client::events::EthereumEvent::ExecTrxRequest { account, trx_request } =>
                     internal::exec_trx_request::exec_trx_request::<T>(&trx_request[..], ChainAccount::Eth(account), None),
 
-                ethereum_client::events::EthereumEvent::NoticeInvoked { era_id, era_index, notice_hash, result } => internal::notices::handle_notice_invoked::<T>(ChainId::Eth, NoticeId(era_id, era_index), ChainHash::Eth(notice_hash), result),
+                ethereum_client::events::EthereumEvent::NoticeInvoked { era_id, era_index, notice_hash, result } =>
+                    internal::notices::handle_notice_invoked::<T>(ChainId::Eth, NoticeId(era_id, era_index), ChainHash::Eth(notice_hash), result),
             }
         }
     }
@@ -595,7 +595,7 @@ pub fn extract_cash_internal<T: Config>(
     let principal_positive: u128 = principal
         .0
         .try_into()
-        .map_err(|_| Reason::NegativePrincipalExtraction)?;
+        .map_err(|_| MathError::SignMismatch)?; // XXX add type
 
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
@@ -786,7 +786,7 @@ pub fn liquidate_internal<T: Config>(
     let borrower_asset = AssetBalances::get(asset.asset, borrower);
     let liquidator_collateral_asset = AssetBalances::get(collateral_asset.asset, liquidator);
     let borrower_collateral_asset = AssetBalances::get(collateral_asset.asset, borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units()) / get_price::<T>(collateral_asset.units());
+    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units())? / get_price::<T>(collateral_asset.units())?;
 
     require!(
         has_liquidity_to_reduce_asset_with_added_collateral::<T>(
@@ -926,7 +926,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     let borrower_cash_principal = CashPrincipals::get(borrower);
     let liquidator_collateral_asset = AssetBalances::get(collateral_asset.asset, liquidator);
     let borrower_collateral_asset = AssetBalances::get(collateral_asset.asset, borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(CASH) / get_price::<T>(collateral_asset.units());
+    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(CASH)? / get_price::<T>(collateral_asset.units())?;
 
     require!(
         has_liquidity_to_reduce_cash_with_added_collateral::<T>(
@@ -1036,7 +1036,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     let borrower_asset = AssetBalances::get(asset.asset, borrower);
     let liquidator_cash_principal = CashPrincipals::get(liquidator);
     let borrower_cash_principal = CashPrincipals::get(borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units()) / get_price::<T>(CASH);
+    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units())? / get_price::<T>(CASH)?;
     let seize_principal = index.as_hold_principal(seize_amount)?;
 
     require!(
@@ -1244,126 +1244,6 @@ pub fn effect_of_asset_interest_internal(
     Ok((cash_principal_post, last_index_post))
 }
 
-// Off-chain Workers //
-
-pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
-    // TODO: Do we want to return a failure here in any case, or collect them, etc?
-    for (chain_id, notice_id, notice_state) in NoticeStates::iter() {
-        match notice_state {
-            NoticeState::Pending { signature_pairs } => {
-                let signer = chain_id.signer_address()?;
-
-                if !notices::has_signer(&signature_pairs, signer) {
-                    // find parent
-                    // id = notice.gen_id(parent)
-
-                    // XXX
-                    // submit onchain call for aggregating the price
-                    let notice = Notices::get(chain_id, notice_id)
-                        .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
-                    let signature: ChainSignature = notice.sign_notice()?;
-
-                    log!("Posting Signature for [{},{}]", notice_id.0, notice_id.1);
-
-                    let call = <Call<T>>::publish_signature(chain_id, notice_id, signature);
-
-                    // TODO: Do we want to short-circuit on an error here?
-                    let _res =
-                        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-                            .map_err(|()| Reason::FailedToSubmitExtrinsic);
-                }
-
-                ()
-            }
-            _ => (),
-        }
-    }
-    Ok(())
-}
-
-pub fn publish_signature_internal(
-    chain_id: ChainId,
-    notice_id: NoticeId,
-    signature: ChainSignature,
-) -> Result<(), Reason> {
-    log!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1);
-    let state = <NoticeStates>::get(chain_id, notice_id);
-
-    match state {
-        NoticeState::Missing => Ok(()),
-
-        NoticeState::Pending { signature_pairs } => {
-            let notice = Notices::get(chain_id, notice_id)
-                .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
-            let signer: ChainAccount = signature.recover(&notice.encode_notice())?; // XXX
-            let has_signer_v = notices::has_signer(&signature_pairs, signer);
-
-            require!(!has_signer_v, Reason::NoticeAlreadySigned);
-
-            // TODO: Can this be easier?
-            let signature_pairs_next = match (signature_pairs, signer, signature) {
-                (
-                    ChainSignatureList::Eth(eth_signature_list),
-                    ChainAccount::Eth(eth_account),
-                    ChainSignature::Eth(eth_sig),
-                ) => {
-                    let mut eth_signature_list_mut = eth_signature_list.clone();
-                    eth_signature_list_mut.push((eth_account, eth_sig));
-                    Ok(ChainSignatureList::Eth(eth_signature_list_mut))
-                }
-                _ => Err(Reason::SignatureMismatch),
-            }?;
-
-            // require(signer == known validator); // XXX
-
-            // XXX sets?
-            // let signers_new = {signer | signers};
-            // let signatures_new = {signature | signatures };
-
-            // if len(signers_new & Validators) > 2/3 * len(Validators) {
-            // NoticeQueue::insert(notice_id, NoticeState::Done);
-            // Self::deposit_event(Event::SignedNotice(ChainId::Eth, notice_id, notice.encode_notice(), signatures)); // XXX generic
-            // Ok(())
-            // } else {
-            NoticeStates::insert(
-                chain_id,
-                notice_id,
-                NoticeState::Pending {
-                    signature_pairs: signature_pairs_next,
-                },
-            );
-            Ok(())
-            // }
-        }
-
-        NoticeState::Executed => Ok(()),
-    }
-}
-
-pub fn prepend_nonce(payload: &Vec<u8>, nonce: Nonce) -> Vec<u8> {
-    let mut result: Vec<u8> = Vec::new();
-    result.extend_from_slice(nonce.to_string().as_bytes());
-    result.extend_from_slice(b":");
-    result.extend_from_slice(&payload[..]);
-    result
-}
-
-// TODO: Unit tests!!
-pub fn exec_trx_request_internal<T: Config>(
-    request: Vec<u8>,
-    signature: ChainAccountSignature,
-    nonce: Nonce,
-) -> Result<(), Reason> {
-    log!("exec_trx_request_internal: {}", nonce);
-
-    let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
-
-    // Build Account=(Chain, Recover(Chain, Signature, NoncedRequest))
-    let sender = signature.recover_account(&prepend_nonce(&request, nonce)[..])?;
-
-    internal::exec_trx_request::exec_trx_request::<T>(request_str, sender, Some(nonce))
-}
-
 // Dispatch Extrinsic Lifecycle //
 
 /// Block initialization step that can fail
@@ -1399,11 +1279,11 @@ pub fn on_initialize<T: Config>(
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     let mut cash_principal_supply_increase = CashPrincipal::ZERO;
     let mut cash_principal_borrow_increase = CashPrincipal::ZERO;
-    let price_cash = get_price::<T>(CASH);
+    let price_cash = get_price::<T>(CASH)?;
 
     for (asset, asset_info) in SupportedAssets::iter() {
         let asset_units = asset_info.units();
-        let price_asset = get_price::<T>(asset_units); // XXX 2 uses price(UNITS) for cash, price(asset) for everything else (currently chain asset)
+        let price_asset = get_price::<T>(asset_units)?; // XXX 2 uses price(UNITS) for cash, price(asset) for everything else (currently chain asset)
 
         let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
 
@@ -1477,110 +1357,6 @@ pub fn on_initialize<T: Config>(
         Clear CashYieldNext
      */
     Ok(0)
-}
-
-pub fn process_events_internal<T: Config>(
-    events: Vec<(ChainLogId, ChainLogEvent)>,
-) -> Result<(), Reason> {
-    for (event_id, event) in events.into_iter() {
-        log!(
-            "Processing event and sending extrinsic: {} {:?}",
-            event_id.show(),
-            event
-        );
-
-        // XXX
-        let signature =  // XXX why are we signing with eth?
-            <Ethereum as Chain>::sign_message(&event.encode()[..])?; // XXX
-        let call = Call::process_chain_event(event_id, event, signature);
-
-        // TODO: Do we want to short-circuit on an error here?
-        let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-            .map_err(|()| Reason::FailedToSubmitExtrinsic);
-
-        if res.is_err() {
-            log!("Error while sending event extrinsic");
-        }
-    }
-    Ok(())
-}
-
-pub fn process_chain_event_internal<T: Config>(
-    event_id: ChainLogId,
-    event: ChainLogEvent,
-    signature: ValidatorSig,
-) -> Result<(), Reason> {
-    // XXX sig
-    // XXX do we want to store/check hash to allow replaying?
-    // TODO: use more generic function?
-    // XXX why is this using eth for validator sig though?
-    let signer: crate::types::ValidatorIdentity =
-        compound_crypto::eth_recover(&event.encode()[..], &signature, false)?;
-    let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
-
-    if !validators.contains(&signer) {
-        log!(
-            "Signer of a log event is not a known validator {:?}, validators are {:?}",
-            signer,
-            validators
-        );
-        return Err(Reason::UnknownValidator)?;
-    }
-
-    match EventStates::get(event_id) {
-        EventState::Pending { signers } => {
-            // XXX sets?
-            if signers.contains(&signer) {
-                log!("process_chain_event_internal({}): Validator has already signed this payload {:?}", event_id.show(), signer);
-                return Err(Reason::ValidatorAlreadySigned);
-            }
-
-            // Add new validator to the signers
-            let mut signers_new = signers.clone();
-            signers_new.push(signer.clone()); // XXX unique add to set?
-
-            if passes_validation_threshold(&signers_new, &validators) {
-                match apply_chain_event_internal::<T>(event) {
-                    Ok(()) => {
-                        EventStates::insert(event_id, EventState::Done);
-                        <Module<T>>::deposit_event(Event::ProcessedChainEvent(event_id));
-                        Ok(())
-                    }
-
-                    Err(reason) => {
-                        log!(
-                            "process_chain_event_internal({}) apply failed: {:?}",
-                            event_id.show(),
-                            reason
-                        );
-                        EventStates::insert(event_id, EventState::Failed { reason });
-                        <Module<T>>::deposit_event(Event::FailedProcessingChainEvent(
-                            event_id, reason,
-                        ));
-                        Ok(())
-                    }
-                }
-            } else {
-                log!(
-                    "process_chain_event_internal({}) signer_count={}",
-                    event_id.show(),
-                    signers_new.len()
-                );
-                EventStates::insert(
-                    event_id,
-                    EventState::Pending {
-                        signers: signers_new,
-                    },
-                );
-                Ok(())
-            }
-        }
-
-        EventState::Failed { .. } | EventState::Done => {
-            // TODO: Eventually we should be deleting or retrying here (based on monotonic ids and signing order)
-            Ok(())
-        }
-    }
 }
 
 #[cfg(test)]

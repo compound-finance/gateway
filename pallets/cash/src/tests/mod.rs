@@ -1,4 +1,4 @@
-use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
+use crate::{chains::*, core::*, internal, mock::*, oracle::*, rates::*, reason::*, symbol::*, *};
 use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
@@ -98,7 +98,7 @@ fn process_eth_event_happy_path() {
         let payload = event.encode();
         let signature = <Ethereum as Chain>::sign_message(&payload).unwrap(); // Sign with our "shared" private key for now XXX
 
-        assert_ok!(CashModule::process_chain_event(
+        assert_ok!(CashModule::receive_event(
             Origin::none(),
             event_id,
             event,
@@ -138,12 +138,7 @@ fn process_eth_event_fails_for_bad_signature() {
 
         // Dispatch a signed extrinsic.
         assert_err!(
-            CashModule::process_chain_event(
-                Origin::signed(Default::default()),
-                event_id,
-                event,
-                [0; 65]
-            ),
+            CashModule::receive_event(Origin::signed(Default::default()), event_id, event, [0; 65]),
             DispatchError::BadOrigin
         );
     });
@@ -173,8 +168,8 @@ fn process_eth_event_fails_if_not_validator() {
             209, 126, 30, 123, 73, 238, 34, 28,
         ];
         assert_err!(
-            CashModule::process_chain_event(Origin::none(), event_id, event, sig),
-            Error::<Test>::ErrorProcessingChainEvent
+            CashModule::receive_event(Origin::none(), event_id, event, sig),
+            Reason::UnknownValidator
         );
     });
 }
@@ -194,7 +189,7 @@ fn correct_error_for_none_value() {
 const TEST_OPF_URL: &str = "http://localhost/";
 
 #[test]
-fn test_process_open_price_feed_happy_path_makes_required_http_call() {
+fn test_process_prices_happy_path_makes_required_http_call() {
     std::env::set_var("OPF_URL", TEST_OPF_URL);
     let calls: Vec<testing::PendingRequest> = vec![testing::PendingRequest {
         method: "GET".into(),
@@ -213,9 +208,9 @@ fn test_process_open_price_feed_happy_path_makes_required_http_call() {
     let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
     t.execute_with(|| {
         initialize_storage();
-        CashModule::process_open_price_feed(1u64).unwrap();
+        internal::oracle::process_prices::<Test>(1u64).unwrap();
         // sadly, it seems we can not check storage here, but we should at least be able to check that
-        // the OCW attempted to call the post_price extrinsic.. that is a todo
+        // the OCW attempted to call the post_price extrinsic.. that is a todo XXX
     });
 }
 
@@ -229,8 +224,8 @@ fn test_post_price_happy_path() {
         CashModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
         let eth_price = CashModule::price(ETH.ticker);
         let eth_price_time = CashModule::price_time(ETH.ticker);
-        assert_eq!(eth_price, 732580000);
-        assert_eq!(eth_price_time, 1609340760);
+        assert_eq!(eth_price, Some(732580000));
+        assert_eq!(eth_price_time, Some(1609340760));
     });
 }
 
@@ -242,7 +237,10 @@ fn test_post_price_invalid_signature() {
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
-        assert_err!(result, Error::<Test>::OpenOracleErrorInvalidSignature);
+        assert_err!(
+            result,
+            Reason::CryptoError(compound_crypto::CryptoError::RecoverError)
+        );
     });
 }
 
@@ -254,7 +252,13 @@ fn test_post_price_invalid_reporter() {
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
-        assert_err!(result, Error::<Test>::OpenOracleErrorInvalidSignature);
+        assert_err!(
+            result,
+            Reason::CryptoError(compound_crypto::CryptoError::RecoverError)
+        );
+        // XXX is this testing the right thing?
+        //  should it be:
+        // assert_err!(result, Reason::OracleError(OracleError::NotAReporter)); ??
     });
 }
 
@@ -270,11 +274,11 @@ fn test_post_price_stale_price() {
             .unwrap();
         let eth_price = CashModule::price(ETH.ticker);
         let eth_price_time = CashModule::price_time(ETH.ticker);
-        assert_eq!(eth_price, 732580000);
-        assert_eq!(eth_price_time, 1609340760);
+        assert_eq!(eth_price, Some(732580000));
+        assert_eq!(eth_price_time, Some(1609340760));
         // try to post the same thing again
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
-        assert_err!(result, Error::<Test>::OpenOracleErrorStalePrice);
+        assert_err!(result, Reason::OracleError(OracleError::StalePrice));
     });
 }
 
@@ -362,7 +366,7 @@ fn offchain_worker_test() {
             }
         }
 
-        // Check `process_event` transactions
+        // Check `receive_event` transactions
         let tx1 = pool_state.write().transactions.pop().unwrap();
         let ex1: Extrinsic = Decode::decode(&mut &*tx1).unwrap();
 
@@ -376,7 +380,7 @@ fn offchain_worker_test() {
         assert_eq!(ex2.signature, None);
         assert_eq!(ex3.signature, None);
 
-        if let Call::process_chain_event(event_id, event, _signature) = ex1.call {
+        if let Call::receive_event(event_id, event, _signature) = ex1.call {
             assert_eq!(event_id, ChainLogId::Eth(3932939, 14)); // TODO: Should this be trx index or log_index?
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [164, 169, 110, 149, 119, 24, 227, 163, 11, 119, 166, 103, 249, 57, 120, 216, 244, 56, 189, 205, 86, 255, 3, 84, 95, 8, 200, 51, 217, 162, 102, 135],
@@ -393,7 +397,7 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let Call::process_chain_event(event_id, event, _signature) = ex2.call {
+        if let Call::receive_event(event_id, event, _signature) = ex2.call {
             assert_eq!(event_id, ChainLogId::Eth(3932897, 1));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [165, 200, 2, 78, 105, 154, 92, 48, 235, 150, 94, 71, 181, 21, 124, 6, 199, 111, 59, 114, 107, 255, 55, 122, 10, 83, 51, 165, 97, 242, 86, 72],
@@ -410,7 +414,7 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let Call::process_chain_event(event_id, event, _signature) = ex3.call {
+        if let Call::receive_event(event_id, event, _signature) = ex3.call {
             assert_eq!(event_id, ChainLogId::Eth(3858223, 0));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [193, 192, 235, 55, 181, 105, 35, 173, 158, 32, 253, 179, 28, 168, 130, 152, 141, 82, 23, 247, 202, 36, 182, 41, 124, 166, 237, 112, 8, 17, 207, 35],

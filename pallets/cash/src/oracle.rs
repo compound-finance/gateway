@@ -1,24 +1,11 @@
-use crate::Timestamp;
-use codec::{Decode, Encode};
-use our_std::{collections::btree_map::BTreeMap, vec::Vec, Debuggable};
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
 
-/// Errors coming from the price oracle
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
-pub enum OracleError {
-    HexParseError,
-    EthAbiParseError,
-    InvalidKind,
-    InvalidTicker,
-    JsonParseError,
-    HttpError,
-    InvalidOpenOracleApiResponse,
-    InvalidSymbol,
-}
+use crate::{reason::OracleError, Timestamp};
+use our_std::{collections::btree_map::BTreeMap, vec::Vec, RuntimeDebug};
 
 /// A single decoded message from the price oracle
-#[derive(PartialEq, Eq, Debuggable)]
+#[derive(PartialEq, Eq, RuntimeDebug)]
 pub struct Message {
     pub kind: String,
     pub timestamp: Timestamp,
@@ -158,12 +145,12 @@ fn open_price_feed_request_unchecked(url: &str) -> Result<OpenPriceFeedApiRespon
 /// due to an inconsistency. The distributed nature of the open price feed should help us here.
 fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), OracleError> {
     if api_response.messages.len() != api_response.signatures.len() {
-        return Err(OracleError::InvalidOpenOracleApiResponse);
+        return Err(OracleError::InvalidApiResponse);
     }
     let timestamp: Timestamp = api_response
         .timestamp
         .parse()
-        .map_err(|_| OracleError::InvalidOpenOracleApiResponse)?;
+        .map_err(|_| OracleError::InvalidApiResponse)?;
 
     // decode messages and check content
     for message in &api_response.messages {
@@ -171,17 +158,17 @@ fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), 
         let decoded_message = parse_message(&message)?;
 
         if decoded_message.timestamp != timestamp {
-            return Err(OracleError::InvalidOpenOracleApiResponse);
+            return Err(OracleError::InvalidApiResponse);
         }
 
         if !api_response.prices.contains_key(&decoded_message.key) {
-            return Err(OracleError::InvalidOpenOracleApiResponse);
+            return Err(OracleError::InvalidApiResponse);
         }
 
         let payload_price = api_response
             .prices
             .get(&decoded_message.key)
-            .ok_or(OracleError::InvalidOpenOracleApiResponse)?;
+            .ok_or(OracleError::InvalidApiResponse)?;
         let price_int = payload_price.replace(".", "");
         let price_int = price_int.trim_start_matches("0");
         let message_price = format!("{}", decoded_message.value);
@@ -189,7 +176,7 @@ fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), 
         // this check is not very good because the value could still be off by an order of magnitude
         // but without the associated decimals this is what we can do
         if price_int != message_price {
-            return Err(OracleError::InvalidOpenOracleApiResponse);
+            return Err(OracleError::InvalidApiResponse);
         }
     }
 
