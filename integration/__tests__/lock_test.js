@@ -51,7 +51,6 @@ describe('lock tests', () => {
       },
       AssetAmount: "0x00000000000000000de0b6b3a7640000",
     });
-
     // Everything's good.
   }, 600000 /* 10m */);
 

@@ -27,7 +27,11 @@ function years(n) {
 }
 
 function buildScenariosInternal(name, baseScenInfo, opts, scenarios, testFn) {
-  if (Array.isArray(opts)) {
+  if (Array.isArray(baseScenInfo)) {
+    scenarios = baseScenInfo;
+    baseScenInfo = {};
+    opts = {};
+  } else if (Array.isArray(opts)) {
     scenarios = opts;
     opts = {};
   }

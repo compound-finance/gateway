@@ -2,13 +2,18 @@ const { log } = require('./log');
 const fs = require('fs').promises;
 const ABI = require('web3-eth-abi');
 
-async function deployContract(web3, from, contracts, contractName, args) {
-  log(`Deploying contract ${contractName}`);
+function findContract(contracts, contractName) {
   let contractObj = Object.entries(contracts).find(([name, contract]) => name.split(':')[1] === contractName);
   if (!contractObj) {
     throw new Error(`Could not find contract: ${contractName}`);
   }
   let [_, contract] = contractObj;
+  return contract;
+}
+
+async function deployContract(web3, from, contracts, contractName, args) {
+  log(`Deploying contract ${contractName}`);
+  let contract = findContract(contracts, contractName);
   let abi = typeof (contract.abi) === 'string' ? JSON.parse(contract.abi) : contract.abi;
   let constructor = abi.find((m) => m.type === 'constructor' && m.inputs.length === args.length);
   if (!constructor) {
@@ -32,6 +37,11 @@ async function deployContract(web3, from, contracts, contractName, args) {
   });
 
   return new web3.eth.Contract(abi, res.contractAddress);
+}
+
+function getContractAt(web3, contracts, contractName, contractAddress) {
+  let contract = findContract(contracts, contractName);
+  return new web3.eth.Contract(contract.abi, contractAddress);
 }
 
 async function readContractsFile(contractsFile) {
@@ -58,6 +68,7 @@ function getEventValues(event) {
 
 module.exports = {
   deployContract,
+  getContractAt,
   getEventValues,
   readContractsFile,
 };

@@ -150,7 +150,12 @@ async function buildCtx(scenInfo={}) {
   debug(() => `test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   let ctx = new Ctx(scenInfo);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
-  let starportAddress = await ctx.eth.getNextContractAddress(1);
+
+  // Note: `3` below is the number of transactions we expect to occur between now and when
+  //       the Starport token is deployed.
+  //       That's now: deploy Cash Token (1), deploy ProxyAdmin (2), deploy Starport Impl (3).
+  let starportAddress = await ctx.eth.getNextContractAddress(3);
+
   ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
   ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);

@@ -128,9 +128,6 @@
 
   "Source3": "NoticesRS",
   "EncodedNotice": "Vec<u8>",
-  "ChainKeys": {
-    "eth_address": "ValidatorIdentity"
-  },
   "EraId": "u32",
   "EraIndex": "u32",
   "NoticeId": "(EraId, EraIndex)",
@@ -315,7 +312,8 @@
       "ValidatorAlreadySigned": "",
       "SetYieldNextError": "SetYieldNextError",
       "MaxForNonCashAsset": "",
-      "MaxWithNegativeCashPrincipal": ""
+      "MaxWithNegativeCashPrincipal": "",
+      "MismatchedNoticeHash": ""
     }
   },
   "MathError": {
@@ -376,7 +374,12 @@
         "amount": "u128",
         "principal": "u128"
       },
-      "Gov": {
+      "ExecTrxRequest": {
+        "account": "[u8; 20]",
+        "trx_request": "String"
+      },
+      "ExecuteProposal": {
+        "title": "String",
         "extrinsics": "Vec<Vec<u8>>"
       }
     }
@@ -390,5 +393,12 @@
     }
   },
   "Source10": "AccountRS",
-  "LiquidityFactor": "u128"
+  "LiquidityFactor": "u128",
+  "Address": "MultiAddress",
+  "LookupSource": "MultiAddress",
+  "VersionedAuthorityList": {
+    "version": "u8",
+    "authorityList": "AuthorityList"
+  },
+  "Authorities": "Vec<AccountId32>"
 }

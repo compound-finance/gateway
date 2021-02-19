@@ -360,6 +360,8 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
 
                 ethereum_client::events::EthereumEvent::ExecTrxRequest { account, trx_request } =>
                     internal::exec_trx_request::exec_trx_request::<T>(&trx_request[..], ChainAccount::Eth(account), None),
+
+                ethereum_client::events::EthereumEvent::NoticeInvoked { era_id, era_index, notice_hash, result } => internal::notices::handle_notice_invoked::<T>(ChainId::Eth, NoticeId(era_id, era_index), ChainHash::Eth(notice_hash), result),
             }
         }
     }
@@ -396,9 +398,9 @@ pub fn dispatch_notice_internal<T: Config>(
 /// Update the index of which assets an account has non-zero balances in.
 fn set_asset_balance_internal(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
     if balance == 0 {
-        // XXX delete from assets with non zero balance
+        AssetsWithNonZeroBalance::remove(account, asset);
     } else {
-        // XXX add to assets with non zero balance
+        AssetsWithNonZeroBalance::insert(account, asset, ());
     }
     AssetBalances::insert(asset, account, balance);
 }
@@ -2041,6 +2043,53 @@ mod tests {
             <pallet_timestamp::Module<Test>>::set_timestamp(expected);
             let actual = get_now::<Test>();
             assert_eq!(actual, expected);
+        });
+    }
+
+    #[test]
+    fn test_set_asset_balance_internal() {
+        new_test_ext().execute_with(|| {
+            let asset1 = ChainAsset::Eth([1; 20]);
+            let asset2 = ChainAsset::Eth([2; 20]);
+            let asset3 = ChainAsset::Eth([3; 20]);
+            let account = ChainAccount::Eth([20; 20]);
+
+            let nonzero_balance = 1;
+            let zero_balance = 0;
+            // asset1 and asset2 both have nonzero balances
+            AssetBalances::insert(asset1, account, nonzero_balance);
+            AssetBalances::insert(asset2, account, nonzero_balance);
+            AssetsWithNonZeroBalance::insert(account, asset1, ());
+            AssetsWithNonZeroBalance::insert(account, asset2, ());
+
+            set_asset_balance_internal(asset1, account, zero_balance);
+            assert!(
+                !AssetsWithNonZeroBalance::contains_key(account, asset1),
+                "set to zero should be zeroed out"
+            );
+            assert!(
+                AssetsWithNonZeroBalance::contains_key(account, asset2),
+                "should not be zeroed out"
+            );
+            assert_eq!(AssetBalances::get(asset1, account), zero_balance);
+            assert_eq!(AssetBalances::get(asset2, account), nonzero_balance);
+
+            set_asset_balance_internal(asset3, account, nonzero_balance);
+            assert!(
+                !AssetsWithNonZeroBalance::contains_key(account, asset1),
+                "set to zero should be zeroed out"
+            );
+            assert!(
+                AssetsWithNonZeroBalance::contains_key(account, asset2),
+                "should not be zeroed out"
+            );
+            assert!(
+                AssetsWithNonZeroBalance::contains_key(account, asset3),
+                "should not be zeroed out"
+            );
+            assert_eq!(AssetBalances::get(asset1, account), zero_balance);
+            assert_eq!(AssetBalances::get(asset2, account), nonzero_balance);
+            assert_eq!(AssetBalances::get(asset3, account), nonzero_balance);
         });
     }
 }

@@ -1,7 +1,7 @@
 const ganache = require('ganache-core');
 const Web3 = require('web3');
 const RLP = require('rlp');
-const { readContractsFile, deployContract } = require('../ethereum');
+const { readContractsFile, deployContract, getContractAt } = require('../ethereum');
 const { genPort } = require('../util');
 
 class Eth {
@@ -13,14 +13,29 @@ class Eth {
     this.defaultFrom = accounts[0];
     this.ganacheServer = ganacheServer;
     this.ctx = ctx;
+    this.contractsFiles = {};
   }
 
   root() {
     return this.defaultFrom;
   }
 
-  async __deployContract(contractsFile, contractName, contractArgs, opts = {}) {
-    let contracts = await readContractsFile(contractsFile);
+  async getContractsFile(contractsFile) {
+    if (this.contractsFiles[contractsFile]) {
+      return this.contractsFiles[contractsFile];
+    } else {
+      let result = await readContractsFile(contractsFile);
+      this.contractsFiles[contractsFile] = result;
+      return result;
+    }
+  }
+
+  async __deploy(contractName, contractArgs, opts = {}) {
+    return await this.__deployFull(this.ctx.__getContractsFile(), contractName, contractArgs, opts);
+  }
+
+  async __deployFull(contractsFile, contractName, contractArgs, opts = {}) {
+    let contracts = await this.getContractsFile(contractsFile);
 
     let contract = await deployContract(
       this.web3,
@@ -33,6 +48,20 @@ class Eth {
     this.ctx.log(`${contractName} deployed to ${contract._address} with args ${JSON.stringify(contractArgs)}`);
 
     return contract;
+  }
+
+  async __getContractAt(contractName, contractAddress) {
+    return await this.__getContractAtFull(this.ctx.__getContractsFile(), contractName, contractAddress);
+  }
+
+  async __getContractAtFull(contractsFile, contractName, contractAddress) {
+    let contracts = await this.getContractsFile(contractsFile);
+
+    return getContractAt(this.web3, contracts, contractName, contractAddress);
+  }
+
+  __getContractAtAbi(abi, contractAddress) {
+    return new this.web3.eth.Contract(abi, contractAddress);
   }
 
   async sign(data, actorLookup) {
@@ -56,6 +85,18 @@ class Eth {
 
   async timestamp() {
     return (await this.web3.eth.getBlock("pending")).timestamp;
+  }
+
+  async proxyRead(proxy, field) {
+    let hash = {
+      implementation: '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc',
+      admin: '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103'
+    }[field];
+    if (!hash) {
+      throw new Error(`unknown proxy read field: ${field}`);
+    }
+
+    return await this.web3.eth.getStorageAt(proxy._address, hash);
   }
 
   async teardown() {

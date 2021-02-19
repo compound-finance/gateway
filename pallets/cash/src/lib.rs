@@ -217,6 +217,9 @@ decl_storage! {
 
 decl_event!(
     pub enum Event {
+        /// A failure to process a given extrinsic
+        Failure(Reason),
+
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
@@ -312,19 +315,16 @@ decl_error! {
     }
 }
 
-macro_rules! r#cash_err {
-    ($expr:expr, $new_err:expr) => {
-        match $expr {
-            core::result::Result::Ok(val) => Ok(val),
-            core::result::Result::Err(err) => {
-                if_std! {
-                    println!("Error {:#?}", err)
-                }
-                log!("Error {:#?}", err);
-                Err($new_err)
-            }
-        }
-    };
+fn check_failure<El, T: Config>(
+    res: Result<El, Reason>,
+    new_err: Error<T>,
+) -> Result<El, Error<T>> {
+    if let Err(err) = res {
+        <Module<T>>::deposit_event(Event::Failure(err));
+        log!("Cash Failure {:#?}", err);
+    }
+
+    res.map_err(|_| new_err)
 }
 
 impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
@@ -344,7 +344,7 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
         if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
             // delete existing validators
             for kv in <Validators>::iter() {
-                <NextValidators>::take(&kv.0);
+                <Validators>::take(&kv.0);
             }
             // push next validators into current validators
             for (id, chain_keys) in <NextValidators>::iter() {
@@ -407,11 +407,18 @@ decl_module! {
         #[weight = 0]
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            cash_err!(
+            check_failure(
                 crate::internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start),
                 <Error<T>>::SetYieldNextFailure
             )?;
 
+            Ok(())
+        }
+
+        #[weight = 0]
+        pub fn change_authorities(origin, keys: Vec<(AccountId32, ValidatorKeys)>) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            Self::change_authorities_internal(keys);
             Ok(())
         }
 
@@ -420,7 +427,7 @@ decl_module! {
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
 
-            cash_err!(core::exec_trx_request_internal::<T>(request, signature, nonce), Error::<T>::TrxRequestError)?;
+            check_failure(core::exec_trx_request_internal::<T>(request, signature, nonce), Error::<T>::TrxRequestError)?;
             Ok(())
         }
 
@@ -430,30 +437,14 @@ decl_module! {
             log!("process_chain_event(origin,event_id,event,sig): {:?} {:?} {}", event_id, &event, hex::encode(&signature));
             ensure_none(origin)?;
 
-            cash_err!(core::process_chain_event_internal::<T>(event_id, event, signature), Error::<T>::ErrorProcessingChainEvent)?;
+            check_failure(core::process_chain_event_internal::<T>(event_id, event, signature), Error::<T>::ErrorProcessingChainEvent)?;
             Ok(())
         }
 
         #[weight = 0] // XXX
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
-            cash_err!(core::publish_signature_internal(chain_id, notice_id, signature), Error::<T>::PublishSignatureFailure)?;
-
-            Ok(())
-        }
-
-        #[weight = 0] // XXX
-        pub fn change_authorities(origin, keys: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
-            ensure_root(origin)?;
-
-            for (substrate_id, _chain_keys) in <NextValidators>::iter() {
-                <NextValidators>::take(substrate_id);
-            }
-
-            for chain_keys in &keys {
-                <NextValidators>::take(&chain_keys.substrate_id);
-                <NextValidators>::insert(&chain_keys.substrate_id, chain_keys);
-            }
+            check_failure(core::publish_signature_internal(chain_id, notice_id, signature), Error::<T>::PublishSignatureFailure)?;
 
             Ok(())
         }
@@ -466,7 +457,7 @@ decl_module! {
             }
 
             // TODO: What to do with res?
-            let _res = cash_err!(core::process_notices::<T>(block_number), Error::<T>::ProcessNoticeFailure);
+            let _res = check_failure(core::process_notices::<T>(block_number), Error::<T>::ProcessNoticeFailure);
 
             // todo: do this less often perhaps once a minute?
             // a really simple idea to do it once a minute on average is to just use probability
@@ -502,7 +493,10 @@ impl<T: Config> Module<T> {
         asset: ChainAsset,
         factor: LiquidityFactor,
     ) -> Result<(), Error<T>> {
-        let asset_info = SupportedAssets::get(asset).ok_or(<Error<T>>::AssetNotSupported)?;
+        let asset_info = check_failure(
+            SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported),
+            <Error<T>>::AssetNotSupported,
+        )?;
         SupportedAssets::insert(
             &asset,
             AssetInfo {
@@ -518,11 +512,13 @@ impl<T: Config> Module<T> {
         asset: ChainAsset,
         model: InterestRateModel,
     ) -> Result<(), Error<T>> {
-        let asset_info = SupportedAssets::get(asset).ok_or(<Error<T>>::AssetNotSupported)?;
-        // XXX err pattern?
-        cash_err!(
-            model.check_parameters(),
-            <Error<T>>::InterestRateModelInvalidParameters
+        let asset_info = check_failure(
+            SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported),
+            <Error<T>>::AssetNotSupported,
+        )?;
+        check_failure(
+            model.check_parameters().map_err(Reason::RatesError),
+            <Error<T>>::InterestRateModelInvalidParameters,
         )?;
         SupportedAssets::insert(
             &asset,
@@ -534,6 +530,17 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
+    fn change_authorities_internal(keys: Vec<(AccountId32, ValidatorKeys)>) {
+        for (id, _chain_keys) in <NextValidators>::iter() {
+            <NextValidators>::take(id);
+        }
+
+        for (id, chain_keys) in &keys {
+            <NextValidators>::take(id);
+            <NextValidators>::insert(&id, chain_keys);
+        }
+    }
+
     /// Body of the post_price extrinsic
     /// * checks signature of message
     /// * parses message
@@ -543,30 +550,30 @@ impl<T: Config> Module<T> {
     /// body of this function here.
     fn post_price_internal(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Error<T>> {
         // check signature
-        let parsed_sig: <Ethereum as Chain>::Signature = cash_err!(
-            compound_crypto::eth_signature_from_bytes(&signature),
-            <Error<T>>::OpenOracleErrorInvalidSignature
+        let parsed_sig: <Ethereum as Chain>::Signature = check_failure(
+            compound_crypto::eth_signature_from_bytes(&signature).map_err(Reason::CryptoError),
+            <Error<T>>::OpenOracleErrorInvalidSignature,
         )?;
         // note that this is actually a double-hash situation but that is expected behavior
         // the hashed message is hashed again in the eth convention inside eth_recover
         let hashed = compound_crypto::keccak(&payload);
-        let recovered = cash_err!(
-            compound_crypto::eth_recover(&hashed, &parsed_sig, true),
-            <Error<T>>::OpenOracleErrorInvalidSignature
+        let recovered = check_failure(
+            compound_crypto::eth_recover(&hashed, &parsed_sig, true).map_err(Reason::CryptoError),
+            <Error<T>>::OpenOracleErrorInvalidSignature,
         )?;
         if !PriceReporters::get().contains(recovered) {
             return Err(<Error<T>>::OpenOracleErrorInvalidReporter);
         }
 
         // parse message and check it
-        let parsed = cash_err!(
-            oracle::parse_message(&payload),
-            <Error<T>>::OpenOracleErrorInvalidMessage
+        let parsed = check_failure(
+            oracle::parse_message(&payload).map_err(Reason::OracleError),
+            <Error<T>>::OpenOracleErrorInvalidMessage,
         )?;
 
-        let ticker: Ticker = cash_err!(
+        let ticker: Ticker = check_failure(
             str::FromStr::from_str(&parsed.key),
-            <Error<T>>::OpenOracleErrorInvalidTicker
+            <Error<T>>::OpenOracleErrorInvalidTicker,
         )?;
 
         log!(
@@ -666,17 +673,22 @@ impl<T: Config> Module<T> {
                 return Ok(());
             }
         }
-        let url = cash_err!(String::from_utf8(url), <Error<T>>::OpenOracleBadUrl)?;
-
-        // poll
-        let api_response = cash_err!(
-            crate::oracle::open_price_feed_request(&url),
-            <Error<T>>::OpenOracleHttpFetchError
+        let url = check_failure(
+            String::from_utf8(url).map_err(|_| Reason::StringError),
+            <Error<T>>::OpenOracleBadUrl,
         )?;
 
-        let messages_and_signatures_and_timestamp = cash_err!(
-            api_response.to_message_signature_pairs(),
-            <Error<T>>::OpenOracleApiResponseHexError
+        // poll
+        let api_response = check_failure(
+            crate::oracle::open_price_feed_request(&url).map_err(Reason::OracleError),
+            <Error<T>>::OpenOracleHttpFetchError,
+        )?;
+
+        let messages_and_signatures_and_timestamp = check_failure(
+            api_response
+                .to_message_signature_pairs()
+                .map_err(Reason::OracleError),
+            <Error<T>>::OpenOracleApiResponseHexError,
         )?;
         let (messages_and_signatures, timestamp) = messages_and_signatures_and_timestamp;
 
@@ -698,11 +710,12 @@ impl<T: Config> Module<T> {
         for (msg, sig) in messages_and_signatures {
             // adding some debug info in here, this will become very chatty
             let call = <Call<T>>::post_price(msg, sig);
-            let _ = cash_err!(
-                SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()),
-                <Error<T>>::OpenOraclePostPriceExtrinsicError
+            let _ = check_failure(
+                SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
+                    .map_err(|()| Reason::FailedToSubmitExtrinsic),
+                <Error<T>>::OpenOraclePostPriceExtrinsicError,
             );
-            // note - there is a log message in cash_err if this extrinsic fails but we should
+            // note - there is a log message in check_failure if this extrinsic fails but we should
             // still try to update the other prices even if one extrinsic fails, thus the result
             // is ignored and we continue in this loop
         }
@@ -758,9 +771,9 @@ impl<T: Config> Module<T> {
                     // We need to make sure this is fully idempotent
 
                     // Send extrinsics for all events
-                    cash_err!(
+                    check_failure(
                         core::process_events_internal::<T>(event_info.events),
-                        Error::<T>::ErrorProcessingChainEvent
+                        Error::<T>::ErrorProcessingChainEvent,
                     )?;
 
                     // Save latest block in ocw storage

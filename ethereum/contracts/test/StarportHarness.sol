@@ -7,7 +7,7 @@ contract StarportHarness is Starport {
 
 	uint public counter;
 
-	constructor(ICash cash_, address admin_, address[] memory authorities_) Starport(cash_, admin_, authorities_) {
+	constructor(ICash cash_, address admin_) Starport(cash_, admin_) {
 	}
 
 	/// Harness to call `getQuorum`
@@ -46,16 +46,6 @@ contract StarportHarness is Starport {
 	/// Harness to call `unlockCash` with this as `msg.sender`
 	function unlockCash_(address account, uint128 principal) external {
 		Starport(this).unlockCash(account, principal);
-	}
-
-	/// Harness to call `changeAuthorities` with this as `msg.sender`
-	function changeAuthorities_(address[] calldata newAuthorities) external {
-		Starport(this).changeAuthorities(newAuthorities);
-	}
-
-	/// Harness to call `setFutureYield` with this as `msg.sender`
-	function setFutureYield_(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart) external {
-		Starport(this).setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
 	}
 
 	/// Simple function to test notices
