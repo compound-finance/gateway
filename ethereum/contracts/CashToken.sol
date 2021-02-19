@@ -21,10 +21,10 @@ contract CashToken is ICash {
     /// @notice The denomination of Cash index
     uint public constant indexBaseUnit = 1e18;
 
-    /// @notice The Exponent calculations precision
+    /// @notice The denomination of `exponent` result
     uint public constant expBaseUnit = 1e18;
 
-    /// @notice The denomination of APY BPS
+    /// @notice The denomination of Cash APY BPS
     uint public constant bpsBaseUnit = 1e4;
 
     /// @notice The admin of contract, address of `Starport` contract
@@ -259,7 +259,9 @@ contract CashToken is ICash {
     //       yield is in BPS, so 300 = 3% = 0.03
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
     function calculateIndex(uint128 yield, uint128 index, uint startAt) public view returns (uint128) {
-        return index * exponent(yield, block.timestamp - startAt) / 1e18;
+        uint newIndex = index * exponent(yield, block.timestamp - startAt) / expBaseUnit;
+        require(newIndex < type(uint128).max, "calculateIndex::overflow");
+        return uint128(newIndex);
     }
 
     // Helper function to calculate e^rt part from countinous compounding interest formula
@@ -269,10 +271,10 @@ contract CashToken is ICash {
     // XXX TODO add ranges for which it works
     function exponent(uint128 yield, uint time) public view returns (uint) {
         uint scale = expBaseUnit / bpsBaseUnit;
-        uint epower = yield * time * expBaseUnit * scale / SECONDS_PER_YEAR;
+        uint epower = yield * time * scale / SECONDS_PER_YEAR;
         uint first = epower * expBaseUnit ** 2;
-        uint second = epower ** 2 * expBaseUnit / 2;
-        uint third = epower ** 3 / 6;
+        uint second = epower * epower * expBaseUnit / 2;
+        uint third = epower * epower * epower / 6;
         return (expBaseUnit ** 3 + first + second + third) / expBaseUnit ** 2;
     }
 }
