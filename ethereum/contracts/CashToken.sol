@@ -21,6 +21,12 @@ contract CashToken is ICash {
     /// @notice The denomination of Cash index
     uint public constant indexBaseUnit = 1e18;
 
+    /// @notice The Exponent calculations precision
+    uint public constant expBaseUnit = 1e18;
+
+    /// @notice The denomination of APY BPS
+    uint public constant bpsBaseUnit = 1e4;
+
     /// @notice The admin of contract, address of `Starport` contract
     address immutable public admin;
 
@@ -124,7 +130,7 @@ contract CashToken is ICash {
             the check for next index and yield values was added
      * @return The current cash index, 18 decimals
      */
-    function getCashIndex() public view virtual override returns (uint) {
+    function getCashIndex() public view virtual override returns (uint128) {
         uint nextAt = nextCashYieldStartAt;
         if (nextAt != 0 && block.timestamp > nextAt) {
             return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
@@ -252,7 +258,7 @@ contract CashToken is ICash {
     //       current_index = base_index * e^(yield * time_ellapsed)
     //       yield is in BPS, so 300 = 3% = 0.03
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
-    function calculateIndex(uint yield, uint index, uint startAt) public view returns (uint) {
+    function calculateIndex(uint128 yield, uint128 index, uint startAt) public view returns (uint128) {
         return index * exponent(yield, block.timestamp - startAt) / 1e18;
     }
 
@@ -261,11 +267,12 @@ contract CashToken is ICash {
     //       1 + x/1! + x^2/2! + x^3/3!
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
     // XXX TODO add ranges for which it works
-    function exponent(uint yield, uint time) public view returns (uint) {
-        uint epower = yield * time * 1e14 / SECONDS_PER_YEAR;
-        uint first = epower * 1e36;
-        uint second = epower * epower  * 1e18 / 2;
-        uint third = epower * epower * epower / 6;
-        return (1e54 + first + second + third) / 1e36;
+    function exponent(uint128 yield, uint time) public view returns (uint) {
+        uint scale = expBaseUnit / bpsBaseUnit;
+        uint epower = yield * time * expBaseUnit * scale / SECONDS_PER_YEAR;
+        uint first = epower * expBaseUnit ** 2;
+        uint second = epower ** 2 * expBaseUnit / 2;
+        uint third = epower ** 3 / 6;
+        return (expBaseUnit ** 3 + first + second + third) / expBaseUnit ** 2;
     }
 }
