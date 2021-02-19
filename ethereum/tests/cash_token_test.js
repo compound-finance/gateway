@@ -365,9 +365,6 @@ describe('CashToken', () => {
       // Balance checks
       expect(balance2).greaterThan(balance1);
       expect(balance3).greaterThan(balance2);
-      console.log("balance1 = ", balance1);
-      console.log("balance2 = ", balance2);
-      console.log("balance3 = ", balance3);
     });
   });
 });
