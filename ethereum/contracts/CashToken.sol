@@ -252,7 +252,7 @@ contract CashToken is ICash {
     //       current_index = base_index * e^(yield * time_ellapsed)
     //       yield is in BPS, so 300 = 3% = 0.03
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
-    function calculateIndex(uint yield, uint index, uint startAt) internal view returns (uint) {
+    function calculateIndex(uint yield, uint index, uint startAt) public view returns (uint) {
         return index * exponent(yield, block.timestamp - startAt) / 1e18;
     }
 
@@ -261,7 +261,7 @@ contract CashToken is ICash {
     //       1 + x/1! + x^2/2! + x^3/3!
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
     // XXX TODO add ranges for which it works
-    function exponent(uint yield, uint time) internal view returns (uint) {
+    function exponent(uint yield, uint time) public view returns (uint) {
         uint epower = yield * time * 1e14 / SECONDS_PER_YEAR;
         uint first = epower * 1e36;
         uint second = epower * epower  * 1e18 / 2;
