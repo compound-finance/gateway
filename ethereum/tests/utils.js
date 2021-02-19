@@ -14,8 +14,8 @@ const e6 = num => {
   return bigInt(num) * bigInt(1e6);
 };
 
-const toPrincipal = (n, index = 1e4) => {
-  return Number(n) / index;
+const toPrincipal = (n, index = 1e18) => {
+  return Number(n) * 1e18 / index;
 };
 
 const getNextContractAddress = (acct, nonce) => {
