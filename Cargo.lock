@@ -4409,6 +4409,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sp-core",
+ "sp-inherents",
  "sp-io",
  "sp-runtime",
  "tiny-keccak 2.0.2",
