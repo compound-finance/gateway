@@ -21,6 +21,12 @@ contract CashToken is ICash {
     /// @notice The denomination of Cash index
     uint public constant indexBaseUnit = 1e18;
 
+    /// @notice The denomination of `exponent` result
+    uint public constant expBaseUnit = 1e18;
+
+    /// @notice The denomination of Cash APY BPS
+    uint public constant bpsBaseUnit = 1e4;
+
     /// @notice The admin of contract, address of `Starport` contract
     address immutable public admin;
 
@@ -124,7 +130,7 @@ contract CashToken is ICash {
             the check for next index and yield values was added
      * @return The current cash index, 18 decimals
      */
-    function getCashIndex() public view virtual override returns (uint) {
+    function getCashIndex() public view virtual override returns (uint128) {
         uint nextAt = nextCashYieldStartAt;
         if (nextAt != 0 && block.timestamp > nextAt) {
             return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
@@ -137,14 +143,25 @@ contract CashToken is ICash {
      * Section: ERC20 Interface
      */
 
+    /**
+     * @notice Returns the amount of tokens in existence.
+     */
     function totalSupply() external view override returns (uint) {
         return totalCashPrincipal * getCashIndex() / indexBaseUnit;
     }
 
+    /**
+     * @notice Returns the amount of tokens owned by `account`.
+     */
     function balanceOf(address account) view external override returns (uint) {
         return cashPrincipal[account] * getCashIndex() / indexBaseUnit;
     }
 
+    /**
+     * @notice Moves `amount` tokens from the caller's account to `recipient`.
+     * @return a boolean value indicating whether the operation succeeded.
+     * Emits a {Transfer} event.
+     */
     function transfer(address recipient, uint amount) external override returns (bool) {
         require(msg.sender != recipient, "Invalid recipient");
         uint128 principal = amountToPrincipal(amount);
@@ -154,16 +171,44 @@ contract CashToken is ICash {
         return true;
     }
 
+     /**
+     * @notice Returns the remaining number of tokens that `spender` will be
+     * allowed to spend on behalf of `owner` through {transferFrom}. This is
+     * zero by default.
+     *
+     * This value changes when {approve} or {transferFrom} are called.
+     */
     function allowance(address owner, address spender) external view override returns (uint256) {
         return allowances[owner][spender];
     }
 
+    /**
+     * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     * IMPORTANT: Beware that changing an allowance with this method brings the risk
+     * that someone may use both the old and the new allowance by unfortunate
+     * transaction ordering. One possible solution to mitigate this race
+     * condition is to first reduce the spender's allowance to 0 and set the
+     * desired value afterwards:
+     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+     *
+     * Emits an {Approval} event.
+     */
+     // XXX double check that issue won't occur in transferFrom
     function approve(address spender, uint amount) external override returns (bool) {
         allowances[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
+    /**
+     * @notice Moves `amount` tokens from `sender` to `recipient` using the
+     * allowance mechanism. `amount` is then deducted from the caller's
+     * allowance.
+     * @return a boolean value indicating whether the operation succeeded.
+     * Emits a {Transfer} event.
+     */
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
         require(sender != recipient, "Invalid recipient");
         address spender = msg.sender;
@@ -176,20 +221,23 @@ contract CashToken is ICash {
     }
 
     /**
-     * @dev Returns the name of the token.
+     * @notice Returns the name of the token.
      */
     function name() external pure returns (string memory) {
         return "SECRET, change";
     }
 
     /**
-     * @dev Returns the symbol of the token, usually a shorter version of the
+     * @notice Returns the symbol of the token, usually a shorter version of the
      * name.
      */
     function symbol() external pure returns (string memory) {
         return "SECRET";
     }
 
+    /**
+     * @notice Returns the number of decimals
+     */
     function decimals() external pure returns (uint8) {
         return 6;
     }
@@ -209,20 +257,24 @@ contract CashToken is ICash {
     // Note: Formula for continuos compounding interest -> A = Pe^rt,
     //       current_index = base_index * e^(yield * time_ellapsed)
     //       yield is in BPS, so 300 = 3% = 0.03
-    // TODO: check if it's really safe if time_elapsed > 1 day and yield is high
-    function calculateIndex(uint yield, uint index, uint startAt) public view returns (uint) {
-        return index * exponent(yield, block.timestamp - startAt) / 1e18;
+    // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
+    function calculateIndex(uint128 yield, uint128 index, uint startAt) public view returns (uint128) {
+        uint newIndex = index * exponent(yield, block.timestamp - startAt) / expBaseUnit;
+        require(newIndex < type(uint128).max, "calculateIndex::overflow");
+        return uint128(newIndex);
     }
 
     // Helper function to calculate e^rt part from countinous compounding interest formula
     // Note: We use the third degree approximation of Taylor Series
     //       1 + x/1! + x^2/2! + x^3/3!
-    // TODO: check if it's really safe if time_elapsed > 1 day and yield is high
-    function exponent(uint yield, uint time) public view returns (uint) {
-        uint epower = yield * time * 1e14 / SECONDS_PER_YEAR;
-        uint first = epower;
-        uint second = epower * epower / 2e18;
-        uint third = epower * epower * epower / 6e36;
-        return 1e18 + first + second + third;
+    // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
+    // XXX TODO add ranges for which it works
+    function exponent(uint128 yield, uint time) public view returns (uint) {
+        uint scale = expBaseUnit / bpsBaseUnit;
+        uint epower = yield * time * scale / SECONDS_PER_YEAR;
+        uint first = epower * expBaseUnit ** 2;
+        uint second = epower * epower * expBaseUnit / 2;
+        uint third = epower * epower * epower / 6;
+        return (expBaseUnit ** 3 + first + second + third) / expBaseUnit ** 2;
     }
 }

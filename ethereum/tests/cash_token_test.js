@@ -11,18 +11,20 @@ describe('CashToken', () => {
 
   // 1e18
   let start_cash_index = '1000000000000000000'
+  let startAt = fromNow(0)
 
   beforeEach(async () => {
-    cash = await deploy('CashToken', [admin, 0, start_cash_index, fromNow(0)], {from: root});
+    cash = await deploy('CashToken', [admin, 0, start_cash_index, startAt], {from: root});
   });
 
   describe('#constructor', () => {
-    // XXX TODO: Fix, better checks here
-    it.skip('should have correct references', async () => {
+    it('should have correct references', async () => {
       expect(await call(cash, 'admin')).toMatchAddress(admin);
-      cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
+      let cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
+      let cashYieldStartAt = await call(cash, 'cashYieldStartAt');
       expect(cashYieldAndIndex.index).toEqualNumber(1e18);
       expect(cashYieldAndIndex.yield).toEqualNumber(0);
+      expect(cashYieldStartAt).toEqualNumber(startAt);
     });
   });
 
@@ -280,36 +282,89 @@ describe('CashToken', () => {
     it('getCashIndex is growing over time', async() => {
       const blockNumber = await web3.eth.getBlockNumber();
       const block = await web3.eth.getBlock(blockNumber);
-      const nextYieldTimestamp = block.timestamp + 1 * 60;
+      const nextYieldTimestamp = block.timestamp;
 
-      // Set non-zero cash index
-      await send(cash, 'setFutureYield', [3000, start_cash_index, nextYieldTimestamp], { from: admin });
+      // Set non-zero cash yield
+      await send(cash, 'setFutureYield', [300, start_cash_index, nextYieldTimestamp], { from: admin });
 
+      // Cash index after 2 minutes
       await sendRPC(web3, "evm_increaseTime", [2 * 60]);
       await sendRPC(web3, "evm_mine", []);
 
       const cashIndex1 = await call(cash, 'getCashIndex');
+      // expect(cashIndex1).toEqualNumber('1000000114155257656');
 
       await sendRPC(web3, "evm_increaseTime", [10]);
       await sendRPC(web3, "evm_mine", []);
 
-      // Cash index after 10 seconds
+      // Cash index after 2 minutes + 10 seconds
       const cashIndex2 = await call(cash, 'getCashIndex');
+      // expect(cashIndex2).toEqualNumber('1000000123668196382');
       expect(cashIndex2).greaterThan(cashIndex1);
 
       await sendRPC(web3, "evm_increaseTime", [30 * 60]);
       await sendRPC(web3, "evm_mine", []);
 
-      // Cash index after 30 minutes
+      // Cash index after 2 minutes + 10 seconds + 30 minutes = 1930 seconds
       const cashIndex3 = await call(cash, 'getCashIndex');
+      // expect(cashIndex3).toEqualNumber('1000001835998641302');
       expect(cashIndex3).greaterThan(cashIndex2);
 
-      await sendRPC(web3, "evm_increaseTime", [24 * 60]);
+      await sendRPC(web3, "evm_increaseTime", [24 * 60 * 60]);
       await sendRPC(web3, "evm_mine", []);
 
-      // Cash index after 1 day
+      // Cash index after 2 minutes + 10 seconds + 30 minutes + 1 day = 88330 seconds
       const cashIndex4 = await call(cash, 'getCashIndex');
+      // expect(cashIndex4).toEqualNumber('1000084031308210378');
       expect(cashIndex4).greaterThan(cashIndex3);
     });
-  })
+
+    it('exponent helper function works', async() => {
+      // Exponent for 10 sec time difference
+      const seconds_per_year = 365 * 24 * 60 * 60;
+      const yield_bps = 300
+      const yield_percent = yield_bps / 1e4;
+
+      // Simple sanity check
+      const exp1 = await call(cash, 'exponent', [yield_bps, 10]);
+      expect(exp1).toEqualNumber('1000000009512937640');
+
+      let time_sec = 1;
+      let precision = 10;
+      while (time_sec <= seconds_per_year / 4) {
+        const exp = await call(cash, 'exponent', [yield_bps, time_sec]);
+        const exp_check = Math.exp(yield_percent * time_sec / seconds_per_year) * 1e18;
+        expect(exp).toBeWithinRange(exp_check - precision, exp_check + precision);
+        time_sec = time_sec * 10;
+        precision = precision * 10;
+      }
+    })
+
+    it('user cash balance is growing', async() => {
+      // Set non-zero cash yield
+      const blockNumber = await web3.eth.getBlockNumber();
+      const block = await web3.eth.getBlock(blockNumber);
+      const nextYieldTimestamp = block.timestamp;
+      await send(cash, 'setFutureYield', [300, start_cash_index, nextYieldTimestamp], { from: admin });
+
+      // Mint cash tokens
+      expect(await call(cash, 'totalSupply')).toEqualNumber(0);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(0);
+      const principal = 3e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
+
+      // Cash balance is growing
+      const balance1 = await call(cash, 'balanceOf', [account1]);
+      await sendRPC(web3, "evm_increaseTime", [30 * 60]);
+      await sendRPC(web3, "evm_mine", []);
+      const balance2 = await call(cash, 'balanceOf', [account1]);
+      await sendRPC(web3, "evm_increaseTime", [2 * 60 * 60]);
+      await sendRPC(web3, "evm_mine", []);
+      const balance3 = await call(cash, 'balanceOf', [account1]);
+
+      // Balance checks
+      expect(balance2).greaterThan(balance1);
+      expect(balance3).greaterThan(balance2);
+    });
+  });
 });
