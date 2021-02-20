@@ -42,7 +42,6 @@ trx-request = { path = '../../trx-request', default-features = false }
 our-std = { path = "../../std", default-features = false }
 parking_lot = "0.11.1"
 lazy_static = "1.4.0"
-either = { version = "1.6.1", default-features = false }
 
 [features]
 default = ['std']

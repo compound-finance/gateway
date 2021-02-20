@@ -2,12 +2,12 @@
 
 use crate::rpc;
 use compound_chain_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
+use pallet_cash;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
 use sc_service::{config::Configuration, error::Error as ServiceError, TaskManager};
 use std::sync::Arc;
 use std::time::Duration;
-use pallet_cash;
 
 type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
 type FullBackend = sc_service::TFullBackend<Block>;
@@ -64,9 +64,9 @@ pub fn new_partial(
         )));
     }
     let inherent_data_providers = sp_inherents::InherentDataProviders::new();
-        inherent_data_providers
-            .register_provider(pallet_cash::internal::miner::InherentDataProvider)
-            .expect("Failed to register miner data provider");
+    inherent_data_providers
+        .register_provider(pallet_cash::internal::miner::InherentDataProvider)
+        .expect("Failed to register miner data provider");
 
     let (client, backend, keystore_container, task_manager) =
         sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;

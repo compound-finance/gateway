@@ -22,11 +22,13 @@ use crate::reason::Reason;
 use crate::symbol::Ticker;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, Bips, CashIndex, CashPrincipal,
-    CodeHash, EncodedNotice, LiquidityFactor, Nonce, ReporterSet, SessionIndex, Timestamp,
-    ValidatorKeys, ValidatorSig,
+    CashPrincipalAmount, CodeHash, EncodedNotice, LiquidityFactor, Nonce, ReporterSet,
+    SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
 };
 use codec::alloc::string::String;
-use frame_support::{decl_event, decl_module, decl_storage, dispatch, Parameter, weights::DispatchClass};
+use frame_support::{
+    decl_event, decl_module, decl_storage, dispatch, weights::DispatchClass, Parameter,
+};
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{str, vec::Vec};
 use sp_core::crypto::AccountId32;
@@ -127,10 +129,10 @@ decl_storage! {
         SupplyIndices get(fn supply_index): map hasher(blake2_128_concat) ChainAsset => AssetIndex;
 
         /// The total CASH principal held per chain.
-        ChainCashPrincipals get(fn chain_cash_principal): map hasher(blake2_128_concat) ChainId => CashPrincipal;
+        ChainCashPrincipals get(fn chain_cash_principal): map hasher(blake2_128_concat) ChainId => CashPrincipalAmount;
 
         /// The total CASH principal in existence.
-        TotalCashPrincipal get(fn total_cash_principal): CashPrincipal;
+        TotalCashPrincipal get(fn total_cash_principal): CashPrincipalAmount;
 
         /// The total amount supplied per collateral asset.
         TotalSupplyAssets get(fn total_supply_asset): map hasher(blake2_128_concat) ChainAsset => AssetAmount;
@@ -189,8 +191,8 @@ decl_storage! {
         /// Miner of the current block.
         Miner get(fn miner): Option<ChainAccount>;
 
-        /// Validator spread due to miner of last block
-        LastMinerSpreadPrincipal get(fn last_miner_spread_principal): CashPrincipal;
+        /// Validator spread due to miner of last block.
+        LastMinerSharePrincipal get(fn last_miner_share_principal): CashPrincipalAmount;
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
@@ -288,7 +290,7 @@ decl_module! {
         /// Called by substrate on block initialization.
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
-            match core::on_initialize_core::<T>() {
+            match core::on_initialize::<T>() {
                 Ok(weight) => weight,
                 Err(err) => {
                     // This should never happen...
@@ -456,19 +458,17 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::set_miner(_miner) => {
-                ValidTransaction::with_tag_prefix("CashPallet")
-                    .longevity(10)
-                    .propagate(true)
-                    .build()
-            },
+            Call::set_miner(_miner) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .propagate(true)
+                .build(),
             Call::receive_event(_event_id, _event, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
                     .and_provides(signature)
                     .propagate(true)
                     .build()
-            },
+            }
             Call::exec_trx_request(request, signature, nonce) => {
                 let signer_res = signature.recover_account(
                     &internal::exec_trx_request::prepend_nonce(request, *nonce)[..],
@@ -489,7 +489,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                         .propagate(true)
                         .build(),
                 }
-            },
+            }
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)

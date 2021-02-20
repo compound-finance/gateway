@@ -20,18 +20,16 @@ pub enum SetYieldNextError {
 }
 
 fn get_cash_yield_index_after<T: Config>(change_in_time: Timestamp) -> Result<CashIndex, Reason> {
-    let cash_yield: APR = CashYield::get();
-    let cash_index_old: CashIndex = GlobalCashIndex::get();
-
-    let increment = cash_yield.over_time(change_in_time)?;
-
+    let cash_yield = CashYield::get();
+    let cash_index_old = GlobalCashIndex::get();
+    let increment = cash_yield.compound(change_in_time)?;
     cash_index_old
         .increment(increment)
         .map_err(Reason::MathError)
 }
 
 pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Result<(), Reason> {
-    let now: Timestamp = get_now::<T>();
+    let now = get_now::<T>();
     let change_in_time = next_apr_start
         .checked_sub(now)
         .ok_or(Reason::TimeTravelNotAllowed)?;

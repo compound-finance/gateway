@@ -45,9 +45,10 @@ impl APR {
         APR(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 
-    /// exp{r * dt} where dt is change in time in seconds
+    /// exp{r * dt} where dt is change in time in milliseconds
     // XXX why is this an index, should it be a CashIndexDelta or something?
-    pub fn over_time(self, dt: Timestamp) -> Result<CashIndex, MathError> {
+    //  actually why is this even related to CASH?
+    pub fn compound(self, dt: Timestamp) -> Result<CashIndex, MathError> {
         let index_scale = &BigInt::from(CashIndex::ONE.0);
         let scaled_rate: &BigInt =
             &(index_scale * self.0 * dt / MILLISECONDS_PER_YEAR / APR::ONE.0);
@@ -85,7 +86,7 @@ impl From<APR> for String {
     }
 }
 
-/// XXX rename this
+/// XXX rename this MinerShares: Factor
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct ReserveFactor(Uint);
@@ -657,7 +658,7 @@ mod test {
     }
 
     #[test]
-    fn test_over_time() {
+    fn test_compound() {
         let mut rates = vec!["0", "0.0001", "0.03", "0.1", "0.2"];
         // XXX should positively assert some failures here instead of commenting these out?
         // let months_per_year = 12;
@@ -680,10 +681,10 @@ mod test {
             for year_frac in year_fractions.iter() {
                 let r = APR::from_nominal(rate);
                 let dt = MILLISECONDS_PER_YEAR / year_frac;
-                let actual = match r.over_time(dt) {
+                let actual = match r.compound(dt) {
                     Ok(actual) => actual,
                     Err(e) => panic!(
-                        "Math error during over_time  r = {}, year_frac = {}, error = {:?}",
+                        "Math error during compound  r = {}, year_frac = {}, error = {:?}",
                         rate, year_frac, e
                     ),
                 };
