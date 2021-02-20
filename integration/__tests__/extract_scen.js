@@ -48,14 +48,20 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
       console.log(notice.Notice);
       console.log(notice.Notice.CashExtractionNotice);
       let signatures = await chain.getNoticeSignatures(notice);
+      log("zzgb0");
       expect(await cash.getCashPrincipal(ashley)).toEqual(0);
+      log("zzgb1");
       expect(await ashley.tokenBalance(cash)).toEqual(0);
+      log("zzgb2");
       let tx = await starport.invoke(notice, signatures);
+      log("zzgb3");
       log({tx});
       log(tx.events.UnlockCash);
       // expect(await cash.getCashPrincipal(ashley)).toEqual(5000);
       expect(await ashley.tokenBalance(cash)).toEqual(20);
+      log("zzgb4");
       expect(await ashley.chainBalance(cash)).toEqual(-20);
+      log("zzgb5");
     }
   },
   {
