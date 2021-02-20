@@ -606,6 +606,14 @@ pub fn extract_cash_internal<T: Config>(
         .try_into()
         .map_err(|_| MathError::SignMismatch)?; // XXX add type
 
+    log!(
+        "amount={:?}, principal={:?}, positive principal={:?}",
+        amount,
+        principal,
+        principal_positive
+    );
+    log!("checking min value against {:?}", MIN_TX_VALUE);
+
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
         has_liquidity_to_reduce_cash::<T>(holder, amount)?,

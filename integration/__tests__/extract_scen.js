@@ -54,8 +54,8 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
       log({tx});
       log(tx.events.UnlockCash);
       // expect(await cash.getCashPrincipal(ashley)).toEqual(5000);
-      expect(await ashley.tokenBalance(cash)).toEqual(20);
       expect(await ashley.chainBalance(cash)).toEqual(-20);
+      expect(await ashley.tokenBalance(cash)).toEqual(20);
     }
   },
   {
