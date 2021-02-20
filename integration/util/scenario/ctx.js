@@ -18,7 +18,7 @@ const { buildPrices } = require('./price');
 class Ctx {
   constructor(scenInfo) {
     this.scenInfo = scenInfo;
-    this.startTime = Math.floor(new Date() / 1000);
+    this.startTime = +new Date();
   }
 
   __startTime() {

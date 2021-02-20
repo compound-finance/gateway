@@ -1368,6 +1368,7 @@ pub fn on_initialize<T: Config>(
         BorrowIndices::insert(asset, new_borrow_index);
     }
 
+    log!("cash_index_old={:?}, change_in_time={:?}, increment={:?}, cash_index_new={:?}", cash_index_old, change_in_time, increment, cash_index_new);
     GlobalCashIndex::put(cash_index_new);
     TotalCashPrincipal::put(total_cash_principal_new);
     LastMinerSpreadPrincipal::put(miner_spread_principal);
