@@ -424,7 +424,7 @@ impl CashPrincipal {
 }
 
 /// Type for representing a multiplicative index on Compound Chain.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Debuggable)]
 pub struct CashIndex(pub Uint);
 
 impl CashIndex {

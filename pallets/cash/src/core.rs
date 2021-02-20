@@ -607,7 +607,8 @@ pub fn extract_cash_internal<T: Config>(
         .map_err(|_| MathError::SignMismatch)?; // XXX add type
 
     log!(
-        "amount={:?}, principal={:?}, positive principal={:?}",
+        "ZZGH index={:?} amount={:?}, principal={:?}, positive principal={:?}",
+        index,
         amount,
         principal,
         principal_positive
