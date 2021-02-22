@@ -126,8 +126,8 @@ pub fn receive_event<T: Config>(
 
     match EventStates::get(event_id) {
         EventState::Pending { signers } => {
-            // Add new validator to the signers
-            // If validator is already in the list, no change will apply
+            // Add new validator to the signers set
+            // Note: If validator is already in the signers set, no change will apply
             let mut signers_new = signers.clone();
             signers_new.insert(signer);
 
