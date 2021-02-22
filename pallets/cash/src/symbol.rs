@@ -77,7 +77,7 @@ pub struct Units {
 // Define units used directly by the chain itself
 
 /// Units for CASH.
-pub const CASH: Units = Units::from_ticker_str("CASH", 18);
+pub const CASH: Units = Units::from_ticker_str("CASH", 6);
 
 /// Units for USD.
 pub const USD: Units = Units::from_ticker_str("USD", 6);

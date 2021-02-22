@@ -16,23 +16,23 @@ use frame_support::storage::{
 use frame_support::traits::UnfilteredDispatchable;
 
 // Import these traits so we can interact with the substrate storage modules.
-use crate::symbol::USD;
 use crate::{
     chains::{ChainAccount, ChainAsset, ChainAssetAccount, ChainHash, ChainId},
     events::ChainLogEvent,
+    factor::Factor,
     internal, log,
     notices::{
         CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
     },
-    params::{MILLISECONDS_PER_YEAR, MIN_TX_VALUE, TRANSFER_FEE},
+    params::{MIN_TX_VALUE, TRANSFER_FEE},
     portfolio::Portfolio,
     rates::{Utilization, APR},
     reason::{MathError, Reason},
     symbol::{Units, CASH},
     types::{
-        AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, AssetQuantity, Balance,
-        CashIndex, CashPrincipal, CashPrincipalAmount, CashQuantity, Int, Price, Quantity,
-        Timestamp, USDQuantity, Uint, ValidatorIdentity,
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
+        CashPrincipal, CashPrincipalAmount, CashQuantity, Price, Quantity, Timestamp, USDQuantity,
+        ValidatorIdentity,
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
     CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
@@ -40,8 +40,6 @@ use crate::{
     NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets,
 };
-use num_bigint::BigUint;
-use num_traits::ToPrimitive;
 
 #[macro_export]
 macro_rules! require {
@@ -129,7 +127,7 @@ pub fn get_rates<T: Config>(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
     let utilization = get_utilization::<T>(asset)?;
     Ok(info
         .rate_model
-        .get_rates(utilization, APR::ZERO, info.reserve_factor)?)
+        .get_rates(utilization, APR::ZERO, info.miner_shares)?)
 }
 
 // Internal helpers
@@ -183,7 +181,7 @@ fn sub_amount_from_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> Result<AssetBalance, MathError> {
-    let signed = Int::try_from(amount.value).or(Err(MathError::Overflow))?;
+    let signed = AssetBalance::try_from(amount.value).or(Err(MathError::Overflow))?;
     Ok(balance.checked_sub(signed).ok_or(MathError::Underflow)?)
 }
 
@@ -416,7 +414,7 @@ pub fn lock_internal<T: Config>(
     )?;
 
     let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
-        asset.asset,
+        asset,
         holder,
         holder_asset,
         holder_asset_new,
@@ -492,7 +490,7 @@ pub fn extract_internal<T: Config>(
         add_amount_to_raw(TotalBorrowAssets::get(asset.asset), holder_borrow_amount)?;
 
     let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
-        asset.asset,
+        asset,
         holder,
         holder_asset,
         holder_asset_new,
@@ -638,7 +636,7 @@ pub fn transfer_internal<T: Config>(
     )?;
 
     let (sender_cash_principal_post, sender_last_index_post) = effect_of_asset_interest_internal(
-        asset.asset,
+        asset,
         sender,
         sender_asset,
         sender_asset_new,
@@ -646,7 +644,7 @@ pub fn transfer_internal<T: Config>(
     )?;
     let (recipient_cash_principal_post, recipient_last_index_post) =
         effect_of_asset_interest_internal(
-            asset.asset,
+            asset,
             recipient,
             recipient_asset,
             recipient_asset_new,
@@ -726,11 +724,18 @@ pub fn liquidate_internal<T: Config>(
     require!(asset != collateral_asset, Reason::InKindLiquidation);
     require_min_tx_value!(get_value::<T>(amount)?);
 
+    let liquidation_incentive = Factor::from_nominal("1.08"); // XXX spec first
     let liquidator_asset = AssetBalances::get(asset.asset, liquidator);
     let borrower_asset = AssetBalances::get(asset.asset, borrower);
     let liquidator_collateral_asset = AssetBalances::get(collateral_asset.asset, liquidator);
     let borrower_collateral_asset = AssetBalances::get(collateral_asset.asset, borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units())? / get_price::<T>(collateral_asset.units())?;
+    let seize_amount = amount
+        .mul_factor(liquidation_incentive)?
+        .mul_price(get_price::<T>(asset.units())?)?
+        .div_price(
+            get_price::<T>(collateral_asset.units())?,
+            collateral_asset.units(),
+        )?;
 
     require!(
         has_liquidity_to_reduce_asset_with_added_collateral::<T>(
@@ -788,7 +793,7 @@ pub fn liquidate_internal<T: Config>(
 
     let (borrower_cash_principal_post, borrower_last_index_post) =
         effect_of_asset_interest_internal(
-            asset.asset,
+            asset,
             borrower,
             borrower_asset,
             borrower_asset_new,
@@ -796,7 +801,7 @@ pub fn liquidate_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_last_index_post) =
         effect_of_asset_interest_internal(
-            asset.asset,
+            asset,
             liquidator,
             liquidator_asset,
             liquidator_asset_new,
@@ -804,7 +809,7 @@ pub fn liquidate_internal<T: Config>(
         )?;
     let (borrower_cash_principal_post, borrower_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset.asset,
+            collateral_asset,
             borrower,
             borrower_collateral_asset,
             borrower_collateral_asset_new,
@@ -812,7 +817,7 @@ pub fn liquidate_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset.asset,
+            collateral_asset,
             liquidator,
             liquidator_collateral_asset,
             liquidator_collateral_asset_new,
@@ -866,11 +871,18 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     require!(borrower != liquidator, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
 
+    let liquidation_incentive = Factor::from_nominal("1.08"); // XXX spec first
     let liquidator_cash_principal = CashPrincipals::get(liquidator);
     let borrower_cash_principal = CashPrincipals::get(borrower);
     let liquidator_collateral_asset = AssetBalances::get(collateral_asset.asset, liquidator);
     let borrower_collateral_asset = AssetBalances::get(collateral_asset.asset, borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(CASH)? / get_price::<T>(collateral_asset.units())?;
+    let seize_amount = amount
+        .mul_factor(liquidation_incentive)?
+        .mul_price(get_price::<T>(CASH)?)?
+        .div_price(
+            get_price::<T>(collateral_asset.units())?,
+            collateral_asset.units(),
+        )?;
 
     require!(
         has_liquidity_to_reduce_cash_with_added_collateral::<T>(
@@ -919,7 +931,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
 
     let (borrower_cash_principal_post, borrower_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset.asset,
+            collateral_asset,
             borrower,
             borrower_collateral_asset,
             borrower_collateral_asset_new,
@@ -927,7 +939,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_collateral_last_index_post) =
         effect_of_asset_interest_internal(
-            collateral_asset.asset,
+            collateral_asset,
             liquidator,
             liquidator_collateral_asset,
             liquidator_collateral_asset_new,
@@ -975,11 +987,15 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     require!(borrower != liquidator, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
 
+    let liquidation_incentive = Factor::from_nominal("1.08"); // XXX spec first
     let liquidator_asset = AssetBalances::get(asset.asset, liquidator);
     let borrower_asset = AssetBalances::get(asset.asset, borrower);
     let liquidator_cash_principal = CashPrincipals::get(liquidator);
     let borrower_cash_principal = CashPrincipals::get(borrower);
-    let seize_amount = amount; // XXX * liquidation_incentive * get_price::<T>(asset.units())? / get_price::<T>(CASH)?;
+    let seize_amount = amount
+        .mul_factor(liquidation_incentive)?
+        .mul_price(get_price::<T>(asset.units())?)?
+        .div_price(get_price::<T>(CASH)?, CASH)?;
     let seize_principal = index.cash_principal_amount(seize_amount)?;
 
     require!(
@@ -1030,7 +1046,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
 
     let (borrower_cash_principal_post, borrower_last_index_post) =
         effect_of_asset_interest_internal(
-            asset.asset,
+            asset,
             borrower,
             borrower_asset,
             borrower_asset_new,
@@ -1038,7 +1054,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
         )?;
     let (liquidator_cash_principal_post, liquidator_last_index_post) =
         effect_of_asset_interest_internal(
-            asset.asset,
+            asset,
             liquidator,
             liquidator_asset,
             liquidator_asset_new,
@@ -1142,40 +1158,46 @@ pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
 }
 
 /// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
-pub fn get_cash_principal_with_asset_interest(
+pub fn get_cash_principal_with_asset_interest<T: Config>(
     account: ChainAccount,
 ) -> Result<CashPrincipal, Reason> {
     let mut principal = CashPrincipals::get(account);
     for (asset, _) in AssetsWithNonZeroBalance::iter_prefix(account) {
+        let asset_info = get_asset::<T>(asset)?;
         let balance = AssetBalances::get(asset, account);
         (principal, _) =
-            effect_of_asset_interest_internal(asset, account, balance, balance, principal)?;
+            effect_of_asset_interest_internal(asset_info, account, balance, balance, principal)?;
     }
     Ok(principal)
 }
 
 /// Calculates the current total CASH value of the account, including all interest from non-CASH markets.
-pub fn get_cash_balance_with_asset_interest(account: ChainAccount) -> Result<Balance, Reason> {
-    Ok(GlobalCashIndex::get().cash_balance(get_cash_principal_with_asset_interest(account)?)?)
+pub fn get_cash_balance_with_asset_interest<T: Config>(
+    account: ChainAccount,
+) -> Result<Balance, Reason> {
+    Ok(GlobalCashIndex::get()
+        .cash_balance(get_cash_principal_with_asset_interest::<T>(account)?)?)
 }
 
 // Asset Interest //
 
 /// Return CASH Principal post asset interest, and updated asset index, for a given account
 pub fn effect_of_asset_interest_internal(
-    asset: ChainAsset,
+    asset_info: AssetInfo,
     account: ChainAccount,
     asset_balance_old: AssetBalance,
     asset_balance_new: AssetBalance,
     cash_principal_pre: CashPrincipal,
 ) -> Result<(CashPrincipal, AssetIndex), MathError> {
+    let asset = asset_info.asset;
     let last_index = LastIndices::get(asset, account);
     let cash_index = if asset_balance_old >= 0 {
         SupplyIndices::get(asset)
     } else {
         BorrowIndices::get(asset)
     };
-    let cash_principal_delta = cash_index.cash_principal_since(last_index, asset_balance_old)?;
+    let balance_old = asset_info.as_balance(asset_balance_old);
+    let cash_principal_delta = cash_index.cash_principal_since(last_index, balance_old)?;
     let cash_principal_post = cash_principal_pre.add(cash_principal_delta)?;
     let last_index_post = if asset_balance_new >= 0 {
         SupplyIndices::get(asset)
@@ -1186,27 +1208,6 @@ pub fn effect_of_asset_interest_internal(
 }
 
 // Dispatch Extrinsic Lifecycle //
-
-/// Compute the amount of CASH principal per unit of asset,
-///  given the rate, cash index, prices, and length of time (ms).
-pub fn compute_cash_principal_per(
-    rate: APR,
-    dt: Timestamp,
-    cash_index: CashIndex,
-    price_asset: Price,
-    price_cash: Price,
-) -> Result<CashPrincipalAmount, Reason> {
-    //  XXX prob want per unit asset not wei (type CashPrincipalPerAsset = AssetIndex?)
-    let raw = BigUint::from(AssetIndex::ONE.0) * rate.0 * dt * price_asset.value * CashIndex::ONE.0
-        / cash_index.0
-        / price_cash.value
-        / MILLISECONDS_PER_YEAR
-        / APR::ONE.0;
-    let raw = raw
-        .to_u128() // XXX hold up
-        .ok_or(MathError::Overflow)?;
-    Ok(CashPrincipalAmount(raw))
-}
 
 /// Block initialization wrapper.
 // XXX we need to be able to mock Now (then get rid of this?)
@@ -1232,38 +1233,39 @@ pub fn on_initialize_internal<T: Config>(
         return Ok(0);
     }
 
+    // Iterate through listed assets, summing the CASH principal they generated/paid last block
     let dt = now
         .checked_sub(last_yield_timestamp)
         .ok_or(Reason::TimeTravelNotAllowed)?;
     let mut cash_principal_supply_increase = CashPrincipalAmount::ZERO;
     let mut cash_principal_borrow_increase = CashPrincipalAmount::ZERO;
 
-    // Iterate through listed assets, adding the CASH principal they generated/paid last block
-    let price_cash = get_price::<T>(CASH)?;
     let cash_index = GlobalCashIndex::get();
     let cash_yield = CashYield::get();
+    let price_cash = get_price::<T>(CASH)?;
 
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     for (asset, asset_info) in SupportedAssets::iter() {
         let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
         let asset_units = asset_info.units();
         let price_asset = get_price::<T>(asset_units)?;
-        let cash_borrow_principal_per =
-            compute_cash_principal_per(asset_cost, dt, cash_index, price_asset, price_cash)?;
-        let cash_hold_principal_per =
-            compute_cash_principal_per(asset_yield, dt, cash_index, price_asset, price_cash)?;
+        let price_ratio = price_asset.ratio(price_cash)?;
+        let cash_borrow_principal_per_asset =
+            cash_index.cash_principal_per_asset(asset_cost.simple(dt)?, price_ratio)?;
+        let cash_hold_principal_per_asset =
+            cash_index.cash_principal_per_asset(asset_yield.simple(dt)?, price_ratio)?;
 
         let supply_index = SupplyIndices::get(&asset);
         let borrow_index = BorrowIndices::get(&asset);
-        let supply_index_new = supply_index.increment(cash_hold_principal_per)?;
-        let borrow_index_new = borrow_index.increment(cash_borrow_principal_per)?;
+        let supply_index_new = supply_index.increment(cash_hold_principal_per_asset)?;
+        let borrow_index_new = borrow_index.increment(cash_borrow_principal_per_asset)?;
 
         let supply_asset = Quantity::new(TotalSupplyAssets::get(asset), asset_units);
         let borrow_asset = Quantity::new(TotalBorrowAssets::get(asset), asset_units);
         cash_principal_supply_increase = cash_principal_supply_increase
-            .add(supply_asset.mul_cash_principal_per(cash_hold_principal_per)?)?;
+            .add(cash_hold_principal_per_asset.cash_principal_amount(supply_asset)?)?;
         cash_principal_borrow_increase = cash_principal_borrow_increase
-            .add(borrow_asset.mul_cash_principal_per(cash_borrow_principal_per)?)?;
+            .add(cash_borrow_principal_per_asset.cash_principal_amount(borrow_asset)?)?;
 
         asset_updates.push((asset.clone(), supply_index_new, borrow_index_new));
     }
@@ -1323,7 +1325,7 @@ pub fn on_initialize_internal<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{chains::*, mock::*, rates::*, symbol::*, tests::*, types::*};
+    use crate::{chains::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*};
 
     #[test]
     fn test_helpers() {
@@ -1672,23 +1674,25 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_cash_principal_per() {
+    fn test_compute_cash_principal_per() -> Result<(), Reason> {
         // round numbers (unrealistic but very easy to check)
         let asset_rate = APR::from_nominal("0.30"); // 30% per year
         let dt = MILLISECONDS_PER_YEAR / 2; // for 6 months
         let cash_index = CashIndex::from_nominal("1.5"); // current index value 1.5
         let price_asset = Price::from_nominal(CASH.ticker, "1500"); // $1,500
         let price_cash = Price::from_nominal(CASH.ticker, "1");
+        let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual =
-            compute_cash_principal_per(asset_rate, dt, cash_index, price_asset, price_cash)
-                .unwrap();
-        let expected = CashPrincipalAmount::from_nominal("150"); // from hand calc
+        let actual = cash_index
+            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
+            .unwrap();
+        let expected = CashPrincipalPerAsset::from_nominal("150"); // from hand calc
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_cash_principal_per_specific_case() {
+    fn test_compute_cash_principal_per_specific_case() -> Result<(), Reason> {
         // a unit test related to previous unexpected larger scope test of on_initialize
         // this showed that we should divide by SECONDS_PER_YEAR last te prevent un-necessary truncation
         let asset_rate = APR::from_nominal("0.1225");
@@ -1696,16 +1700,18 @@ mod tests {
         let cash_index = CashIndex::from_nominal("1.123");
         let price_asset = Price::from_nominal(CASH.ticker, "1450");
         let price_cash = Price::from_nominal(CASH.ticker, "1");
+        let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual =
-            compute_cash_principal_per(asset_rate, dt, cash_index, price_asset, price_cash)
-                .unwrap();
-        let expected = CashPrincipalAmount::from_nominal("39.542520035618878005"); // from hand calc
+        let actual = cash_index
+            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
+            .unwrap();
+        let expected = CashPrincipalPerAsset::from_nominal("39.542520035618878005"); // from hand calc
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_cash_principal_per_realistic_underflow_case() {
+    fn test_compute_cash_principal_per_realistic_underflow_case() -> Result<(), Reason> {
         // a unit test related to previous unexpected larger scope test of on_initialize
         // This case showed that we should have more decimals on CASH token to avoid 0 interest
         // showing for common cases. We want "number go up" technology.
@@ -1714,12 +1720,14 @@ mod tests {
         let cash_index = CashIndex::from_nominal("4.629065392511782467");
         let price_asset = Price::from_nominal(CASH.ticker, "0.313242");
         let price_cash = Price::from_nominal(CASH.ticker, "1");
+        let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual =
-            compute_cash_principal_per(asset_rate, dt, cash_index, price_asset, price_cash)
-                .unwrap();
-        let expected = CashPrincipalAmount::from_nominal("0.000000002008426366"); // from hand calc
+        let actual = cash_index
+            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
+            .unwrap();
+        let expected = CashPrincipalPerAsset::from_nominal("0.000000002008426366"); // from hand calc
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
@@ -1742,7 +1750,7 @@ mod tests {
             let asset = eth_asset();
             let asset_info = AssetInfo {
                 rate_model: InterestRateModel::new_kink(0, kink_rate, 5000, 202),
-                reserve_factor: ReserveFactor::from_nominal("0.5"),
+                miner_shares: MinerShares::from_nominal("0.5"),
                 ..AssetInfo::minimal(asset, ETH).unwrap()
             };
 
@@ -1768,7 +1776,7 @@ mod tests {
             let asset = eth_asset();
             let asset_info = AssetInfo {
                 rate_model: InterestRateModel::new_kink(0, 2500, 5000, 5000),
-                reserve_factor: ReserveFactor::from_nominal("0.02"),
+                miner_shares: MinerShares::from_nominal("0.02"),
                 ..AssetInfo::minimal(asset, ETH).unwrap()
             };
             // XXX how to inject now / last yield timestamp?
@@ -1806,11 +1814,11 @@ mod tests {
             );
             assert_eq!(
                 TotalCashPrincipal::get(),
-                CashPrincipalAmount::from_nominal("462104.853072128227960800")
+                CashPrincipalAmount::from_nominal("462104.853072")
             );
             assert_eq!(
                 CashPrincipals::get(&miner),
-                CashPrincipal::from_nominal("1.000000000000000000")
+                CashPrincipal::from_nominal("1.000000")
             );
             // Run again to set miner true principal
             assert_eq!(
@@ -1819,7 +1827,7 @@ mod tests {
             );
             assert_eq!(
                 CashPrincipals::get(&miner),
-                CashPrincipal::from_nominal("243.097061442564559300")
+                CashPrincipal::from_nominal("243.097062")
             );
         });
     }
