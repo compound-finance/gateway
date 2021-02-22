@@ -48,12 +48,12 @@ pub enum Reason {
     RatesError(RatesError),
     RepayTooMuch,
     SelfTransfer,
+    SetYieldNextError(SetYieldNextError),
     SignatureAccountMismatch,
     SignatureMismatch,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
-    SetYieldNextError(SetYieldNextError),
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
