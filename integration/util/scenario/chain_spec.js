@@ -48,7 +48,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         full_rate: 2000
       }
     },
-    reserve_factor: 1000,
+    miner_shares: 1000,
     supply_cap: 0
   }));
 

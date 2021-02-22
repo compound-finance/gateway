@@ -6,13 +6,12 @@ use our_std::{
 
 use crate::{
     chains::{Chain, ChainAsset, Ethereum},
-    rates::{InterestRateModel, ReserveFactor},
+    factor::{BigInt, BigUint, Factor},
+    rates::InterestRateModel,
     reason::{MathError, Reason},
     symbol::{static_pow10, Symbol, Ticker, Units, CASH, USD},
     SubstrateId,
 };
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 
 // Type aliases //
 
@@ -49,14 +48,20 @@ pub type AssetBalance = Int;
 /// Type for representing a price, potentially for any symbol.
 pub type AssetPrice = Uint;
 
-/// Type for representing an amount of a specific asset.
+/// Type for representing an amount of an asset, together with its units.
 pub type AssetQuantity = Quantity;
 
-/// Type for representing an amount of CASH.
+/// Type for representing a quantity of CASH.
 pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 
-/// Type for representing an amount of USD.
+/// Type for representing a quantity of USD.
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
+
+/// Type for a market's liquidity factor.
+pub type LiquidityFactor = Factor;
+
+/// Type for the miner shares portion of interest going to miners.
+pub type MinerShares = Factor;
 
 /// Type for a code hash.
 pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
@@ -112,51 +117,6 @@ pub enum CashOrChainAsset {
     ChainAsset(ChainAsset),
 }
 
-/// LiquidityFactor for a given market.
-#[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct LiquidityFactor(pub Uint);
-
-impl From<Uint> for LiquidityFactor {
-    fn from(x: u128) -> Self {
-        LiquidityFactor(x)
-    }
-}
-
-impl LiquidityFactor {
-    pub const DECIMALS: Decimals = 4;
-    pub const ZERO: LiquidityFactor = LiquidityFactor::from_nominal("0");
-    pub const ONE: LiquidityFactor = LiquidityFactor::from_nominal("1");
-
-    /// Get a liquidity factor from a string.
-    /// Only for use in const contexts.
-    pub const fn from_nominal(s: &'static str) -> Self {
-        LiquidityFactor(uint_from_string_with_decimals(Self::DECIMALS, s))
-    }
-}
-
-impl Default for LiquidityFactor {
-    fn default() -> Self {
-        LiquidityFactor::ZERO
-    }
-}
-
-impl our_std::str::FromStr for LiquidityFactor {
-    type Err = Reason;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        Ok(LiquidityFactor(
-            u128::from_str(string).map_err(|_| Reason::InvalidLiquidityFactor)?,
-        ))
-    }
-}
-
-impl From<LiquidityFactor> for String {
-    fn from(string: LiquidityFactor) -> Self {
-        format!("{}", string.0)
-    }
-}
-
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -165,7 +125,7 @@ pub struct AssetInfo {
     pub decimals: Decimals,
     pub liquidity_factor: LiquidityFactor,
     pub rate_model: InterestRateModel,
-    pub reserve_factor: ReserveFactor,
+    pub miner_shares: MinerShares,
     pub supply_cap: AssetAmount,
     pub symbol: Symbol,
     pub ticker: Ticker,
@@ -178,7 +138,7 @@ impl AssetInfo {
             decimals: units.decimals,
             liquidity_factor: LiquidityFactor::default(),
             rate_model: InterestRateModel::default(),
-            reserve_factor: ReserveFactor::default(),
+            miner_shares: MinerShares::default(),
             supply_cap: AssetAmount::default(),
             symbol: Symbol(units.ticker.0),
             ticker: units.ticker,
@@ -228,6 +188,15 @@ impl Price {
     /// Only for use in const contexts.
     pub const fn from_nominal(ticker: Ticker, s: &'static str) -> Self {
         Price::new(ticker, uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+
+    /// Take a ratio of prices.
+    // If we generalized prices over the quote type, this would probably be:
+    //  Price<A, Q> / P<B, Q> -> Price<A, B>
+    // But we don't need generalize prices, just enough Decimals, so we have:
+    //  Price<A, { USD }> / Price<B, { USD }> -> Factor(B per A)
+    pub fn ratio(self, rhs: Price) -> Result<Factor, MathError> {
+        Factor::from_fraction(self.value, rhs.value)
     }
 }
 
@@ -312,15 +281,24 @@ impl Quantity {
         Ok(Quantity::new(result as AssetAmount, units))
     }
 
-    // Quantity<U> * (CashPrincipal / Quantity<U>) -> CashPrincipal
-    pub fn mul_cash_principal_per(self, per: CashPrincipal) -> Result<CashPrincipal, MathError> {
-        let self_scale = 10u128.pow(self.units.decimals as u32);
-        let raw: BigInt = BigInt::from(self.value) * per.0 / self_scale;
-        if let Some(raw) = raw.to_i128() {
-            Ok(CashPrincipal(raw))
-        } else {
-            return Err(MathError::Overflow);
-        }
+    // Quantity<U> * Factor -> Quantity<U>
+    pub fn mul_factor(self, factor: Factor) -> Result<Quantity, MathError> {
+        Ok(Quantity::new(
+            BigUint::from_uint(self.value)
+                .mul_decimal(factor.0, Factor::DECIMALS)
+                .to_uint()?,
+            self.units,
+        ))
+    }
+
+    // Quantity<U> / Factor -> Quantity<U>
+    pub fn div_factor(self, factor: Factor) -> Result<Quantity, MathError> {
+        Ok(Quantity::new(
+            BigUint::from_uint(self.value)
+                .div_decimal(factor.0, Factor::DECIMALS)?
+                .to_uint()?,
+            self.units,
+        ))
     }
 }
 
@@ -395,16 +373,16 @@ impl Balance {
     }
 }
 
-/// Type for representing an amount of CASH Principal.
+/// Type for representing a balance of CASH Principal.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
-pub struct CashPrincipal(pub Int);
+pub struct CashPrincipal(pub AssetBalance);
 
 impl CashPrincipal {
     pub const DECIMALS: Decimals = CASH.decimals;
     pub const ZERO: CashPrincipal = CashPrincipal(0);
     pub const ONE: CashPrincipal = CashPrincipal::from_nominal("1");
 
-    /// Get a CASH index from a string.
+    /// Get a CASH principal balance from a string.
     /// Only for use in const contexts.
     pub const fn from_nominal(s: &'static str) -> Self {
         CashPrincipal(int_from_string_with_decimals(Self::DECIMALS, s))
@@ -421,14 +399,68 @@ impl CashPrincipal {
             self.0.checked_sub(rhs.0).ok_or(MathError::Underflow)?,
         ))
     }
+
+    pub fn add_amount(self, amount: CashPrincipalAmount) -> Result<Self, MathError> {
+        let signed = AssetBalance::try_from(amount.0).or(Err(MathError::Overflow))?;
+        self.add(CashPrincipal(signed))
+    }
+
+    pub fn sub_amount(self, amount: CashPrincipalAmount) -> Result<Self, MathError> {
+        let signed = AssetBalance::try_from(amount.0).or(Err(MathError::Overflow))?;
+        self.sub(CashPrincipal(signed))
+    }
+
+    pub fn amount_withdrawable(self) -> Result<CashPrincipalAmount, MathError> {
+        if self.0 > 0 {
+            Ok(CashPrincipalAmount(self.0 as AssetAmount))
+        } else {
+            Ok(CashPrincipalAmount(0))
+        }
+    }
+
+    pub fn amount_repayable(self) -> Result<CashPrincipalAmount, MathError> {
+        if self.0 < 0 {
+            Ok(CashPrincipalAmount(-self.0 as AssetAmount))
+        } else {
+            Ok(CashPrincipalAmount(0))
+        }
+    }
+}
+
+/// Type for representing an amount of CASH Principal.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+pub struct CashPrincipalAmount(pub AssetAmount);
+
+impl CashPrincipalAmount {
+    pub const DECIMALS: Decimals = CashPrincipal::DECIMALS;
+    pub const ZERO: CashPrincipalAmount = CashPrincipalAmount(0);
+
+    /// Get a CASH principal amount from a string.
+    /// Only for use in const contexts.
+    pub const fn from_nominal(s: &'static str) -> Self {
+        CashPrincipalAmount(uint_from_string_with_decimals(Self::DECIMALS, s))
+    }
+
+    pub fn add(self: Self, rhs: Self) -> Result<Self, MathError> {
+        Ok(CashPrincipalAmount(
+            self.0.checked_add(rhs.0).ok_or(MathError::Overflow)?,
+        ))
+    }
+
+    pub fn sub(self, rhs: Self) -> Result<Self, MathError> {
+        Ok(CashPrincipalAmount(
+            self.0.checked_sub(rhs.0).ok_or(MathError::Underflow)?,
+        ))
+    }
 }
 
 /// Type for representing a multiplicative index on Compound Chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct CashIndex(pub Uint);
+pub type CashPerCashPrincipal = CashIndex;
 
 impl CashIndex {
-    pub const DECIMALS: Decimals = 18;
+    pub const DECIMALS: Decimals = Factor::DECIMALS;
     pub const ONE: CashIndex = CashIndex(static_pow10(Self::DECIMALS));
 
     /// Get a CASH index from a string.
@@ -438,70 +470,68 @@ impl CashIndex {
     }
 
     // CashPrincipal * CashIndex -> Balance<{ CASH }>
-    pub fn as_balance(self, rhs: CashPrincipal) -> Result<Balance, MathError> {
-        let result = rhs
-            .0
-            .checked_mul(self.0.try_into().map_err(|_| MathError::Overflow)?)
-            .ok_or(MathError::Overflow)?;
-        Ok(Balance::new(result / (CashIndex::ONE.0 as Int), CASH))
-    }
-
-    // CashPrincipal(-) * CashIndex -> Quantity<{ CASH }>
-    pub fn as_debt_amount(self, rhs: CashPrincipal) -> Result<Quantity, MathError> {
-        if rhs.0 <= 0 {
-            let result = ((-rhs.0) as AssetAmount)
-                .checked_mul(self.0)
-                .ok_or(MathError::Overflow)?;
-            Ok(Quantity::new(result / CashIndex::ONE.0, CASH))
-        } else {
-            Err(MathError::SignMismatch)
-        }
+    pub fn cash_balance(self, principal: CashPrincipal) -> Result<Balance, MathError> {
+        Ok(Balance::new(
+            BigInt::from_uint(self.0)
+                .mul_decimal(principal.0, CashPrincipal::DECIMALS)
+                .convert(Self::DECIMALS, CASH.decimals)
+                .to_int()?,
+            CASH,
+        ))
     }
 
     // CashPrincipal(+) * CashIndex -> Quantity<{ CASH }>
-    pub fn as_hold_amount(self, rhs: CashPrincipal) -> Result<Quantity, MathError> {
-        if rhs.0 >= 0 {
-            let result = (rhs.0 as AssetAmount)
-                .checked_mul(self.0)
-                .ok_or(MathError::Overflow)?;
-            Ok(Quantity::new(result / CashIndex::ONE.0, CASH))
-        } else {
-            Err(MathError::SignMismatch)
-        }
-    }
-
-    // Quantity<{ CASH }> / CashIndex -> CashPrincipal(-)
-    pub fn as_debt_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
-        let amount = rhs
-            .value
-            .checked_div(self.0)
-            .ok_or(MathError::DivisionByZero)?;
-        let signed = -Int::try_from(amount).or(Err(MathError::Overflow))?;
-        Ok(CashPrincipal(signed))
+    pub fn cash_quantity(
+        self,
+        principal_amount: CashPrincipalAmount,
+    ) -> Result<Quantity, MathError> {
+        Ok(Quantity::new(
+            BigUint::from_uint(self.0)
+                .mul_decimal(principal_amount.0, CashPrincipal::DECIMALS)
+                .convert(Self::DECIMALS, CASH.decimals)
+                .to_uint()?,
+            CASH,
+        ))
     }
 
     // Quantity<{ CASH }> / CashIndex -> CashPrincipal(+)
-    pub fn as_hold_principal(self, rhs: Quantity) -> Result<CashPrincipal, MathError> {
-        let amount = rhs
-            .value
-            .checked_div(self.0)
-            .ok_or(MathError::DivisionByZero)?;
-        let signed = Int::try_from(amount).or(Err(MathError::Overflow))?;
-        Ok(CashPrincipal(signed))
+    pub fn cash_principal_amount(
+        self,
+        quantity: Quantity,
+    ) -> Result<CashPrincipalAmount, MathError> {
+        Ok(CashPrincipalAmount(
+            BigUint::from_uint(Self::ONE.0)
+                .mul_decimal(quantity.value, quantity.units.decimals)
+                .div_decimal(self.0, Self::DECIMALS)?
+                .convert(Self::DECIMALS, CashPrincipalAmount::DECIMALS)
+                .to_uint()?,
+        ))
     }
 
-    /// Push the index forward by an index increment, multiplicative in the case of CashIndex
-    /// New index = Old index * increment
-    // XXX why is increment also an index? I think this should be its own type?
-    pub fn increment(self, rhs: CashIndex) -> Result<CashIndex, MathError> {
-        let raw = self
-            .0
-            .checked_mul(rhs.0)
-            .ok_or(MathError::Overflow)?
-            .checked_div(Self::ONE.0)
-            .ok_or(MathError::DivisionByZero)?;
+    /// Compute the amount of CASH principal per unit of asset,
+    ///  given the rate, CASH index, prices, and length of time (ms).
+    // Factor(rate*dt) * Factor(price_asset/price_cash) / CashIndex -> AssetIndex
+    pub fn cash_principal_per_asset(
+        self,
+        multiplier: Factor,
+        cash_per_asset: Factor,
+    ) -> Result<CashPrincipalPerAsset, Reason> {
+        Ok(AssetIndex(
+            multiplier
+                .mul(cash_per_asset)
+                .div_decimal(self.0, Self::DECIMALS)?
+                .convert(Factor::DECIMALS, CashPrincipalPerAsset::DECIMALS)
+                .to_uint()?,
+        ))
+    }
 
-        Ok(CashIndex(raw))
+    /// Multiply the index by the increase in cash per cash principal.
+    pub fn increment(self, rhs: CashPerCashPrincipal) -> Result<Self, MathError> {
+        Ok(CashIndex(
+            BigUint::from_uint(self.0)
+                .mul_decimal(rhs.0, CashPerCashPrincipal::DECIMALS)
+                .to_uint()?,
+        ))
     }
 }
 
@@ -523,9 +553,10 @@ where
 /// Type for representing the additive asset indices.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct AssetIndex(pub Uint);
+pub type CashPrincipalPerAsset = AssetIndex;
 
 impl AssetIndex {
-    pub const DECIMALS: Decimals = CashPrincipal::DECIMALS; // Note: decimals must match
+    pub const DECIMALS: Decimals = Factor::DECIMALS;
     pub const ONE: AssetIndex = AssetIndex::from_nominal("1");
 
     /// Get an asset index from a string.
@@ -534,24 +565,38 @@ impl AssetIndex {
         AssetIndex(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 
+    /// Get the change in CASH principal generated by a balance, since a previous index.
     pub fn cash_principal_since(
         self,
         since: AssetIndex,
-        balance: AssetBalance,
+        balance: Balance,
     ) -> Result<CashPrincipal, MathError> {
         let delta_index = self.0.checked_sub(since.0).ok_or(MathError::Underflow)?;
         Ok(CashPrincipal(
-            balance
-                .checked_mul(TryFrom::try_from(delta_index).map_err(|_| MathError::Overflow)?)
-                .ok_or(MathError::Overflow)?,
+            BigInt::from_uint(delta_index)
+                .mul_decimal(balance.value, balance.units.decimals)
+                .convert(AssetIndex::DECIMALS, CashPrincipal::DECIMALS)
+                .to_int()?,
         ))
     }
 
-    pub fn increment(self, rhs: CashPrincipal) -> Result<AssetIndex, MathError> {
-        // XXX accept UnsignedCashPrincipal
-        let unsigned: Uint = rhs.0.try_into().map_err(|_| MathError::SignMismatch)?;
+    // AssetQuantity<U> * CashPrincipalPerAsset(+) -> CashPrincipal(+)
+    pub fn cash_principal_amount(
+        self,
+        amount: AssetQuantity,
+    ) -> Result<CashPrincipalAmount, MathError> {
+        Ok(CashPrincipalAmount(
+            BigUint::from_uint(self.0)
+                .mul_decimal(amount.value, amount.units.decimals)
+                .convert(AssetIndex::DECIMALS, CashPrincipalAmount::DECIMALS)
+                .to_uint()?,
+        ))
+    }
+
+    /// Add an amount of cash principal per unit of asset to the index.
+    pub fn increment(self, rhs: CashPrincipalPerAsset) -> Result<Self, MathError> {
         Ok(AssetIndex(
-            self.0.checked_add(unsigned).ok_or(MathError::Overflow)?,
+            self.0.checked_add(rhs.0).ok_or(MathError::Overflow)?,
         ))
     }
 }
@@ -819,7 +864,7 @@ mod tests {
     #[test]
     fn test_from_nominal_with_all_decimals() {
         let a = Quantity::from_nominal("123.456789", CASH);
-        let b = Quantity::new(123456789000000000000, CASH);
+        let b = Quantity::new(123456789, CASH);
         assert_eq!(a, b);
     }
 
@@ -924,21 +969,12 @@ mod tests {
 
     #[test]
     fn test_mul_index() {
-        let pprincipal = CashPrincipal::from_nominal("100");
-        let nprincipal = CashPrincipal::from_nominal("-100");
         let index = CashIndex::from_nominal("1.01");
-        let pquantity = index.as_hold_amount(pprincipal).unwrap();
-        let nquantity = index.as_debt_amount(nprincipal).unwrap();
-        assert_eq!(
-            index.as_debt_amount(pprincipal),
-            Err(MathError::SignMismatch)
-        );
-        assert_eq!(pquantity, Quantity::from_nominal("101", CASH));
-        assert_eq!(
-            index.as_hold_amount(nprincipal),
-            Err(MathError::SignMismatch)
-        );
-        assert_eq!(nquantity, Quantity::from_nominal("101", CASH));
+        let principal = CashPrincipalAmount::from_nominal("100");
+        let quantity = index.cash_quantity(principal).unwrap();
+        let principal_ = index.cash_principal_amount(quantity).unwrap();
+        assert_eq!(quantity, Quantity::from_nominal("101", CASH));
+        assert_eq!(principal_, principal);
     }
 
     #[test]
@@ -997,7 +1033,7 @@ mod tests {
     fn test_cash_principal_since() {
         let old_index = AssetIndex::from_nominal("1.0");
         let cur_index = AssetIndex::from_nominal("1.1");
-        let balance = 100i128;
+        let balance = Balance::from_nominal("100", ETH);
         let actual = cur_index.cash_principal_since(old_index, balance).unwrap();
         let expected = CashPrincipal::from_nominal("10");
         assert_eq!(actual, expected);

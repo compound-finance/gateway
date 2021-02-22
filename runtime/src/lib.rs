@@ -317,7 +317,6 @@ where
         let current_block = System::block_number()
             .saturated_into::<u64>()
             .saturating_sub(1);
-        let tip = 0;
         let extra: SignedExtra = (
             frame_system::CheckSpecVersion::<Runtime>::new(),
             frame_system::CheckTxVersion::<Runtime>::new(),

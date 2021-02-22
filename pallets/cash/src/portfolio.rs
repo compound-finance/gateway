@@ -21,7 +21,7 @@ pub struct Portfolio {
 impl Portfolio {
     /// Read a portfolio from storage.
     pub fn from_storage<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
-        let cash = get_cash_balance_with_asset_interest(account)?;
+        let cash = get_cash_balance_with_asset_interest::<T>(account)?;
         let mut positions = Vec::new();
         for (asset, _) in AssetsWithNonZeroBalance::iter_prefix(&account) {
             let asset_info = get_asset::<T>(asset)?;
@@ -81,7 +81,7 @@ impl Portfolio {
 pub mod tests {
     use super::*;
     use crate::types::Price;
-    use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
+    use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, types::*, *};
 
     struct TestAsset {
         asset: u8,
@@ -109,7 +109,7 @@ pub mod tests {
                 let asset = ChainAsset::Eth([asset_case.asset; 20]);
                 let decimals = asset_case.decimals;
                 let liquidity_factor = LiquidityFactor::from_nominal(asset_case.liquidity_factor);
-                let reserve_factor: ReserveFactor = Default::default();
+                let miner_shares: MinerShares = Default::default();
                 let rate_model: InterestRateModel = Default::default();
                 let supply_cap = AssetAmount::MAX;
                 let symbol = Symbol::new(&asset_case.ticker);
@@ -119,7 +119,7 @@ pub mod tests {
                     asset,
                     decimals,
                     liquidity_factor,
-                    reserve_factor,
+                    miner_shares,
                     rate_model,
                     supply_cap,
                     symbol,

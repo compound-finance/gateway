@@ -3,9 +3,10 @@ use codec::{Decode, Encode};
 use our_std::{Deserialize, RuntimeDebug, Serialize};
 
 use crate::{
+    factor::Factor,
     params::MILLISECONDS_PER_YEAR,
     reason::{MathError, Reason},
-    types::{uint_from_string_with_decimals, AssetAmount, CashIndex, Timestamp, Uint},
+    types::{uint_from_string_with_decimals, AssetAmount, CashIndex, MinerShares, Timestamp, Uint},
 };
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -21,7 +22,6 @@ pub enum RatesError {
     ModelKinkUtilizationNotPositive,
     ModelRateOutOfBounds,
     Overflowed,
-    ReserveFactorOver100Percent,
 }
 
 /// Annualized interest rate
@@ -45,9 +45,11 @@ impl APR {
         APR(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 
-    /// exp{r * dt} where dt is change in time in seconds
+    /// exp{r * dt} where dt is change in time in milliseconds
     // XXX why is this an index, should it be a CashIndexDelta or something?
-    pub fn over_time(self, dt: Timestamp) -> Result<CashIndex, MathError> {
+    //  actually why is this even related to CASH?
+    // XXX this should return a Factor
+    pub fn compound(self, dt: Timestamp) -> Result<CashIndex, MathError> {
         let index_scale = &BigInt::from(CashIndex::ONE.0);
         let scaled_rate: &BigInt =
             &(index_scale * self.0 * dt / MILLISECONDS_PER_YEAR / APR::ONE.0);
@@ -62,6 +64,13 @@ impl APR {
         } else {
             Err(MathError::Overflow)
         }
+    }
+
+    pub fn simple(self, dt: Timestamp) -> Result<Factor, MathError> {
+        let years_accrued = Factor::from_fraction(dt, MILLISECONDS_PER_YEAR)?;
+        Ok(Factor(
+            years_accrued.mul_decimal(self.0, APR::DECIMALS).to_uint()?,
+        ))
     }
 }
 
@@ -82,33 +91,6 @@ impl our_std::str::FromStr for APR {
 impl From<APR> for String {
     fn from(string: APR) -> Self {
         format!("{}", string.0)
-    }
-}
-
-/// XXX rename this
-#[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct ReserveFactor(Uint);
-
-impl From<Uint> for ReserveFactor {
-    fn from(x: u128) -> Self {
-        ReserveFactor(x)
-    }
-}
-
-impl ReserveFactor {
-    pub const DECIMALS: u8 = 4;
-    pub const ZERO: ReserveFactor = ReserveFactor::from_nominal("0");
-    pub const ONE: ReserveFactor = ReserveFactor::from_nominal("1");
-
-    pub const fn from_nominal(s: &'static str) -> Self {
-        ReserveFactor(uint_from_string_with_decimals(Self::DECIMALS, s))
-    }
-}
-
-impl Default for ReserveFactor {
-    fn default() -> Self {
-        ReserveFactor::ZERO
     }
 }
 
@@ -318,27 +300,27 @@ impl InterestRateModel {
 
     fn borrow_rate_to_supply_rate(
         borrow_rate: Uint,
-        reserve_factor: Uint,
+        miner_shares: Uint,
         utilization: Uint,
     ) -> Result<Uint, MathError> {
-        // Borrow Rate * (1-reserve factor) * utilization
+        // Borrow Rate * (1-miner shares) * utilization
 
-        // (1-reserve factor)
-        let reserve_multiplier = ReserveFactor::ONE
+        // (1-miner shares)
+        let reserve_multiplier = MinerShares::ONE
             .0
-            .checked_sub(reserve_factor)
+            .checked_sub(miner_shares)
             .ok_or(MathError::Underflow)?;
 
-        // Borrow Rate * (1-reserve factor)
+        // Borrow Rate * (1-miner shares)
         let acc = crate::types::mul(
             borrow_rate,
             APR::DECIMALS,
             reserve_multiplier,
-            ReserveFactor::DECIMALS,
+            MinerShares::DECIMALS,
             APR::DECIMALS,
         )?;
 
-        // Borrow Rate * (1-reserve factor) * utilization
+        // Borrow Rate * (1-miner shares) * utilization
         let acc = crate::types::mul(
             acc,
             APR::DECIMALS,
@@ -355,26 +337,26 @@ impl InterestRateModel {
         self: &Self,
         utilization: Utilization,
         current_rate: APR,
-        reserve_factor: ReserveFactor,
+        miner_shares: MinerShares,
     ) -> Result<(APR, APR), RatesError> {
         let borrow_rate = self.get_borrow_rate(utilization, current_rate)?;
-        // unsafe version Borrow Rate * (1-reserve factor) * utilization
+        // unsafe version Borrow Rate * (1-miner shares) * utilization
         let supply_rate =
-            Self::borrow_rate_to_supply_rate(borrow_rate.0, reserve_factor.0, utilization.0)
+            Self::borrow_rate_to_supply_rate(borrow_rate.0, miner_shares.0, utilization.0)
                 .map_err(|_| RatesError::Overflowed)?;
         Ok((borrow_rate, APR(supply_rate)))
     }
 
     /// Get the supply rate
     ///
-    /// always Borrow Rate * (1-reserve factor) * utilization
+    /// always Borrow Rate * (1-miner shares) * utilization
     pub fn get_supply_rate(
         self: &Self,
         utilization: Utilization,
         current_rate: APR,
-        reserve_factor: ReserveFactor,
+        miner_shares: MinerShares,
     ) -> Result<APR, RatesError> {
-        let (_, supply_rate) = self.get_rates(utilization, current_rate, reserve_factor)?;
+        let (_, supply_rate) = self.get_rates(utilization, current_rate, miner_shares)?;
         Ok(supply_rate)
     }
 }
@@ -657,7 +639,7 @@ mod test {
     }
 
     #[test]
-    fn test_over_time() {
+    fn test_compound() {
         let mut rates = vec!["0", "0.0001", "0.03", "0.1", "0.2"];
         // XXX should positively assert some failures here instead of commenting these out?
         // let months_per_year = 12;
@@ -680,10 +662,10 @@ mod test {
             for year_frac in year_fractions.iter() {
                 let r = APR::from_nominal(rate);
                 let dt = MILLISECONDS_PER_YEAR / year_frac;
-                let actual = match r.over_time(dt) {
+                let actual = match r.compound(dt) {
                     Ok(actual) => actual,
                     Err(e) => panic!(
-                        "Math error during over_time  r = {}, year_frac = {}, error = {:?}",
+                        "Math error during compound  r = {}, year_frac = {}, error = {:?}",
                         rate, year_frac, e
                     ),
                 };

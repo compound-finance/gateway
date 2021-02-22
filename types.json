@@ -26,7 +26,7 @@
     "decimals": "Decimals",
     "liquidity_factor": "LiquidityFactor",
     "rate_model": "InterestRateModel",
-    "reserve_factor": "ReserveFactor",
+    "miner_shares": "MinerShares",
     "supply_cap": "AssetAmount",
     "symbol": "Symbol",
     "ticker": "Ticker"
@@ -34,9 +34,10 @@
   "ConfigSetString": "Vec<String>",
   "Price": ["Symbol", "AssetPrice"],
   "Quantity": ["Symbol", "AssetAmount"],
-  "CashPrincipal": "Int",
-  "CashIndex": "Uint",
-  "AssetIndex": "Uint",
+  "CashPrincipal": "(Int)",
+  "CashPrincipalAmount": "(Uint)",
+  "CashIndex": "(Uint)",
+  "AssetIndex": "(Uint)",
   "SessionIndex": "u32",
   "AccountId32": "[u8;32]",
   "AccountId": "AccountId32",
@@ -237,7 +238,8 @@
       "Overflowed"
     ]
   },
-  "ReserveFactor": "Uint",
+  "Factor": "(Uint)",
+  "MinerShares": "Factor",
   "APR": "(Uint)",
   "Utilization": "(Uint)",
   "KinkModel": {

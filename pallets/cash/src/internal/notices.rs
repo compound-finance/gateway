@@ -30,7 +30,6 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), R
         match notice_state {
             NoticeState::Pending { signature_pairs } => {
                 let signer = chain_id.signer_address()?;
-
                 if !has_signer(&signature_pairs, signer) {
                     // find parent
                     // id = notice.gen_id(parent)

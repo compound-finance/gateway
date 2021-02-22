@@ -1,3 +1,4 @@
+use crate::{chains::ChainAccount, Call, Config, Module};
 #[cfg(feature = "std")]
 use codec::Decode;
 use codec::Encode;
@@ -5,12 +6,6 @@ use codec::Encode;
 use sp_inherents::ProvideInherentData;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError, ProvideInherent};
 use sp_runtime::RuntimeString;
-use crate::{
-    chains::ChainAccount,
-    Module,
-    Config,
-    Call,
-};
 
 /// The identifier for the miner inherent.
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"miner000";
@@ -72,15 +67,14 @@ impl ProvideInherentData for InherentDataProvider {
         &self,
         inherent_data: &mut InherentData,
     ) -> Result<(), sp_inherents::Error> {
-        let miner_address_str =
-            runtime_interfaces::validator_config_interface::get_miner_address()
+        let miner_address_str = runtime_interfaces::validator_config_interface::get_miner_address()
             .ok_or("no miner address")?;
 
-        let miner_address =
-            our_std::str::from_utf8(&miner_address_str).map_err(|_| "invalid miner address bytes")?;
+        let miner_address = our_std::str::from_utf8(&miner_address_str)
+            .map_err(|_| "invalid miner address bytes")?;
 
-        let chain_account: ChainAccount = our_std::str::FromStr::from_str(miner_address)
-            .map_err(|_| "invalid miner address")?;
+        let chain_account: ChainAccount =
+            our_std::str::FromStr::from_str(miner_address).map_err(|_| "invalid miner address")?;
 
         inherent_data.put_data(INHERENT_IDENTIFIER, &chain_account)
     }
@@ -103,10 +97,8 @@ impl<T: Config> ProvideInherent for Module<T> {
 
     fn create_inherent(data: &InherentData) -> Option<Self::Call> {
         match extract_inherent_data(data) {
-            Ok(miner) =>
-                Some(Call::set_miner(miner)),
-            Err(_err) =>
-                None,
+            Ok(miner) => Some(Call::set_miner(miner)),
+            Err(_err) => None,
         }
     }
 
