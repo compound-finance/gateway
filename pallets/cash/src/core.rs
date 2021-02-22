@@ -133,19 +133,14 @@ pub fn get_rates<T: Config>(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
 // Internal helpers
 
 pub fn passes_validation_threshold(
-    signers: &Vec<ValidatorIdentity>,
+    signers: &BTreeSet<ValidatorIdentity>,
     validators: &Vec<ValidatorIdentity>,
 ) -> bool {
-    let mut signer_set = BTreeSet::<ValidatorIdentity>::new();
-    for v in signers {
-        signer_set.insert(*v);
-    }
-
     let mut validator_set = BTreeSet::<ValidatorIdentity>::new();
     for v in validators {
         validator_set.insert(*v);
     }
-    signer_set.len() > validator_set.len() * 2 / 3
+    signers.len() > validator_set.len() * 2 / 3
 }
 
 // XXX use Balances instead of raw balances everywhere and put all fns on types?

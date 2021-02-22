@@ -126,17 +126,12 @@ pub fn receive_event<T: Config>(
 
     match EventStates::get(event_id) {
         EventState::Pending { signers } => {
-            // XXX sets?
-            if signers.contains(&signer) {
-                log!("process_chain_event_internal({}): Validator has already signed this payload {:?}", event_id.show(), signer);
-                return Err(Reason::EventAlreadySigned);
-            }
-
             // Add new validator to the signers
+            // If validator is already in the list, no change will apply
             let mut signers_new = signers.clone();
-            signers_new.push(signer.clone()); // XXX unique add to set?
+            signers_new.insert(signer);
 
-            if passes_validation_threshold(&signers_new, &validators) {
+            if passes_validation_threshold(&signers, &validators) {
                 match apply_chain_event_internal::<T>(event) {
                     Ok(()) => {
                         EventStates::insert(event_id, EventState::Done);
