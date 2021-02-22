@@ -1,10 +1,9 @@
+use crate::aws_kms;
 use crate::dev_keyring;
 use crate::no_std::*;
 use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
 use std::collections::hash_map::HashMap;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 /// The crypto module for compound chain.
 ///
@@ -193,10 +192,15 @@ impl Keyring for InMemoryKeyring {
     }
 }
 
-type ThreadSafeKeyring = dyn Keyring + Send + Sync;
+pub fn keyring() -> Box<dyn Keyring> {
+    let keyring_type: Option<String> = std::env::var("KEYRING_TYPE").ok().into();
+    let aws_kms = String::from("AWS_KMS");
 
-lazy_static::lazy_static! {
-    pub static ref KEYRING: Mutex<Arc<ThreadSafeKeyring>> = Mutex::new(Arc::new(dev_keyring()));
+    if keyring_type == Some(aws_kms) {
+        Box::new(aws_kms::KmsKeyring::new())
+    } else {
+        Box::new(dev_keyring())
+    }
 }
 
 pub(crate) const ETH_PRIVATE_KEY_ENV_VAR: &str = "ETH_KEY";

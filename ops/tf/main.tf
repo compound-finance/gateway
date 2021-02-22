@@ -366,6 +366,14 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
   }
 }
 
+
+module keystore {
+  source = "./keystore"
+
+  key_spec = "ECC_SECG_P256K1"
+  alias = "alias/eth_notice_signer"
+}
+
 resource "aws_instance" "full_node_public" {
   ami                         = var.base_instance_ami
   availability_zone           = var.az
@@ -414,6 +422,7 @@ resource "aws_instance" "authority_node" {
   vpc_security_group_ids      = [aws_security_group.authority_node_sg.id]
   subnet_id                   = aws_subnet.compound_chain_private.id
   associate_public_ip_address = false
+  iam_instance_profile        = module.keystore.instance_profile_for_access.name
 
   root_block_device {
     volume_size               = var.node_root_disk_size
