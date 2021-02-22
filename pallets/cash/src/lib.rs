@@ -26,7 +26,9 @@ use crate::types::{
     ValidatorKeys, ValidatorSig,
 };
 use codec::alloc::string::String;
-use frame_support::{decl_event, decl_module, decl_storage, dispatch, Parameter, weights::DispatchClass};
+use frame_support::{
+    decl_event, decl_module, decl_storage, dispatch, weights::DispatchClass, Parameter,
+};
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{str, vec::Vec};
 use sp_core::crypto::AccountId32;
@@ -66,6 +68,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+mod calculation;
 #[cfg(test)]
 mod testdata;
 
@@ -456,19 +459,17 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::set_miner(_miner) => {
-                ValidTransaction::with_tag_prefix("CashPallet")
-                    .longevity(10)
-                    .propagate(true)
-                    .build()
-            },
+            Call::set_miner(_miner) => ValidTransaction::with_tag_prefix("CashPallet")
+                .longevity(10)
+                .propagate(true)
+                .build(),
             Call::receive_event(_event_id, _event, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
                     .and_provides(signature)
                     .propagate(true)
                     .build()
-            },
+            }
             Call::exec_trx_request(request, signature, nonce) => {
                 let signer_res = signature.recover_account(
                     &internal::exec_trx_request::prepend_nonce(request, *nonce)[..],
@@ -489,7 +490,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                         .propagate(true)
                         .build(),
                 }
-            },
+            }
             Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
                 .longevity(10)
                 .and_provides(sig)

@@ -37,8 +37,9 @@ use crate::{
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
     CashYield, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
-    LastYieldTimestamp, LatestNotice, Module, NoticeHashes, NoticeStates, Notices, Prices,
-    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Miner, LastMinerSpreadPrincipal,
+    LastMinerSpreadPrincipal, LastYieldTimestamp, LatestNotice, Miner, Module, NoticeHashes,
+    NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets,
 };
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
@@ -1352,7 +1353,11 @@ pub fn on_initialize<T: Config>(
     let miner_cash_principal_old: CashPrincipal = CashPrincipals::get(&last_miner);
     let miner_cash_principal_new = miner_cash_principal_old.add(last_miner_spread_principal)?;
     CashPrincipals::insert(last_miner, miner_cash_principal_new);
-    log!("Miner={:?} received {:?} principal for mining last block", last_miner, last_miner_spread_principal);
+    log!(
+        "Miner={:?} received {:?} principal for mining last block",
+        last_miner,
+        last_miner_spread_principal
+    );
 
     for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
         SupplyIndices::insert(asset.clone(), new_supply_index);
