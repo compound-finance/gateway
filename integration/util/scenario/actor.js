@@ -81,24 +81,53 @@ class Actor {
   }
 
   async chainCashPrincipal() {
-    let principal = await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
-    return principal.toNumber();
+    return await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
   }
 
   async chainCashBalance() {
-    return await this.chainCashPrincipal() * await this.ctx.chain.cashIndex();
+    return
+        descale(
+          await this.chainCashPrincipal().toBigNumber()
+          * await this.ctx.chain.cashIndex().toBigNumber(),
+          18
+        );
   }
 
   async chainBalance(tokenLookup) {
     let token = this.ctx.tokens.get(tokenLookup);
     if (token instanceof CashToken) {
-      return token.toTokenAmount(await this.chainCashBalance());
+      return await this.cash();
     } else {
       let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
       return token.toTokenAmount(weiAmount);
     }
   }
 
+  async cashForToken(token) {
+    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let lastIndex = await this.ctx.api().query.cash.lastIndices(token.toChainAsset(), this.toChainAccount());
+
+    if (assetBalance == 0) {
+      return 0;
+    } else if (assetBalance > 0) {
+      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
+      let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
+      return descale(assetBalance.toBigInt() * (supplyIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
+    } else {
+      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
+      let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
+      return descale(assetBalance.toBigInt() * (borrowIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
+    }
+  }
+
+  async cash() {
+    // TODO: Use non-zero balances
+    let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
+    console.log({cashForTokens});
+    return await this.chainCashPrincipal() + cashForTokens.reduce((acc, el) => acc + el, 0);
+  }
+
+  async liquidityForToken(token) {
     let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
     let price = await token.getPrice();
     let liquidityFactor = await token.getLiquidityFactor();
@@ -134,9 +163,6 @@ class Actor {
 
   async extract(amount, asset, recipient = null) {
     return await this.declare("extract", [amount, asset, "for", recipient || "myself"], async () => {
-      let token = this.ctx.tokens.get(asset);
-      let weiAmount = token.toWeiAmount(amount);
-
       let trxReq = this.extractTrxReq(amount, asset, recipient);
 
       this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
@@ -211,6 +237,9 @@ function actorInfoMap(keyring) {
     },
     bert: {
       key_uri: '//Bob'
+    },
+    chuck: {
+      key_uri: '//Charlie'
     }
   };
 }
