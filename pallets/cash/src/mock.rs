@@ -1,7 +1,7 @@
 use crate::types::Timestamp;
 use crate::{Call, Config, Module};
 use codec::alloc::sync::Arc;
-use frame_support::{impl_outer_dispatch, impl_outer_event, impl_outer_origin, parameter_types};
+use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
 use parking_lot::RwLock;
 use sp_core::{
     offchain::{

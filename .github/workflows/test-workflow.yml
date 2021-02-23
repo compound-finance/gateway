@@ -39,6 +39,7 @@ jobs:
 
       - name: Cargo Test
         run: |
+          set -eo pipefail
           cargo test -- -Z unstable-options --format json | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"

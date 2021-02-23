@@ -1086,7 +1086,7 @@ pub fn has_liquidity_to_reduce_asset<T: Config>(
     let liquidity = Portfolio::from_storage::<T>(account)?
         .asset_change(asset, amount.as_decrease()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing asset by amount and paying a CASH fee.
@@ -1100,7 +1100,7 @@ pub fn has_liquidity_to_reduce_asset_with_fee<T: Config>(
         .asset_change(asset, amount.as_decrease()?)?
         .cash_change(fee.as_decrease()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of asset collateral.
@@ -1115,7 +1115,7 @@ pub fn has_liquidity_to_reduce_asset_with_added_collateral<T: Config>(
         .asset_change(asset, amount.as_decrease()?)?
         .asset_change(collateral_asset, collateral_amount.as_increase()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of CASH collateral.
@@ -1129,7 +1129,7 @@ pub fn has_liquidity_to_reduce_asset_with_added_cash<T: Config>(
         .asset_change(asset, amount.as_decrease()?)?
         .cash_change(cash_amount.as_increase()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing CASH by amount.
@@ -1140,7 +1140,7 @@ pub fn has_liquidity_to_reduce_cash<T: Config>(
     let liquidity = Portfolio::from_storage::<T>(account)?
         .cash_change(amount.as_decrease()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing CASH by amount and adding an amount of asset collateral.
@@ -1154,7 +1154,7 @@ pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
         .cash_change(amount.as_decrease()?)?
         .asset_change(collateral_asset, collateral_amount.as_increase()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
@@ -1391,7 +1391,7 @@ mod tests {
     #[test]
     fn test_extract_internal_min_value() {
         let asset = ChainAsset::Eth([238; 20]);
-        let asset_info = AssetInfo::minimal(asset, ETH).unwrap();
+        let asset_info = AssetInfo::minimal(asset, ETH);
         let holder = ChainAccount::Eth([0; 20]);
         let recipient = ChainAccount::Eth([0; 20]);
 
@@ -1446,7 +1446,7 @@ mod tests {
         let asset = ChainAsset::Eth(eth_asset);
         let asset_info = AssetInfo {
             liquidity_factor: LiquidityFactor::from_nominal("1"),
-            ..AssetInfo::minimal(asset, ETH).unwrap()
+            ..AssetInfo::minimal(asset, ETH)
         };
         let eth_holder = [0; 20];
         let eth_recipient = [0; 20];
@@ -1556,7 +1556,7 @@ mod tests {
         let asset = ChainAsset::Eth(eth_asset);
         let asset_info = AssetInfo {
             liquidity_factor: LiquidityFactor::from_nominal("1"),
-            ..AssetInfo::minimal(asset, ETH).unwrap()
+            ..AssetInfo::minimal(asset, ETH)
         };
         let eth_holder = [0; 20];
         let eth_recipient = [0; 20];
@@ -1757,7 +1757,7 @@ mod tests {
                     202,
                 ),
                 miner_shares: MinerShares::from_nominal("0.5"),
-                ..AssetInfo::minimal(asset, ETH).unwrap()
+                ..AssetInfo::minimal(asset, ETH)
             };
 
             SupportedAssets::insert(&asset, asset_info);
@@ -1780,7 +1780,7 @@ mod tests {
         let asset = ChainAsset::from_str("Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef")?;
         let asset_info = AssetInfo {
             liquidity_factor: LiquidityFactor::from_nominal("0.6543"),
-            ..AssetInfo::minimal(asset, BAT).unwrap()
+            ..AssetInfo::minimal(asset, BAT)
         };
 
         new_test_ext().execute_with(|| {
@@ -1809,7 +1809,7 @@ mod tests {
             let asset_info = AssetInfo {
                 rate_model: InterestRateModel::new_kink(0, 2500, Factor::from_nominal("0.5"), 5000),
                 miner_shares: MinerShares::from_nominal("0.02"),
-                ..AssetInfo::minimal(asset, ETH).unwrap()
+                ..AssetInfo::minimal(asset, ETH)
             };
             // XXX how to inject now / last yield timestamp?
             let last_yield_timestamp = 10;
