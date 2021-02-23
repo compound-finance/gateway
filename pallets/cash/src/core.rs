@@ -28,7 +28,7 @@ use crate::{
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
-    symbol::{Units, CASH},
+    symbol::{Units, CASH, USD_TICKER},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
         CashPrincipal, CashPrincipalAmount, CashQuantity, Price, Quantity, Timestamp, USDQuantity,
@@ -91,6 +91,9 @@ pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
 /// Return the USD price associated with the given units.
 pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
     match units {
+        Units {
+            ticker: USD_TICKER, ..
+        } => Ok(Price::from_nominal(USD_TICKER, "1.0")),
         CASH => Ok(Price::from_nominal(CASH.ticker, "1.0")),
         _ => Ok(Price::new(
             units.ticker,
@@ -1137,7 +1140,8 @@ pub fn has_liquidity_to_reduce_cash<T: Config>(
     account: ChainAccount,
     amount: CashQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
+    let portfolio = Portfolio::from_storage::<T>(account)?;
+    let liquidity = portfolio
         .cash_change(amount.as_decrease()?)?
         .get_liquidity::<T>()?;
     Ok(liquidity.value >= 0)

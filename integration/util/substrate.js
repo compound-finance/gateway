@@ -189,9 +189,14 @@ function decodeCall(api, callData) {
   return call.toHuman();
 }
 
+function descale(val, decimals) {
+  return Number(`${val}e-${decimals}`);
+}
+
 module.exports = {
   decodeCall,
   encodeCall,
+  descale,
   findEvent,
   getEventData,
   sendAndWaitForEvents,
