@@ -5,7 +5,8 @@ const { getNotice } = require('../util/substrate');
 
 let extract_scen_info = {
   tokens: [
-    { token: "zrx", balances: { ashley: 1000 } }
+    { token: "zrx", balances: { ashley: 1000 } },
+    { token: "bat", balances: { bert: 25000 } }
   ],
 };
 
@@ -40,7 +41,6 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
-    only: true,
     name: "Extract Cash",
     scenario: async ({ ashley, zrx, chain, starport, cash, log }) => {
       let notice = getNotice(await ashley.extract(20, cash));
@@ -50,6 +50,21 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
       let tx = await starport.invoke(notice, signatures);
       expect(await ashley.tokenBalance(cash)).toBeCloseTo(20, 4);
       expect(await ashley.cash()).toBeCloseTo(-20, 4);
+    }
+  },
+  {
+    only: true,
+    name: "Extract Cash Torrey",
+    beforeEach: null,
+    scenario: async ({ bert, bat, chain, starport, cash, log }) => {
+      await bert.lock(25000, bat);
+      let notice = getNotice(await bert.extract(5, cash));
+      let signatures = await chain.getNoticeSignatures(notice);
+      expect(await cash.getCashPrincipal(bert)).toEqual(0);
+      expect(await bert.tokenBalance(cash)).toEqual(0);
+      let tx = await starport.invoke(notice, signatures);
+      expect(await bert.tokenBalance(cash)).toBeCloseTo(5, 4);
+      expect(await bert.cash()).toBeCloseTo(-5, 4);
     }
   },
   {
