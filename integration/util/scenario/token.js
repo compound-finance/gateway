@@ -1,6 +1,7 @@
 const { instantiateInfo } = require('./scen_info');
 const BigNumber = require('bignumber.js');
 const { lookupBy } = require('../util');
+const { descale } = require('../substrate');
 
 class Token {
   constructor(ticker, symbol, name, decimals, token, owner, ctx) {
@@ -100,7 +101,11 @@ class Token {
   }
 
   async getPrice() {
-    return Number(await this.ctx.api().query.cash.prices((await this.getAsset()).ticker));
+    if (['USD', 'CASH'].includes(this.priceTicker)) {
+      return 1.0;
+    } else {
+      return descale(await this.ctx.api().query.cash.prices(await this.getAssetInfo('ticker')), 6);
+    }
   }
 }
 
@@ -157,35 +162,36 @@ function tokenInfoMap(ctx) {
       contract: 'ZRXToken',
       decimals: 18,
       constructor_args: [],
-      supply_cap: 1000000
+      supply_cap: 1000000,
     },
     dai: {
       build: 'dai.json',
       contract: 'Dai',
       decimals: 18,
       constructor_args: [0], // TODO: ChainId
-      supply_cap: 1000000
+      supply_cap: 1000000,
     },
     comp: {
       build: 'compound.json',
       contract: 'Comp',
       decimals: 18,
       constructor_args: [accounts[0]],
-      supply_cap: 1000000
+      supply_cap: 1000000,
     },
     bat: {
       build: 'bat.json',
       contract: 'BAToken',
       decimals: 18,
       constructor_args: ['0x0000000000000000000000000000000000000000', accounts[0], 0, 0],
-      supply_cap: 1000000
+      supply_cap: 1000000,
     },
     wbtc: {
       build: 'wbtc.json',
       contract: 'WBTC',
       decimals: 8,
       constructor_args: [],
-      supply_cap: 1000000
+      supply_cap: 1000000,
+      price_ticker: 'BTC',
     },
     usdc: {
       build: 'FiatTokenV1.json',
@@ -193,6 +199,7 @@ function tokenInfoMap(ctx) {
       decimals: 6,
       constructor_args: [],
       supply_cap: 1000000,
+      price_ticker: 'USD',
       afterDeploy: async (contract, owner) => {
         await contract.methods.initialize(
           "USD Coin",
@@ -230,7 +237,8 @@ async function buildToken(ticker, tokenInfo, ctx) {
   let symbol = await tokenContract.methods.symbol().call();
   let name = await tokenContract.methods.name().call();
   let decimals = Number(await tokenContract.methods.decimals().call());
-  let token = new Token(ticker, symbol, name, decimals, tokenContract, owner, ctx);
+  let priceTicker = tokenInfo.price_ticker || symbol;
+  let token = new Token(ticker, symbol, name, decimals, priceTicker, tokenContract, owner, ctx);
 
   if (tokenInfo.balances) {
     await Object.entries(tokenInfo.balances).reduce(async (acc, [actor, amount]) => {
