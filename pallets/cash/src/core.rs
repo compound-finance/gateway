@@ -553,7 +553,7 @@ pub fn extract_cash_principal_internal<T: Config>(
         add_principal_amounts(ChainCashPrincipals::get(chain_id), principal)?;
     let total_cash_principal_new =
         add_principal_amounts(TotalCashPrincipal::get(), holder_borrow_principal)?;
-    let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
+    let holder_cash_principal_new = holder_cash_principal.sub_amount(principal)?;
 
     ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
     CashPrincipals::insert(holder, holder_cash_principal_new);
