@@ -1,7 +1,7 @@
 const { Keyring } = require('@polkadot/api');
 const { getInfoKey } = require('../util');
 const { instantiateInfo } = require('./scen_info');
-const { sendAndWaitForEvents } = require('../substrate');
+const { descale, sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
 const { CashToken } = require('./cash_token');
 
@@ -97,6 +97,29 @@ class Actor {
       let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
       return token.toTokenAmount(weiAmount);
     }
+  }
+
+    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let price = await token.getPrice();
+    let liquidityFactor = await token.getLiquidityFactor();
+    console.log({token: token.symbol, assetBalance, price, liquidityFactor});
+
+    if (assetBalance == 0) {
+      return 0;
+    } else if (assetBalance > 0) {
+      // AssetBalance • LiquidityFactor_Asset • Price_Asset
+      return token.toTokenAmount(assetBalance.toBigInt()) * price * liquidityFactor;
+    } else {
+      // AssetBalance ÷ LiquidityFactor_Asset • Price_Asset
+      return token.toTokenAmount(assetBalance.toBigInt()) * price / liquidityFactor;
+    }
+  }
+
+  async liquidity() {
+    // TODO: Use non-zero balances
+    let liquidityForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.liquidityForToken(token)));
+    console.log({liquidityForTokens});
+    return await this.cash() + liquidityForTokens.reduce((acc, el) => acc + el, 0);
   }
 
   async lock(amount, asset, awaitEvent = true) {
