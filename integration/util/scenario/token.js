@@ -4,11 +4,13 @@ const { lookupBy } = require('../util');
 const { descale } = require('../substrate');
 
 class Token {
-  constructor(ticker, symbol, name, decimals, token, owner, ctx) {
+  constructor(ticker, symbol, name, decimals, priceTicker, liquidityFactor, token, owner, ctx) {
     this.ticker = ticker;
     this.symbol = symbol;
     this.name = name;
     this.decimals = decimals;
+    this.priceTicker = priceTicker;
+    this.liquidityFactor = liquidityFactor;
     this.token = token;
     this.owner = owner;
     this.ctx = ctx;
@@ -107,11 +109,24 @@ class Token {
       return descale(await this.ctx.api().query.cash.prices(await this.getAssetInfo('ticker')), 6);
     }
   }
+
+  async getLiquidityFactor() {
+    let liquidityFactor = await this.getAssetInfo('liquidity_factor');
+    return descale(liquidityFactor, 18);
+  }
+
+  async totalChainSupply() {
+    return this.toTokenAmount(await this.ctx.api().query.cash.totalSupplyAssets(this.toChainAsset()));
+  }
+
+  async totalChainBorrows() {
+    return this.toTokenAmount(await this.ctx.api().query.cash.totalBorrowAssets(this.toChainAsset()));
+  }
 }
 
 class EtherToken extends Token {
-  constructor(ctx) {
-    super('ether', 'ETH', 'Ether', 18, null, null, ctx);
+  constructor(liquidityFactor, ctx) {
+    super('ether', 'ETH', 'Ether', 18, 'ETH', liquidityFactor, null, null, ctx);
   }
 
   ethAddress() {
@@ -163,6 +178,7 @@ function tokenInfoMap(ctx) {
       decimals: 18,
       constructor_args: [],
       supply_cap: 1000000,
+      liquidity_factor: 0.5,
     },
     dai: {
       build: 'dai.json',
@@ -170,6 +186,7 @@ function tokenInfoMap(ctx) {
       decimals: 18,
       constructor_args: [0], // TODO: ChainId
       supply_cap: 1000000,
+      liquidity_factor: 0.8,
     },
     comp: {
       build: 'compound.json',
@@ -177,6 +194,7 @@ function tokenInfoMap(ctx) {
       decimals: 18,
       constructor_args: [accounts[0]],
       supply_cap: 1000000,
+      liquidity_factor: 0.75,
     },
     bat: {
       build: 'bat.json',
@@ -184,6 +202,7 @@ function tokenInfoMap(ctx) {
       decimals: 18,
       constructor_args: ['0x0000000000000000000000000000000000000000', accounts[0], 0, 0],
       supply_cap: 1000000,
+      liquidity_factor: 0.3,
     },
     wbtc: {
       build: 'wbtc.json',
@@ -191,6 +210,7 @@ function tokenInfoMap(ctx) {
       decimals: 8,
       constructor_args: [],
       supply_cap: 1000000,
+      liquidity_factor: 0.6,
       price_ticker: 'BTC',
     },
     usdc: {
@@ -199,6 +219,7 @@ function tokenInfoMap(ctx) {
       decimals: 6,
       constructor_args: [],
       supply_cap: 1000000,
+      liquidity_factor: 0.8,
       price_ticker: 'USD',
       afterDeploy: async (contract, owner) => {
         await contract.methods.initialize(
@@ -238,7 +259,8 @@ async function buildToken(ticker, tokenInfo, ctx) {
   let name = await tokenContract.methods.name().call();
   let decimals = Number(await tokenContract.methods.decimals().call());
   let priceTicker = tokenInfo.price_ticker || symbol;
-  let token = new Token(ticker, symbol, name, decimals, priceTicker, tokenContract, owner, ctx);
+  let liquidityFactor = tokenInfo.liquidity_factor;
+  let token = new Token(ticker, symbol, name, decimals, priceTicker, liquidityFactor, tokenContract, owner, ctx);
 
   if (tokenInfo.balances) {
     await Object.entries(tokenInfo.balances).reduce(async (acc, [actor, amount]) => {
@@ -269,7 +291,7 @@ async function buildTokens(tokensInfoHash, scenInfo, ctx) {
     ];
   }, Promise.resolve([]));
 
-  let etherToken = new EtherToken(ctx);
+  let etherToken = new EtherToken(scenInfo.eth_liquidity_factor, ctx);
   tokens.push(etherToken);
   if (scenInfo.eth_supply_cap) {
     await etherToken.setSupplyCap(scenInfo.eth_supply_cap);

@@ -39,7 +39,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     decimals: token.decimals,
     symbol: token.symbol.toUpperCase(),
     ticker: token.priceTicker,
-    liquidity_factor: 6543,
+    liquidity_factor: Math.floor(token.liquidityFactor * 1e18),
     rate_model: {
       Kink: {
         zero_rate: 0,
