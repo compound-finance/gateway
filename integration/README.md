@@ -11,6 +11,14 @@ First, you'll need to compile Compound Chain (in release mode) and compile the E
 compound-chain> cargo +nightly build
 ```
 
+Note: if you require deeper debugging, you may want to enable the `runtime-debug` feature, via:
+
+```sh
+compound-chain> cargo +nightly build -Zpackage-features --features "runtime-debug"
+```
+
+This will remove `wasm-stripped` messages at the cost of a larger wasm runtime blob. This should not be used for production builds.
+
 In the `ethereum` directory, run:
 
 Note: you'll need solc 0.7.5 installed

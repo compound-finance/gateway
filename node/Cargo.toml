@@ -73,7 +73,7 @@ frame-benchmarking-cli = { version = '2.0.0', git = 'https://github.com/compound
 # Local dependencies
 compound-chain-runtime = { path = '../runtime' }
 compound-crypto = { path = '../compound-crypto' }
-our-std = { path = '../std' }
+our-std = { path = '../our-std' }
 pallet-cash = { path = '../pallets/cash' }
 runtime-interfaces = { path = '../pallets/runtime-interfaces' }
 
@@ -97,3 +97,4 @@ runtime-benchmarks = [
 	'compound-chain-runtime/runtime-benchmarks',
 	'frame-benchmarking-cli',
 ]
+runtime-debug = ['our-std/runtime-debug']

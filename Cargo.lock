@@ -893,6 +893,7 @@ dependencies = [
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
  "hex-literal",
+ "our-std",
  "pallet-aura",
  "pallet-balances",
  "pallet-cash",

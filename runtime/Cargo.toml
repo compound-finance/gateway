@@ -53,6 +53,7 @@ pallet-session = { version = '2.0.0', default-features = false, git = 'https://g
 
 # Local dependencies
 pallet-cash = { path = '../pallets/cash', default-features = false, version = '1.0.0' }
+our-std = { path = "../our-std", default-features = false }
 
 [features]
 default = ['std']
@@ -95,3 +96,4 @@ std = [
     'sp-transaction-pool/std',
     'sp-version/std',
 ]
+runtime-debug = ['our-std/runtime-debug']

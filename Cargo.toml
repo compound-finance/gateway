@@ -7,7 +7,7 @@ members = [
     'pallets/cash',
     'pallets/runtime-interfaces',
     'runtime',
-    'std',
+    'our-std',
     'compound-crypto',
     'ethereum-client',
     'test-utils/open-oracle-mock-reporter',
