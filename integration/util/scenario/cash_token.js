@@ -16,7 +16,7 @@ class CashToken extends Token {
     if (tokenAmount === 'Max' || tokenAmount === 'MAX') {
       return tokenAmount;
     } else {
-      super.toWeiAmount(tokenAmount)
+      return super.toWeiAmount(tokenAmount)
     }
   }
 
