@@ -53,7 +53,6 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
-    only: true,
     name: "Extract Cash Torrey",
     beforeEach: null,
     scenario: async ({ bert, bat, chain, starport, cash, log }) => {
@@ -68,18 +67,19 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
-    skip: true,
+    only: true,
     name: "Extract Cash Max",
-    scenario: async ({ ashley, zrx, chain, starport, cash }) => {
-      // TODO: Make sure user has Cash to begin scenario
-      let notice = getNotice(await ashley.extract('Max', cash));
+    scenario: async ({ ashley, bert, zrx, chain, starport, cash }) => {
+      await ashley.transfer(10, cash, bert);
+      let notice = getNotice(await bert.extract('Max', cash)); // TODO: This is failing with insufficient liquidity
       let signatures = await chain.getNoticeSignatures(notice);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(0);
-      expect(await ashley.tokenBalance(cash)).toEqual(0);
+
+      // TODO: Fill in correct numbers
+      expect(await cash.getCashPrincipal(bert)).toEqual(0);
+      expect(await bert.tokenBalance(cash)).toEqual(0);
       await starport.invoke(notice, signatures);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(5000);
-      expect(await ashley.tokenBalance(cash)).toEqual(50);
-      expect(await ashley.chainBalance(cash)).toEqual(-50);
+      expect(await bert.tokenBalance(cash)).toEqual(50);
+      expect(await bert.chainBalance(cash)).toEqual(-50);
     }
   }
 ]);
