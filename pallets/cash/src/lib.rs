@@ -334,7 +334,7 @@ decl_module! {
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
         }
 
-        /// Set the price using the open price feed. [Root]
+        /// Set the liquidity factor for an asset [Root]
         #[weight = 0] // XXX
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;

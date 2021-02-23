@@ -2,8 +2,8 @@ const { readContractsFile } = require('../ethereum');
 const { Token } = require('./token');
 
 class CashToken extends Token {
-  constructor(cashToken, owner, ctx) {
-    super('cash', 'CASH', 'Cash Token', 6, cashToken, owner, ctx);
+  constructor(cashToken, liquidityFactor, owner, ctx) {
+    super('cash', 'CASH', 'Cash Token', 6, 'CASH', liquidityFactor, cashToken, owner, ctx);
 
     this.cashToken = cashToken;
   }
@@ -45,7 +45,7 @@ async function buildCashToken(cashTokenInfo, ctx, owner) {
 
   let cashToken = await ctx.eth.__deploy('CashToken', [owner, ctx.__initialYield(), initial_yield_index, ctx.__initialYieldStart()]);
 
-  return new CashToken(cashToken, owner, ctx);
+  return new CashToken(cashToken, cashTokenInfo.liquidity_factor, owner, ctx);
 }
 
 module.exports = {

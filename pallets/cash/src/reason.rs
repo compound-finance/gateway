@@ -55,6 +55,7 @@ pub enum Reason {
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
+    InvalidLiquidation,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -107,6 +108,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::TrxRequestParseError(_) => (22, 0, "trx request parse error"),
             Reason::UnknownValidator => (23, 0, "unknown validator"),
             Reason::SetYieldNextError(_) => (24, 0, "set yield next error"),
+            Reason::InvalidLiquidation => (25, 0, "invalid liquidation parameters"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

@@ -1,7 +1,7 @@
 const { Keyring } = require('@polkadot/api');
 const { getInfoKey } = require('../util');
 const { instantiateInfo } = require('./scen_info');
-const { sendAndWaitForEvents } = require('../substrate');
+const { descale, sendAndWaitForEvents } = require('../substrate');
 const { lookupBy } = require('../util');
 const { CashToken } = require('./cash_token');
 
@@ -111,11 +111,11 @@ class Actor {
     } else if (assetBalance > 0) {
       // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
       let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
-      return Number(token.toTokenAmount(assetBalance.toBigInt()) * Number(supplyIndex.toBigInt() - lastIndex.toBigInt())) / 1e18;
+      return descale(assetBalance.toBigInt() * (supplyIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
     } else {
       // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
       let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
-      return Number(token.toTokenAmount(assetBalance.toBigInt()) * Number(borrowIndex.toBigInt() - lastIndex.toBigInt())) / 1e18;
+      return descale(assetBalance.toBigInt() * (borrowIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
     }
   }
 
@@ -124,6 +124,30 @@ class Actor {
     let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
     console.log({cashForTokens});
     return await this.chainCashPrincipal() + cashForTokens.reduce((acc, el) => acc + el, 0);
+  }
+
+  async liquidityForToken(token) {
+    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let price = await token.getPrice();
+    let liquidityFactor = await token.getLiquidityFactor();
+    console.log({token: token.symbol, assetBalance, price, liquidityFactor});
+
+    if (assetBalance == 0) {
+      return 0;
+    } else if (assetBalance > 0) {
+      // AssetBalance • LiquidityFactor_Asset • Price_Asset
+      return token.toTokenAmount(assetBalance.toBigInt()) * price * liquidityFactor;
+    } else {
+      // AssetBalance ÷ LiquidityFactor_Asset • Price_Asset
+      return token.toTokenAmount(assetBalance.toBigInt()) * price / liquidityFactor;
+    }
+  }
+
+  async liquidity() {
+    // TODO: Use non-zero balances
+    let liquidityForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.liquidityForToken(token)));
+    console.log({liquidityForTokens});
+    return await this.cash() + liquidityForTokens.reduce((acc, el) => acc + el, 0);
   }
 
   async lock(amount, asset, awaitEvent = true) {
@@ -138,10 +162,17 @@ class Actor {
 
   async extract(amount, asset, recipient = null) {
     return await this.declare("extract", [amount, asset, "for", recipient || "myself"], async () => {
-      let token = this.ctx.tokens.get(asset);
-      let weiAmount = token.toWeiAmount(amount);
-
       let trxReq = this.extractTrxReq(amount, asset, recipient);
+
+      this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
+
+      return await this.runTrxRequest(trxReq);
+    });
+  }
+
+  async liquidate(liquidateAmount, borrowedAsset, collateralAsset, borrower) {
+    return await this.declare("liquidate", [liquidateAmount, borrowedAsset, "for", collateralAsset, "from", borrower], async () => {
+      let trxReq = this.liquidateTrxReq(liquidateAmount, borrowedAsset, collateralAsset, borrower);
 
       this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
 
@@ -157,7 +188,15 @@ class Actor {
     let token = this.ctx.tokens.get(asset);
     let weiAmount = token.toWeiAmount(amount);
 
-    return this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this)
+    return this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
+  }
+
+  liquidateTrxReq(liquidateAmount, borrowedAsset, collateralAsset, borrower) {
+    let borrowedToken = this.ctx.tokens.get(borrowedAsset);
+    let weiLiquidateAmount = borrowedToken.toWeiAmount(liquidateAmount);
+    let collateralToken = this.ctx.tokens.get(collateralAsset);
+
+    return this.ctx.generateTrxReq("Liquidate", weiLiquidateAmount, borrowedToken, collateralToken, borrower);
   }
 
   async transfer(amount, asset, recipient) {

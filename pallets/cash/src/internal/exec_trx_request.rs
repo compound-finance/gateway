@@ -130,6 +130,71 @@ pub fn exec_trx_request<T: Config>(
                 },
             }
         }
+
+        trx_request::TrxRequest::Liquidate(
+            max_amount,
+            trx_borrowed_asset,
+            trx_collateral_asset,
+            borrower,
+        ) => match (
+            CashOrChainAsset::from(trx_borrowed_asset),
+            CashOrChainAsset::from(trx_collateral_asset),
+        ) {
+            (x, y) if x == y => Err(Reason::InKindLiquidation),
+            (CashOrChainAsset::Cash, CashOrChainAsset::ChainAsset(collateral)) => {
+                let collateral_asset = get_asset::<T>(collateral)?;
+                let cash_principal_amount = match max_amount {
+                    trx_request::MaxAmount::Max => panic!("Not supported"), // TODO
+                    trx_request::MaxAmount::Amount(amount) => {
+                        let index = GlobalCashIndex::get();
+                        index.cash_principal_amount(Quantity::new(amount, CASH))?
+                    }
+                };
+
+                core::liquidate_cash_principal_internal::<T>(
+                    collateral_asset,
+                    sender,
+                    borrower.into(),
+                    cash_principal_amount,
+                )
+            }
+            (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::Cash) => {
+                let borrowed_asset = get_asset::<T>(borrowed)?;
+                let borrowed_asset_amount = match max_amount {
+                    trx_request::MaxAmount::Max => panic!("Not supported"), // TODO
+                    trx_request::MaxAmount::Amount(amount) => {
+                        borrowed_asset.as_quantity(amount.into())
+                    }
+                };
+
+                core::liquidate_cash_collateral_internal::<T>(
+                    borrowed_asset,
+                    sender,
+                    borrower.into(),
+                    borrowed_asset_amount,
+                )
+            }
+
+            (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::ChainAsset(collateral)) => {
+                let borrowed_asset = get_asset::<T>(borrowed)?;
+                let collateral_asset = get_asset::<T>(collateral)?;
+                let borrowed_asset_amount = match max_amount {
+                    trx_request::MaxAmount::Max => panic!("Not supported"), // TODO
+                    trx_request::MaxAmount::Amount(amount) => {
+                        borrowed_asset.as_quantity(amount.into())
+                    }
+                };
+
+                core::liquidate_internal::<T>(
+                    borrowed_asset,
+                    collateral_asset,
+                    sender,
+                    borrower.into(),
+                    borrowed_asset_amount,
+                )
+            }
+            _ => Err(Reason::InvalidLiquidation), // Probably isn't possible
+        }?,
     }
 
     if let Some(nonce) = nonce_opt {

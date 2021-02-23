@@ -19,6 +19,7 @@ const baseScenInfo = {
     "usdc",
   ],
   eth_supply_cap: 1000000,
+  eth_liquidity_factor: 0.7,
   chain_spec: { // TODO: Allow override of chain spec?
     base_chain: "local",
     use_temp: true,
@@ -27,7 +28,8 @@ const baseScenInfo = {
   declare_opts: {},
   starport: {},
   cash_token: {
-    initial_yield_index: '1000000000000000000'
+    initial_yield_index: '1000000000000000000',
+    liquidity_factor: 1.0,
   },
   initial_yield: 300, // [env=INITIAL_YIELD]
   initial_yield_start: null, // defaults to current time [env=INITIAL_YIELD_START]

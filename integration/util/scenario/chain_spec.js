@@ -38,8 +38,8 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     asset: `Eth:${token.ethAddress()}`,
     decimals: token.decimals,
     symbol: token.symbol.toUpperCase(),
-    ticker: token.symbol.toUpperCase(), // XXX how to set price ticker in integration tests?
-    liquidity_factor: 6543e14,
+    ticker: token.priceTicker,
+    liquidity_factor: Math.floor(token.liquidityFactor * 1e18),
     rate_model: {
       Kink: {
         zero_rate: 0,
