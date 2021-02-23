@@ -132,8 +132,8 @@ pub struct AssetInfo {
 }
 
 impl AssetInfo {
-    pub fn minimal(asset: ChainAsset, units: Units) -> Result<Self, Reason> {
-        Ok(AssetInfo {
+    pub fn minimal(asset: ChainAsset, units: Units) -> Self {
+        AssetInfo {
             asset,
             decimals: units.decimals,
             liquidity_factor: LiquidityFactor::default(),
@@ -142,7 +142,7 @@ impl AssetInfo {
             supply_cap: AssetAmount::default(),
             symbol: Symbol(units.ticker.0),
             ticker: units.ticker,
-        })
+        }
     }
 
     pub const fn units(self) -> Units {

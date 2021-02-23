@@ -110,7 +110,7 @@ pub mod tests {
                 let decimals = asset_case.decimals;
                 let liquidity_factor = LiquidityFactor::from_nominal(asset_case.liquidity_factor);
                 let miner_shares: MinerShares = Default::default();
-                let rate_model: InterestRateModel = InterestRateModel::default();
+                let rate_model: InterestRateModel = Default::default();
                 let supply_cap = AssetAmount::MAX;
                 let symbol = Symbol::new(&asset_case.ticker);
                 let ticker = Ticker::new(&asset_case.ticker);

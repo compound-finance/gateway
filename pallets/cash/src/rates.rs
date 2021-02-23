@@ -115,7 +115,7 @@ pub enum InterestRateModel {
 /// This is for convenience, we shouldn't rely on a sane default model.
 impl Default for InterestRateModel {
     fn default() -> Self {
-        Self::new_kink(0, 500, 8000, 2000)
+        Self::new_kink(0, 500, Factor::from_nominal("0.8"), 2000)
     }
 }
 

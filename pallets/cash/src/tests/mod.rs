@@ -1,32 +1,32 @@
-use crate::{chains::*, core::*, internal, mock::*, oracle::*, rates::*, reason::*, symbol::*, *};
+use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, *};
 use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 use our_std::str::FromStr;
 use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
 
+pub mod protocol;
+
 pub const ETH: Units = Units::from_ticker_str("ETH", 18);
+
+#[macro_export]
+macro_rules! bal {
+    ($string:expr, $units:expr) => {
+        Balance::from_nominal($string, $units);
+    };
+}
+
+#[macro_export]
+macro_rules! qty {
+    ($string:expr, $units:expr) => {
+        Quantity::from_nominal($string, $units);
+    };
+}
 
 pub fn eth_asset() -> ChainAsset {
     ChainAsset::Eth(
         <Ethereum as Chain>::str_to_address("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
     )
-}
-
-#[test]
-fn it_fails_exec_trx_request_signed() {
-    new_test_ext().execute_with(|| {
-        // Dispatch a signed extrinsic.
-        assert_err!(
-            CashModule::exec_trx_request(
-                Origin::signed(Default::default()),
-                vec![],
-                ChainAccountSignature::Eth([0; 20], [0; 65]),
-                0
-            ),
-            DispatchError::BadOrigin
-        );
-    });
 }
 
 pub fn initialize_storage() {
@@ -38,7 +38,6 @@ pub fn initialize_storage() {
                 FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
                 FromStr::from_str("ETH/18").unwrap(),
             )
-            .unwrap()
         },
         AssetInfo {
             ticker: FromStr::from_str("USD").unwrap(),
@@ -47,7 +46,6 @@ pub fn initialize_storage() {
                 FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
                 FromStr::from_str("USDC/6").unwrap(),
             )
-            .unwrap()
         },
     ]);
     CashModule::initialize_reporters(
@@ -76,6 +74,22 @@ pub fn initialize_storage() {
             .unwrap(),
         },
     ]);
+}
+
+#[test]
+fn it_fails_exec_trx_request_signed() {
+    new_test_ext().execute_with(|| {
+        // Dispatch a signed extrinsic.
+        assert_err!(
+            CashModule::exec_trx_request(
+                Origin::signed(Default::default()),
+                vec![],
+                ChainAccountSignature::Eth([0; 20], [0; 65]),
+                0
+            ),
+            DispatchError::BadOrigin
+        );
+    });
 }
 
 #[test]

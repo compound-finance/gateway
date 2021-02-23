@@ -218,7 +218,6 @@ fn testnet_genesis(
                             .unwrap(),
                         FromStr::from_str("ETH/18").unwrap(),
                     )
-                    .unwrap()
                 },
                 AssetInfo {
                     ticker: FromStr::from_str("USD").unwrap(),
@@ -228,7 +227,6 @@ fn testnet_genesis(
                             .unwrap(),
                         FromStr::from_str("USDC/6").unwrap(),
                     )
-                    .unwrap()
                 },
             ],
 
