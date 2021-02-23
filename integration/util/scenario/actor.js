@@ -296,7 +296,7 @@ async function getActorsInfo(actorsInfoHash, keyring, ctx) {
 }
 
 async function buildActors(actorsInfoHash, defaultActor, ctx) {
-  let keyring = new Keyring();
+  let keyring = new Keyring({ type: 'sr25519' });
 
   let actorsInfo = await instantiateInfo(actorsInfoHash, 'Actor', 'name', actorInfoMap(keyring));
   let actors = await Promise.all(actorsInfo.map(([actorName, actorInfo], index) => {

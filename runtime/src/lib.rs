@@ -301,6 +301,7 @@ impl pallet_cash::Config for Runtime {
     type Call = Call;
     type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
     type AccountStore = System;
+    type SessionInterface = Self;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------

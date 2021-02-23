@@ -1,4 +1,4 @@
-const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson } = require('../substrate');
+const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
 const {
   getNoticeChainId,
@@ -237,6 +237,16 @@ class Chain {
     const rawAuths = await this.ctx.api().rpc.state.getStorage(auraAuthStorageKey);
     const auths = this.ctx.api().createType('Authorities', rawAuths.value);
     return auths.map(e => this.ctx.actors.keyring.encodeAddress(e));
+  }
+
+  async rotateKeys(validator) {
+    const keysRaw = await validator.api.rpc.author.rotateKeys();
+    return  this.ctx.api().createType('SessionKeys', keysRaw);
+  }
+
+  async setKeys(signer, keys) {
+    const call = this.ctx.api().tx.session.setKeys(keys, new Uint8Array());
+    await signAndSend(call, signer);
   }
   
   async waitUntilSession(num) {

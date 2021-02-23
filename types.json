@@ -420,5 +420,10 @@
     "version": "u8",
     "authorityList": "AuthorityList"
   },
-  "Authorities": "Vec<AccountId32>"
+  "Authorities": "Vec<AccountId32>",
+  "SessionKeys": {
+    "aura": "[u8;32]",
+    "grandpa": "[u8;32]"
+  },
+  "Keys": "SessionKeys"
 }
