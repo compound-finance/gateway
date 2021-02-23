@@ -228,13 +228,10 @@
   "Source5": "RatesRS",
   "RatesError": {
     "_enum": [
-      "UtilizationZeroSupplyError",
-      "UtilizationBorrowedIsMoreThanSupplied",
-      "ModelNotIncreasingZeroRateAboveKinkRate",
-      "ModelNotIncreasingKinkRateAboveFullRate",
-      "ModelKinkUtilizationOver100Percent",
-      "ModelKinkUtilizationNotPositive",
       "ModelRateOutOfBounds",
+      "ZeroAboveKink",
+      "KinkAboveFull",
+      "KinkUtilizationTooHigh",
       "Overflowed"
     ]
   },

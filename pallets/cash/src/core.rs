@@ -26,7 +26,7 @@ use crate::{
     },
     params::{MIN_TX_VALUE, TRANSFER_FEE},
     portfolio::Portfolio,
-    rates::{Utilization, APR},
+    rates::APR,
     reason::{MathError, Reason},
     symbol::{Units, CASH},
     types::{
@@ -114,7 +114,7 @@ pub fn get_value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, Reason
 }
 
 /// Return the current utilization for the asset.
-pub fn get_utilization<T: Config>(asset: &ChainAsset) -> Result<Utilization, Reason> {
+pub fn get_utilization<T: Config>(asset: ChainAsset) -> Result<Factor, Reason> {
     let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let total_supply = TotalSupplyAssets::get(asset);
     let total_borrow = TotalBorrowAssets::get(asset);
@@ -122,7 +122,7 @@ pub fn get_utilization<T: Config>(asset: &ChainAsset) -> Result<Utilization, Rea
 }
 
 /// Return the current borrow and supply rates for the asset.
-pub fn get_rates<T: Config>(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
+pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
     let info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let utilization = get_utilization::<T>(asset)?;
     Ok(info
@@ -1246,7 +1246,7 @@ pub fn on_initialize_internal<T: Config>(
 
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     for (asset, asset_info) in SupportedAssets::iter() {
-        let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
+        let (asset_cost, asset_yield) = crate::core::get_rates::<T>(asset)?;
         let asset_units = asset_info.units();
         let price_asset = get_price::<T>(asset_units)?;
         let price_ratio = price_asset.ratio(price_cash)?;
@@ -1326,6 +1326,7 @@ pub fn on_initialize_internal<T: Config>(
 mod tests {
     use super::*;
     use crate::{chains::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*};
+    use our_std::str::FromStr;
 
     #[test]
     fn test_helpers() {
@@ -1737,8 +1738,8 @@ mod tests {
             let asset = eth_asset();
             TotalSupplyAssets::insert(&asset, 100);
             TotalBorrowAssets::insert(&asset, 50);
-            let utilization = crate::core::get_utilization::<Test>(&asset).unwrap();
-            assert_eq!(utilization, Utilization::from_nominal("0.5"));
+            let utilization = crate::core::get_utilization::<Test>(asset).unwrap();
+            assert_eq!(utilization, Factor::from_nominal("0.5"));
         });
     }
 
@@ -1749,7 +1750,12 @@ mod tests {
             let kink_rate = 105;
             let asset = eth_asset();
             let asset_info = AssetInfo {
-                rate_model: InterestRateModel::new_kink(0, kink_rate, 5000, 202),
+                rate_model: InterestRateModel::new_kink(
+                    0,
+                    kink_rate,
+                    Factor::from_nominal("0.5"),
+                    202,
+                ),
                 miner_shares: MinerShares::from_nominal("0.5"),
                 ..AssetInfo::minimal(asset, ETH).unwrap()
             };
@@ -1760,12 +1766,38 @@ mod tests {
 
             CashModule::set_rate_model(Origin::root(), asset.clone(), asset_info.rate_model)
                 .unwrap();
-            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(&asset).unwrap();
+            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(asset).unwrap();
 
             assert_eq!(borrow_rate, kink_rate.into());
             // 50% utilization and 50% reserve factor
             assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
         });
+    }
+
+    #[test]
+    fn test_has_liquidity_to_reduce_cash() -> Result<(), Reason> {
+        const BAT: Units = Units::from_ticker_str("BAT", 18);
+        let asset = ChainAsset::from_str("Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef")?;
+        let asset_info = AssetInfo {
+            liquidity_factor: LiquidityFactor::from_nominal("0.6543"),
+            ..AssetInfo::minimal(asset, BAT).unwrap()
+        };
+
+        new_test_ext().execute_with(|| {
+            let account = ChainAccount::Eth([0u8; 20]);
+            let amount = Quantity::from_nominal("5", CASH);
+
+            assert!(!has_liquidity_to_reduce_cash::<Test>(account, amount)?);
+
+            Prices::insert(BAT.ticker, Price::from_nominal(BAT.ticker, "0.53").value);
+            SupportedAssets::insert(&asset, asset_info);
+            AssetBalances::insert(&asset, &account, Balance::from_nominal("25000", BAT).value);
+            AssetsWithNonZeroBalance::insert(account, asset, ());
+
+            assert!(has_liquidity_to_reduce_cash::<Test>(account, amount)?);
+
+            Ok(())
+        })
     }
 
     #[test]
@@ -1775,7 +1807,7 @@ mod tests {
             let miner = ChainAccount::Eth([0; 20]);
             let asset = eth_asset();
             let asset_info = AssetInfo {
-                rate_model: InterestRateModel::new_kink(0, 2500, 5000, 5000),
+                rate_model: InterestRateModel::new_kink(0, 2500, Factor::from_nominal("0.5"), 5000),
                 miner_shares: MinerShares::from_nominal("0.02"),
                 ..AssetInfo::minimal(asset, ETH).unwrap()
             };

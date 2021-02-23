@@ -149,3 +149,9 @@ impl From<Factor> for String {
         format!("{}", string.0)
     }
 }
+
+impl From<Uint> for Factor {
+    fn from(raw: u128) -> Self {
+        Factor(raw)
+    }
+}
