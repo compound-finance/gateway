@@ -4,13 +4,14 @@ use crate::notices::NoticeId;
 use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
+use compound_crypto::CryptoError;
 use our_std::RuntimeDebug;
 use trx_request;
 
 /// Type for reporting failures for reasons outside of our control.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum Reason {
-    AssetExtractionNotSupported, // XXX temporary?
+    AssetExtractionNotSupported,
     AssetNotSupported,
     BadAccount,
     BadAddress,
@@ -21,7 +22,7 @@ pub enum Reason {
     BadTicker,
     BadUnits,
     ChainMismatch,
-    CryptoError(compound_crypto::CryptoError),
+    CryptoError(CryptoError),
     EventAlreadySigned,
     FailedToSubmitExtrinsic,
     FetchError,
@@ -54,6 +55,7 @@ pub enum Reason {
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
+    InvalidLiquidation,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -106,6 +108,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::TrxRequestParseError(_) => (22, 0, "trx request parse error"),
             Reason::UnknownValidator => (23, 0, "unknown validator"),
             Reason::SetYieldNextError(_) => (24, 0, "set yield next error"),
+            Reason::InvalidLiquidation => (25, 0, "invalid liquidation parameters"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
@@ -121,8 +124,8 @@ impl From<MathError> for Reason {
     }
 }
 
-impl From<compound_crypto::CryptoError> for Reason {
-    fn from(err: compound_crypto::CryptoError) -> Self {
+impl From<CryptoError> for Reason {
+    fn from(err: CryptoError) -> Self {
         Reason::CryptoError(err)
     }
 }

@@ -37,6 +37,7 @@ pub enum Account {
 pub enum TrxRequest {
     Extract(MaxAmount, Asset, Account),
     Transfer(MaxAmount, Asset, Account),
+    Liquidate(MaxAmount, Asset, Asset, Account),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -130,7 +131,7 @@ fn parse_extract<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
 
             Ok(TrxRequest::Extract(max_amount, asset, account))
         }
-        _ => Err(ParseError::InvalidArgs("Extract", 2, args.len())),
+        _ => Err(ParseError::InvalidArgs("Extract", 3, args.len())),
     }
 }
 
@@ -143,7 +144,26 @@ fn parse_transfer<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> 
 
             Ok(TrxRequest::Transfer(max_amount, asset, account))
         }
-        _ => Err(ParseError::InvalidArgs("Transfer", 2, args.len())),
+        _ => Err(ParseError::InvalidArgs("Transfer", 3, args.len())),
+    }
+}
+
+fn parse_liquidate<'a>(args: &[Token<'a>]) -> Result<TrxRequest, ParseError<'a>> {
+    match args {
+        [amount_token, borrowed_asset_token, collateral_asset_token, account_token] => {
+            let max_amount = parse_max_amount(amount_token)?;
+            let borrowed_asset = parse_asset(borrowed_asset_token)?;
+            let collateral_asset = parse_asset(collateral_asset_token)?;
+            let account = parse_account(account_token)?;
+
+            Ok(TrxRequest::Liquidate(
+                max_amount,
+                borrowed_asset,
+                collateral_asset,
+                account,
+            ))
+        }
+        _ => Err(ParseError::InvalidArgs("Liquidate", 4, args.len())),
     }
 }
 
@@ -168,6 +188,9 @@ fn parse<'a>(tokens: Lexer<'a, Token<'a>>) -> Result<TrxRequest, ParseError<'a>>
         }
         [Token::LeftDelim, Token::Identifier("Transfer"), args @ .., Token::RightDelim] => {
             parse_transfer(args)
+        }
+        [Token::LeftDelim, Token::Identifier("Liquidate"), args @ .., Token::RightDelim] => {
+            parse_liquidate(args)
         }
         [Token::LeftDelim, Token::Identifier(fun), .., Token::RightDelim] => {
             Err(ParseError::UnknownFunction(fun))
@@ -256,6 +279,20 @@ mod tests {
       parse_transfer_max:
         "(Transfer Max Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Transfer(
           MaxAmount::Max,
+          Asset::Eth(ETH),
+          Account::Eth(ALAN)
+        )),
+      parse_liquidate_amount:
+        "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Liquidate(
+          MaxAmount::Amount(55),
+          Asset::Eth(ETH),
+          Asset::Cash,
+          Account::Eth(ALAN)
+        )),
+      parse_liquidate_max:
+        "(Liquidate Max Cash Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Liquidate(
+          MaxAmount::Max,
+          Asset::Cash,
           Asset::Eth(ETH),
           Account::Eth(ALAN)
         )),
