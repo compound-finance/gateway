@@ -145,6 +145,16 @@ class Actor {
     });
   }
 
+  async liquidate(liquidateAmount, borrowedAsset, collateralAsset, borrower) {
+    return await this.declare("liquidate", [liquidateAmount, borrowedAsset, "for", collateralAsset, "from", borrower], async () => {
+      let trxReq = this.liquidateTrxReq(liquidateAmount, borrowedAsset, collateralAsset, borrower);
+
+      this.ctx.log(`Running Trx Request \`${trxReq}\` from ${this.name}`);
+
+      return await this.runTrxRequest(trxReq);
+    });
+  }
+
   async execTrxRequest(trxRequest, awaitEvent = true) {
     return await this.ctx.starport.execTrxRequest(this, trxRequest, awaitEvent);
   }
@@ -153,7 +163,15 @@ class Actor {
     let token = this.ctx.tokens.get(asset);
     let weiAmount = token.toWeiAmount(amount);
 
-    return this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this)
+    return this.ctx.generateTrxReq("Extract", weiAmount, token, recipient || this);
+  }
+
+  liquidateTrxReq(liquidateAmount, borrowedAsset, collateralAsset, borrower) {
+    let borrowedToken = this.ctx.tokens.get(borrowedAsset);
+    let weiLiquidateAmount = borrowedToken.toWeiAmount(liquidateAmount);
+    let collateralToken = this.ctx.tokens.get(collateralAsset);
+
+    return this.ctx.generateTrxReq("Liquidate", weiLiquidateAmount, borrowedToken, collateralToken, borrower);
   }
 
   async transfer(amount, asset, recipient) {
