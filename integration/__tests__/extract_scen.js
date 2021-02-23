@@ -5,7 +5,8 @@ const { getNotice } = require('../util/substrate');
 
 let extract_scen_info = {
   tokens: [
-    { token: "zrx", balances: { ashley: 1000 } }
+    { token: "zrx", balances: { ashley: 1000 } },
+    { token: "bat", balances: { bert: 25000 } }
   ],
 };
 
@@ -40,32 +41,44 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
-    skip: true,
     name: "Extract Cash",
-    scenario: async ({ ashley, zrx, chain, starport, cash }) => {
-      let notice = getNotice(await ashley.extract(50, cash));
+    scenario: async ({ ashley, zrx, chain, starport, cash, log }) => {
+      let notice = getNotice(await ashley.extract(20, cash));
       let signatures = await chain.getNoticeSignatures(notice);
       expect(await cash.getCashPrincipal(ashley)).toEqual(0);
       expect(await ashley.tokenBalance(cash)).toEqual(0);
-      await starport.invoke(notice, signatures);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(5000);
-      expect(await ashley.tokenBalance(cash)).toEqual(50);
-      expect(await ashley.chainBalance(cash)).toEqual(-50);
+      let tx = await starport.invoke(notice, signatures);
+      expect(await ashley.tokenBalance(cash)).toBeCloseTo(20, 4);
+      expect(await ashley.cash()).toBeCloseTo(-20, 4);
     }
   },
   {
-    skip: true,
-    name: "Extract Cash Max",
-    scenario: async ({ ashley, zrx, chain, starport, cash }) => {
-      // TODO: Make sure user has Cash to begin scenario
-      let notice = getNotice(await ashley.extract('Max', cash));
+    name: "Extract Cash Torrey",
+    beforeEach: null,
+    scenario: async ({ bert, bat, chain, starport, cash, log }) => {
+      await bert.lock(25000, bat);
+      let notice = getNotice(await bert.extract(5, cash));
       let signatures = await chain.getNoticeSignatures(notice);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(0);
-      expect(await ashley.tokenBalance(cash)).toEqual(0);
+      expect(await cash.getCashPrincipal(bert)).toEqual(0);
+      expect(await bert.tokenBalance(cash)).toEqual(0);
+      let tx = await starport.invoke(notice, signatures);
+      expect(await bert.tokenBalance(cash)).toBeCloseTo(5, 4);
+      expect(await bert.cash()).toBeCloseTo(-5, 4);
+    }
+  },
+  {
+    name: "Extract Cash Max",
+    scenario: async ({ ashley, bert, zrx, chain, starport, cash }) => {
+      await ashley.transfer(10, cash, bert);
+      expect(await bert.cash()).toBeCloseTo(10, 4);
+      let notice = getNotice(await bert.extract('Max', cash));
+      let signatures = await chain.getNoticeSignatures(notice);
+
+      expect(await ashley.cash()).toBeCloseTo(-10.01, 4);
+      expect(await bert.cash()).toEqual(0, 4);
+      expect(await bert.tokenBalance(cash)).toEqual(0);
       await starport.invoke(notice, signatures);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(5000);
-      expect(await ashley.tokenBalance(cash)).toEqual(50);
-      expect(await ashley.chainBalance(cash)).toEqual(-50);
+      expect(await bert.tokenBalance(cash)).toBeCloseTo(10, 4);
     }
   }
 ]);
