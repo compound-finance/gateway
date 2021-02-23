@@ -54,7 +54,7 @@ pub fn authority_keys_from_seed(
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_starport_address" : "0xbbde1662bC3ED16aA8C618c9833c801F3543B587"
+        "eth_starport_address" : "0x3cFD5Ac2afce237689b679912Be1Aca41c68D6Ba"
     });
     let as_object = value.as_object();
     let unwrapped = as_object.unwrap();
