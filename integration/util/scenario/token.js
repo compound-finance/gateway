@@ -98,8 +98,18 @@ class Token {
     }
   }
 
-  async getAsset() {
-    return (await this.ctx.api().query.cash.supportedAssets(this.toChainAsset())).unwrap();
+  async getAssetInfo(field = undefined) {
+    let assetRes = await this.ctx.api().query.cash.supportedAssets(this.toChainAsset());
+    let unwrapped = assetRes.unwrap();
+    if (field) {
+      if (unwrapped.hasOwnProperty(field)) {
+        return unwrapped[field];
+      } else {
+        throw new Error(`No such field ${field} on ${JSON.stringify(unwrapped)}`);
+      }
+    } else {
+      return unwrapped;
+    }
   }
 
   async getPrice() {
