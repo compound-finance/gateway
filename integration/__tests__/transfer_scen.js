@@ -28,25 +28,34 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
     }
   },
   {
-    skip: true,
     name: "Transfer Cash",
     scenario: async ({ ashley, bert, zrx, chain, starport, cash }) => {
-      let notice = await ashley.transfer(50, cash);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(5000); // ??
-      expect(await ashley.tokenBalance(cash)).toEqual(50);
-      expect(await ashley.chainBalance(cash)).toEqual(-50);
-      expect(await bert.chainBalance(cash)).toEqual(50);
+      await ashley.transfer(10, cash, bert);
+      expect(await ashley.tokenBalance(cash)).toEqual(0);
+      expect(await bert.tokenBalance(cash)).toEqual(0);
+      expect(await ashley.cash()).toBeCloseTo(-10.01, 4);
+      expect(await bert.cash()).toBeCloseTo(10, 4);
     }
   },
   {
-    skip: true,
+    only: true,
     name: "Transfer Cash Max",
-    scenario: async ({ ashley, bert, zrx, chain, starport, cash }) => {
-      let notice = await ashley.transfer('Max', cash);
-      expect(await cash.getCashPrincipal(ashley)).toEqual(5000); // ??
-      expect(await ashley.tokenBalance(cash)).toEqual(50);
-      expect(await ashley.chainBalance(cash)).toEqual(-50);
-      expect(await bert.chainBalance(cash)).toEqual(50);
+    scenario: async ({ ashley, bert, chuck, zrx, chain, starport, cash }) => {
+      await ashley.transfer(10, cash, bert);
+      await bert.transfer('Max', cash, chuck); // This is failing due to Insufficient Liquidity (!)
+      let ashleyCash = await ashley.cash();
+      let bertCash = await bert.cash();
+      let chuckCash = await chuck.cash();
+      console.log({
+        ashleyCash,
+        bertCash,
+        chuckCash,
+      })
+
+      // TODO: Fix checks below
+      expect(ashleyCash).toBeCloseTo(-10.01, 4);
+      expect(bertCash).toEqual(0, 4);
+      expect(chuckCash).toEqual(10, 4);
     }
   }
 ]);
