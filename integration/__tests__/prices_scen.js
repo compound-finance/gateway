@@ -18,10 +18,18 @@ let pricePayloads = {
 
 buildScenarios('Prices Scenarios', prices_scen_info, [
   {
+    only: true,
+    name: "Prices from Price Server",
+    scenario: async ({ chain, zrx, sleep }) => {
+      await sleep(30000); // Wait for prices to come in naturally
+      expect(await zrx.getPrice()).toEqual(0.599453);
+    }
+  },
+  {
     name: "Prices from Storage",
-    scenario: async ({ chain, zrx }) => {
+    scenario: async ({ chain, zrx, sleep }) => {
       await chain.postPrice(pricePayloads.ZRX.payload, pricePayloads.ZRX.signature, false);
-      expect(await zrx.getPrice()).toEqual(599453);
+      expect(await zrx.getPrice()).toEqual(0.599453);
     }
   },
   {
