@@ -123,6 +123,10 @@ class Ctx {
       await this.eth.teardown();
     }
 
+    if (this.prices) {
+      await this.prices.teardown();
+    }
+
     await sleep(1000); // Give things a second to close
   }
 }
@@ -161,10 +165,13 @@ async function buildCtx(scenInfo={}) {
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
+  ctx.prices = await buildPrices(scenInfo.tokens, ctx);
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
   ctx.trxReq = await buildTrxReq(ctx);
   ctx.chain = await buildChain(ctx);
-  ctx.prices = await buildPrices(scenInfo.tokens, ctx);
+  ctx.sleep = sleep;
+
+  // TODO: Post prices?
 
   aliasBy(ctx, ctx.actors.all(), 'name');
   aliasBy(ctx, ctx.tokens.all(), 'ticker');
