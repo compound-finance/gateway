@@ -22,7 +22,7 @@ const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereu
 const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
 
 // XXX disambiguate whats for ethereum vs not
-pub fn fetch_events<T: Config>() -> Result<(), Reason> {
+pub fn process_events<T: Config>() -> Result<(), Reason> {
     let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_ETHEREUM_BLOCK);
 
     let from_block: String = if let Some(Some(cached_block_num)) = s_info.get::<u64>() {
@@ -129,58 +129,52 @@ pub fn receive_event<T: Config>(
         return Err(Reason::UnknownValidator)?;
     }
 
-    if PendingEvents::contains_key(chain_id, event_id) {
-        let mut signers: SignersSet = PendingEvents::get(chain_id, event_id);
-        // Add new validator to the signers set
-        // Note: If validator is already in the signers set, no change will apply
-        // let mut signers_new = signers.clone();
-        signers.insert(signer);
-
-        if passes_validation_threshold(&signers, &validators) {
-            match apply_chain_event_internal::<T>(event) {
-                Ok(()) => {
-                    PendingEvents::remove(chain_id, event_id);
-                    DoneEvents::insert(chain_id, event_id, signers);
-                    <Module<T>>::deposit_event(EventT::ProcessedChainEvent(chain_id, event_id));
-                    Ok(())
-                }
-
-                Err(reason) => {
-                    log!(
-                        "process_chain_event_internal({}) apply failed: {:?}",
-                        event_id.show(),
-                        reason
-                    );
-                    PendingEvents::remove(chain_id, event_id);
-                    FailedEvents::insert(chain_id, event_id, reason);
-                    <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(
-                        chain_id, event_id, reason,
-                    ));
-                    Ok(())
-                }
-            }
-        } else {
-            log!(
-                "process_chain_event_internal({}) signer_count={}",
-                event_id.show(),
-                signers.len()
-            );
-            // XX, do we really need to insert or we can modify signers directly
-            PendingEvents::insert(chain_id, event_id, signers);
-            Ok(())
-        }
-    } else if DoneEvents::contains_key(chain_id, event_id)
+    // Check if event is in `Done` or `Failed` queues first,
+    // Otherwise it is a new or already seen `Pending` event
+    if DoneEvents::contains_key(chain_id, event_id)
         || FailedEvents::contains_key(chain_id, event_id)
     {
         // TODO: Eventually we should be deleting or retrying here (based on monotonic ids and signing order)
-        Ok(())
-    } else {
-        // Adding new event and start collectiong validators vote for it
-        let mut signers: SignersSet = SignersSet::new();
-        signers.insert(signer);
-        PendingEvents::insert(chain_id, event_id, signers);
+        return Ok(());
+    }
 
-        /// XXX it can pass validation threshold if there is only 1 validator
+    // Get signers set, if it's a new `Pending` event, create a new empty signers set
+    let signers_prev = if PendingEvents::contains_key(chain_id, event_id) {
+        PendingEvents::take(chain_id, event_id)
+    } else {
+        SignersSet::new()
+    };
+    let mut signers_new = signers_prev.clone();
+    signers_new.insert(signer);
+
+    if passes_validation_threshold(&signers_new, &validators) {
+        match apply_chain_event_internal::<T>(event) {
+            Ok(()) => {
+                DoneEvents::insert(chain_id, event_id, signers_new);
+                <Module<T>>::deposit_event(EventT::ProcessedChainEvent(chain_id, event_id));
+                Ok(())
+            }
+
+            Err(reason) => {
+                log!(
+                    "process_chain_event_internal({}) apply failed: {:?}",
+                    event_id.show(),
+                    reason
+                );
+                FailedEvents::insert(chain_id, event_id, reason);
+                <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(
+                    chain_id, event_id, reason,
+                ));
+                Ok(())
+            }
+        }
+    } else {
+        log!(
+            "process_chain_event_internal({}) signer_count={}",
+            event_id.show(),
+            signers_new.len()
+        );
+        PendingEvents::insert(chain_id, event_id, signers_new);
         Ok(())
     }
 }

@@ -391,7 +391,7 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            if let Err(e) = internal::events::fetch_events::<T>() {
+            if let Err(e) = internal::events::process_events::<T>() {
                 log!("offchain_worker error during fetch events: {:?}", e);
             }
 
