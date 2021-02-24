@@ -34,38 +34,42 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
         // Validator's cache is empty, fetch events from the earliest block with pending events
         log!("Block number has not been cached yet");
 
-        let earlist_pending_event_block_number: u64 = PendingEvents::iter()
+        let pending_event_block_numbers: Vec<u64> = PendingEvents::iter()
             .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
                 ChainLogId::Eth(block_number, _log_index) => Some(block_number),
                 _ => None,
             })
-            .min();
+            .collect();
+        let earlist_pending_event_block_number = pending_event_block_numbers.iter().min();
 
-        let earlist_failed_event_block_number: u64 = FailedEvents::iter()
+        let failed_event_block_numbers: Vec<u64> = FailedEvents::iter()
             .filter_map(|(_chain_id, chain_log_id, _reason)| match chain_log_id {
                 ChainLogId::Eth(block_number, _log_index) => Some(block_number),
                 _ => None,
             })
-            .min();
+            .collect();
+        let earlist_failed_event_block_number = failed_event_block_numbers.iter().min();
 
         let min_pending_and_done = cmp::min(
-            earlist_pending_event_block_number.unwrap_or(0),
-            earlist_failed_event_block_number.unwrap_or(0),
+            earlist_pending_event_block_number.unwrap_or(&0),
+            earlist_failed_event_block_number.unwrap_or(&0),
         );
 
         // If there are no `Pending` or `Failed` events, check latest `Done` event
-        if min_pending_and_done == 0 {
+        if min_pending_and_done == &0 {
             /// XXX: Storing max in cash pallet storage?
-            let latest_done_block_number: u64 = DoneEvents::iter()
+            let done_event_block_numbers: Vec<u64> = DoneEvents::iter()
                 .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
                     ChainLogId::Eth(block_number, _log_index) => Some(block_number),
                     _ => None,
                 })
-                .max();
+                .collect();
+            let latest_done_block_number = done_event_block_numbers.iter().max();
             if latest_done_block_number.is_some() {
-                let done_events_block: u64 = latest_done_block_number.unwrap();
+                let done_events_block: u64 = *latest_done_block_number.unwrap();
                 format!("{:#X}", done_events_block + 1)
             } else {
+                // Note: No `Done` events were found, it means it's beginning of the chain
                 String::from("earliest")
             }
         } else {
