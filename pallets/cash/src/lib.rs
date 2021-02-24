@@ -15,7 +15,7 @@ use crate::chains::{
     ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
     ChainSignatureList,
 };
-use crate::events::{ChainLogEvent, ChainLogId, EventState};
+use crate::events::{ChainLogEvent, ChainLogId};
 use crate::notices::{Notice, NoticeId, NoticeState};
 use crate::rates::{InterestRateModel, APR};
 use crate::reason::Reason;
@@ -23,7 +23,7 @@ use crate::symbol::Ticker;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, Bips, CashIndex, CashPrincipal,
     CashPrincipalAmount, CodeHash, EncodedNotice, LiquidityFactor, Nonce, ReporterSet,
-    SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
+    SessionIndex, SignersSet, Timestamp, ValidatorKeys, ValidatorSig,
 };
 use codec::alloc::string::String;
 use frame_support::{
@@ -153,8 +153,14 @@ decl_storage! {
         /// The mapping of asset indices, by asset and account.
         LastIndices get(fn last_index): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
 
-        /// The mapping of (status of) events witnessed on a given chain, by event id.
-        EventStates get(fn event_state): map hasher(blake2_128_concat) ChainLogId => EventState;
+        /// XXX update here The mapping of (status of) events witnessed on a given chain, by event id.
+        PendingEvents get(fn pending_events): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) ChainLogId => SignersSet;
+
+        /// XXX update here
+        DoneEvents get(fn done_events): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) ChainLogId => SignersSet;
+
+        /// XXX update here
+        FailedEvents get(fn failed_events): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) ChainLogId => Reason;
 
         /// Notices contain information which can be synced to Starports
         Notices get(fn notice): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
@@ -218,10 +224,10 @@ decl_event!(
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
         /// An Ethereum event was successfully processed. [event_id]
-        ProcessedChainEvent(ChainLogId),
+        ProcessedChainEvent(ChainId, ChainLogId),
 
         /// An Ethereum event failed during processing. [event_id, reason]
-        FailedProcessingChainEvent(ChainLogId, Reason),
+        FailedProcessingChainEvent(ChainId, ChainLogId, Reason),
 
         /// Signed notice. [chain_id, notice_id, message, signatures]
         SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
@@ -371,10 +377,10 @@ decl_module! {
 
         // TODO: Do we need to sign the event id, too?
         #[weight = 1] // XXX how are we doing weights?
-        pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+        pub fn receive_event(origin, chain_id: ChainId, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
             log!("receive_event(origin,event_id,event,sig): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
+            Ok(check_failure::<T>(internal::events::receive_event::<T>(chain_id, event_id, event, signature))?)
         }
 
         #[weight = 0] // XXX
@@ -463,7 +469,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .longevity(10)
                 .propagate(true)
                 .build(),
-            Call::receive_event(_event_id, _event, signature) => {
+            Call::receive_event(_chain_id, _event_id, _event, signature) => {
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
                     .and_provides(signature)

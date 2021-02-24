@@ -1,5 +1,5 @@
 use codec::Encode;
-use frame_support::storage::{IterableStorageMap, StorageMap};
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap};
 use frame_system::offchain::SubmitTransaction;
 use our_std::collections::btree_set::BTreeSet;
 use sp_runtime::offchain::{
@@ -8,13 +8,13 @@ use sp_runtime::offchain::{
 };
 
 use crate::{
-    chains::{Chain, Ethereum},
+    chains::{Chain, ChainId, Ethereum},
     core::{apply_chain_event_internal, passes_validation_threshold},
-    events::{encode_block_hex, fetch_eth_events, ChainLogEvent, ChainLogId, EventState},
+    events::{encode_block_hex, fetch_eth_events, ChainLogEvent, ChainLogId},
     log,
     reason::Reason,
-    types::ValidatorSig,
-    Call, Config, Event as EventT, EventStates, Module, Validators,
+    types::{SignersSet, ValidatorSig},
+    Call, Config, DoneEvents, Event as EventT, FailedEvents, Module, PendingEvents, Validators,
 };
 
 // OCW storage constants
@@ -66,7 +66,7 @@ pub fn fetch_events<T: Config>() -> Result<(), Reason> {
                 // We need to make sure this is fully idempotent
 
                 // Send extrinsics for all events
-                submit_events::<T>(event_info.events)?;
+                submit_events::<T>(ChainId::Eth, event_info.events)?;
 
                 // Save latest block in ocw storage
                 s_info.set(&event_info.latest_eth_block);
@@ -80,7 +80,10 @@ pub fn fetch_events<T: Config>() -> Result<(), Reason> {
     Ok(())
 }
 
-fn submit_events<T: Config>(events: Vec<(ChainLogId, ChainLogEvent)>) -> Result<(), Reason> {
+fn submit_events<T: Config>(
+    chain_id: ChainId,
+    events: Vec<(ChainLogId, ChainLogEvent)>,
+) -> Result<(), Reason> {
     for (event_id, event) in events.into_iter() {
         log!(
             "Processing event and sending extrinsic: {} {:?}",
@@ -91,7 +94,7 @@ fn submit_events<T: Config>(events: Vec<(ChainLogId, ChainLogEvent)>) -> Result<
         // XXX why are we signing with eth?
         //  bc eth is identity key...
         let signature = <Ethereum as Chain>::sign_message(&event.encode()[..])?;
-        let call = Call::receive_event(event_id, event, signature);
+        let call = Call::receive_event(chain_id, event_id, event, signature);
 
         // TODO: Do we want to short-circuit on an error here?
         let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
@@ -105,6 +108,7 @@ fn submit_events<T: Config>(events: Vec<(ChainLogId, ChainLogEvent)>) -> Result<
 }
 
 pub fn receive_event<T: Config>(
+    chain_id: ChainId,
     event_id: ChainLogId,
     event: ChainLogEvent,
     signature: ValidatorSig,
@@ -125,53 +129,58 @@ pub fn receive_event<T: Config>(
         return Err(Reason::UnknownValidator)?;
     }
 
-    match EventStates::get(event_id) {
-        EventState::Pending { signers } => {
-            // Add new validator to the signers set
-            // Note: If validator is already in the signers set, no change will apply
-            let mut signers_new = signers.clone();
-            signers_new.insert(signer);
+    if PendingEvents::contains_key(chain_id, event_id) {
+        let mut signers: SignersSet = PendingEvents::get(chain_id, event_id);
+        // Add new validator to the signers set
+        // Note: If validator is already in the signers set, no change will apply
+        // let mut signers_new = signers.clone();
+        signers.insert(signer);
 
-            if passes_validation_threshold(&signers, &validators) {
-                match apply_chain_event_internal::<T>(event) {
-                    Ok(()) => {
-                        EventStates::insert(event_id, EventState::Done);
-                        <Module<T>>::deposit_event(EventT::ProcessedChainEvent(event_id));
-                        Ok(())
-                    }
-
-                    Err(reason) => {
-                        log!(
-                            "process_chain_event_internal({}) apply failed: {:?}",
-                            event_id.show(),
-                            reason
-                        );
-                        EventStates::insert(event_id, EventState::Failed { reason });
-                        <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(
-                            event_id, reason,
-                        ));
-                        Ok(())
-                    }
+        if passes_validation_threshold(&signers, &validators) {
+            match apply_chain_event_internal::<T>(event) {
+                Ok(()) => {
+                    PendingEvents::remove(chain_id, event_id);
+                    DoneEvents::insert(chain_id, event_id, signers);
+                    <Module<T>>::deposit_event(EventT::ProcessedChainEvent(chain_id, event_id));
+                    Ok(())
                 }
-            } else {
-                log!(
-                    "process_chain_event_internal({}) signer_count={}",
-                    event_id.show(),
-                    signers_new.len()
-                );
-                EventStates::insert(
-                    event_id,
-                    EventState::Pending {
-                        signers: signers_new,
-                    },
-                );
-                Ok(())
-            }
-        }
 
-        EventState::Failed { .. } | EventState::Done => {
-            // TODO: Eventually we should be deleting or retrying here (based on monotonic ids and signing order)
+                Err(reason) => {
+                    log!(
+                        "process_chain_event_internal({}) apply failed: {:?}",
+                        event_id.show(),
+                        reason
+                    );
+                    PendingEvents::remove(chain_id, event_id);
+                    FailedEvents::insert(chain_id, event_id, reason);
+                    <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(
+                        chain_id, event_id, reason,
+                    ));
+                    Ok(())
+                }
+            }
+        } else {
+            log!(
+                "process_chain_event_internal({}) signer_count={}",
+                event_id.show(),
+                signers.len()
+            );
+            // XX, do we really need to insert or we can modify signers directly
+            PendingEvents::insert(chain_id, event_id, signers);
             Ok(())
         }
+    } else if DoneEvents::contains_key(chain_id, event_id)
+        || FailedEvents::contains_key(chain_id, event_id)
+    {
+        // TODO: Eventually we should be deleting or retrying here (based on monotonic ids and signing order)
+        Ok(())
+    } else {
+        // Adding new event and start collectiong validators vote for it
+        let mut signers: SignersSet = SignersSet::new();
+        signers.insert(signer);
+        PendingEvents::insert(chain_id, event_id, signers);
+
+        /// XXX it can pass validation threshold if there is only 1 validator
+        Ok(())
     }
 }

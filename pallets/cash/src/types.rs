@@ -1,5 +1,6 @@
 use codec::{Decode, Encode};
 use our_std::{
+    collections::btree_set::BTreeSet,
     convert::{TryFrom, TryInto},
     Deserialize, RuntimeDebug, Serialize,
 };
@@ -102,6 +103,9 @@ pub type ValidatorIdentity = <Ethereum as Chain>::Address;
 
 /// Type for signature used to verify that a signed payload comes from a validator.
 pub type ValidatorSig = <Ethereum as Chain>::Signature;
+
+/// Type for signers set used to identify validators that signed this event.
+pub type SignersSet = BTreeSet<ValidatorIdentity>;
 
 /// Type for representing the keys to sign notices.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]

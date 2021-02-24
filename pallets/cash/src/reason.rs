@@ -56,6 +56,12 @@ pub enum Reason {
     SetYieldNextError(SetYieldNextError),
 }
 
+impl Default for Reason {
+    fn default() -> Self {
+        Reason::None
+    }
+}
+
 impl From<Reason> for frame_support::dispatch::DispatchError {
     fn from(reason: Reason) -> frame_support::dispatch::DispatchError {
         // XXX better way to assign codes?
