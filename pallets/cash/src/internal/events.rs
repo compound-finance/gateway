@@ -1,6 +1,7 @@
 use codec::Encode;
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap};
+use frame_support::storage::{IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap};
 use frame_system::offchain::SubmitTransaction;
+use our_std::cmp;
 use our_std::collections::btree_set::BTreeSet;
 use sp_runtime::offchain::{
     storage::StorageValueRef,
@@ -32,26 +33,44 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
     } else {
         // Validator's cache is empty, fetch events from the earliest block with pending events
         log!("Block number has not been cached yet");
-        // XXX TODO: Add back?
-        // let block_numbers: Vec<u32> = EthEventQueue::iter()
-        //     .filter_map(|((block_number, _log_index), status)| {
-        //         if match status {
-        //             EventStatus::<Ethereum>::Pending { .. } => true,
-        //             _ => false,
-        //         } {
-        //             Some(block_number)
-        //         } else {
-        //             None
-        //         }
-        //     })
-        //     .collect();
-        // let pending_events_block = block_numbers.iter().min();
-        // if pending_events_block.is_some() {
-        //     let events_block: u32 = *pending_events_block.unwrap();
-        //     from_block = format!("{:#X}", events_block);
-        // } else {
-        //}
-        String::from("earliest")
+
+        let earlist_pending_event_block_number: u64 = PendingEvents::iter()
+            .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
+                ChainLogId::Eth(block_number, _log_index) => Some(block_number),
+                _ => None,
+            })
+            .min();
+
+        let earlist_failed_event_block_number: u64 = FailedEvents::iter()
+            .filter_map(|(_chain_id, chain_log_id, _reason)| match chain_log_id {
+                ChainLogId::Eth(block_number, _log_index) => Some(block_number),
+                _ => None,
+            })
+            .min();
+
+        let min_pending_and_done = cmp::min(
+            earlist_pending_event_block_number.unwrap_or(0),
+            earlist_failed_event_block_number.unwrap_or(0),
+        );
+
+        // If there are no `Pending` or `Failed` events, check latest `Done` event
+        if min_pending_and_done == 0 {
+            /// XXX: Storing max in cash pallet storage?
+            let latest_done_block_number: u64 = DoneEvents::iter()
+                .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
+                    ChainLogId::Eth(block_number, _log_index) => Some(block_number),
+                    _ => None,
+                })
+                .max();
+            if latest_done_block_number.is_some() {
+                let done_events_block: u64 = latest_done_block_number.unwrap();
+                format!("{:#X}", done_events_block + 1)
+            } else {
+                String::from("earliest")
+            }
+        } else {
+            format!("{:#X}", min_pending_and_done)
+        }
     };
 
     log!("Fetching events starting from block {:?}", from_block);
