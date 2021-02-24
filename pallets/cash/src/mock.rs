@@ -6,12 +6,12 @@ use sp_core::{
         testing::{self, OffchainState, PoolState},
         OffchainExt, TransactionPoolExt,
     },
-    sr25519::Signature,
     H256,
 };
 use sp_runtime::{
     testing::{Header, TestXt},
     traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
+    MultiSignature as Signature,
 };
 
 pub type Extrinsic = TestXt<Call, ()>;
@@ -53,7 +53,7 @@ impl frame_system::Config for Test {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = sp_core::sr25519::Public;
+    type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = Event;
@@ -84,6 +84,7 @@ impl Config for Test {
     type Event = Event;
     type Call = Call;
     type TimeConverter = crate::converters::TimeConverter<Self>;
+    type AccountStore = System;
 }
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test

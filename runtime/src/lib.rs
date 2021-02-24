@@ -299,6 +299,7 @@ impl pallet_cash::Config for Runtime {
     type Event = Event;
     type Call = Call;
     type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
+    type AccountStore = System;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------

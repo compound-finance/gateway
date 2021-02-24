@@ -27,7 +27,8 @@ use crate::types::{
 };
 use codec::alloc::string::String;
 use frame_support::{
-    decl_event, decl_module, decl_storage, dispatch, weights::DispatchClass, Parameter,
+    decl_event, decl_module, decl_storage, dispatch, traits::StoredMap, weights::DispatchClass,
+    Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{str, vec::Vec};
@@ -87,7 +88,11 @@ pub trait Config:
         + UnfilteredDispatchable<Origin = Self::Origin>
         + GetDispatchInfo;
 
+    /// Convert implementation for Moment -> Timestamp.
     type TimeConverter: Convert<<Self as pallet_timestamp::Config>::Moment, Timestamp>;
+
+    /// Placate substrate's `HandleLifetime` trait.
+    type AccountStore: StoredMap<SubstrateId, ()>;
 }
 
 decl_storage! {
@@ -433,6 +438,10 @@ impl<T: Config> Module<T> {
             assert!(
                 <Validators>::get(&validator_keys.substrate_id) == None,
                 "Duplicate validator keys in genesis config"
+            );
+            assert!(
+                T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
+                "Could not placate the substrate account existence thing"
             );
             <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
         }
