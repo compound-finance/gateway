@@ -80,17 +80,22 @@ class Actor {
     return await token.getBalance(this);
   }
 
-  async chainCashPrincipal() {
+  async chainCashPrincipal_() {
     return await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
   }
 
+  async chainCashPrincipal() {
+    return descale(await this.chainCashPrincipal_(), 6);
+  }
+
+  async chainCashBalance_() {
+    let chainCashPrincipal = await this.chainCashPrincipal_();
+    let cashIndex = await this.ctx.chain.cashIndex();
+    return chainCashPrincipal.toBigInt() * cashIndex.toBigInt();
+  }
+
   async chainCashBalance() {
-    return
-        descale(
-          await this.chainCashPrincipal().toBigNumber()
-          * await this.ctx.chain.cashIndex().toBigNumber(),
-          18
-        );
+    return descale(await this.chainCashBalance_(), 18 + 6);
   }
 
   async chainBalance(tokenLookup) {
@@ -123,8 +128,9 @@ class Actor {
   async cash() {
     // TODO: Use non-zero balances
     let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
-    console.log({cashForTokens});
-    return await this.chainCashPrincipal() + cashForTokens.reduce((acc, el) => acc + el, 0);
+    let chainCashBalance = await this.chainCashBalance();
+    console.log({cashForTokens, chainCashBalance});
+    return chainCashBalance + cashForTokens.reduce((acc, el) => acc + el, 0);
   }
 
   async liquidityForToken(token) {

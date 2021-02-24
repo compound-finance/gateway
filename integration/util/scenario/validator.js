@@ -170,6 +170,14 @@ class Validators {
     return this.validators;
   }
 
+  count() {
+    return this.validators.length;
+  }
+
+  quorum() {
+    return Math.ceil(this.count() * 2 / 3);
+  }
+
   first() {
     if (this.validators.length === 0) {
       throw new Error(`No validators for scenario`);
