@@ -1301,7 +1301,7 @@ pub fn on_initialize_internal<T: Config>(
     CashPrincipals::insert(last_miner, miner_cash_principal_new);
     log!(
         "Miner={:?} received {:?} principal for mining last block",
-        last_miner,
+        String::from(last_miner),
         last_miner_share_principal
     );
 

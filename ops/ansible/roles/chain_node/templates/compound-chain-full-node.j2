@@ -5,6 +5,7 @@ Description=Compound Chain Full Node
 User=compound
 Group=compound
 WorkingDirectory={{ compound_user_home }}
+Environment="MINER={{ miner }}"
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
   --chain "{{ compound_user_home }}/chainSpec.json" \
