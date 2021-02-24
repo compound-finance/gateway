@@ -139,18 +139,17 @@ pub fn receive_event<T: Config>(
     }
 
     // Get signers set, if it's a new `Pending` event, create a new empty signers set
-    let signers_prev = if PendingEvents::contains_key(chain_id, event_id) {
+    let mut signers = if PendingEvents::contains_key(chain_id, event_id) {
         PendingEvents::take(chain_id, event_id)
     } else {
         SignersSet::new()
     };
-    let mut signers_new = signers_prev.clone();
-    signers_new.insert(signer);
+    signers.insert(signer);
 
-    if passes_validation_threshold(&signers_new, &validators) {
+    if passes_validation_threshold(&signers, &validators) {
         match apply_chain_event_internal::<T>(event) {
             Ok(()) => {
-                DoneEvents::insert(chain_id, event_id, signers_new);
+                DoneEvents::insert(chain_id, event_id, signers);
                 <Module<T>>::deposit_event(EventT::ProcessedChainEvent(chain_id, event_id));
                 Ok(())
             }
@@ -172,9 +171,9 @@ pub fn receive_event<T: Config>(
         log!(
             "process_chain_event_internal({}) signer_count={}",
             event_id.show(),
-            signers_new.len()
+            signers.len()
         );
-        PendingEvents::insert(chain_id, event_id, signers_new);
+        PendingEvents::insert(chain_id, event_id, signers);
         Ok(())
     }
 }

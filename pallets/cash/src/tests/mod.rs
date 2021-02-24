@@ -1,6 +1,8 @@
 use crate::{chains::*, core::*, internal, mock::*, oracle::*, rates::*, reason::*, symbol::*, *};
 use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
+use our_std::collections::btree_set::BTreeSet;
+use our_std::iter::FromIterator;
 use our_std::str::FromStr;
 use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
@@ -83,6 +85,7 @@ fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();
         // Dispatch a signed extrinsic.
+        let chain_id = ChainId::Eth;
         let event_id = ChainLogId::Eth(3858223, 0);
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
@@ -100,23 +103,28 @@ fn process_eth_event_happy_path() {
 
         assert_ok!(CashModule::receive_event(
             Origin::none(),
+            chain_id,
             event_id,
             event,
             signature
         ));
 
-        match CashModule::event_state(event_id) {
-            EventState::Pending { signers } => {
-                assert_eq!(signers.len(), 1);
-                assert_eq!(
-                    hex::encode(signers[0]),
-                    "6a72a2f14577d9cd0167801efdd54a07b40d2b61"
-                );
-            }
-            _ => {
-                assert!(false);
-            }
-        }
+        assert_eq!(
+            CashModule::pending_events(chain_id, event_id),
+            BTreeSet::from_iter(vec![hex::decode(
+                "6a72a2f14577d9cd0167801efdd54a07b40d2b61"
+            )
+            .unwrap()
+            .try_into()
+            .unwrap()])
+        );
+
+        assert_eq!(
+            CashModule::done_events(chain_id, event_id),
+            BTreeSet::from_iter(vec![])
+        );
+
+        assert_eq!(CashModule::failed_events(chain_id, event_id), Reason::None);
     });
 }
 
@@ -124,6 +132,7 @@ fn process_eth_event_happy_path() {
 fn process_eth_event_fails_for_bad_signature() {
     new_test_ext().execute_with(|| {
         let event_id = ChainLogId::Eth(3858223, 0);
+        let chain_id = ChainId::Eth;
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
             block_number: 3858223,
@@ -138,7 +147,13 @@ fn process_eth_event_fails_for_bad_signature() {
 
         // Dispatch a signed extrinsic.
         assert_err!(
-            CashModule::receive_event(Origin::signed(Default::default()), event_id, event, [0; 65]),
+            CashModule::receive_event(
+                Origin::signed(Default::default()),
+                chain_id,
+                event_id,
+                event,
+                [0; 65]
+            ),
             DispatchError::BadOrigin
         );
     });
@@ -148,6 +163,7 @@ fn process_eth_event_fails_for_bad_signature() {
 fn process_eth_event_fails_if_not_validator() {
     new_test_ext().execute_with(|| {
         let event_id = ChainLogId::Eth(3858223, 0);
+        let chain_id = ChainId::Eth;
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
             block_number: 3858223,
@@ -168,7 +184,7 @@ fn process_eth_event_fails_if_not_validator() {
             209, 126, 30, 123, 73, 238, 34, 28,
         ];
         assert_err!(
-            CashModule::receive_event(Origin::none(), event_id, event, sig),
+            CashModule::receive_event(Origin::none(), chain_id, event_id, event, sig),
             Reason::UnknownValidator
         );
     });
@@ -380,7 +396,8 @@ fn offchain_worker_test() {
         assert_eq!(ex2.signature, None);
         assert_eq!(ex3.signature, None);
 
-        if let Call::receive_event(event_id, event, _signature) = ex1.call {
+        if let Call::receive_event(chain_id, event_id, event, _signature) = ex1.call {
+            assert_eq!(chain_id, ChainId::Eth);
             assert_eq!(event_id, ChainLogId::Eth(3932939, 14)); // TODO: Should this be trx index or log_index?
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [164, 169, 110, 149, 119, 24, 227, 163, 11, 119, 166, 103, 249, 57, 120, 216, 244, 56, 189, 205, 86, 255, 3, 84, 95, 8, 200, 51, 217, 162, 102, 135],
@@ -397,7 +414,8 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let Call::receive_event(event_id, event, _signature) = ex2.call {
+        if let Call::receive_event(chain_id, event_id, event, _signature) = ex2.call {
+            assert_eq!(chain_id, ChainId::Eth);
             assert_eq!(event_id, ChainLogId::Eth(3932897, 1));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [165, 200, 2, 78, 105, 154, 92, 48, 235, 150, 94, 71, 181, 21, 124, 6, 199, 111, 59, 114, 107, 255, 55, 122, 10, 83, 51, 165, 97, 242, 86, 72],
@@ -414,7 +432,8 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let Call::receive_event(event_id, event, _signature) = ex3.call {
+        if let Call::receive_event(chain_id, event_id, event, _signature) = ex3.call {
+            assert_eq!(chain_id, ChainId::Eth);
             assert_eq!(event_id, ChainLogId::Eth(3858223, 0));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [193, 192, 235, 55, 181, 105, 35, 173, 158, 32, 253, 179, 28, 168, 130, 152, 141, 82, 23, 247, 202, 36, 182, 41, 124, 166, 237, 112, 8, 17, 207, 35],

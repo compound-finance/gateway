@@ -378,7 +378,7 @@ decl_module! {
         // TODO: Do we need to sign the event id, too?
         #[weight = 1] // XXX how are we doing weights?
         pub fn receive_event(origin, chain_id: ChainId, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_event(origin,event_id,event,sig): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
+            log!("receive_event(origin,chain_id,event_id,event,sig): {:?} {:?} {:?} {}", chain_id, event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_event::<T>(chain_id, event_id, event, signature))?)
         }
