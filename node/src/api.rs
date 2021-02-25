@@ -9,7 +9,8 @@ use sp_blockchain::HeaderBackend;
 use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 
 use pallet_cash::{
-    chains::ChainAccount,
+    chains::{ChainAccount, ChainAsset},
+    rates::APR,
     reason::Reason,
     types::{AssetBalance, AssetPrice},
 };
@@ -18,8 +19,12 @@ use pallet_cash_runtime_api::CashApi as CashRuntimeApi;
 const RUNTIME_ERROR: i64 = 1;
 const CHAIN_ERROR: i64 = 2;
 
-pub type ApiAssetBalance = i64; // XXX ugh no i128s for the moment
-pub type ApiAssetPrice = u64; // XXX ugh no u128s for the moment
+// Note: no 128 bit integers for the moment
+//  due to issues with serde/serde_json
+pub type ApiAssetBalance = i64;
+pub type ApiAssetPrice = u64;
+pub type ApiAPR = u64;
+pub type ApiRates = (ApiAPR, ApiAPR);
 
 /// Converts a runtime trap into an RPC error.
 fn runtime_err(err: impl std::fmt::Debug) -> RpcError {
@@ -50,6 +55,9 @@ pub trait CompoundRpcApi<BlockHash> {
 
     #[rpc(name = "get_price")]
     fn get_price(&self, ticker: String, at: Option<BlockHash>) -> RpcResult<ApiAssetPrice>;
+
+    #[rpc(name = "get_rates")]
+    fn get_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
 }
 
 pub struct CompoundRpcHandler<C, B> {
@@ -83,7 +91,7 @@ where
             .get_liquidity(&at, account)
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-        Ok((result as ApiAssetBalance).into()) // XXX ugh
+        Ok((result as ApiAssetBalance).into())
     }
 
     fn get_price(
@@ -97,6 +105,16 @@ where
             .get_price(&at, ticker)
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-        Ok((result as ApiAssetPrice).into()) // XXX ugh
+        Ok((result as ApiAssetPrice).into()) // XXX try_into, or patch for 128?
+    }
+
+    fn get_rates(&self, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiRates> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let (borrow_rate, supply_rate): (APR, APR) = api
+            .get_rates(&at, asset)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+        Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
     }
 }

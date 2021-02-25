@@ -459,6 +459,8 @@ impl<T: Config> Module<T> {
         PriceReporters::put(reporters);
     }
 
+    // ** API / View Functions ** //
+
     /// Get the liquidity for the given account.
     pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
         Ok(core::get_liquidity::<T>(account)?.value)
@@ -467,6 +469,11 @@ impl<T: Config> Module<T> {
     /// Get the price for the given asset.
     pub fn get_price(ticker: Ticker) -> Result<AssetPrice, Reason> {
         Ok(core::get_price_by_ticker::<T>(ticker)?.value)
+    }
+
+    /// Get the rates for the given asset.
+    pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
+        Ok(core::get_rates::<T>(asset)?)
     }
 }
 

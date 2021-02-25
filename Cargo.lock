@@ -1724,7 +1724,6 @@ dependencies = [
  "lazy_static",
  "our-std",
  "parity-scale-codec 2.0.0",
- "primitive-types 0.7.3",
  "serde",
  "serde_json",
  "sp-io",
@@ -1867,18 +1866,6 @@ name = "fixed-hash"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3367952ceb191f4ab95dd5685dc163ac539e36202f9fcfd0cb22f9f9c542fefc"
-dependencies = [
- "byteorder",
- "rand 0.7.3",
- "rustc-hex",
- "static_assertions",
-]
-
-[[package]]
-name = "fixed-hash"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11498d382790b7a8f2fd211780bec78619bba81cdad3a283997c0c41f836759c"
 dependencies = [
  "byteorder",
  "rand 0.7.3",
@@ -5118,17 +5105,6 @@ dependencies = [
  "impl-codec 0.4.2",
  "impl-rlp",
  "impl-serde 0.3.1",
- "uint 0.8.5",
-]
-
-[[package]]
-name = "primitive-types"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dd39dcacf71411ba488570da7bbc89b717225e46478b30ba99b92db6b149809"
-dependencies = [
- "fixed-hash 0.6.1",
- "impl-codec 0.4.2",
  "uint 0.8.5",
 ]
 
