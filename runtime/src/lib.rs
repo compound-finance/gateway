@@ -44,7 +44,8 @@ pub use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAutho
 pub use pallet_timestamp::Call as TimestampCall;
 
 use pallet_cash::{
-    chains::ChainAccount,
+    chains::{ChainAccount, ChainAsset},
+    rates::APR,
     reason::Reason,
     symbol::Ticker,
     types::{AssetBalance, AssetPrice},
@@ -542,6 +543,10 @@ impl_runtime_apis! {
 
         fn get_price(ticker_str: String) -> Result<AssetPrice, Reason> {
             Cash::get_price(Ticker::from_str(&ticker_str)?)
+        }
+
+        fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
+            Cash::get_rates(asset)
         }
     }
 

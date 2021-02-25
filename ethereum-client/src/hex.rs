@@ -53,7 +53,6 @@ pub fn parse_u64(val_opt: Option<String>) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use primitive_types::H256;
 
     #[test]
     fn test_decode_hex() {
@@ -76,11 +75,13 @@ mod tests {
         assert_eq!(
             decode_topic(&String::from(
                 "0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"
-            )),
-            Some(H256([
+            ))
+            .unwrap()
+            .to_fixed_bytes(),
+            [
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
                 10, 11, 12, 13, 14, 15
-            ]))
+            ]
         );
 
         assert_eq!(
