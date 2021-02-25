@@ -310,7 +310,6 @@
       "SignatureMismatch": "",
       "TimeTravelNotAllowed": "",
       "TrxRequestParseError": "TrxReqParseError",
-      "UnknownValidator": "",
       "ValidatorAlreadySigned": "",
       "SetYieldNextError": "SetYieldNextError",
       "MaxForNonCashAsset": "",

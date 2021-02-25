@@ -143,14 +143,6 @@ pub fn receive_event<T: Config>(
     let signer: crate::types::ValidatorIdentity =
         compound_crypto::eth_recover(&event.encode()[..], &signature, false)?;
     let validators: BTreeSet<_> = Validators::iter().map(|v| v.1.eth_address).collect();
-    if !validators.contains(&signer) {
-        log!(
-            "Signer of a log event is not a known validator {:?}, validators are {:?}",
-            signer,
-            validators
-        );
-        return Err(Reason::UnknownValidator)?;
-    }
 
     // Check if event is in `Done` or `Failed` queues first,
     // Otherwise it is a new or already seen `Pending` event
