@@ -31,7 +31,10 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
         log!("Last cached block number: {:?}", cached_block_num);
         encode_block_hex(cached_block_num + 1)
     } else {
-        // Validator's cache is empty, fetch events from the earliest block with pending events
+        // Validator's cache is empty:
+        // - fetch events from the earliest block with `Pending` events
+        // - or if no `Pending` events, start from the latest block with `Failed` or `Done` events
+        // - or if no `Failed` or `Done` events in the queues, start from the beginning of chain time
         log!("Block number has not been cached yet");
 
         let pending_blocks: Vec<u64> = PendingEvents::iter()
@@ -52,7 +55,7 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
                     _ => None,
                 })
                 .collect();
-            let latest_failed_block = failed_blocks.iter().max();
+            let latest_failed = failed_blocks.iter().max();
 
             let done_blocks: Vec<u64> = DoneEvents::iter()
                 .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
@@ -60,19 +63,16 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
                     _ => None,
                 })
                 .collect();
-            let latest_done_block = done_blocks.iter().max();
+            let latest_done = done_blocks.iter().max();
 
-            let max_pending_and_done = cmp::max(
-                latest_failed_block.unwrap_or(&0),
-                latest_done_block.unwrap_or(&0),
-            );
+            /// XXX possibly analyze `signers` field to see which block this exact validator has already signed
+            let max_done_failed = *cmp::max(latest_failed.unwrap_or(&0), latest_done.unwrap_or(&0));
 
-            if max_pending_and_done == &0 {
-                // Note: No `Done` or `Failed` events were found, it means it's beginning of the chain
+            if max_done_failed == 0 {
+                // Note: No `Done` or `Failed` events were found, start from the beginning of the chain
                 String::from("earliest")
             } else {
-                let done_events_block: u64 = *max_pending_and_done;
-                format!("{:#X}", done_events_block + 1)
+                format!("{:#X}", max_done_failed + 1)
             }
         }
     };
