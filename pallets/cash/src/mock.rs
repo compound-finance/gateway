@@ -1,53 +1,45 @@
-use crate::types::Timestamp;
-use crate::{Call, Config, Module};
+use crate::{self as pallet_cash, *};
 use codec::alloc::sync::Arc;
-use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
 use parking_lot::RwLock;
 use sp_core::{
     offchain::{
         testing::{self, OffchainState, PoolState},
         OffchainExt, TransactionPoolExt,
     },
-    sr25519::Signature,
     H256,
 };
 use sp_runtime::{
     testing::{Header, TestXt},
     traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
+    MultiSignature as Signature,
 };
 
-pub type Extrinsic = TestXt<Call<Test>, ()>;
+pub type Extrinsic = TestXt<Call, ()>;
 pub type CashModule = Module<Test>;
-pub type System = frame_system::Module<Test>;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
-impl_outer_origin! {
-    pub enum Origin for Test {}
-}
+pub const MILLISECS_PER_BLOCK: types::Timestamp = 6000;
+pub const SLOT_DURATION: types::Timestamp = MILLISECS_PER_BLOCK;
 
-mod cash {
-    pub use crate::Event;
-}
+type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
 
-impl_outer_event! {
-    pub enum TestEvent for Test {
-        cash,
-        frame_system<T>,
+frame_support::construct_runtime!(
+    pub enum Test where
+    Block = Block,
+    NodeBlock = Block,
+    UncheckedExtrinsic = UncheckedExtrinsic,
+    {
+    System: frame_system::{Module, Call, Config, Storage, Event<T>},
+        Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
+        Cash: pallet_cash::{Module, Call, Config, Storage, Event},
     }
-}
+);
 
-// Configure a mock runtime to test the pallet.
-#[derive(Clone, Eq, PartialEq)]
-pub struct Test;
-
-pub const MILLISECS_PER_BLOCK: u128 = 6000;
-
-pub const SLOT_DURATION: u128 = MILLISECS_PER_BLOCK;
-
-parameter_types! {
+frame_support::parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
-    pub const MinimumPeriod: u128 = SLOT_DURATION / 2;
+    pub const MinimumPeriod: types::Timestamp = SLOT_DURATION / 2;
 }
 
 impl frame_system::Config for Test {
@@ -56,18 +48,18 @@ impl frame_system::Config for Test {
     type BlockLength = ();
     type DbWeight = ();
     type Origin = Origin;
-    type Call = ();
+    type Call = Call;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = sp_core::sr25519::Public;
+    type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
-    type Event = TestEvent;
+    type Event = Event;
     type BlockHashCount = BlockHashCount;
     type Version = ();
-    type PalletInfo = ();
+    type PalletInfo = PalletInfo;
     type AccountData = ();
     type OnNewAccount = ();
     type OnKilledAccount = ();
@@ -77,7 +69,7 @@ impl frame_system::Config for Test {
 
 impl pallet_timestamp::Config for Test {
     /// A timestamp: milliseconds since the unix epoch.
-    type Moment = Timestamp;
+    type Moment = types::Timestamp;
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
     type WeightInfo = ();
@@ -88,32 +80,33 @@ impl frame_system::offchain::SigningTypes for Test {
     type Signature = Signature;
 }
 
+impl Config for Test {
+    type Event = Event;
+    type Call = Call;
+    type TimeConverter = crate::converters::TimeConverter<Self>;
+    type AccountStore = System;
+}
+
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
 where
-    Call<Test>: From<LocalCall>,
+    Call: From<LocalCall>,
 {
-    type OverarchingCall = Call<Test>;
+    type OverarchingCall = Call;
     type Extrinsic = Extrinsic;
 }
 
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
 where
-    Call<Test>: From<LocalCall>,
+    Call: From<LocalCall>,
 {
     fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
-        call: Call<Test>,
+        call: Call,
         _public: <Signature as Verify>::Signer,
         _account: AccountId,
         nonce: u64,
-    ) -> Option<(Call<Test>, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
+    ) -> Option<(Call, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
         Some((call, (nonce, ())))
     }
-}
-
-impl Config for Test {
-    type Event = TestEvent;
-    type Call = Call<Test>;
-    type TimeConverter = crate::converters::TimeConverter<Self>;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -132,6 +125,7 @@ pub fn new_test_ext_with_http_calls(
     let (offchain, offchain_state) = testing::TestOffchainExt::new();
     let (pool, pool_state) = testing::TestTransactionPoolExt::new();
 
+    // XXX
     // let mut test_externalities: sp_io::TestExternalities = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
     let mut test_externalities = sp_io::TestExternalities::default();
     test_externalities.register_extension(OffchainExt::new(offchain));

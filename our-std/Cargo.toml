@@ -12,8 +12,8 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 serde = { version = "1.0.101", features = ["derive"], default-features = false }
-sp-runtime = { default-features = false, version = '2.0.0', git = 'https://github.com/compound-finance/substrate.git' }
-sp-std = { version = '2.0.0', default-features = false, git = 'https://github.com/compound-finance/substrate.git' }
+sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
 
 our-std-proc-macro = { path = "./proc-macro" }
 

@@ -24,8 +24,8 @@ pub type Decimals = u8;
 /// Type for a nonce.
 pub type Nonce = u32;
 
-/// Type for representing time as milliseconds since unix epoch.
-pub type Timestamp = u128; // XXX u64?
+/// Type for representing time since current Unix epoch in milliseconds.
+pub type Timestamp = u64;
 
 /// Type of the largest possible signed integer.
 pub type Int = i128;

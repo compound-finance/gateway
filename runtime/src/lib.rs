@@ -2,6 +2,7 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
+use codec::alloc::string::String;
 use sp_api::{impl_runtime_apis, Encode};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
@@ -14,7 +15,7 @@ use sp_runtime::{
     transaction_validity::{TransactionSource, TransactionValidity},
     ApplyExtrinsicResult, MultiSignature, SaturatedConversion,
 };
-use sp_std::prelude::*;
+use sp_std::{prelude::*, str::FromStr};
 
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -23,7 +24,7 @@ use sp_version::RuntimeVersion;
 // A few (re-)exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-pub use sp_runtime::{Perbill, Permill};
+pub use sp_runtime::{FixedPointNumber, Perbill, Permill, Perquintill};
 
 pub use frame_support::{
     construct_runtime, debug, parameter_types,
@@ -38,10 +39,16 @@ pub use frame_support::{
     StorageValue,
 };
 
-use pallet_cash;
 pub use pallet_grandpa::fg_primitives;
 pub use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 pub use pallet_timestamp::Call as TimestampCall;
+
+use pallet_cash::{
+    chains::ChainAccount,
+    reason::Reason,
+    symbol::Ticker,
+    types::{AssetBalance, AssetPrice},
+};
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -125,9 +132,9 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// up by `pallet_aura` to implement `fn slot_duration()`.
 ///
 /// Change this to adjust the block time.
-pub const MILLISECS_PER_BLOCK: u128 = 6000;
+pub const MILLISECS_PER_BLOCK: Moment = 6000;
 
-pub const SLOT_DURATION: u128 = MILLISECS_PER_BLOCK;
+pub const SLOT_DURATION: Moment = MILLISECS_PER_BLOCK;
 
 // Time is measured by number of blocks.
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
@@ -232,12 +239,11 @@ impl pallet_grandpa::Config for Runtime {
 }
 
 parameter_types! {
-    pub const MinimumPeriod: u128 = SLOT_DURATION / 2;
+    pub const MinimumPeriod: Moment = SLOT_DURATION / 2;
 }
 
 impl pallet_timestamp::Config for Runtime {
-    /// A timestamp: milliseconds since the unix epoch.
-    type Moment = pallet_cash::types::Timestamp;
+    type Moment = Moment;
     type OnTimestampSet = Aura;
     type MinimumPeriod = MinimumPeriod;
     type WeightInfo = ();
@@ -249,7 +255,8 @@ parameter_types! {
 }
 
 parameter_types! {
-    pub const TransactionByteFee: Balance = 1;
+    pub const TransactionByteFee: Balance = 10_000_000; // XXX how are we doing weights/fees for substrate?
+    pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -292,6 +299,7 @@ impl pallet_cash::Config for Runtime {
     type Event = Event;
     type Call = Call;
     type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
+    type AccountStore = System;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------
@@ -367,7 +375,7 @@ construct_runtime!(
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
         RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-        Aura: pallet_aura::{Module, Config<T>, Inherent},
+        Aura: pallet_aura::{Module, Config<T>},
         Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
         Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
@@ -524,6 +532,16 @@ impl_runtime_apis! {
     impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
         fn account_nonce(account: AccountId) -> Index {
             System::account_nonce(account)
+        }
+    }
+
+    impl pallet_cash_runtime_api::CashApi<Block> for Runtime {
+        fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
+            Cash::get_liquidity(account)
+        }
+
+        fn get_price(ticker_str: String) -> Result<AssetPrice, Reason> {
+            Cash::get_price(Ticker::from_str(&ticker_str)?)
         }
     }
 

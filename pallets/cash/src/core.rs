@@ -9,11 +9,13 @@ pub use our_std::{
 };
 
 use codec::Decode;
-use frame_support::sp_runtime::traits::Convert;
-use frame_support::storage::{
-    IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
-};
 use frame_support::traits::UnfilteredDispatchable;
+use frame_support::{
+    sp_runtime::traits::Convert,
+    storage::{
+        IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
+    },
+};
 
 // Import these traits so we can interact with the substrate storage modules.
 use crate::{
@@ -28,7 +30,7 @@ use crate::{
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
-    symbol::{Units, CASH, USD_TICKER},
+    symbol::{Ticker, Units, CASH, USD},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
         CashPrincipal, CashPrincipalAmount, CashQuantity, Price, Quantity, Timestamp, USDQuantity,
@@ -89,19 +91,22 @@ pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
 }
 
 /// Return the USD price associated with the given units.
-pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
-    match units {
-        Units {
-            ticker: USD_TICKER, ..
-        } => Ok(Price::from_nominal(USD_TICKER, "1.0")),
-        CASH => Ok(Price::from_nominal(CASH.ticker, "1.0")),
+pub fn get_price_by_ticker<T: Config>(ticker: Ticker) -> Result<Price, Reason> {
+    match ticker {
+        t if t == USD.ticker => Ok(Price::from_nominal(USD.ticker, "1.0")),
+        t if t == CASH.ticker => Ok(Price::from_nominal(CASH.ticker, "1.0")),
         _ => Ok(Price::new(
-            units.ticker,
+            ticker,
             // XXX Prices::get(units.ticker).ok_or(Reason::NoPrice)?,
             // XXX fix me how to handle no prices during initialization?
-            Prices::get(units.ticker).unwrap_or(0),
+            Prices::get(ticker).unwrap_or(0),
         )),
     }
+}
+
+/// Return the USD price associated with the given units.
+pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
+    get_price_by_ticker::<T>(units.ticker)
 }
 
 /// Return a quantity with units of the given asset.
@@ -135,6 +140,7 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
 
 // Internal helpers
 
+// XXX we should receive the sets as args
 pub fn passes_validation_threshold(
     signers: &Vec<ValidatorIdentity>,
     validators: &Vec<ValidatorIdentity>,
@@ -1161,6 +1167,11 @@ pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
     Ok(liquidity.value >= 0)
 }
 
+/// Calculates the current liquidity value for an account.
+pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
+    Ok(Portfolio::from_storage::<T>(account)?.get_liquidity::<T>()?)
+}
+
 /// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
 pub fn get_cash_principal_with_asset_interest<T: Config>(
     account: ChainAccount,
@@ -1328,8 +1339,9 @@ pub fn on_initialize_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{chains::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*};
+    use crate::{
+        chains::*, core::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*, *,
+    };
     use our_std::str::FromStr;
 
     #[test]
@@ -1544,7 +1556,7 @@ mod tests {
             assert_eq!((recipient, vec![expected_notice_id]), account_notice);
 
             assert_eq!(
-                TestEvent::cash(Event::Notice(
+                mock::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice,
                     expected_notice_encoded
@@ -1688,11 +1700,10 @@ mod tests {
         let price_cash = Price::from_nominal(CASH.ticker, "1");
         let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual = cash_index
-            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
-            .unwrap();
+        let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("150"); // from hand calc
         assert_eq!(actual, expected);
+
         Ok(())
     }
 
@@ -1707,11 +1718,10 @@ mod tests {
         let price_cash = Price::from_nominal(CASH.ticker, "1");
         let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual = cash_index
-            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
-            .unwrap();
+        let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("39.542520035618878005"); // from hand calc
         assert_eq!(actual, expected);
+
         Ok(())
     }
 
@@ -1727,32 +1737,35 @@ mod tests {
         let price_cash = Price::from_nominal(CASH.ticker, "1");
         let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual = cash_index
-            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
-            .unwrap();
+        let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("0.000000002008426366"); // from hand calc
         assert_eq!(actual, expected);
+
         Ok(())
     }
 
     #[test]
-    fn test_get_utilization() {
+    fn test_get_utilization() -> Result<(), Reason> {
         new_test_ext().execute_with(|| {
             initialize_storage();
-            let asset = eth_asset();
-            TotalSupplyAssets::insert(&asset, 100);
-            TotalBorrowAssets::insert(&asset, 50);
-            let utilization = crate::core::get_utilization::<Test>(asset).unwrap();
-            assert_eq!(utilization, Factor::from_nominal("0.5"));
-        });
+            TotalSupplyAssets::insert(&Eth, 100);
+            TotalBorrowAssets::insert(&Eth, 50);
+
+            assert_eq!(
+                crate::core::get_utilization::<Test>(Eth)?,
+                Factor::from_nominal("0.5")
+            );
+
+            Ok(())
+        })
     }
 
     #[test]
-    fn test_get_borrow_rate() {
+    fn test_get_borrow_rate() -> Result<(), Reason> {
         new_test_ext().execute_with(|| {
             initialize_storage();
             let kink_rate = 105;
-            let asset = eth_asset();
+            let asset = Eth;
             let asset_info = AssetInfo {
                 rate_model: InterestRateModel::new_kink(
                     0,
@@ -1764,18 +1777,23 @@ mod tests {
                 ..AssetInfo::minimal(asset, ETH)
             };
 
+            // 50% utilization and 50% miner shares
             SupportedAssets::insert(&asset, asset_info);
             TotalSupplyAssets::insert(&asset, 100);
             TotalBorrowAssets::insert(&asset, 50);
 
-            CashModule::set_rate_model(Origin::root(), asset.clone(), asset_info.rate_model)
-                .unwrap();
-            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(asset).unwrap();
+            assert_ok!(CashModule::set_rate_model(
+                Origin::root(),
+                asset,
+                asset_info.rate_model
+            ));
 
+            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(asset)?;
             assert_eq!(borrow_rate, kink_rate.into());
-            // 50% utilization and 50% reserve factor
             assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
-        });
+
+            Ok(())
+        })
     }
 
     #[test]
@@ -1809,7 +1827,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             // XXX how to inject miner?
             let miner = ChainAccount::Eth([0; 20]);
-            let asset = eth_asset();
+            let asset = Eth;
             let asset_info = AssetInfo {
                 rate_model: InterestRateModel::new_kink(0, 2500, Factor::from_nominal("0.5"), 5000),
                 miner_shares: MinerShares::from_nominal("0.02"),

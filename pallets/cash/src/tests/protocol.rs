@@ -1,27 +1,5 @@
-#![allow(non_upper_case_globals)]
-
-use crate::{chains::*, core::*, factor::*, mock::*, rates::*, reason::*, symbol::*, types::*, *};
-use frame_support::{assert_err, assert_ok};
-use hex_literal::hex;
+use super::*;
 use our_std::str::FromStr;
-
-const UNI: Units = Units::from_ticker_str("UNI", 18);
-const Uni: ChainAsset = ChainAsset::Eth(hex!("1f9840a85d5af5bf1d1762f925bdaddc4201f984"));
-const uni: AssetInfo = AssetInfo {
-    asset: Uni,
-    decimals: UNI.decimals,
-    liquidity_factor: LiquidityFactor::from_nominal("0.7"),
-    rate_model: InterestRateModel::Kink {
-        zero_rate: APR(0),
-        kink_rate: APR(500),
-        kink_utilization: Factor::from_nominal("0.8"),
-        full_rate: APR(2000),
-    },
-    miner_shares: Factor::from_nominal("0.05"),
-    supply_cap: Quantity::from_nominal("1000", UNI).value,
-    symbol: Symbol(UNI.ticker.0),
-    ticker: Ticker(UNI.ticker.0),
-};
 
 #[test]
 fn upload_transfer_download() -> Result<(), Reason> {

@@ -88,6 +88,7 @@ where
         + 'static,
     C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
     C::Api: BlockBuilder<Block>,
+    C::Api: pallet_cash_runtime_api::CashApi<Block>,
     P: TransactionPool + 'static,
     SC: SelectChain<Block> + 'static,
     B: sc_client_api::Backend<Block> + Send + Sync + 'static,
@@ -99,8 +100,8 @@ where
     let FullDeps {
         client,
         pool,
-        select_chain,
-        chain_spec,
+        select_chain, // XXX delete?
+        chain_spec,   // XXX delete?
         deny_unsafe,
         grandpa,
     } = deps;
@@ -132,7 +133,9 @@ where
         ),
     ));
 
-    // XXX extend with our custom rpc calls (getPrice(String), getLiquidity(ChainAccount), etc.)
+    io.extend_with(crate::api::CompoundRpcApi::to_delegate(
+        crate::api::CompoundRpcHandler::new(client),
+    ));
 
     io
 }

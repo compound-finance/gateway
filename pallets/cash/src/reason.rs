@@ -33,6 +33,7 @@ pub enum Reason {
     InsufficientTotalFunds,
     InvalidAPR,
     InvalidCodeHash,
+    InvalidLiquidation,
     InvalidUTF8,
     KeyNotFound,
     MathError(MathError),
@@ -50,17 +51,18 @@ pub enum Reason {
     RepayTooMuch,
     SelfTransfer,
     SetYieldNextError(SetYieldNextError),
+    SerdeError,
     SignatureAccountMismatch,
     SignatureMismatch,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
-    InvalidLiquidation,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
     fn from(reason: Reason) -> frame_support::dispatch::DispatchError {
         // XXX better way to assign codes?
+        //  also we can use them to differentiate between inner type variants
         let (index, error, message) = match reason {
             Reason::AssetExtractionNotSupported => {
                 (0, 99, "asset extraction not supported XXX temporary")
@@ -86,7 +88,8 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::InsufficientTotalFunds => (6, 2, "insufficient total funds"),
             Reason::InvalidAPR => (7, 0, "invalid apr"),
             Reason::InvalidCodeHash => (7, 1, "invalid code hash"),
-            Reason::InvalidUTF8 => (7, 2, "invalid utf8"),
+            Reason::InvalidLiquidation => (7, 2, "invalid liquidation parameters"),
+            Reason::InvalidUTF8 => (7, 3, "invalid utf8"),
             Reason::KeyNotFound => (8, 0, "key not found"),
             Reason::MathError(_) => (9, 0, "math error"),
             Reason::MaxForNonCashAsset => (10, 0, "max for non cash asset"),
@@ -102,13 +105,13 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::RatesError(_) => (17, 0, "rates error"),
             Reason::RepayTooMuch => (18, 0, "repay too much"),
             Reason::SelfTransfer => (19, 0, "self transfer"),
-            Reason::SignatureAccountMismatch => (20, 0, "signature account mismatch"),
-            Reason::SignatureMismatch => (20, 1, "signature mismatch"),
-            Reason::TimeTravelNotAllowed => (21, 0, "time travel not allowed"),
-            Reason::TrxRequestParseError(_) => (22, 0, "trx request parse error"),
-            Reason::UnknownValidator => (23, 0, "unknown validator"),
-            Reason::SetYieldNextError(_) => (24, 0, "set yield next error"),
-            Reason::InvalidLiquidation => (25, 0, "invalid liquidation parameters"),
+            Reason::SerdeError => (20, 0, "serde error"),
+            Reason::SetYieldNextError(_) => (21, 0, "set yield next error"),
+            Reason::SignatureAccountMismatch => (22, 0, "signature account mismatch"),
+            Reason::SignatureMismatch => (23, 1, "signature mismatch"),
+            Reason::TimeTravelNotAllowed => (24, 0, "time travel not allowed"),
+            Reason::TrxRequestParseError(_) => (25, 0, "trx request parse error"),
+            Reason::UnknownValidator => (26, 0, "unknown validator"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
@@ -159,6 +162,14 @@ impl our_std::fmt::Display for Reason {
         write!(f, "{:?}", self)
     }
 }
+
+impl serde::de::Error for Reason {
+    fn custom<T: our_std::fmt::Display>(_msg: T) -> Self {
+        Reason::SerdeError
+    }
+}
+
+impl serde::de::StdError for Reason {}
 
 /// Type for reporting failures from calculations.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]

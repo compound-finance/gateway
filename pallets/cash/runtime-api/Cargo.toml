@@ -1,0 +1,25 @@
+[package]
+authors = ['Compound <https://compound.finance>']
+description = 'Runtime API for CASH pallet RPC.'
+edition = '2018'
+homepage = 'https://compound.cash'
+name = 'pallet-cash-runtime-api'
+repository = 'https://github.com/compound-finance/compound-chain/'
+version = '1.0.0'
+
+[package.metadata.docs.rs]
+targets = ['x86_64-unknown-linux-gnu']
+
+[dependencies]
+sp-api = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+
+pallet-cash = { path = '..', default-features = false }
+
+[features]
+default = ['std']
+std = [
+    "sp-api/std",
+    "sp-runtime/std",
+    "pallet-cash/std",
+]
