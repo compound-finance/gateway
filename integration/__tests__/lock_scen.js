@@ -2,12 +2,22 @@ const {
   years,
   buildScenarios
 } = require('../util/scenario');
+const { getNotice } = require('../util/substrate');
 
 let lock_scen_info = {
   tokens: [
     { token: 'usdc', balances: { ashley: 1000 } }
   ],
 };
+
+async function getCash({ ashley, usdc, cash, chain, starport }) {
+  await ashley.lock(1000, usdc);
+  let notice = getNotice(await ashley.extract(100, cash));
+  let signatures = await chain.getNoticeSignatures(notice);
+  await starport.invoke(notice, signatures);
+  expect(await ashley.tokenBalance(cash)).toBeCloseTo(100);
+  expect(await ashley.chainBalance(cash)).toBeCloseTo(-100);
+}
 
 buildScenarios('Lock Scenarios', lock_scen_info, [
   {
@@ -29,7 +39,16 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
     }
   },
   {
-    skip: true,
+    only: true,
+    before: getCash,
+    name: 'Lock Cash',
+    scenario: async ({ ashley, cash, chain }) => {
+      await ashley.lock(100, cash);
+      expect(await ashley.tokenBalance(cash)).toBeCloseTo(0);
+      expect(await ashley.chainBalance(cash)).toBeCloseTo(0);
+    }
+  },
+  {
     name: 'Lock Too Little Collateral',
     scenario: async ({ ashley, usdc, chain }) => {
       await ashley.lock(0.1, usdc, false);

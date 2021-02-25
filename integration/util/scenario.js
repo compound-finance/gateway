@@ -46,10 +46,10 @@ function buildScenariosInternal(name, baseScenInfo, opts, scenarios, testFn) {
         let ctx = await buildCtx(scenInfo);
         ctx.ctx = ctx; // Self reference to make ctx pattern-matchable for scenario fns
         try {
-          let beforeEach = scenario.hasOwnProperty('beforeEach') ? scenario.beforeEach : opts.beforeEach;
+          let beforeFn = scenario.hasOwnProperty('before') ? scenario.before : opts.beforeEach;
 
-          if (beforeEach) {
-            await beforeEach(ctx);
+          if (beforeFn) {
+            await beforeFn(ctx);
           }
           await scenario.scenario(ctx);
         } finally {

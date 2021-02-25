@@ -221,6 +221,9 @@ decl_event!(
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
+        /// XXX -- For testing
+        GoldieLocksCash(ChainAccount, CashPrincipalAmount),
+
         /// An Ethereum event was successfully processed. [event_id]
         ProcessedChainEvent(ChainLogId),
 
@@ -376,7 +379,7 @@ decl_module! {
         // TODO: Do we need to sign the event id, too?
         #[weight = 1] // XXX how are we doing weights?
         pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_event(origin,event_id,event,sig): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
+            log!("receive_event(origin,event_id,event,signature): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
         }
@@ -481,10 +484,17 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .longevity(10)
                 .propagate(true)
                 .build(),
-            Call::receive_event(_event_id, _event, signature) => {
+            Call::receive_event(event_id, event, signature) => {
+                log!(
+                    "validating receive_event({:?},{:?},{}))",
+                    event_id,
+                    event,
+                    hex::encode(&signature)
+                );
+
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
-                    .and_provides(signature)
+                    .and_provides((event_id, signature))
                     .propagate(true)
                     .build()
             }
@@ -493,7 +503,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     &internal::exec_trx_request::prepend_nonce(request, *nonce)[..],
                 );
 
-                log!("signer_res={:?}", signer_res);
+                log!("validating signer_res={:?}", signer_res);
 
                 match (signer_res, nonce) {
                     (Err(_e), _) => InvalidTransaction::Call.into(),

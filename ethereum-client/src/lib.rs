@@ -2,12 +2,13 @@
 extern crate lazy_static;
 
 pub mod events;
+pub mod hex;
 
 use crate::events::decode_event;
 pub use crate::events::EthereumEvent;
+use crate::hex::{parse_u64, parse_word};
 use codec::{Decode, Encode};
 use frame_support::debug;
-use our_std::convert::TryInto;
 use our_std::RuntimeDebug;
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
@@ -21,27 +22,27 @@ pub enum EthereumClientError {
     JsonParseError,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
 pub struct ResponseError {
     pub message: Option<String>,
     pub code: Option<i64>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
 pub struct EventsResponse<T> {
     pub id: Option<u64>,
     pub result: Option<Vec<T>>,
     pub error: Option<ResponseError>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
 pub struct BlockResponse {
     pub id: Option<u64>,
     pub result: Option<String>,
     pub error: Option<ResponseError>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LogObject {
     /// true when the log was removed, due to a chain reorganization. false if it's a valid log.
@@ -126,58 +127,6 @@ fn send_rpc(
     })?;
 
     Ok(String::from(body_str))
-}
-
-fn parse_word(val_opt: Option<String>) -> Option<[u8; 32]> {
-    match val_opt {
-        Some(val) => match events::decode_hex(&val) {
-            Ok(v) => match ethabi::decode(&[ethabi::ParamType::FixedBytes(32)], &v[..]) {
-                Ok(tokens) => match &tokens[..] {
-                    [ethabi::token::Token::FixedBytes(bytes)] => bytes[..].try_into().ok(),
-                    _ => None,
-                },
-                _ => None,
-            },
-            _ => None,
-        },
-        None => None,
-    }
-}
-
-// Note: our hex library won't even _parse_ hex with an odd-number of digits
-//       so we need to pad before we parse with ethabi, as opposed to decoding
-//       and then padding.
-fn pad(val: String) -> Option<String> {
-    if val.len() > 66 || &val[0..2] != "0x" {
-        None
-    } else {
-        let mut s = String::with_capacity(64);
-        let padding = 66 - val.len();
-        for _ in 0..padding {
-            s.push('0');
-        }
-        s.push_str(&val[2..]);
-        Some(s)
-    }
-}
-
-fn parse_u64(val_opt: Option<String>) -> Option<u64> {
-    match val_opt {
-        Some(val) => match pad(val) {
-            Some(padded) => match hex::decode(&padded) {
-                Ok(v) => match ethabi::decode(&[ethabi::ParamType::Uint(256)], &v[..]) {
-                    Ok(tokens) => match tokens[..] {
-                        [ethabi::token::Token::Uint(uint)] => uint.try_into().ok(),
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            },
-            None => None,
-        },
-        None => None,
-    }
 }
 
 pub fn fetch_and_decode_logs(
@@ -287,15 +236,37 @@ mod tests {
         }
       ]
     }"#;
-        let actual = deserialize_get_logs_response(RESPONSE);
-        assert!(actual.is_ok());
-        let actual = actual.unwrap();
-        // println!("{:?}", actual);
-        assert!(actual.id.is_some());
-        assert_eq!(actual.id.unwrap(), 1);
-        assert!(actual.result.is_some());
-        assert!(actual.error.is_none());
-        // todo : assert all the fields, but i inspected it, it is working fine.....
+        let result = deserialize_get_logs_response(RESPONSE);
+
+        let expected = EventsResponse {
+            id: Some(1),
+            result: Some(vec![
+                LogObject {
+                    removed: Some(false),
+                    log_index: Some(String::from("0x1d")),
+                    transaction_index: Some(String::from("0x1d")),
+                    transaction_hash: Some(String::from("0x3dc91b98249fa9f2c5c37486a2427a3a7825be240c1c84961dfb3063d9c04d50")),
+                    block_hash: Some(String::from("0x7c5a35e9cb3e8ae0e221ab470abae9d446c3a5626ce6689fc777dcffcab52c70")),
+                    block_number: Some(String::from("0x5c29fb")),
+                    address: Some(String::from("0x1a94fce7ef36bc90959e206ba569a12afbc91ca1")),
+                    data: Some(String::from("0x0000000000000000000000003e3310720058c51f0de456e273c626cdd35065700000000000000000000000000000000000000000000000000000000000003185000000000000000000000000000000000000000000000000000000000000318200000000000000000000000000000000000000000000000000000000005c2a23")),
+                    topics: Some(vec![String::from("0x241ea03ca20251805084d27d4440371c34a0b85ff108f6bb5611248f73818b80")])
+                },
+                LogObject {
+                    removed: Some(false),
+                    log_index: Some(String::from("0x57")),
+                    transaction_index: Some(String::from("0x54")),
+                    transaction_hash: Some(String::from("0x788b1442414cb9c9a36dba2abe250763161a6f6395788a2e808f1b34e92beec1")),
+                    block_hash: Some(String::from("0x7c5a35e9cb3e8ae0e221ab470abae9d446c3a5626ce6689fc777dcffcab52c70")),
+                    block_number: Some(String::from("0x5c29fb")),
+                    address: Some(String::from("0x06012c8cf97bead5deae237070f9587f8e7a266d")),
+                    data: Some(String::from("0x00000000000000000000000077ea137625739598666ded665953d26b3d8e374400000000000000000000000000000000000000000000000000000000000749ff00000000000000000000000000000000000000000000000000000000000a749d00000000000000000000000000000000000000000000000000000000005c2a0f")),
+                    topics: Some(vec![String::from("0x241ea03ca20251805084d27d4440371c34a0b85ff108f6bb5611248f73818b80")])
+                }
+            ]),
+            error: None,
+        };
+        assert_eq!(result.unwrap(), expected)
     }
 
     #[test]
@@ -308,27 +279,27 @@ mod tests {
         "message": "query returned more than 10000 results"
       }
     }"#;
-        let actual = deserialize_get_logs_response(RESPONSE);
-        assert!(actual.is_ok());
-        let actual = actual.unwrap();
-        // println!("{:?}", actual);
-        assert!(actual.id.is_some());
-        assert_eq!(actual.id.unwrap(), 1);
-        assert!(actual.result.is_none());
-        assert!(actual.error.is_some());
-        // todo : assert all the fields, but i inspected it, it is working fine.....
+        let result = deserialize_get_logs_response(RESPONSE);
+        let expected = EventsResponse {
+            id: Some(1),
+            result: None,
+            error: Some(ResponseError {
+                message: Some(String::from("query returned more than 10000 results")),
+                code: Some(-32005),
+            }),
+        };
+        assert_eq!(result.unwrap(), expected);
     }
 
     #[test]
     fn test_deserialize_get_logs_request_totally_unexpected_input() {
         const RESPONSE: &str = r#"{"USD": 2}"#;
-        let actual = deserialize_get_logs_response(RESPONSE);
-        assert!(actual.is_ok());
-        let actual = actual.unwrap();
-        // println!("{:?}", actual);
-        assert!(actual.id.is_none());
-        assert!(actual.result.is_none());
-        assert!(actual.error.is_none());
-        // todo : assert all the fields, but i inspected it, it is working fine.....
+        let result = deserialize_get_logs_response(RESPONSE);
+        let expected = EventsResponse {
+            id: None,
+            result: None,
+            error: None,
+        };
+        assert_eq!(result.unwrap(), expected);
     }
 }

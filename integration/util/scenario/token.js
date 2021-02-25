@@ -53,6 +53,10 @@ class Token {
     return `${this.toTokenAmount(weiAmount)} ${this.symbol}`;
   }
 
+  lockEventName() {
+    return 'GoldieLocks';
+  }
+
   async getBalance(actorLookup) {
     let actor = this.ctx.actors.get(actorLookup);
     let balanceWei = await this.token.methods.balanceOf(actor.ethAddress()).call();

@@ -282,20 +282,21 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
         ChainLogEvent::Eth(eth_event) => match eth_event.event {
             ethereum_client::events::EthereumEvent::Lock {
                 asset,
-                holder,
+                recipient,
                 amount,
+                ..
             } => lock_internal::<T>(
                 get_asset::<T>(ChainAsset::Eth(asset))?,
-                ChainAccount::Eth(holder),
+                ChainAccount::Eth(recipient),
                 get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
             ),
 
             ethereum_client::events::EthereumEvent::LockCash {
-                holder,
-                amount: _amount,
+                recipient,
                 principal,
+                ..
             } => lock_cash_principal_internal::<T>(
-                ChainAccount::Eth(holder),
+                ChainAccount::Eth(recipient),
                 CashPrincipalAmount(principal),
             ),
 
@@ -467,6 +468,8 @@ pub fn lock_cash_principal_internal<T: Config>(
     ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
+
+    <Module<T>>::deposit_event(Event::GoldieLocksCash(holder, principal)); // XXX -> raw amount?
 
     Ok(()) // XXX should we return events to be deposited?
 }

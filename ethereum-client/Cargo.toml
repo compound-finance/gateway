@@ -21,6 +21,9 @@ sp-std = { default-features = false, git = 'https://github.com/compound-finance/
 
 our-std = { path = '../our-std', default-features = false }
 
+[dev-dependencies]
+primitive-types = "0.7.3"
+
 [features]
 default = ['std']
 std = [

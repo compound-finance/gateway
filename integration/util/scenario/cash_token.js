@@ -20,6 +20,10 @@ class CashToken extends Token {
     }
   }
 
+  lockEventName() {
+    return 'GoldieLocksCash';
+  }
+
   async cashIndex() {
     return this.cashToken.methods.getCashIndex().call();
   }
