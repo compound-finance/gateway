@@ -314,10 +314,8 @@ fn test_set_interest_rate_model() {
 fn test_offchain_worker() {
     use frame_support::traits::OffchainWorker;
     std::env::set_var("OPF_URL", TEST_OPF_URL);
-    let mut calls: Vec<testing::PendingRequest> = events::tests::get_mockup_http_calls(
-        testdata::json_responses::BLOCK_NUMBER_RESPONSE.to_vec(),
-        testdata::json_responses::EVENTS_RESPONSE.to_vec(),
-    );
+    let mut calls: Vec<testing::PendingRequest> =
+        events::tests::get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
     let price_call = testing::PendingRequest {
         method: "GET".into(),
         uri: TEST_OPF_URL.into(),

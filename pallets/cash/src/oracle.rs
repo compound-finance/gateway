@@ -243,6 +243,18 @@ pub mod tests {
     }
     "#;
 
+    pub static API_RESPONSE_NO_TEST_DATA: &str = r#"
+    {
+      "messages": [
+      ],
+      "prices": {
+      },
+      "signatures": [
+      ],
+      "timestamp": "1609340760"
+    }
+    "#;
+
     #[test]
     fn test_parse_message_happy_path() -> Result<(), OracleError> {
         // note test case taken from https://docs.pro.coinbase.com/#oracle but naturally it may change
