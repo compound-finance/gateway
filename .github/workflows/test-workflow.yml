@@ -22,15 +22,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-         restore-keys: |
-          ${{ runner.os }}-cargo-
-         path: |
-          /usr/local/bin/rustup
-          ~/.cargo
-          target
+      # - uses: actions/cache@v2
+      #   with:
+      #    key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      #    restore-keys: |
+      #     ${{ runner.os }}-cargo-
+      #    path: |
+      #     /usr/local/bin/rustup
+      #     ~/.cargo
+      #     target
 
       - name: Test Setup
         run: |
@@ -76,15 +76,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-         restore-keys: |
-          ${{ runner.os }}-cargo-
-         path: |
-          /usr/local/bin/rustup
-          ~/.cargo
-          target
+      # - uses: actions/cache@v2
+      #   with:
+      #    key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      #    restore-keys: |
+      #     ${{ runner.os }}-cargo-
+      #    path: |
+      #     /usr/local/bin/rustup
+      #     ~/.cargo
+      #     target
 
       - name: Test Setup
         run: |
@@ -130,10 +130,10 @@ jobs:
         with:
           node-version: '14.x'
 
-      - uses: actions/cache@v2
-        with:
-          path: '**/node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+      # - uses: actions/cache@v2
+      #   with:
+      #     path: '**/node_modules'
+      #     key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
         run: yarn install
