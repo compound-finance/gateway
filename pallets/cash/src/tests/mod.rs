@@ -1,3 +1,4 @@
+use crate::types::SignersSet;
 use crate::{chains::*, core::*, internal, mock::*, oracle::*, rates::*, reason::*, symbol::*, *};
 use codec::{Decode, Encode};
 use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
@@ -310,12 +311,13 @@ fn test_set_interest_rate_model() {
     });
 }
 
-#[test]
-fn offchain_worker_test() {
+fn test_offchain_worker() {
     use frame_support::traits::OffchainWorker;
     std::env::set_var("OPF_URL", TEST_OPF_URL);
-    let mut calls: Vec<testing::PendingRequest> =
-        events::tests::get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
+    let mut calls: Vec<testing::PendingRequest> = events::tests::get_mockup_http_calls(
+        testdata::json_responses::BLOCK_NUMBER_RESPONSE.to_vec(),
+        testdata::json_responses::EVENTS_RESPONSE.to_vec(),
+    );
     let price_call = testing::PendingRequest {
         method: "GET".into(),
         uri: TEST_OPF_URL.into(),
@@ -449,5 +451,310 @@ fn offchain_worker_test() {
         } else {
             assert!(false);
         }
+    });
+}
+
+#[test]
+fn test_offchain_worker_min_in_pending() {
+    use frame_support::traits::OffchainWorker;
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
+
+    pub const latest_block_number_response: &[u8; 79] = br#"{
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0xB60498"
+    }"#;
+
+    let mut calls = vec![
+            // Find the latest eth block number
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
+                response: Some(latest_block_number_response.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            },
+            /// XXX: check why eth starport address is not set here
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB602E5", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
+                response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            }
+        ];
+
+    let price_call = testing::PendingRequest {
+        method: "GET".into(),
+        uri: TEST_OPF_URL.into(),
+        body: vec![],
+        response: Some(
+            crate::oracle::tests::API_RESPONSE_NO_TEST_DATA
+                .to_owned()
+                .into_bytes(),
+        ),
+        headers: vec![],
+        sent: true,
+        ..Default::default()
+    };
+
+    calls.push(price_call);
+
+    let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
+
+    t.execute_with(|| {
+        initialize_storage();
+
+        // Set block number
+        let block = 1;
+        System::set_block_number(block);
+
+        PendingEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11938293, 0),
+            SignersSet::new(),
+        );
+        // Min block number is here, 11928293 == 0xB602E5
+        PendingEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11928293, 0),
+            SignersSet::new(),
+        );
+        PendingEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11928294, 0),
+            SignersSet::new(),
+        );
+
+        // Execute offchain worker with no cached block number
+        CashModule::offchain_worker(block);
+    });
+}
+
+#[test]
+fn test_offchain_worker_max_in_done() {
+    use frame_support::traits::OffchainWorker;
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
+
+    pub const latest_block_number_response: &[u8; 79] = br#"{
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0xB60498"
+    }"#;
+
+    let mut calls = vec![
+            // Find the latest eth block number
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
+                response: Some(latest_block_number_response.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            },
+            /// XXX: check why eth starport address is not set here
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629F6", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
+                response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            }
+        ];
+
+    let price_call = testing::PendingRequest {
+        method: "GET".into(),
+        uri: TEST_OPF_URL.into(),
+        body: vec![],
+        response: Some(
+            crate::oracle::tests::API_RESPONSE_NO_TEST_DATA
+                .to_owned()
+                .into_bytes(),
+        ),
+        headers: vec![],
+        sent: true,
+        ..Default::default()
+    };
+    calls.push(price_call);
+
+    let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
+
+    t.execute_with(|| {
+        initialize_storage();
+
+        // Set block number
+        let block = 1;
+        System::set_block_number(block);
+
+        // Max block number is here, 11938293 == 0xB629F5
+        DoneEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11938293, 0),
+            SignersSet::new(),
+        );
+        DoneEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11928293, 0),
+            SignersSet::new(),
+        );
+        DoneEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11928294, 0),
+            SignersSet::new(),
+        );
+
+        // Execute offchain worker with no cached block number
+        CashModule::offchain_worker(block);
+    });
+}
+
+#[test]
+fn test_offchain_worker_max_in_done_and_failed() {
+    use frame_support::traits::OffchainWorker;
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
+
+    pub const latest_block_number_response: &[u8; 79] = br#"{
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0xB60498"
+    }"#;
+
+    let mut calls = vec![
+            // Find the latest eth block number
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
+                response: Some(latest_block_number_response.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            },
+            /// XXX: check why eth starport address is not set here
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629FA", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
+                response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            }
+        ];
+
+    let price_call = testing::PendingRequest {
+        method: "GET".into(),
+        uri: TEST_OPF_URL.into(),
+        body: vec![],
+        response: Some(
+            crate::oracle::tests::API_RESPONSE_NO_TEST_DATA
+                .to_owned()
+                .into_bytes(),
+        ),
+        headers: vec![],
+        sent: true,
+        ..Default::default()
+    };
+    calls.push(price_call);
+
+    let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
+
+    t.execute_with(|| {
+        initialize_storage();
+
+        // Set block number
+        let block = 1;
+        System::set_block_number(block);
+
+        // Max block number is `Done` queue, 11938293 == 0xB629F5
+        DoneEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11938293, 0),
+            SignersSet::new(),
+        );
+        DoneEvents::insert(
+            ChainId::Eth,
+            ChainLogId::Eth(11928293, 0),
+            SignersSet::new(),
+        );
+
+        // Max block number is in `Failed` queue, 11938297 == 0xB629F9
+        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11928295, 0), Reason::None);
+        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11938297, 0), Reason::None);
+
+        // Total max for `Failed` and `Done` queues will be 0xB629F9
+        // Execute offchain worker with no cached block number
+        CashModule::offchain_worker(block);
+    });
+}
+
+#[test]
+fn test_offchain_worker_no_events() {
+    use frame_support::traits::OffchainWorker;
+    std::env::set_var("OPF_URL", TEST_OPF_URL);
+
+    pub const latest_block_number_response: &[u8; 79] = br#"{
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0xB60498"
+    }"#;
+
+    let mut calls = vec![
+            // Find the latest eth block number
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
+                response: Some(latest_block_number_response.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            },
+            /// XXX: check why eth starport address is not set here
+            testing::PendingRequest{
+                method: "POST".into(),
+                uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+                body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "earliest", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
+                response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                sent: true,
+                ..Default::default()
+            }
+        ];
+
+    let price_call = testing::PendingRequest {
+        method: "GET".into(),
+        uri: TEST_OPF_URL.into(),
+        body: vec![],
+        response: Some(
+            crate::oracle::tests::API_RESPONSE_NO_TEST_DATA
+                .to_owned()
+                .into_bytes(),
+        ),
+        headers: vec![],
+        sent: true,
+        ..Default::default()
+    };
+    calls.push(price_call);
+
+    let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
+
+    t.execute_with(|| {
+        initialize_storage();
+
+        // Set block number
+        let block = 1;
+        System::set_block_number(block);
+
+        // Total max for `Failed` and `Done` queues will be 0xB629F9
+        // Execute offchain worker with no cached block number
+        CashModule::offchain_worker(block);
     });
 }
