@@ -378,7 +378,7 @@ impl Balance {
 pub struct CashPrincipal(pub AssetBalance);
 
 impl CashPrincipal {
-    pub const DECIMALS: Decimals = CASH.decimals;
+    pub const DECIMALS: Decimals = Factor::DECIMALS;
     pub const ZERO: CashPrincipal = CashPrincipal(0);
     pub const ONE: CashPrincipal = CashPrincipal::from_nominal("1");
 

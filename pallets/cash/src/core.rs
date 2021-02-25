@@ -1871,7 +1871,7 @@ mod tests {
             );
             assert_eq!(
                 TotalCashPrincipal::get(),
-                CashPrincipalAmount::from_nominal("462104.853072")
+                CashPrincipalAmount::from_nominal("462104.853072128227960800")
             );
             assert_eq!(
                 CashPrincipals::get(&miner),
@@ -1884,7 +1884,7 @@ mod tests {
             );
             assert_eq!(
                 CashPrincipals::get(&miner),
-                CashPrincipal::from_nominal("243.097062")
+                CashPrincipal::from_nominal("243.097061442564559300")
             );
         });
     }
