@@ -1,5 +1,4 @@
 use super::*;
-use our_std::str::FromStr;
 
 #[test]
 fn upload_transfer_download() -> Result<(), Reason> {
