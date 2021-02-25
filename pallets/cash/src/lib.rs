@@ -215,14 +215,14 @@ decl_storage! {
 
 decl_event!(
     pub enum Event {
-        /// A failure to process a given extrinsic
-        Failure(Reason),
-
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
         /// XXX -- For testing
         GoldieLocksCash(ChainAccount, CashPrincipalAmount),
+
+        /// A failure to process a given extrinsic
+        Failure(Reason),
 
         /// An Ethereum event was successfully processed. [event_id]
         ProcessedChainEvent(ChainLogId),
@@ -233,11 +233,17 @@ decl_event!(
         /// Signed notice. [chain_id, notice_id, message, signatures]
         SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
 
-        /// When a new notice is generated
+        /// A new notice is generated. [notice_id, notice, encoded_notice]
         Notice(NoticeId, Notice, EncodedNotice),
 
-        /// Executed Governance Action
+        /// Governance actions were executed. [actions]
         ExecutedGovernance(Vec<(Vec<u8>, bool)>),
+
+        /// The next code hash has been allowed. [hash]
+        AllowedNextCodeHash(CodeHash),
+
+        /// An attempt to set code via hash is made. [hash, result]
+        AttemptedSetCodeByHash(CodeHash, dispatch::DispatchResult),
     }
 );
 
