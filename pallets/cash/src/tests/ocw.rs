@@ -86,7 +86,7 @@ fn offchain_worker_test() {
         assert_eq!(ex2.signature, None);
         assert_eq!(ex3.signature, None);
 
-        if let mock::Call::Cash(crate::Call::receive_event(ChainId::Eth, event_id, event, _signature)) = ex1.call {
+        if let mock::Call::Cash(crate::Call::receive_event(event_id, event, _signature)) = ex1.call {
             assert_eq!(event_id, ChainLogId::Eth(3932939, 14)); // TODO: Should this be trx index or log_index?
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [164, 169, 110, 149, 119, 24, 227, 163, 11, 119, 166, 103, 249, 57, 120, 216, 244, 56, 189, 205, 86, 255, 3, 84, 95, 8, 200, 51, 217, 162, 102, 135],
@@ -104,7 +104,7 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let mock::Call::Cash(crate::Call::receive_event(ChainId::Eth, event_id, event, _signature)) = ex2.call {
+        if let mock::Call::Cash(crate::Call::receive_event(event_id, event, _signature)) = ex2.call {
             assert_eq!(event_id, ChainLogId::Eth(3932897, 1));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [165, 200, 2, 78, 105, 154, 92, 48, 235, 150, 94, 71, 181, 21, 124, 6, 199, 111, 59, 114, 107, 255, 55, 122, 10, 83, 51, 165, 97, 242, 86, 72],
@@ -122,7 +122,7 @@ fn offchain_worker_test() {
             assert!(false);
         }
 
-        if let mock::Call::Cash(crate::Call::receive_event(ChainId::Eth, event_id, event, _signature)) = ex3.call {
+        if let mock::Call::Cash(crate::Call::receive_event(event_id, event, _signature)) = ex3.call {
             assert_eq!(event_id, ChainLogId::Eth(3858223, 0));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [193, 192, 235, 55, 181, 105, 35, 173, 158, 32, 253, 179, 28, 168, 130, 152, 141, 82, 23, 247, 202, 36, 182, 41, 124, 166, 237, 112, 8, 17, 207, 35],
@@ -171,22 +171,10 @@ fn test_offchain_worker_min_in_pending() {
         let block = 1;
         System::set_block_number(block);
 
-        PendingEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11938293, 0),
-            SignersSet::new(),
-        );
+        PendingEvents::insert(ChainLogId::Eth(11938293, 0), SignersSet::new());
         // Min block number is here, 11928293 == 0xB602E5
-        PendingEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11928293, 0),
-            SignersSet::new(),
-        );
-        PendingEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11928294, 0),
-            SignersSet::new(),
-        );
+        PendingEvents::insert(ChainLogId::Eth(11928293, 0), SignersSet::new());
+        PendingEvents::insert(ChainLogId::Eth(11928294, 0), SignersSet::new());
 
         // Execute offchain worker with no cached block number
         CashModule::offchain_worker(block);
@@ -221,21 +209,9 @@ fn test_offchain_worker_max_in_done() {
         System::set_block_number(block);
 
         // Max block number is here, 11938293 == 0xB629F5
-        DoneEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11938293, 0),
-            SignersSet::new(),
-        );
-        DoneEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11928293, 0),
-            SignersSet::new(),
-        );
-        DoneEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11928294, 0),
-            SignersSet::new(),
-        );
+        DoneEvents::insert(ChainLogId::Eth(11938293, 0), SignersSet::new());
+        DoneEvents::insert(ChainLogId::Eth(11928293, 0), SignersSet::new());
+        DoneEvents::insert(ChainLogId::Eth(11928294, 0), SignersSet::new());
 
         // Execute offchain worker with no cached block number
         CashModule::offchain_worker(block);
@@ -270,9 +246,9 @@ fn test_offchain_worker_max_in_failed() {
         System::set_block_number(block);
 
         // Max block number is here, 11938293 == 0xB629F5
-        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11928293, 0), Reason::None);
-        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11928294, 0), Reason::None);
-        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11938293, 0), Reason::None);
+        FailedEvents::insert(ChainLogId::Eth(11928293, 0), Reason::None);
+        FailedEvents::insert(ChainLogId::Eth(11928294, 0), Reason::None);
+        FailedEvents::insert(ChainLogId::Eth(11938293, 0), Reason::None);
 
         // Execute offchain worker with no cached block number
         CashModule::offchain_worker(block);
@@ -307,20 +283,12 @@ fn test_offchain_worker_max_in_done_and_failed() {
         System::set_block_number(block);
 
         // Max block number is `Done` queue, 11938293 == 0xB629F5
-        DoneEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11938293, 0),
-            SignersSet::new(),
-        );
-        DoneEvents::insert(
-            ChainId::Eth,
-            ChainLogId::Eth(11928293, 0),
-            SignersSet::new(),
-        );
+        DoneEvents::insert(ChainLogId::Eth(11938293, 0), SignersSet::new());
+        DoneEvents::insert(ChainLogId::Eth(11928293, 0), SignersSet::new());
 
         // Max block number is in `Failed` queue, 11938297 == 0xB629F9
-        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11928295, 0), Reason::None);
-        FailedEvents::insert(ChainId::Eth, ChainLogId::Eth(11938297, 0), Reason::None);
+        FailedEvents::insert(ChainLogId::Eth(11928295, 0), Reason::None);
+        FailedEvents::insert(ChainLogId::Eth(11938297, 0), Reason::None);
 
         // Total max for `Failed` and `Done` queues will be 0xB629F9
         // Execute offchain worker with no cached block number
@@ -361,7 +329,7 @@ fn test_offchain_worker_no_events() {
 }
 
 fn get_basic_calls(events_call: testing::PendingRequest) -> Vec<testing::PendingRequest> {
-    pub const LATEST_BLOCK_NUMBER_RESPONSE: &[u8; 79] = br#"{
+    const LATEST_BLOCK_NUMBER_RESPONSE: &[u8; 79] = br#"{
         "jsonrpc": "2.0",
         "id": 1,
         "result": "0xB60498"
@@ -378,7 +346,7 @@ fn get_basic_calls(events_call: testing::PendingRequest) -> Vec<testing::Pending
         ..Default::default()
     };
 
-    let PRICE_API_RESPONSE_NO_TEST_DATA = r#"
+    const PRICE_API_RESPONSE_NO_TEST_DATA: &str = r#"
     {
       "messages": [
       ],

@@ -1,5 +1,5 @@
 use codec::Encode;
-use frame_support::storage::{IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap};
+use frame_support::storage::{IterableStorageMap, StorageMap};
 use frame_system::offchain::SubmitTransaction;
 use our_std::cmp;
 use our_std::collections::btree_set::BTreeSet;
@@ -9,7 +9,7 @@ use sp_runtime::offchain::{
 };
 
 use crate::{
-    chains::{Chain, ChainId, Ethereum},
+    chains::{Chain, Ethereum},
     core::{apply_chain_event_internal, passes_validation_threshold},
     events::{encode_block_hex, fetch_eth_events, ChainLogEvent, ChainLogId},
     log,
@@ -23,7 +23,7 @@ const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereu
 const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
 
 // XXX disambiguate whats for ethereum vs not
-pub fn process_events<T: Config>() -> Result<(), Reason> {
+pub fn fetch_process_events<T: Config>() -> Result<(), Reason> {
     let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_ETHEREUM_BLOCK);
 
     let from_block: String = if let Some(Some(cached_block_num)) = s_info.get::<u64>() {
@@ -38,7 +38,7 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
         log!("Block number has not been cached yet");
 
         let pending_blocks: Vec<u64> = PendingEvents::iter()
-            .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
+            .filter_map(|(chain_log_id, _signers)| match chain_log_id {
                 ChainLogId::Eth(block_number, _log_index) => Some(block_number),
                 _ => None,
             })
@@ -50,7 +50,7 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
         } else {
             // Find max block number of `Failed` and `Done` events
             let failed_blocks: Vec<u64> = FailedEvents::iter()
-                .filter_map(|(_chain_id, chain_log_id, _reason)| match chain_log_id {
+                .filter_map(|(chain_log_id, _reason)| match chain_log_id {
                     ChainLogId::Eth(block_number, _log_index) => Some(block_number),
                     _ => None,
                 })
@@ -58,14 +58,14 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
             let latest_failed = failed_blocks.iter().max();
 
             let done_blocks: Vec<u64> = DoneEvents::iter()
-                .filter_map(|(_chain_id, chain_log_id, _signers)| match chain_log_id {
+                .filter_map(|(chain_log_id, _signers)| match chain_log_id {
                     ChainLogId::Eth(block_number, _log_index) => Some(block_number),
                     _ => None,
                 })
                 .collect();
             let latest_done = done_blocks.iter().max();
 
-            /// XXX possibly analyze `signers` field to see which block this exact validator has already signed
+            // XXX possibly analyze `signers` field to see which block this exact validator has already signed
             let max_done_failed = *cmp::max(latest_failed.unwrap_or(&0), latest_done.unwrap_or(&0));
 
             if max_done_failed == 0 {
@@ -89,7 +89,7 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
                 // We need to make sure this is fully idempotent
 
                 // Send extrinsics for all events
-                submit_events::<T>(ChainId::Eth, event_info.events)?;
+                submit_events::<T>(event_info.events)?;
 
                 // Save latest block in ocw storage
                 s_info.set(&event_info.latest_eth_block);
@@ -103,10 +103,7 @@ pub fn process_events<T: Config>() -> Result<(), Reason> {
     Ok(())
 }
 
-fn submit_events<T: Config>(
-    chain_id: ChainId,
-    events: Vec<(ChainLogId, ChainLogEvent)>,
-) -> Result<(), Reason> {
+fn submit_events<T: Config>(events: Vec<(ChainLogId, ChainLogEvent)>) -> Result<(), Reason> {
     for (event_id, event) in events.into_iter() {
         log!(
             "Processing event and sending extrinsic: {} {:?}",
@@ -117,7 +114,7 @@ fn submit_events<T: Config>(
         // XXX why are we signing with eth?
         //  bc eth is identity key...
         let signature = <Ethereum as Chain>::sign_message(&event.encode()[..])?;
-        let call = Call::receive_event(chain_id, event_id, event, signature);
+        let call = Call::receive_event(event_id, event, signature);
 
         // TODO: Do we want to short-circuit on an error here?
         let res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
@@ -131,7 +128,6 @@ fn submit_events<T: Config>(
 }
 
 pub fn receive_event<T: Config>(
-    chain_id: ChainId,
     event_id: ChainLogId,
     event: ChainLogEvent,
     signature: ValidatorSig,
@@ -154,16 +150,14 @@ pub fn receive_event<T: Config>(
 
     // Check if event is in `Done` or `Failed` queues first,
     // Otherwise it is a new or already seen `Pending` event
-    if DoneEvents::contains_key(chain_id, event_id)
-        || FailedEvents::contains_key(chain_id, event_id)
-    {
+    if DoneEvents::contains_key(event_id) || FailedEvents::contains_key(event_id) {
         // TODO: Eventually we should be deleting or retrying here (based on monotonic ids and signing order)
         return Ok(());
     }
 
     // Get signers set, if it's a new `Pending` event, create a new empty signers set
-    let mut signers = if PendingEvents::contains_key(chain_id, event_id) {
-        PendingEvents::take(chain_id, event_id)
+    let mut signers = if PendingEvents::contains_key(event_id) {
+        PendingEvents::take(event_id)
     } else {
         SignersSet::new()
     };
@@ -172,8 +166,8 @@ pub fn receive_event<T: Config>(
     if passes_validation_threshold(&signers, &validators) {
         match apply_chain_event_internal::<T>(event) {
             Ok(()) => {
-                DoneEvents::insert(chain_id, event_id, signers);
-                <Module<T>>::deposit_event(EventT::ProcessedChainEvent(chain_id, event_id));
+                DoneEvents::insert(event_id, signers);
+                <Module<T>>::deposit_event(EventT::ProcessedChainEvent(event_id));
                 Ok(())
             }
 
@@ -183,10 +177,8 @@ pub fn receive_event<T: Config>(
                     event_id.show(),
                     reason
                 );
-                FailedEvents::insert(chain_id, event_id, reason);
-                <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(
-                    chain_id, event_id, reason,
-                ));
+                FailedEvents::insert(event_id, reason);
+                <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(event_id, reason));
                 Ok(())
             }
         }
@@ -196,7 +188,7 @@ pub fn receive_event<T: Config>(
             event_id.show(),
             signers.len()
         );
-        PendingEvents::insert(chain_id, event_id, signers);
+        PendingEvents::insert(event_id, signers);
         Ok(())
     }
 }

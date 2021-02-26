@@ -157,14 +157,14 @@ decl_storage! {
         /// The mapping of asset indices, by asset and account.
         LastIndices get(fn last_index): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
 
-        /// XXX update here The mapping of (status of) events witnessed on a given chain, by event id.
-        PendingEvents get(fn pending_events): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) ChainLogId => SignersSet;
+        /// The mapping of `Pending` events witnessed on a given chain, by event id.
+        PendingEvents get(fn pending_events): map hasher(blake2_128_concat) ChainLogId => SignersSet;
 
-        /// XXX update here
-        DoneEvents get(fn done_events): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) ChainLogId => SignersSet;
+        /// The mapping of `Done` events witnessed on a given chain, by event id.
+        DoneEvents get(fn done_events): map hasher(blake2_128_concat) ChainLogId => SignersSet;
 
-        /// XXX update here
-        FailedEvents get(fn failed_events): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) ChainLogId => Reason;
+        /// The mapping of `Failed` events witnessed on a given chain, by event id.
+        FailedEvents get(fn failed_events): map hasher(blake2_128_concat) ChainLogId => Reason;
 
         /// Notices contain information which can be synced to Starports
         Notices get(fn notice): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
@@ -231,10 +231,10 @@ decl_event!(
         GoldieLocksCash(ChainAccount, CashPrincipalAmount),
 
         /// An Ethereum event was successfully processed. [event_id]
-        ProcessedChainEvent(ChainId, ChainLogId),
+        ProcessedChainEvent(ChainLogId),
 
         /// An Ethereum event failed during processing. [event_id, reason]
-        FailedProcessingChainEvent(ChainId, ChainLogId, Reason),
+        FailedProcessingChainEvent(ChainLogId, Reason),
 
         /// Signed notice. [chain_id, notice_id, message, signatures]
         SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
@@ -384,10 +384,10 @@ decl_module! {
 
         // TODO: Do we need to sign the event id, too?
         #[weight = 1] // XXX how are we doing weights?
-        pub fn receive_event(origin, chain_id: ChainId, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_event(origin,chain_id,event_id,event,signature): {:?} {:?} {:?} {}", chain_id, event_id, &event, hex::encode(&signature)); // XXX ?
+        pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+            log!("receive_event(origin,event_id,event,signature): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::events::receive_event::<T>(chain_id, event_id, event, signature))?)
+            Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
         }
 
         #[weight = 0] // XXX
@@ -398,7 +398,7 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            if let Err(e) = internal::events::process_events::<T>() {
+            if let Err(e) = internal::events::fetch_process_events::<T>() {
                 log!("offchain_worker error during fetch events: {:?}", e);
             }
 
@@ -497,10 +497,9 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .longevity(10)
                 .propagate(true)
                 .build(),
-            Call::receive_event(chain_id, event_id, event, signature) => {
+            Call::receive_event(event_id, event, signature) => {
                 log!(
-                    "validating receive_event({:?},{:?},{:?},{}))",
-                    chain_id,
+                    "validating receive_event({:?},{:?},{}))",
                     event_id,
                     event,
                     hex::encode(&signature)

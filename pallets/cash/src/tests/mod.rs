@@ -15,10 +15,8 @@ pub use our_std::iter::FromIterator;
 pub use our_std::str::FromStr;
 
 pub mod extract;
+pub mod ocw;
 pub mod protocol;
-
-#[cfg(test)]
-mod ocw;
 
 pub const ETH: Units = Units::from_ticker_str("ETH", 18);
 pub const Eth: ChainAsset = ChainAsset::Eth(hex!("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"));
@@ -138,7 +136,6 @@ fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();
         // Dispatch a signed extrinsic.
-        let chain_id = ChainId::Eth;
         let event_id = ChainLogId::Eth(3858223, 0);
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
@@ -157,14 +154,13 @@ fn process_eth_event_happy_path() {
 
         assert_ok!(CashModule::receive_event(
             Origin::none(),
-            chain_id,
             event_id,
             event,
             signature
         ));
 
         assert_eq!(
-            CashModule::pending_events(chain_id, event_id),
+            CashModule::pending_events(event_id),
             BTreeSet::from_iter(vec![hex::decode(
                 "6a72a2f14577d9cd0167801efdd54a07b40d2b61"
             )
@@ -174,11 +170,11 @@ fn process_eth_event_happy_path() {
         );
 
         assert_eq!(
-            CashModule::done_events(chain_id, event_id),
+            CashModule::done_events(event_id),
             BTreeSet::from_iter(vec![])
         );
 
-        assert_eq!(CashModule::failed_events(chain_id, event_id), Reason::None);
+        assert_eq!(CashModule::failed_events(event_id), Reason::None);
     });
 }
 
@@ -186,7 +182,6 @@ fn process_eth_event_happy_path() {
 fn process_eth_event_fails_for_bad_signature() {
     new_test_ext().execute_with(|| {
         let event_id = ChainLogId::Eth(3858223, 0);
-        let chain_id = ChainId::Eth;
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
             block_number: 3858223,
@@ -202,13 +197,7 @@ fn process_eth_event_fails_for_bad_signature() {
 
         // Dispatch a signed extrinsic.
         assert_err!(
-            CashModule::receive_event(
-                Origin::signed(Default::default()),
-                chain_id,
-                event_id,
-                event,
-                [0; 65]
-            ),
+            CashModule::receive_event(Origin::signed(Default::default()), event_id, event, [0; 65]),
             DispatchError::BadOrigin
         );
     });
@@ -218,7 +207,6 @@ fn process_eth_event_fails_for_bad_signature() {
 fn process_eth_event_fails_if_not_validator() {
     new_test_ext().execute_with(|| {
         let event_id = ChainLogId::Eth(3858223, 0);
-        let chain_id = ChainId::Eth;
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
             block_number: 3858223,
@@ -240,7 +228,7 @@ fn process_eth_event_fails_if_not_validator() {
             209, 126, 30, 123, 73, 238, 34, 28,
         ];
         assert_err!(
-            CashModule::receive_event(Origin::none(), chain_id, event_id, event, sig),
+            CashModule::receive_event(Origin::none(), event_id, event, sig),
             Reason::UnknownValidator
         );
     });
