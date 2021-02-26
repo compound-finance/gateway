@@ -343,8 +343,6 @@ where
             .ok()?;
 
         let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
-
-        // let address = MultiAddress(account, ());
         let (call, extra, _) = raw_payload.deconstruct();
         Some((
             call,
