@@ -1,4 +1,5 @@
 use codec::{Decode, Encode};
+use our_std::RuntimeDebug;
 use tiny_keccak::Hasher;
 
 pub type SignatureBytes = [u8; 65];
@@ -18,7 +19,7 @@ pub type HashedMessageBytes = [u8; 32];
 /// * The key id provided is unknown
 /// * The HSM is not available
 /// * The HSM failed to sign this request for some other reason
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, our_std::Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub enum CryptoError {
     Unknown,
     KeyNotFound,

@@ -27,7 +27,8 @@ use crate::types::{
 };
 use codec::alloc::string::String;
 use frame_support::{
-    decl_event, decl_module, decl_storage, dispatch, weights::DispatchClass, Parameter,
+    decl_event, decl_module, decl_storage, dispatch, traits::StoredMap, weights::DispatchClass,
+    Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{str, vec::Vec};
@@ -53,7 +54,6 @@ pub mod factor;
 pub mod internal;
 pub mod log;
 pub mod notices;
-pub mod oracle;
 pub mod params;
 pub mod portfolio;
 pub mod rates;
@@ -88,7 +88,11 @@ pub trait Config:
         + UnfilteredDispatchable<Origin = Self::Origin>
         + GetDispatchInfo;
 
+    /// Convert implementation for Moment -> Timestamp.
     type TimeConverter: Convert<<Self as pallet_timestamp::Config>::Moment, Timestamp>;
+
+    /// Placate substrate's `HandleLifetime` trait.
+    type AccountStore: StoredMap<SubstrateId, ()>;
 }
 
 decl_storage! {
@@ -223,6 +227,9 @@ decl_event!(
         /// XXX -- For testing
         GoldieLocks(ChainAsset, ChainAccount, AssetAmount),
 
+        /// XXX -- For testing
+        GoldieLocksCash(ChainAccount, CashPrincipalAmount),
+
         /// An Ethereum event was successfully processed. [event_id]
         ProcessedChainEvent(ChainId, ChainLogId),
 
@@ -340,7 +347,7 @@ decl_module! {
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
         }
 
-        /// Set the price using the open price feed. [Root]
+        /// Set the liquidity factor for an asset [Root]
         #[weight = 0] // XXX
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
@@ -378,7 +385,7 @@ decl_module! {
         // TODO: Do we need to sign the event id, too?
         #[weight = 1] // XXX how are we doing weights?
         pub fn receive_event(origin, chain_id: ChainId, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_event(origin,chain_id,event_id,event,sig): {:?} {:?} {:?} {}", chain_id, event_id, &event, hex::encode(&signature)); // XXX ?
+            log!("receive_event(origin,chain_id,event_id,event,signature): {:?} {:?} {:?} {}", chain_id, event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_event::<T>(chain_id, event_id, event, signature))?)
         }
@@ -441,6 +448,10 @@ impl<T: Config> Module<T> {
                 <Validators>::get(&validator_keys.substrate_id) == None,
                 "Duplicate validator keys in genesis config"
             );
+            assert!(
+                T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
+                "Could not placate the substrate account existence thing"
+            );
             <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
         }
     }
@@ -452,6 +463,23 @@ impl<T: Config> Module<T> {
             "Open price feed price reporters must be set in the genesis config"
         );
         PriceReporters::put(reporters);
+    }
+
+    // ** API / View Functions ** //
+
+    /// Get the liquidity for the given account.
+    pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
+        Ok(core::get_liquidity::<T>(account)?.value)
+    }
+
+    /// Get the price for the given asset.
+    pub fn get_price(ticker: Ticker) -> Result<AssetPrice, Reason> {
+        Ok(core::get_price_by_ticker::<T>(ticker)?.value)
+    }
+
+    /// Get the rates for the given asset.
+    pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
+        Ok(core::get_rates::<T>(asset)?)
     }
 }
 
@@ -469,10 +497,18 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .longevity(10)
                 .propagate(true)
                 .build(),
-            Call::receive_event(_chain_id, _event_id, _event, signature) => {
+            Call::receive_event(chain_id, event_id, event, signature) => {
+                log!(
+                    "validating receive_event({:?},{:?},{:?},{}))",
+                    chain_id,
+                    event_id,
+                    event,
+                    hex::encode(&signature)
+                );
+
                 ValidTransaction::with_tag_prefix("CashPallet")
                     .longevity(10)
-                    .and_provides(signature)
+                    .and_provides((event_id, signature))
                     .propagate(true)
                     .build()
             }
@@ -481,7 +517,7 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     &internal::exec_trx_request::prepend_nonce(request, *nonce)[..],
                 );
 
-                log!("signer_res={:?}", signer_res);
+                log!("validating signer_res={:?}", signer_res);
 
                 match (signer_res, nonce) {
                     (Err(_e), _) => InvalidTransaction::Call.into(),

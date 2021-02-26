@@ -14,13 +14,10 @@ use num_traits::ToPrimitive;
 /// Error enum for interest rates
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum RatesError {
-    UtilizationZeroSupplyError,
-    UtilizationBorrowedIsMoreThanSupplied,
-    ModelNotIncreasingZeroRateAboveKinkRate,
-    ModelNotIncreasingKinkRateAboveFullRate,
-    ModelKinkUtilizationOver100Percent,
-    ModelKinkUtilizationNotPositive,
     ModelRateOutOfBounds,
+    ZeroAboveKink,
+    KinkAboveFull,
+    KinkUtilizationTooHigh,
     Overflowed,
 }
 
@@ -94,76 +91,31 @@ impl From<APR> for String {
     }
 }
 
-/// Utilization rate for a given market.
-#[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct Utilization(Uint);
-
-impl From<Uint> for Utilization {
-    fn from(x: u128) -> Self {
-        Utilization(x)
+/// Get the utilization ratio given the amount supplied and borrowed.
+pub fn get_utilization(supplied: AssetAmount, borrowed: AssetAmount) -> Result<Factor, MathError> {
+    if borrowed == 0 {
+        Ok(Factor::ZERO)
+    } else {
+        Ok(Factor::from_fraction(borrowed, supplied)?)
     }
-}
-
-impl Utilization {
-    pub const DECIMALS: u8 = 4;
-    pub const ZERO: Utilization = Utilization::from_nominal("0");
-    pub const ONE: Utilization = Utilization::from_nominal("1");
-
-    pub const fn from_nominal(s: &'static str) -> Self {
-        Utilization(uint_from_string_with_decimals(Self::DECIMALS, s))
-    }
-}
-
-/// Internal function for getting a raw utilization. Used so that we can use ? operator with options
-/// then write one ok_or later.
-fn get_raw_utilization(supplied: AssetAmount, borrowed: AssetAmount) -> Option<Uint> {
-    borrowed
-        .checked_mul(Utilization::ONE.0)?
-        .checked_div(supplied)
-}
-
-/// Get the utilization ratio given the amount supplied and borrowed. These amounts should be in
-/// "today" money AKA "balance" money.
-pub fn get_utilization(
-    supplied: AssetAmount,
-    borrowed: AssetAmount,
-) -> Result<Utilization, RatesError> {
-    if supplied == 0 && borrowed == 0 {
-        // 0 over 0 is defined to be 0 utilization
-        return Ok(Utilization::ZERO);
-    }
-
-    if borrowed > supplied {
-        return Err(RatesError::UtilizationBorrowedIsMoreThanSupplied);
-    }
-
-    let result = get_raw_utilization(supplied, borrowed).ok_or(RatesError::Overflowed)?;
-
-    Ok(result.into())
 }
 
 /// This represents an interest rate model type and parameters.
-/// It also implements the pure functionality of the interest rate model
-/// leaving out all issues of storage read and write.
-///
-/// In the future we may support serde serialization and deserialization of this struct
-/// for the purpose of inclusion in the genesis configuration chain_spec file.
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub enum InterestRateModel {
     Kink {
         zero_rate: APR,
         kink_rate: APR,
-        kink_utilization: Utilization,
+        kink_utilization: Factor,
         full_rate: APR,
     },
 }
 
-/// This is _required_ for storage, we should never depend on this.
+/// This is for convenience, we shouldn't rely on a sane default model.
 impl Default for InterestRateModel {
     fn default() -> Self {
-        Self::new_kink(0, 500, 8000, 2000)
+        Self::new_kink(0, 500, Factor::from_nominal("0.8"), 2000)
     }
 }
 
@@ -179,7 +131,7 @@ impl InterestRateModel {
         T: Into<APR>,
         U: Into<APR>,
         V: Into<APR>,
-        W: Into<Utilization>,
+        W: Into<Factor>,
     {
         InterestRateModel::Kink {
             zero_rate: zero_rate.into(),
@@ -191,8 +143,7 @@ impl InterestRateModel {
 
     /// Check the model parameters for sanity
     ///
-    /// Kink - we expect the kink model to be monotonically increasing with a kink somewhere between
-    /// 0% and 100% utilization
+    /// Kink - monotonically increasing rate with a kink somewhere between 0% and 100% utilization
     pub fn check_parameters(self: &Self) -> Result<(), RatesError> {
         match self {
             Self::Kink {
@@ -206,19 +157,15 @@ impl InterestRateModel {
                 }
 
                 if zero_rate >= kink_rate {
-                    return Err(RatesError::ModelNotIncreasingZeroRateAboveKinkRate);
+                    return Err(RatesError::ZeroAboveKink);
                 }
 
                 if kink_rate >= full_rate {
-                    return Err(RatesError::ModelNotIncreasingKinkRateAboveFullRate);
+                    return Err(RatesError::KinkAboveFull);
                 }
 
-                if *kink_utilization >= Utilization::ONE {
-                    return Err(RatesError::ModelKinkUtilizationOver100Percent);
-                }
-
-                if *kink_utilization <= Utilization::ZERO {
-                    return Err(RatesError::ModelKinkUtilizationNotPositive);
+                if *kink_utilization >= Factor::ONE {
+                    return Err(RatesError::KinkUtilizationTooHigh);
                 }
             }
         };
@@ -253,7 +200,7 @@ impl InterestRateModel {
         utilization
             .checked_sub(kink_utilization)?
             .checked_mul(full_rate.checked_sub(kink_rate)?)?
-            .checked_div(Utilization::ONE.0.checked_sub(kink_utilization)?)?
+            .checked_div(Factor::ONE.0.checked_sub(kink_utilization)?)?
             .checked_add(kink_rate)
     }
 
@@ -261,7 +208,7 @@ impl InterestRateModel {
     /// Current rate is not used at the moment
     pub fn get_borrow_rate<T: Into<APR>>(
         self: &Self,
-        utilization: Utilization,
+        utilization: Factor,
         _current_rate: T,
     ) -> Result<APR, RatesError> {
         match self {
@@ -325,7 +272,7 @@ impl InterestRateModel {
             acc,
             APR::DECIMALS,
             utilization,
-            Utilization::DECIMALS,
+            Factor::DECIMALS,
             APR::DECIMALS,
         )?;
 
@@ -335,7 +282,7 @@ impl InterestRateModel {
     /// Get the (borrow_rate, supply_rate) pair, they're often needed at the same time.
     pub fn get_rates(
         self: &Self,
-        utilization: Utilization,
+        utilization: Factor,
         current_rate: APR,
         miner_shares: MinerShares,
     ) -> Result<(APR, APR), RatesError> {
@@ -352,7 +299,7 @@ impl InterestRateModel {
     /// always Borrow Rate * (1-miner shares) * utilization
     pub fn get_supply_rate(
         self: &Self,
-        utilization: Utilization,
+        utilization: Factor,
         current_rate: APR,
         miner_shares: MinerShares,
     ) -> Result<APR, RatesError> {
@@ -368,7 +315,7 @@ mod test {
     struct UtilizationTestCase {
         supplied: AssetAmount,
         borrowed: AssetAmount,
-        expected: Result<Utilization, RatesError>,
+        expected: Result<Factor, MathError>,
         message: &'static str,
     }
 
@@ -380,7 +327,7 @@ mod test {
 
     struct InterestRateModelGetBorrowRateTestCase {
         model: InterestRateModel,
-        utilization: Utilization,
+        utilization: Factor,
         expected: Result<APR, RatesError>,
         message: &'static str,
     }
@@ -390,43 +337,43 @@ mod test {
             UtilizationTestCase {
                 supplied: 0,
                 borrowed: 0,
-                expected: Ok(Utilization::ZERO),
+                expected: Ok(Factor::ZERO),
                 message: "Zero supply and zero borrow is defined as zero utilization",
             },
             UtilizationTestCase {
                 supplied: 0,
                 borrowed: 1,
-                expected: Err(RatesError::UtilizationBorrowedIsMoreThanSupplied),
+                expected: Err(MathError::DivisionByZero),
                 message: "Borrowed can not be more than supplied, even when supplied is zero",
             },
             UtilizationTestCase {
                 supplied: 1,
                 borrowed: 2,
-                expected: Err(RatesError::UtilizationBorrowedIsMoreThanSupplied),
-                message: "Borrowed can not be more than supplied",
+                expected: Ok(Factor::from_nominal("2")),
+                message: "More than 100% utilization is well defined",
             },
             UtilizationTestCase {
                 supplied: Uint::max_value(),
                 borrowed: Uint::max_value(),
-                expected: Err(RatesError::Overflowed),
-                message: "These numbers are vastly too large to compute the utilization",
+                expected: Ok(Factor::ONE),
+                message: "We can compute utilization for large numbers",
             },
             UtilizationTestCase {
-                supplied: Uint::max_value() / Utilization::ONE.0 + 1,
-                borrowed: Uint::max_value() / Utilization::ONE.0 + 1,
-                expected: Err(RatesError::Overflowed),
-                message: "These numbers are only just too large to compute the utilization",
+                supplied: Uint::max_value() / Factor::ONE.0 + 1,
+                borrowed: Uint::max_value() / Factor::ONE.0,
+                expected: Ok(Factor(Factor::ONE.0 - 1)),
+                message: "We can compute utilization for large numbers",
             },
             UtilizationTestCase {
-                supplied: Uint::max_value() / Utilization::ONE.0,
-                borrowed: Uint::max_value() / Utilization::ONE.0,
-                expected: Ok(Utilization::ONE),
+                supplied: Uint::max_value() / Factor::ONE.0,
+                borrowed: Uint::max_value() / Factor::ONE.0,
+                expected: Ok(Factor::ONE),
                 message: "These are the largest numbers we can use to compute the utilization",
             },
             UtilizationTestCase {
                 supplied: 100,
                 borrowed: 100,
-                expected: Ok(Utilization::ONE),
+                expected: Ok(Factor::ONE),
                 message: "This is a basic test of 100% utilization",
             },
             UtilizationTestCase {
@@ -438,13 +385,13 @@ mod test {
             UtilizationTestCase {
                 supplied: 100,
                 borrowed: 50,
-                expected: Ok(Utilization::from_nominal("0.5")),
+                expected: Ok(Factor::from_nominal("0.5")),
                 message: "A basic test of middling utilization",
             },
         ]
     }
 
-    fn test_get_utilizatio_case(case: UtilizationTestCase) {
+    fn test_get_utilization_case(case: UtilizationTestCase) {
         assert_eq!(
             case.expected,
             get_utilization(case.supplied, case.borrowed),
@@ -457,7 +404,7 @@ mod test {
     fn test_get_utilization() {
         get_utilization_test_cases()
             .drain(..)
-            .for_each(test_get_utilizatio_case)
+            .for_each(test_get_utilization_case)
     }
 
     fn get_check_parameters_test_cases() -> Vec<InterestRateModelCheckParametersTestCase> {
@@ -467,7 +414,7 @@ mod test {
                     zero_rate: 1.into(),
                     kink_rate: 2.into(),
                     full_rate: 3.into(),
-                    kink_utilization: Utilization::from_nominal("0.5"),
+                    kink_utilization: Factor::from_nominal("0.5"),
                 },
                 expected: Ok(()),
                 message: "typical case should work well",
@@ -477,9 +424,9 @@ mod test {
                     zero_rate: 1.into(),
                     kink_rate: 1.into(),
                     full_rate: 3.into(),
-                    kink_utilization: Utilization::from_nominal("0.5"),
+                    kink_utilization: Factor::from_nominal("0.5"),
                 },
-                expected: Err(RatesError::ModelNotIncreasingZeroRateAboveKinkRate),
+                expected: Err(RatesError::ZeroAboveKink),
                 message: "rates must be increasing between zero and kink",
             },
             InterestRateModelCheckParametersTestCase {
@@ -487,9 +434,9 @@ mod test {
                     zero_rate: 1.into(),
                     kink_rate: 2.into(),
                     full_rate: 2.into(),
-                    kink_utilization: Utilization::from_nominal("0.5"),
+                    kink_utilization: Factor::from_nominal("0.5"),
                 },
-                expected: Err(RatesError::ModelNotIncreasingKinkRateAboveFullRate),
+                expected: Err(RatesError::KinkAboveFull),
                 message: "rates must be increasing between kink and 100% util rate",
             },
             InterestRateModelCheckParametersTestCase {
@@ -497,27 +444,17 @@ mod test {
                     zero_rate: 1.into(),
                     kink_rate: 2.into(),
                     full_rate: 3.into(),
-                    kink_utilization: Utilization::ONE,
+                    kink_utilization: Factor::ONE,
                 },
-                expected: Err(RatesError::ModelKinkUtilizationOver100Percent),
+                expected: Err(RatesError::KinkUtilizationTooHigh),
                 message: "kink must be less than 100%",
-            },
-            InterestRateModelCheckParametersTestCase {
-                model: InterestRateModel::Kink {
-                    zero_rate: 1.into(),
-                    kink_rate: 2.into(),
-                    full_rate: 3.into(),
-                    kink_utilization: 0.into(),
-                },
-                expected: Err(RatesError::ModelKinkUtilizationNotPositive),
-                message: "kink must be more than zero",
             },
             InterestRateModelCheckParametersTestCase {
                 model: InterestRateModel::Kink {
                     zero_rate: APR(APR::MAX.0 + 1),
                     kink_rate: 2.into(),
                     full_rate: 3.into(),
-                    kink_utilization: 0.into(),
+                    kink_utilization: Factor::ZERO,
                 },
                 expected: Err(RatesError::ModelRateOutOfBounds),
                 message: "rate must be less than max rate",
@@ -527,7 +464,7 @@ mod test {
                     zero_rate: 1.into(),
                     kink_rate: APR(APR::MAX.0 + 1),
                     full_rate: 3.into(),
-                    kink_utilization: 0.into(),
+                    kink_utilization: Factor::ZERO,
                 },
                 expected: Err(RatesError::ModelRateOutOfBounds),
                 message: "rate must be less than max rate",
@@ -537,7 +474,7 @@ mod test {
                     zero_rate: 1.into(),
                     kink_rate: 2.into(),
                     full_rate: APR(APR::MAX.0 + 1),
-                    kink_utilization: 0.into(),
+                    kink_utilization: Factor::ZERO,
                 },
                 expected: Err(RatesError::ModelRateOutOfBounds),
                 message: "rate must be less than max rate",
@@ -568,10 +505,10 @@ mod test {
                 model: InterestRateModel::Kink {
                     zero_rate: 100.into(),
                     kink_rate: 200.into(),
-                    kink_utilization: 5000.into(),
+                    kink_utilization: Factor::from_nominal("0.5"),
                     full_rate: 500.into(),
                 },
-                utilization: 0.into(),
+                utilization: Factor::ZERO,
                 expected: Ok(100.into()),
                 message: "rate at zero utilization should be zero utilization rate",
             },
@@ -579,10 +516,10 @@ mod test {
                 model: InterestRateModel::Kink {
                     zero_rate: 100.into(),
                     kink_rate: 200.into(),
-                    kink_utilization: 5000.into(),
+                    kink_utilization: Factor::from_nominal("0.5"),
                     full_rate: 500.into(),
                 },
-                utilization: 5000.into(),
+                utilization: Factor::from_nominal("0.5"),
                 expected: Ok(200.into()),
                 message: "rate at kink utilization should be kink utilization rate",
             },
@@ -590,10 +527,10 @@ mod test {
                 model: InterestRateModel::Kink {
                     zero_rate: 100.into(),
                     kink_rate: 200.into(),
-                    kink_utilization: 5000.into(),
+                    kink_utilization: Factor::from_nominal("0.5"),
                     full_rate: 500.into(),
                 },
-                utilization: Utilization::ONE,
+                utilization: Factor::ONE,
                 expected: Ok(500.into()),
                 message: "rate at full utilization should be full utilization rate",
             },
@@ -601,10 +538,10 @@ mod test {
                 model: InterestRateModel::Kink {
                     zero_rate: 100.into(),
                     kink_rate: 200.into(),
-                    kink_utilization: 5000.into(),
+                    kink_utilization: Factor::from_nominal("0.5"),
                     full_rate: 500.into(),
                 },
-                utilization: 1000.into(),
+                utilization: Factor::from_nominal("0.1"),
                 expected: Ok(120.into()),
                 message: "rate at point between zero and kink",
             },
@@ -612,10 +549,10 @@ mod test {
                 model: InterestRateModel::Kink {
                     zero_rate: 100.into(),
                     kink_rate: 200.into(),
-                    kink_utilization: 5000.into(),
+                    kink_utilization: Factor::from_nominal("0.5"),
                     full_rate: 500.into(),
                 },
-                utilization: 8000.into(),
+                utilization: Factor::from_nominal("0.8"),
                 expected: Ok(380.into()),
                 message: "rate at point between kink and full",
             },

@@ -14,7 +14,7 @@ let callbacks = [];
 // TODO: Refactor here?
 function subscribeEvents(api) {
   api.query.system.events((events) => {
-    events.forEach(({ event, phase }) => {
+    events.forEach(({ event, phase }, i) => {
       debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
     });
     // TODO: Clean this up
@@ -101,15 +101,17 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
           }
 
           if (error.isModule) {
-            // for module errors, we have the section indexed, lookup
-            const decoded = api.registry.findMetaError(error.asModule);
-            const { documentation, method, section } = decoded;
+            try {
+              // for module errors, we have the section indexed, lookup
+              const decoded = api.registry.findMetaError(error.asModule);
+              const { documentation, method, section } = decoded;
 
-            return new Error(`DispatchError[id=${id}]: ${section}.${method}: ${documentation.join(' ')}`);
-          } else {
-            // Other, CannotLookup, BadOrigin, no extra info
-            return new Error(`DispatchError[id=${id}]: ${error.toString()}`);
+              return new Error(`DispatchError[id=${id}]: ${section}.${method}: ${documentation.join(' ')}`);
+            } catch (e) {}
           }
+
+          // Other, CannotLookup, BadOrigin, no extra info
+          return new Error(`DispatchError[id=${id}]: ${error.toString()}`);
         });
 
       let failures = [
@@ -189,9 +191,14 @@ function decodeCall(api, callData) {
   return call.toHuman();
 }
 
+function descale(val, decimals) {
+  return Number(`${val}e-${decimals}`);
+}
+
 module.exports = {
   decodeCall,
   encodeCall,
+  descale,
   findEvent,
   getEventData,
   sendAndWaitForEvents,

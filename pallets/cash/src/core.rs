@@ -9,11 +9,13 @@ pub use our_std::{
 };
 
 use codec::Decode;
-use frame_support::sp_runtime::traits::Convert;
-use frame_support::storage::{
-    IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
-};
 use frame_support::traits::UnfilteredDispatchable;
+use frame_support::{
+    sp_runtime::traits::Convert,
+    storage::{
+        IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
+    },
+};
 
 // Import these traits so we can interact with the substrate storage modules.
 use crate::{
@@ -26,9 +28,9 @@ use crate::{
     },
     params::{MIN_TX_VALUE, TRANSFER_FEE},
     portfolio::Portfolio,
-    rates::{Utilization, APR},
+    rates::APR,
     reason::{MathError, Reason},
-    symbol::{Units, CASH},
+    symbol::{Ticker, Units, CASH, USD},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
         CashPrincipal, CashPrincipalAmount, CashQuantity, Price, Quantity, Timestamp, USDQuantity,
@@ -89,16 +91,22 @@ pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
 }
 
 /// Return the USD price associated with the given units.
-pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
-    match units {
-        CASH => Ok(Price::from_nominal(CASH.ticker, "1.0")),
+pub fn get_price_by_ticker<T: Config>(ticker: Ticker) -> Result<Price, Reason> {
+    match ticker {
+        t if t == USD.ticker => Ok(Price::from_nominal(USD.ticker, "1.0")),
+        t if t == CASH.ticker => Ok(Price::from_nominal(CASH.ticker, "1.0")),
         _ => Ok(Price::new(
-            units.ticker,
+            ticker,
             // XXX Prices::get(units.ticker).ok_or(Reason::NoPrice)?,
             // XXX fix me how to handle no prices during initialization?
-            Prices::get(units.ticker).unwrap_or(0),
+            Prices::get(ticker).unwrap_or(0),
         )),
     }
+}
+
+/// Return the USD price associated with the given units.
+pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
+    get_price_by_ticker::<T>(units.ticker)
 }
 
 /// Return a quantity with units of the given asset.
@@ -114,7 +122,7 @@ pub fn get_value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, Reason
 }
 
 /// Return the current utilization for the asset.
-pub fn get_utilization<T: Config>(asset: &ChainAsset) -> Result<Utilization, Reason> {
+pub fn get_utilization<T: Config>(asset: ChainAsset) -> Result<Factor, Reason> {
     let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let total_supply = TotalSupplyAssets::get(asset);
     let total_borrow = TotalBorrowAssets::get(asset);
@@ -122,7 +130,7 @@ pub fn get_utilization<T: Config>(asset: &ChainAsset) -> Result<Utilization, Rea
 }
 
 /// Return the current borrow and supply rates for the asset.
-pub fn get_rates<T: Config>(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
+pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
     let info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let utilization = get_utilization::<T>(asset)?;
     Ok(info
@@ -132,6 +140,7 @@ pub fn get_rates<T: Config>(asset: &ChainAsset) -> Result<(APR, APR), Reason> {
 
 // Internal helpers
 
+// XXX we should receive the sets as args
 pub fn passes_validation_threshold(
     signers: &BTreeSet<ValidatorIdentity>,
     validators: &BTreeSet<ValidatorIdentity>,
@@ -266,20 +275,21 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
         ChainLogEvent::Eth(eth_event) => match eth_event.event {
             ethereum_client::events::EthereumEvent::Lock {
                 asset,
-                holder,
+                recipient,
                 amount,
+                ..
             } => lock_internal::<T>(
                 get_asset::<T>(ChainAsset::Eth(asset))?,
-                ChainAccount::Eth(holder),
+                ChainAccount::Eth(recipient),
                 get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
             ),
 
             ethereum_client::events::EthereumEvent::LockCash {
-                holder,
-                amount: _amount,
+                recipient,
                 principal,
+                ..
             } => lock_cash_principal_internal::<T>(
-                ChainAccount::Eth(holder),
+                ChainAccount::Eth(recipient),
                 CashPrincipalAmount(principal),
             ),
 
@@ -452,6 +462,8 @@ pub fn lock_cash_principal_internal<T: Config>(
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
+    <Module<T>>::deposit_event(Event::GoldieLocksCash(holder, principal)); // XXX -> raw amount?
+
     Ok(()) // XXX should we return events to be deposited?
 }
 
@@ -489,6 +501,10 @@ pub fn extract_internal<T: Config>(
         holder_asset_new,
         CashPrincipals::get(holder),
     )?;
+    require!(
+        total_borrow_new <= total_supply_new,
+        Reason::InsufficientTotalFunds
+    );
 
     LastIndices::insert(asset.asset, holder, last_index_post);
     CashPrincipals::insert(holder, cash_principal_post);
@@ -546,7 +562,7 @@ pub fn extract_cash_principal_internal<T: Config>(
         add_principal_amounts(ChainCashPrincipals::get(chain_id), principal)?;
     let total_cash_principal_new =
         add_principal_amounts(TotalCashPrincipal::get(), holder_borrow_principal)?;
-    let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
+    let holder_cash_principal_new = holder_cash_principal.sub_amount(principal)?;
 
     ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
     CashPrincipals::insert(holder, holder_cash_principal_new);
@@ -1079,7 +1095,7 @@ pub fn has_liquidity_to_reduce_asset<T: Config>(
     let liquidity = Portfolio::from_storage::<T>(account)?
         .asset_change(asset, amount.as_decrease()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing asset by amount and paying a CASH fee.
@@ -1093,7 +1109,7 @@ pub fn has_liquidity_to_reduce_asset_with_fee<T: Config>(
         .asset_change(asset, amount.as_decrease()?)?
         .cash_change(fee.as_decrease()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of asset collateral.
@@ -1108,7 +1124,7 @@ pub fn has_liquidity_to_reduce_asset_with_added_collateral<T: Config>(
         .asset_change(asset, amount.as_decrease()?)?
         .asset_change(collateral_asset, collateral_amount.as_increase()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of CASH collateral.
@@ -1122,7 +1138,7 @@ pub fn has_liquidity_to_reduce_asset_with_added_cash<T: Config>(
         .asset_change(asset, amount.as_decrease()?)?
         .cash_change(cash_amount.as_increase()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing CASH by amount.
@@ -1130,10 +1146,11 @@ pub fn has_liquidity_to_reduce_cash<T: Config>(
     account: ChainAccount,
     amount: CashQuantity,
 ) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
+    let portfolio = Portfolio::from_storage::<T>(account)?;
+    let liquidity = portfolio
         .cash_change(amount.as_decrease()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
 }
 
 /// Calculates if an account will remain solvent after reducing CASH by amount and adding an amount of asset collateral.
@@ -1147,7 +1164,12 @@ pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
         .cash_change(amount.as_decrease()?)?
         .asset_change(collateral_asset, collateral_amount.as_increase()?)?
         .get_liquidity::<T>()?;
-    Ok(liquidity.value > 0)
+    Ok(liquidity.value >= 0)
+}
+
+/// Calculates the current liquidity value for an account.
+pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
+    Ok(Portfolio::from_storage::<T>(account)?.get_liquidity::<T>()?)
 }
 
 /// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
@@ -1239,7 +1261,7 @@ pub fn on_initialize_internal<T: Config>(
 
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     for (asset, asset_info) in SupportedAssets::iter() {
-        let (asset_cost, asset_yield) = get_rates::<T>(&asset)?;
+        let (asset_cost, asset_yield) = crate::core::get_rates::<T>(asset)?;
         let asset_units = asset_info.units();
         let price_asset = get_price::<T>(asset_units)?;
         let price_ratio = price_asset.ratio(price_cash)?;
@@ -1290,7 +1312,7 @@ pub fn on_initialize_internal<T: Config>(
     CashPrincipals::insert(last_miner, miner_cash_principal_new);
     log!(
         "Miner={:?} received {:?} principal for mining last block",
-        last_miner,
+        String::from(last_miner),
         last_miner_share_principal
     );
 
@@ -1317,8 +1339,9 @@ pub fn on_initialize_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{chains::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*};
+    use crate::{
+        chains::*, core::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*, *,
+    };
 
     #[test]
     fn test_helpers() {
@@ -1381,292 +1404,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_internal_min_value() {
-        let asset = ChainAsset::Eth([238; 20]);
-        let asset_info = AssetInfo::minimal(asset, ETH).unwrap();
-        let holder = ChainAccount::Eth([0; 20]);
-        let recipient = ChainAccount::Eth([0; 20]);
-
-        new_test_ext().execute_with(|| {
-            SupportedAssets::insert(&asset, asset_info);
-            Prices::insert(asset_info.ticker, 100_000); // $0.10
-            let quantity = get_quantity::<Test>(asset, 5_000_000_000_000_000_000).unwrap();
-            let asset_balances_pre = AssetBalances::get(asset, holder);
-            let total_supply_pre = TotalSupplyAssets::get(asset);
-            let total_borrows_pre = TotalBorrowAssets::get(asset);
-            let events_pre: Vec<_> = System::events().into_iter().collect();
-            let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
-            let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let latest_notice_pre: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
-            let notice_hashes_pre: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
-            let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
-                AccountNotices::iter().collect();
-
-            let res = extract_internal::<Test>(asset_info, holder, recipient, quantity);
-
-            assert_eq!(res, Err(Reason::MinTxValueNotMet));
-
-            let asset_balances_post = AssetBalances::get(asset, holder);
-            let total_supply_post = TotalSupplyAssets::get(asset);
-            let total_borrows_post = TotalBorrowAssets::get(asset);
-            let events_post: Vec<_> = System::events().into_iter().collect();
-            let notices_post: Vec<(NoticeId, Notice)> =
-                Notices::iter_prefix(ChainId::Eth).collect();
-            let notice_states_post: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let latest_notice_post: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
-            let notice_hashes_post: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
-            let account_notices_post: Vec<(ChainAccount, Vec<NoticeId>)> =
-                AccountNotices::iter().collect();
-
-            assert_eq!(asset_balances_pre, asset_balances_post);
-            assert_eq!(total_supply_pre, total_supply_post);
-            assert_eq!(total_borrows_pre, total_borrows_post);
-            assert_eq!(events_pre.len(), events_post.len());
-            assert_eq!(notices_pre, notices_post);
-            assert_eq!(notice_states_pre, notice_states_post);
-            assert_eq!(latest_notice_pre, latest_notice_post);
-            assert_eq!(notice_hashes_pre, notice_hashes_post);
-            assert_eq!(account_notices_pre, account_notices_post);
-        });
-    }
-
-    #[test]
-    fn test_extract_internal_sufficient_value() {
-        let eth_asset = [238; 20];
-        let asset = ChainAsset::Eth(eth_asset);
-        let asset_info = AssetInfo {
-            liquidity_factor: LiquidityFactor::from_nominal("1"),
-            ..AssetInfo::minimal(asset, ETH).unwrap()
-        };
-        let eth_holder = [0; 20];
-        let eth_recipient = [0; 20];
-        let holder = ChainAccount::Eth(eth_holder);
-        let recipient = ChainAccount::Eth(eth_recipient);
-
-        new_test_ext().execute_with(|| {
-            SupportedAssets::insert(&asset, asset_info);
-            Prices::insert(asset_info.ticker, 100_000); // $0.10
-            let quantity = get_quantity::<Test>(asset, 50_000_000_000_000_000_000).unwrap();
-            let hodl_balance = quantity.value * 5;
-            AssetBalances::insert(asset, holder, hodl_balance as AssetBalance);
-            AssetsWithNonZeroBalance::insert(holder, asset, ());
-            TotalSupplyAssets::insert(&asset, hodl_balance);
-
-            let asset_balances_pre = AssetBalances::get(asset, holder);
-            let total_supply_pre = TotalSupplyAssets::get(asset);
-            let total_borrows_pre = TotalBorrowAssets::get(asset);
-            let events_pre: Vec<_> = System::events().into_iter().collect();
-            let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
-            let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let latest_notice_pre: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
-            let notice_hashes_pre: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
-            let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
-                AccountNotices::iter().collect();
-
-            let res = extract_internal::<Test>(asset_info, holder, recipient, quantity);
-
-            assert_eq!(res, Ok(()));
-
-            let asset_balances_post = AssetBalances::get(asset, holder);
-            let total_supply_post = TotalSupplyAssets::get(asset);
-            let total_borrows_post = TotalBorrowAssets::get(asset);
-            let events_post: Vec<_> = System::events().into_iter().collect();
-            let notices_post: Vec<(NoticeId, Notice)> =
-                Notices::iter_prefix(ChainId::Eth).collect();
-            let notice_states_post: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let latest_notice_post: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
-            let notice_hashes_post: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
-            let account_notices_post: Vec<(ChainAccount, Vec<NoticeId>)> =
-                AccountNotices::iter().collect();
-
-            assert_eq!(
-                asset_balances_pre - 50000000000000000000,
-                asset_balances_post
-            ); // 50e18
-            assert_eq!(total_supply_pre - 50000000000000000000, total_supply_post);
-            assert_eq!(total_borrows_pre, total_borrows_post);
-            assert_eq!(events_pre.len() + 1, events_post.len());
-
-            assert_eq!(notices_pre.len() + 1, notices_post.len());
-            assert_eq!(notice_states_pre.len() + 1, notice_states_post.len());
-            assert_ne!(latest_notice_pre, latest_notice_post);
-            assert_eq!(notice_hashes_pre.len() + 1, notice_hashes_post.len());
-            assert_eq!(account_notices_pre.len() + 1, account_notices_post.len());
-
-            let notice_event = events_post.into_iter().next().unwrap();
-
-            let notice = notices_post.into_iter().last().unwrap().1;
-            let notice_state = notice_states_post.into_iter().last().unwrap();
-            let latest_notice = latest_notice_post.unwrap();
-            let notice_hash = notice_hashes_post.into_iter().last().unwrap();
-            let account_notice = account_notices_post.into_iter().last().unwrap();
-
-            let expected_notice_id = NoticeId(0, 1);
-            let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
-                id: expected_notice_id,
-                parent: [0u8; 32],
-                asset: eth_asset,
-                account: eth_recipient,
-                amount: 50000000000000000000,
-            });
-            let expected_notice_encoded = expected_notice.encode_notice();
-            let expected_notice_hash = expected_notice.hash();
-
-            assert_eq!(notice, expected_notice.clone());
-            assert_eq!(
-                (
-                    ChainId::Eth,
-                    expected_notice_id,
-                    NoticeState::Pending {
-                        signature_pairs: ChainSignatureList::Eth(vec![])
-                    }
-                ),
-                notice_state
-            );
-            assert_eq!((expected_notice_id, expected_notice_hash), latest_notice);
-            assert_eq!((expected_notice_hash, expected_notice_id), notice_hash);
-            assert_eq!((recipient, vec![expected_notice_id]), account_notice);
-
-            assert_eq!(
-                TestEvent::cash(Event::Notice(
-                    expected_notice_id,
-                    expected_notice,
-                    expected_notice_encoded
-                )),
-                notice_event.event
-            );
-        });
-    }
-
-    #[test]
-    fn test_extract_internal_notice_ids() {
-        let eth_asset = [238; 20];
-        let asset = ChainAsset::Eth(eth_asset);
-        let asset_info = AssetInfo {
-            liquidity_factor: LiquidityFactor::from_nominal("1"),
-            ..AssetInfo::minimal(asset, ETH).unwrap()
-        };
-        let eth_holder = [0; 20];
-        let eth_recipient = [0; 20];
-        let holder = ChainAccount::Eth(eth_holder);
-        let recipient = ChainAccount::Eth(eth_recipient);
-
-        new_test_ext().execute_with(|| {
-            SupportedAssets::insert(&asset, asset_info);
-            Prices::insert(asset_info.ticker, 100_000); // $0.10
-            let quantity = get_quantity::<Test>(asset, 50_000_000_000_000_000_000).unwrap();
-            let hodl_balance = quantity.value * 5;
-            AssetBalances::insert(asset, holder, hodl_balance as AssetBalance);
-            AssetsWithNonZeroBalance::insert(holder, asset, ());
-            TotalSupplyAssets::insert(&asset, hodl_balance);
-
-            let notices_pre: Vec<(NoticeId, Notice)> = Notices::iter_prefix(ChainId::Eth).collect();
-            let notice_states_pre: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let latest_notice_pre: Option<(NoticeId, ChainHash)> = LatestNotice::get(ChainId::Eth);
-            let notice_hashes_pre: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
-            let account_notices_pre: Vec<(ChainAccount, Vec<NoticeId>)> =
-                AccountNotices::iter().collect();
-
-            assert_eq!(LatestNotice::get(ChainId::Eth), None);
-            assert_eq!(
-                extract_internal::<Test>(asset_info, holder, recipient, quantity),
-                Ok(())
-            );
-
-            let notice_state_post: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let notice_state = notice_state_post.into_iter().next().unwrap();
-            let notice = Notices::get(notice_state.0, notice_state.1);
-
-            let expected_notice_id = NoticeId(0, 1);
-            let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
-                id: expected_notice_id,
-                parent: [0u8; 32],
-                asset: eth_asset,
-                account: eth_recipient,
-                amount: 50000000000000000000,
-            });
-
-            assert_eq!(
-                (
-                    ChainId::Eth,
-                    expected_notice_id,
-                    NoticeState::Pending {
-                        signature_pairs: ChainSignatureList::Eth(vec![])
-                    }
-                ),
-                notice_state
-            );
-
-            assert_eq!(notice, Some(expected_notice.clone()));
-
-            assert_eq!(
-                LatestNotice::get(ChainId::Eth),
-                Some((NoticeId(0, 1), expected_notice.hash()))
-            );
-            assert_eq!(
-                extract_internal::<Test>(asset_info, holder, recipient, quantity),
-                Ok(())
-            );
-
-            let notices_post_2: Vec<(NoticeId, Notice)> =
-                Notices::iter_prefix(ChainId::Eth).collect();
-            let notice_states_post_2: Vec<(ChainId, NoticeId, NoticeState)> =
-                NoticeStates::iter().collect();
-            let latest_notice_post_2: Option<(NoticeId, ChainHash)> =
-                LatestNotice::get(ChainId::Eth);
-            let notice_hashes_post_2: Vec<(ChainHash, NoticeId)> = NoticeHashes::iter().collect();
-            let account_notices_post_2: Vec<(ChainAccount, Vec<NoticeId>)> =
-                AccountNotices::iter().collect();
-
-            assert_eq!(notices_pre.len() + 2, notices_post_2.len());
-            assert_eq!(notice_states_pre.len() + 2, notice_states_post_2.len());
-            assert_ne!(latest_notice_pre, latest_notice_post_2);
-            assert_eq!(notice_hashes_pre.len() + 2, notice_hashes_post_2.len());
-            assert_eq!(account_notices_pre.len() + 1, account_notices_post_2.len());
-
-            let latest_notice_2 = LatestNotice::get(ChainId::Eth).unwrap();
-            let notice_2 = Notices::get(ChainId::Eth, latest_notice_2.0).unwrap();
-            let notice_state_2 = NoticeStates::get(ChainId::Eth, latest_notice_2.0);
-            let notice_hash_2 = NoticeHashes::get(latest_notice_2.1).unwrap();
-            let account_notice_2 = AccountNotices::get(recipient);
-
-            let expected_notice_2_id = NoticeId(0, 2);
-            let expected_notice_2 = Notice::ExtractionNotice(ExtractionNotice::Eth {
-                id: expected_notice_2_id,
-                parent: <Ethereum as Chain>::hash_bytes(&expected_notice.encode_notice()),
-                asset: eth_asset,
-                account: eth_recipient,
-                amount: 50000000000000000000,
-            });
-            let expected_notice_encoded_2 = expected_notice_2.encode_notice();
-            let expected_notice_hash_2 = expected_notice_2.hash();
-
-            assert_eq!(notice_2, expected_notice_2.clone());
-            assert_eq!(
-                NoticeState::Pending {
-                    signature_pairs: ChainSignatureList::Eth(vec![])
-                },
-                notice_state_2
-            );
-            assert_eq!(
-                (expected_notice_2_id, expected_notice_hash_2),
-                latest_notice_2
-            );
-            assert_eq!(expected_notice_2_id, notice_hash_2);
-            assert_eq!(
-                vec![expected_notice_id, expected_notice_2_id],
-                account_notice_2
-            );
-        });
-    }
-
-    #[test]
     fn test_compute_cash_principal_per() -> Result<(), Reason> {
         // round numbers (unrealistic but very easy to check)
         let asset_rate = APR::from_nominal("0.30"); // 30% per year
@@ -1676,11 +1413,10 @@ mod tests {
         let price_cash = Price::from_nominal(CASH.ticker, "1");
         let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual = cash_index
-            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
-            .unwrap();
+        let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("150"); // from hand calc
         assert_eq!(actual, expected);
+
         Ok(())
     }
 
@@ -1695,11 +1431,10 @@ mod tests {
         let price_cash = Price::from_nominal(CASH.ticker, "1");
         let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual = cash_index
-            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
-            .unwrap();
+        let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("39.542520035618878005"); // from hand calc
         assert_eq!(actual, expected);
+
         Ok(())
     }
 
@@ -1715,50 +1450,87 @@ mod tests {
         let price_cash = Price::from_nominal(CASH.ticker, "1");
         let price_ratio = price_asset.ratio(price_cash)?;
 
-        let actual = cash_index
-            .cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)
-            .unwrap();
+        let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("0.000000002008426366"); // from hand calc
         assert_eq!(actual, expected);
+
         Ok(())
     }
 
     #[test]
-    fn test_get_utilization() {
+    fn test_get_utilization() -> Result<(), Reason> {
         new_test_ext().execute_with(|| {
             initialize_storage();
-            let asset = eth_asset();
-            TotalSupplyAssets::insert(&asset, 100);
-            TotalBorrowAssets::insert(&asset, 50);
-            let utilization = crate::core::get_utilization::<Test>(&asset).unwrap();
-            assert_eq!(utilization, Utilization::from_nominal("0.5"));
-        });
+            TotalSupplyAssets::insert(&Eth, 100);
+            TotalBorrowAssets::insert(&Eth, 50);
+            assert_eq!(
+                crate::core::get_utilization::<Test>(Eth)?,
+                Factor::from_nominal("0.5")
+            );
+            Ok(())
+        })
     }
 
     #[test]
-    fn test_get_borrow_rate() {
+    fn test_get_borrow_rate() -> Result<(), Reason> {
         new_test_ext().execute_with(|| {
             initialize_storage();
             let kink_rate = 105;
-            let asset = eth_asset();
+            let asset = Eth;
             let asset_info = AssetInfo {
-                rate_model: InterestRateModel::new_kink(0, kink_rate, 5000, 202),
+                rate_model: InterestRateModel::new_kink(
+                    0,
+                    kink_rate,
+                    Factor::from_nominal("0.5"),
+                    202,
+                ),
                 miner_shares: MinerShares::from_nominal("0.5"),
-                ..AssetInfo::minimal(asset, ETH).unwrap()
+                ..AssetInfo::minimal(asset, ETH)
             };
 
+            // 50% utilization and 50% miner shares
             SupportedAssets::insert(&asset, asset_info);
             TotalSupplyAssets::insert(&asset, 100);
             TotalBorrowAssets::insert(&asset, 50);
 
-            CashModule::set_rate_model(Origin::root(), asset.clone(), asset_info.rate_model)
-                .unwrap();
-            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(&asset).unwrap();
+            assert_ok!(CashModule::set_rate_model(
+                Origin::root(),
+                asset,
+                asset_info.rate_model
+            ));
 
+            let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(asset)?;
             assert_eq!(borrow_rate, kink_rate.into());
-            // 50% utilization and 50% reserve factor
             assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
-        });
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_has_liquidity_to_reduce_cash() -> Result<(), Reason> {
+        const BAT: Units = Units::from_ticker_str("BAT", 18);
+        let asset = ChainAsset::from_str("Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef")?;
+        let asset_info = AssetInfo {
+            liquidity_factor: LiquidityFactor::from_nominal("0.6543"),
+            ..AssetInfo::minimal(asset, BAT)
+        };
+
+        new_test_ext().execute_with(|| {
+            let account = ChainAccount::Eth([0u8; 20]);
+            let amount = Quantity::from_nominal("5", CASH);
+
+            assert!(!has_liquidity_to_reduce_cash::<Test>(account, amount)?);
+
+            Prices::insert(BAT.ticker, Price::from_nominal(BAT.ticker, "0.53").value);
+            SupportedAssets::insert(&asset, asset_info);
+            AssetBalances::insert(&asset, &account, Balance::from_nominal("25000", BAT).value);
+            AssetsWithNonZeroBalance::insert(account, asset, ());
+
+            assert!(has_liquidity_to_reduce_cash::<Test>(account, amount)?);
+
+            Ok(())
+        })
     }
 
     #[test]
@@ -1766,11 +1538,11 @@ mod tests {
         new_test_ext().execute_with(|| {
             // XXX how to inject miner?
             let miner = ChainAccount::Eth([0; 20]);
-            let asset = eth_asset();
+            let asset = Eth;
             let asset_info = AssetInfo {
-                rate_model: InterestRateModel::new_kink(0, 2500, 5000, 5000),
+                rate_model: InterestRateModel::new_kink(0, 2500, Factor::from_nominal("0.5"), 5000),
                 miner_shares: MinerShares::from_nominal("0.02"),
-                ..AssetInfo::minimal(asset, ETH).unwrap()
+                ..AssetInfo::minimal(asset, ETH)
             };
             // XXX how to inject now / last yield timestamp?
             let last_yield_timestamp = 10;

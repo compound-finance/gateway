@@ -21,18 +21,18 @@ contract Starport {
     uint public eraId; // TODO: could bitpack here and use uint32
     mapping(bytes32 => bool) public isNoticeInvoked;
 
-    event NoticeInvoked(uint32 eraId, uint32 eraIndex, bytes32 noticeHash, bytes result);
-    event NoticeReplay(bytes32 noticeHash);
+    event NoticeInvoked(uint32 indexed eraId, uint32 indexed eraIndex, bytes32 indexed noticeHash, bytes result);
+    event NoticeReplay(bytes32 indexed noticeHash);
 
-    event Lock(address asset, address holder, uint amount);
-    event LockCash(address holder, uint amount, uint128 principal);
-    event ExecTrxRequest(address account, string trxRequest);
-    event Unlock(address account, uint amount, address asset);
-    event UnlockCash(address account, uint amount, uint128 principal);
+    event Lock(address indexed asset, address indexed sender, address indexed recipient, uint amount);
+    event LockCash(address indexed sender, address indexed recipient, uint amount, uint128 principal);
+    event ExecTrxRequest(address indexed account, string trxRequest);
+    event Unlock(address indexed account, uint amount, address asset);
+    event UnlockCash(address indexed account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
     event SetFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart);
     event ExecuteProposal(string title, bytes[] extrinsics);
-    event NewSupplyCap(address asset, uint supplyCap);
+    event NewSupplyCap(address indexed asset, uint supplyCap);
 
     constructor(ICash cash_, address admin_) {
         cash = cash_;
@@ -49,13 +49,24 @@ contract Starport {
      * @param amount The amount (in the asset's native wei) to lock
      * @param asset The asset to lock in the Starport
      */
-    function lock(uint amount, address asset) public {
+    function lock(uint amount, address asset) external {
+        lockTo(amount, asset, msg.sender);
+    }
+
+    /**
+     * @notice Transfer an asset to Compound Chain via locking it in the Starport
+     * @dev Use `lockEth` to lock Ether. Note: locking CASH will burn the CASH from Ethereum.
+     * @param amount The amount (in the asset's native wei) to lock
+     * @param asset The asset to lock in the Starport
+     * @param recipient The recipient of the asset in Compound Chain
+     */
+    function lockTo(uint amount, address asset, address recipient) public {
         require(asset != ETH_ADDRESS, "Please use lockEth");
 
         if (asset == address(cash)) {
-            lockCashInternal(amount);
+            lockCashInternal(amount, recipient);
         } else {
-            lockAssetInternal(amount, asset);
+            lockAssetInternal(amount, asset, recipient);
         }
     }
 
@@ -64,8 +75,17 @@ contract Starport {
      * @dev Use `lock` to lock CASH or collateral assets.
      */
     function lockEth() public payable {
+        lockEthTo(msg.sender);
+    }
+
+    /*
+     * @notice Transfer Eth to Compound Chain via locking it in the Starport
+     * @param recipient The recipient of the Eth on Compound Chain
+     * @dev Use `lock` to lock CASH or collateral assets.
+     */
+    function lockEthTo(address recipient) public payable {
         require(address(this).balance <= supplyCaps[ETH_ADDRESS], "Supply Cap Exceeded");
-        emit Lock(ETH_ADDRESS, msg.sender, msg.value);
+        emit Lock(ETH_ADDRESS, msg.sender, recipient, msg.value);
     }
 
     /*
@@ -82,16 +102,16 @@ contract Starport {
      * @dev Locking CASH will burn the CASH (as it's being transfer to Compound Chain)
      * @param amount The amount of CASH to lock and burn.
      */
-    function lockCashInternal(uint amount) internal {
+    function lockCashInternal(uint amount, address recipient) internal {
         uint128 principal = cash.burn(msg.sender, amount);
-        emit LockCash(msg.sender, amount, principal);
+        emit LockCash(msg.sender, recipient, amount, principal);
     }
 
     // Internal function for locking non-ETH collateral assets
-    function lockAssetInternal(uint amount, address asset) internal {
+    function lockAssetInternal(uint amount, address asset, address recipient) internal {
         uint amountTransferred = transferAssetIn(msg.sender, amount, asset);
         require(IERC20(asset).balanceOf(address(this)) <= supplyCaps[asset], "Supply Cap Exceeded");
-        emit Lock(asset, msg.sender, amountTransferred);
+        emit Lock(asset, msg.sender, recipient, amountTransferred);
     }
 
     // Transfer in an asset, returning the balance actually accrued (i.e. less token fees)

@@ -1,13 +1,16 @@
 const { instantiateInfo } = require('./scen_info');
 const BigNumber = require('bignumber.js');
 const { lookupBy } = require('../util');
+const { descale } = require('../substrate');
 
 class Token {
-  constructor(ticker, symbol, name, decimals, token, owner, ctx) {
+  constructor(ticker, symbol, name, decimals, priceTicker, liquidityFactor, token, owner, ctx) {
     this.ticker = ticker;
     this.symbol = symbol;
     this.name = name;
     this.decimals = decimals;
+    this.priceTicker = priceTicker;
+    this.liquidityFactor = liquidityFactor;
     this.token = token;
     this.owner = owner;
     this.ctx = ctx;
@@ -48,6 +51,10 @@ class Token {
 
   showAmount(weiAmount) {
     return `${this.toTokenAmount(weiAmount)} ${this.symbol}`;
+  }
+
+  lockEventName() {
+    return 'GoldieLocks';
   }
 
   async getBalance(actorLookup) {
@@ -95,18 +102,45 @@ class Token {
     }
   }
 
-  async getAsset() {
-    return (await this.ctx.api().query.cash.supportedAssets(this.toChainAsset())).unwrap();
+  async getAssetInfo(field = undefined) {
+    let assetRes = await this.ctx.api().query.cash.supportedAssets(this.toChainAsset());
+    let unwrapped = assetRes.unwrap();
+    if (field) {
+      if (unwrapped.hasOwnProperty(field)) {
+        return unwrapped[field];
+      } else {
+        throw new Error(`No such field ${field} on ${JSON.stringify(unwrapped)}`);
+      }
+    } else {
+      return unwrapped;
+    }
   }
 
   async getPrice() {
-    return Number(await this.ctx.api().query.cash.prices((await this.getAsset()).ticker));
+    if (['USD', 'CASH'].includes(this.priceTicker)) {
+      return 1.0;
+    } else {
+      return descale(await this.ctx.api().query.cash.prices(await this.getAssetInfo('ticker')), 6);
+    }
+  }
+
+  async getLiquidityFactor() {
+    let liquidityFactor = await this.getAssetInfo('liquidity_factor');
+    return descale(liquidityFactor, 18);
+  }
+
+  async totalChainSupply() {
+    return this.toTokenAmount(await this.ctx.api().query.cash.totalSupplyAssets(this.toChainAsset()));
+  }
+
+  async totalChainBorrows() {
+    return this.toTokenAmount(await this.ctx.api().query.cash.totalBorrowAssets(this.toChainAsset()));
   }
 }
 
 class EtherToken extends Token {
-  constructor(ctx) {
-    super('ether', 'ETH', 'Ether', 18, null, null, ctx);
+  constructor(liquidityFactor, ctx) {
+    super('ether', 'ETH', 'Ether', 18, 'ETH', liquidityFactor, null, null, ctx);
   }
 
   ethAddress() {
@@ -157,35 +191,41 @@ function tokenInfoMap(ctx) {
       contract: 'ZRXToken',
       decimals: 18,
       constructor_args: [],
-      supply_cap: 1000000
+      supply_cap: 1000000,
+      liquidity_factor: 0.5,
     },
     dai: {
       build: 'dai.json',
       contract: 'Dai',
       decimals: 18,
       constructor_args: [0], // TODO: ChainId
-      supply_cap: 1000000
+      supply_cap: 1000000,
+      liquidity_factor: 0.8,
     },
     comp: {
       build: 'compound.json',
       contract: 'Comp',
       decimals: 18,
       constructor_args: [accounts[0]],
-      supply_cap: 1000000
+      supply_cap: 1000000,
+      liquidity_factor: 0.75,
     },
     bat: {
       build: 'bat.json',
       contract: 'BAToken',
       decimals: 18,
       constructor_args: ['0x0000000000000000000000000000000000000000', accounts[0], 0, 0],
-      supply_cap: 1000000
+      supply_cap: 1000000,
+      liquidity_factor: 0.3,
     },
     wbtc: {
       build: 'wbtc.json',
       contract: 'WBTC',
       decimals: 8,
       constructor_args: [],
-      supply_cap: 1000000
+      supply_cap: 1000000,
+      liquidity_factor: 0.6,
+      price_ticker: 'BTC',
     },
     usdc: {
       build: 'FiatTokenV1.json',
@@ -193,6 +233,8 @@ function tokenInfoMap(ctx) {
       decimals: 6,
       constructor_args: [],
       supply_cap: 1000000,
+      liquidity_factor: 0.8,
+      price_ticker: 'USD',
       afterDeploy: async (contract, owner) => {
         await contract.methods.initialize(
           "USD Coin",
@@ -230,7 +272,9 @@ async function buildToken(ticker, tokenInfo, ctx) {
   let symbol = await tokenContract.methods.symbol().call();
   let name = await tokenContract.methods.name().call();
   let decimals = Number(await tokenContract.methods.decimals().call());
-  let token = new Token(ticker, symbol, name, decimals, tokenContract, owner, ctx);
+  let priceTicker = tokenInfo.price_ticker || symbol;
+  let liquidityFactor = tokenInfo.liquidity_factor;
+  let token = new Token(ticker, symbol, name, decimals, priceTicker, liquidityFactor, tokenContract, owner, ctx);
 
   if (tokenInfo.balances) {
     await Object.entries(tokenInfo.balances).reduce(async (acc, [actor, amount]) => {
@@ -261,7 +305,7 @@ async function buildTokens(tokensInfoHash, scenInfo, ctx) {
     ];
   }, Promise.resolve([]));
 
-  let etherToken = new EtherToken(ctx);
+  let etherToken = new EtherToken(scenInfo.eth_liquidity_factor, ctx);
   tokens.push(etherToken);
   if (scenInfo.eth_supply_cap) {
     await etherToken.setSupplyCap(scenInfo.eth_supply_cap);

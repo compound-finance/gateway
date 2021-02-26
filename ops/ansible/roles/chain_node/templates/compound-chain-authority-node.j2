@@ -5,6 +5,12 @@ Description=Compound Chain Validator Node
 User=compound
 Group=compound
 WorkingDirectory={{ compound_user_home }}
+Environment="ETH_RPC_URL=https://goerli-eth.compound.finance"
+Environment="ETH_KEY_ID=arn:aws:kms:us-east-2:926310256153:key/8ab1ec35-e0f2-4aff-987a-eba460442b9c"
+Environment="ETH_KEY={{ eth_private_key | default(omit) }}"
+Environment="AWS_REGION={{ aws_region | default(omit) }}"
+Environment="KEYRING_TYPE={{ keyring_type | default('IN_MEMORY') }}"
+Environment="MINER={{ miner }}"
 ExecStart={{ compound_chain_bin }} \
   --base-path {{ chain_data_dir }} \
   --chain "{{ compound_user_home }}/chainSpec.json" \
@@ -14,7 +20,6 @@ ExecStart={{ compound_chain_bin }} \
   --rpc-methods Unsafe \
   --no-mdns \
   --node-key-file {{ node_key_priv_file }} \
-  --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
   {% for bootnode_multi_addr in peers -%}
   --bootnodes {{ bootnode_multi_addr }} \
   {% endfor -%}

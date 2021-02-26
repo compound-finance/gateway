@@ -95,7 +95,7 @@ async function buildPrice(key, priceInfo, ctx) {
 async function buildPrices(tokensInfoHash, ctx) {
   let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
   let symbols = tokensInfo.map(([symbol, _]) => symbol.toUpperCase());
-  let entries = Object.entries(basePricesInfo).filter(([k, v]) => symbols.includes(k));
+  let entries = Object.entries(basePricesInfo).filter(([k, v]) => k == 'ETH' || symbols.includes(k));
 
   let prices = await entries.reduce(async (acc, [key, priceInfo]) => {
     return [

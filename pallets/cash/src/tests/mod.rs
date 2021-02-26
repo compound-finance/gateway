@@ -1,38 +1,73 @@
+#![allow(non_upper_case_globals)]
 use crate::types::SignersSet;
-use crate::{chains::*, core::*, internal, mock::*, oracle::*, rates::*, reason::*, symbol::*, *};
-use codec::{Decode, Encode};
-use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
+use crate::{
+    chains::*, core::*, factor::*, mock::*, notices::*, rates::*, reason::*, symbol::*, types::*, *,
+};
 use our_std::collections::btree_set::BTreeSet;
-use our_std::iter::FromIterator;
-use our_std::str::FromStr;
+
+use codec::{Decode, Encode};
+use hex_literal::hex;
 use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
+
+pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
+pub use our_std::iter::FromIterator;
+pub use our_std::str::FromStr;
+
+pub mod extract;
+pub mod protocol;
 
 #[cfg(test)]
 mod ocw;
 
 pub const ETH: Units = Units::from_ticker_str("ETH", 18);
+pub const Eth: ChainAsset = ChainAsset::Eth(hex!("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"));
+pub const eth: AssetInfo = AssetInfo {
+    asset: Eth,
+    decimals: ETH.decimals,
+    liquidity_factor: LiquidityFactor::from_nominal("0.8"),
+    rate_model: InterestRateModel::Kink {
+        zero_rate: APR(0),
+        kink_rate: APR(200),
+        kink_utilization: Factor::from_nominal("0.9"),
+        full_rate: APR(5000),
+    },
+    miner_shares: Factor::from_nominal("0.05"),
+    supply_cap: Quantity::from_nominal("1000", ETH).value,
+    symbol: Symbol(ETH.ticker.0),
+    ticker: Ticker(ETH.ticker.0),
+};
 
-pub fn eth_asset() -> ChainAsset {
-    ChainAsset::Eth(
-        <Ethereum as Chain>::str_to_address("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
-    )
+pub const UNI: Units = Units::from_ticker_str("UNI", 18);
+pub const Uni: ChainAsset = ChainAsset::Eth(hex!("1f9840a85d5af5bf1d1762f925bdaddc4201f984"));
+pub const uni: AssetInfo = AssetInfo {
+    asset: Uni,
+    decimals: UNI.decimals,
+    liquidity_factor: LiquidityFactor::from_nominal("0.7"),
+    rate_model: InterestRateModel::Kink {
+        zero_rate: APR(0),
+        kink_rate: APR(500),
+        kink_utilization: Factor::from_nominal("0.8"),
+        full_rate: APR(2000),
+    },
+    miner_shares: Factor::from_nominal("0.05"),
+    supply_cap: Quantity::from_nominal("1000", UNI).value,
+    symbol: Symbol(UNI.ticker.0),
+    ticker: Ticker(UNI.ticker.0),
+};
+
+#[macro_export]
+macro_rules! bal {
+    ($string:expr, $units:expr) => {
+        Balance::from_nominal($string, $units);
+    };
 }
 
-#[test]
-fn it_fails_exec_trx_request_signed() {
-    new_test_ext().execute_with(|| {
-        // Dispatch a signed extrinsic.
-        assert_err!(
-            CashModule::exec_trx_request(
-                Origin::signed(Default::default()),
-                vec![],
-                ChainAccountSignature::Eth([0; 20], [0; 65]),
-                0
-            ),
-            DispatchError::BadOrigin
-        );
-    });
+#[macro_export]
+macro_rules! qty {
+    ($string:expr, $units:expr) => {
+        Quantity::from_nominal($string, $units);
+    };
 }
 
 pub fn initialize_storage() {
@@ -44,7 +79,6 @@ pub fn initialize_storage() {
                 FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
                 FromStr::from_str("ETH/18").unwrap(),
             )
-            .unwrap()
         },
         AssetInfo {
             ticker: FromStr::from_str("USD").unwrap(),
@@ -53,7 +87,6 @@ pub fn initialize_storage() {
                 FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
                 FromStr::from_str("USDC/6").unwrap(),
             )
-            .unwrap()
         },
     ]);
     CashModule::initialize_reporters(
@@ -85,6 +118,22 @@ pub fn initialize_storage() {
 }
 
 #[test]
+fn it_fails_exec_trx_request_signed() {
+    new_test_ext().execute_with(|| {
+        // Dispatch a signed extrinsic.
+        assert_err!(
+            CashModule::exec_trx_request(
+                Origin::signed(Default::default()),
+                vec![],
+                ChainAccountSignature::Eth([0; 20], [0; 65]),
+                0
+            ),
+            DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
 fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();
@@ -98,7 +147,8 @@ fn process_eth_event_happy_path() {
             log_index: 0,
             event: ethereum_client::EthereumEvent::Lock {
                 asset: [1; 20],
-                holder: [2; 20],
+                sender: [3; 20],
+                recipient: [2; 20],
                 amount: 10,
             },
         });
@@ -144,7 +194,8 @@ fn process_eth_event_fails_for_bad_signature() {
             log_index: 0,
             event: ethereum_client::EthereumEvent::Lock {
                 asset: [1; 20],
-                holder: [2; 20],
+                sender: [3; 20],
+                recipient: [2; 20],
                 amount: 10,
             },
         });
@@ -175,7 +226,8 @@ fn process_eth_event_fails_if_not_validator() {
             log_index: 0,
             event: ethereum_client::EthereumEvent::Lock {
                 asset: [1; 20],
-                holder: [2; 20],
+                sender: [3; 20],
+                recipient: [2; 20],
                 amount: 10,
             },
         });
@@ -194,18 +246,6 @@ fn process_eth_event_fails_if_not_validator() {
     });
 }
 
-#[test]
-fn correct_error_for_none_value() {
-    // XXX keep as example for now
-    // new_test_ext().execute_with(|| {
-    //     // Ensure the expected error is thrown when no value is present.
-    //     assert_noop!(
-    //         CashModule::cause_error(Origin::signed(Default::default())),
-    //         Error::<Test>::NoneValue
-    //     );
-    // });
-}
-
 const TEST_OPF_URL: &str = "http://localhost/";
 
 #[test]
@@ -216,7 +256,7 @@ fn test_process_prices_happy_path_makes_required_http_call() {
         uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
-            crate::oracle::tests::API_RESPONSE_TEST_DATA
+            internal::oracle::tests::API_RESPONSE_TEST_DATA
                 .to_owned()
                 .into_bytes(),
         ),
@@ -228,7 +268,7 @@ fn test_process_prices_happy_path_makes_required_http_call() {
     let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
     t.execute_with(|| {
         initialize_storage();
-        internal::oracle::process_prices::<Test>(1u64).unwrap();
+        assert_ok!(internal::oracle::process_prices::<Test>(1u64));
         // sadly, it seems we can not check storage here, but we should at least be able to check that
         // the OCW attempted to call the post_price extrinsic.. that is a todo XXX
     });
@@ -245,7 +285,7 @@ fn test_post_price_happy_path() {
         let eth_price = CashModule::price(ETH.ticker);
         let eth_price_time = CashModule::price_time(ETH.ticker);
         assert_eq!(eth_price, Some(732580000));
-        assert_eq!(eth_price_time, Some(1609340760));
+        assert_eq!(eth_price_time, Some(1609340760000));
     });
 }
 
@@ -295,7 +335,7 @@ fn test_post_price_stale_price() {
         let eth_price = CashModule::price(ETH.ticker);
         let eth_price_time = CashModule::price_time(ETH.ticker);
         assert_eq!(eth_price, Some(732580000));
-        assert_eq!(eth_price_time, Some(1609340760));
+        assert_eq!(eth_price_time, Some(1609340760000));
         // try to post the same thing again
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
         assert_err!(result, Reason::OracleError(OracleError::StalePrice));
@@ -306,10 +346,9 @@ fn test_post_price_stale_price() {
 fn test_set_interest_rate_model() {
     new_test_ext().execute_with(|| {
         initialize_storage();
-        let asset = eth_asset();
         let expected_model = InterestRateModel::new_kink(100, 101, 5000, 202);
-        CashModule::set_rate_model(Origin::root(), asset.clone(), expected_model).unwrap();
-        let asset_info = CashModule::asset(asset).expect("no asset");
+        CashModule::set_rate_model(Origin::root(), Eth, expected_model).unwrap();
+        let asset_info = CashModule::asset(Eth).expect("no asset");
         assert_eq!(asset_info.rate_model, expected_model);
     });
 }

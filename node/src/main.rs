@@ -4,6 +4,7 @@
 mod chain_spec;
 #[macro_use]
 mod service;
+mod api;
 mod cli;
 mod command;
 mod rpc;

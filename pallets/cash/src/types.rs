@@ -25,8 +25,8 @@ pub type Decimals = u8;
 /// Type for a nonce.
 pub type Nonce = u32;
 
-/// Type for representing time.
-pub type Timestamp = u128; // XXX u64?
+/// Type for representing time since current Unix epoch in milliseconds.
+pub type Timestamp = u64;
 
 /// Type of the largest possible signed integer.
 pub type Int = i128;
@@ -136,8 +136,8 @@ pub struct AssetInfo {
 }
 
 impl AssetInfo {
-    pub fn minimal(asset: ChainAsset, units: Units) -> Result<Self, Reason> {
-        Ok(AssetInfo {
+    pub fn minimal(asset: ChainAsset, units: Units) -> Self {
+        AssetInfo {
             asset,
             decimals: units.decimals,
             liquidity_factor: LiquidityFactor::default(),
@@ -146,7 +146,7 @@ impl AssetInfo {
             supply_cap: AssetAmount::default(),
             symbol: Symbol(units.ticker.0),
             ticker: units.ticker,
-        })
+        }
     }
 
     pub const fn units(self) -> Units {

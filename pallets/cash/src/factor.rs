@@ -106,11 +106,11 @@ impl Factor {
         Factor(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 
-    pub fn from_fraction(numerator: Uint, denominator: Uint) -> Result<Self, MathError> {
+    pub fn from_fraction<T: Into<Uint>>(numerator: T, denominator: T) -> Result<Self, MathError> {
         Ok(Factor(
             Self::ONE
-                .mul_uint(numerator)
-                .div_uint(denominator)?
+                .mul_uint(numerator.into())
+                .div_uint(denominator.into())?
                 .to_uint()?,
         ))
     }
@@ -147,5 +147,11 @@ impl our_std::str::FromStr for Factor {
 impl From<Factor> for String {
     fn from(string: Factor) -> Self {
         format!("{}", string.0)
+    }
+}
+
+impl From<Uint> for Factor {
+    fn from(raw: u128) -> Self {
+        Factor(raw)
     }
 }

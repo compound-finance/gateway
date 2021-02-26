@@ -38,8 +38,8 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     asset: `Eth:${token.ethAddress()}`,
     decimals: token.decimals,
     symbol: token.symbol.toUpperCase(),
-    ticker: token.symbol.toUpperCase(), // XXX how to set price ticker in integration tests?
-    liquidity_factor: 6543,
+    ticker: token.priceTicker,
+    liquidity_factor: Math.floor(token.liquidityFactor * 1e18),
     rate_model: {
       Kink: {
         zero_rate: 0,
@@ -56,7 +56,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   if (ctx.__initialYield() > 0) {
     initialYieldConfig = {
       cashYield: ctx.__initialYield(),
-      lastYieldTimestamp: ctx.__initialYieldStart()
+      lastYieldTimestamp: ctx.__initialYieldStart() * 1000
     };
   }
 

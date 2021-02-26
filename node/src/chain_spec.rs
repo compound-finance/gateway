@@ -5,8 +5,9 @@ use compound_chain_runtime::{
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
     chains::{Chain, Ethereum},
-    types::{AssetInfo, ValidatorKeys},
+    types::{AssetInfo, Timestamp, ValidatorKeys},
 };
+
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
@@ -54,8 +55,7 @@ pub fn authority_keys_from_seed(
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_starport_address" : "0xbbde1662bC3ED16aA8C618c9833c801F3543B587",
-        // todo: override with environment variable and/or cli param?
+        "eth_starport_address" : "0x3cFD5Ac2afce237689b679912Be1Aca41c68D6Ba"
     });
     let as_object = value.as_object();
     let unwrapped = as_object.unwrap();
@@ -209,7 +209,7 @@ fn testnet_genesis(
             last_yield_timestamp: wasm_timer::SystemTime::now()
                 .duration_since(wasm_timer::UNIX_EPOCH)
                 .expect("cannot get system time for genesis")
-                .as_millis(),
+                .as_millis() as Timestamp,
 
             assets: vec![
                 AssetInfo {
@@ -219,7 +219,6 @@ fn testnet_genesis(
                             .unwrap(),
                         FromStr::from_str("ETH/18").unwrap(),
                     )
-                    .unwrap()
                 },
                 AssetInfo {
                     ticker: FromStr::from_str("USD").unwrap(),
@@ -229,7 +228,6 @@ fn testnet_genesis(
                             .unwrap(),
                         FromStr::from_str("USDC/6").unwrap(),
                     )
-                    .unwrap()
                 },
             ],
 

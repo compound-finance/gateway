@@ -228,13 +228,10 @@
   "Source5": "RatesRS",
   "RatesError": {
     "_enum": [
-      "UtilizationZeroSupplyError",
-      "UtilizationBorrowedIsMoreThanSupplied",
-      "ModelNotIncreasingZeroRateAboveKinkRate",
-      "ModelNotIncreasingKinkRateAboveFullRate",
-      "ModelKinkUtilizationOver100Percent",
-      "ModelKinkUtilizationNotPositive",
       "ModelRateOutOfBounds",
+      "ZeroAboveKink",
+      "KinkAboveFull",
+      "KinkUtilizationTooHigh",
       "Overflowed"
     ]
   },
@@ -255,6 +252,80 @@
   },
 
   "Source6": "ReasonRS",
+  "Reason": {
+    "_enum": {
+      "AssetExtractionNotSupported": "",
+      "AssetNotSupported": "",
+      "BadAccount": "",
+      "BadAddress": "",
+      "BadAsset": "",
+      "BadChainId": "",
+      "BadFactor": "",
+      "BadSymbol": "",
+      "BadTicker": "",
+      "BadUnits": "",
+      "ChainMismatch": "",
+      "CryptoError": "(CryptoError)",
+      "EventAlreadySigned": "",
+      "FailedToSubmitExtrinsic": "",
+      "FetchError": "",
+      "IncorrectNonce": "(Nonce, Nonce)",
+      "InKindLiquidation": "",
+      "InsufficientChainCash": "",
+      "InsufficientLiquidity": "",
+      "InsufficientTotalFunds": "",
+      "InvalidAPR": "",
+      "InvalidCodeHash": "",
+      "InvalidUTF8": "",
+      "KeyNotFound": "",
+      "MathError": "(MathError)",
+      "MaxForNonCashAsset": "",
+      "MinTxValueNotMet": "",
+      "None": "",
+      "NoPrice": "",
+      "NoSuchAsset": "",
+      "NoticeAlreadySigned": "",
+      "NoticeHashMismatch": "",
+      "NoticeMissing": "(ChainId, NoticeId)",
+      "NotImplemented": "",
+      "OracleError": "(OracleError)",
+      "RatesError": "(RatesError)",
+      "RepayTooMuch": "",
+      "SelfTransfer": "",
+      "SetYieldNextError": "(SetYieldNextError)",
+      "SignatureAccountMismatch": "",
+      "SignatureMismatch": "",
+      "TimeTravelNotAllowed": "",
+      "TrxRequestParseError": "(TrxReqParseError)",
+      "UnknownValidator": ""
+    }
+  },
+  "MathError": {
+    "_enum": [
+      "Overflow",
+      "Underflow",
+      "SignMismatch",
+      "SymbolMismatch",
+      "PriceNotUSD",
+      "DivisionByZero"
+    ]
+  },
+  "OracleError": {
+    "_enum": [
+      "EthAbiParseError",
+      "InvalidApiEndpoint",
+      "InvalidApiResponse",
+      "InvalidKind",
+      "InvalidSymbol",
+      "InvalidTicker",
+      "JsonParseError",
+      "HexParseError",
+      "HttpError",
+      "NotAReporter",
+      "StalePrice",
+      "SubmitError"
+    ]
+  },
   "TrxReqParseError": {
     "_enum": [
       "NotImplemented",
@@ -266,66 +337,6 @@
       "InvalidExpression",
       "InvalidChain",
       "InvalidChainAccount"
-    ]
-  },
-  "Reason": {
-    "_enum": {
-      "AssetExtractionNotSupported": "",
-      "AssetNotSupported": "",
-      "AssetSymbolNotFound": "",
-      "BadAccount": "",
-      "BadAddress": "",
-      "BadAsset": "",
-      "BadChainId": "",
-      "BadSymbol": "",
-      "ChainMismatch": "",
-      "CryptoError": "CryptoError",
-      "FailedToSubmitExtrinsic": "",
-      "HttpError": "",
-      "IncorrectNonce": "(Nonce, Nonce)",
-      "InKindLiquidation": "",
-      "InsufficientChainCash": "",
-      "InsufficientLiquidity": "",
-      "InsufficientTotalFunds": "",
-      "InvalidLiquidityFactor": "",
-      "InvalidSignature": "",
-      "InvalidSymbol": "",
-      "InvalidUTF8": "",
-      "KeyNotFound": "",
-      "MathError": "MathError",
-      "MinTxValueNotMet": "",
-      "MissingEvent": "",
-      "NegativePrincipalExtraction": "",
-      "NegativePrincipalExtrction": "",
-      "None": "",
-      "NoSuchAsset": "",
-      "NoticeAlreadySigned": "",
-      "NoticeMissing": "(ChainId, NoticeId)",
-      "NotImplemented": "",
-      "ParseIntError": "",
-      "RatesError": "RatesError",
-      "RepayTooMuch": "",
-      "SelfTransfer": "",
-      "SignatureAccountMismatch": "",
-      "SignatureMismatch": "",
-      "TimeTravelNotAllowed": "",
-      "TrxRequestParseError": "TrxReqParseError",
-      "UnknownValidator": "",
-      "ValidatorAlreadySigned": "",
-      "SetYieldNextError": "SetYieldNextError",
-      "MaxForNonCashAsset": "",
-      "MaxWithNegativeCashPrincipal": "",
-      "MismatchedNoticeHash": ""
-    }
-  },
-  "MathError": {
-    "_enum": [
-      "Overflow",
-      "Underflow",
-      "SignMismatch",
-      "SymbolMismatch",
-      "PriceNotUSD",
-      "DivisionByZero"
     ]
   },
 

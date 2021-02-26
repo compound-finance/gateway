@@ -7,7 +7,7 @@ use crate::types::{AssetAmount, CashIndex, Timestamp};
 
 use codec::{Decode, Encode};
 use compound_crypto::public_key_bytes_to_eth_address;
-use our_std::{convert::TryInto, Debuggable, Deserialize, RuntimeDebug, Serialize};
+use our_std::{convert::TryInto, str::FromStr, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
 /// Type for representing the selection of a supported chain.
 #[derive(Serialize, Deserialize)] // used in config
@@ -119,7 +119,7 @@ impl ChainAccount {
 
 // Implement deserialization for ChainAccounts so we can use them in GenesisConfig / ChainSpec JSON.
 //  i.e. "eth:0x..." <> Eth(0x...)
-impl our_std::str::FromStr for ChainAccount {
+impl FromStr for ChainAccount {
     type Err = Reason;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
@@ -164,7 +164,7 @@ impl ChainAsset {
 
 // Implement deserialization for ChainAssets so we can use them in GenesisConfig / ChainSpec JSON.
 //  i.e. "eth:0x..." <> Eth(0x...)
-impl our_std::str::FromStr for ChainAsset {
+impl FromStr for ChainAsset {
     type Err = Reason;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
@@ -282,7 +282,7 @@ pub enum ChainSignatureList {
 }
 
 // Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
-impl our_std::str::FromStr for ChainId {
+impl FromStr for ChainId {
     type Err = Reason;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -301,10 +301,10 @@ pub trait Chain {
     type Amount: Debuggable + Clone + Eq + Into<AssetAmount> = u128;
     type CashIndex: Debuggable + Clone + Eq + Into<CashIndex> = u128;
     type Rate: Debuggable + Clone + Eq + Into<APR> = u128;
-    type Timestamp: Debuggable + Clone + Eq + Into<Timestamp> = u128; // XXX u64?
+    type Timestamp: Debuggable + Clone + Eq + Into<Timestamp> = u64;
     type Hash: Debuggable + Clone + Eq = [u8; 32];
     type PublicKey: Debuggable + Clone + Eq = [u8; 64];
-    type Signature: Debuggable + Clone + Eq = [u8; 65]; // XXX
+    type Signature: Debuggable + Clone + Eq = [u8; 65]; // secp256k1 sign
     type EventId: Debuggable + Clone + Eq + Ord;
     type Event: Debuggable + Clone + Eq;
 

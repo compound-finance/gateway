@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn test_offchain_worker() {
+fn offchain_worker_test() {
     use frame_support::traits::OffchainWorker;
     std::env::set_var("OPF_URL", TEST_OPF_URL);
     let mut calls: Vec<testing::PendingRequest> =
@@ -11,7 +11,7 @@ fn test_offchain_worker() {
         uri: TEST_OPF_URL.into(),
         body: vec![],
         response: Some(
-            crate::oracle::tests::API_RESPONSE_TEST_DATA
+            internal::oracle::tests::API_RESPONSE_TEST_DATA
                 .to_owned()
                 .into_bytes(),
         ),
@@ -62,7 +62,7 @@ fn test_offchain_worker() {
         for _ in 0..8 {
             let tx = pool_state.write().transactions.pop().unwrap();
             let ex: Extrinsic = Decode::decode(&mut &*tx).unwrap();
-            if let Call::post_price(msg, sig) = ex.call {
+            if let mock::Call::Cash(crate::Call::post_price(msg, sig)) = ex.call {
                 let msg_str: &str = &hex::encode(&msg)[..];
                 let sig_str: &str = &hex::encode(&sig)[..];
                 assert!(messages.contains(&msg_str));
@@ -86,8 +86,7 @@ fn test_offchain_worker() {
         assert_eq!(ex2.signature, None);
         assert_eq!(ex3.signature, None);
 
-        if let Call::receive_event(chain_id, event_id, event, _signature) = ex1.call {
-            assert_eq!(chain_id, ChainId::Eth);
+        if let mock::Call::Cash(crate::Call::receive_event(ChainId::Eth, event_id, event, _signature)) = ex1.call {
             assert_eq!(event_id, ChainLogId::Eth(3932939, 14)); // TODO: Should this be trx index or log_index?
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [164, 169, 110, 149, 119, 24, 227, 163, 11, 119, 166, 103, 249, 57, 120, 216, 244, 56, 189, 205, 86, 255, 3, 84, 95, 8, 200, 51, 217, 162, 102, 135],
@@ -96,7 +95,8 @@ fn test_offchain_worker() {
                 log_index: 14,
                 event: ethereum_client::EthereumEvent::Lock {
                     asset: [228, 232, 31, 166, 177, 99, 39, 212, 183, 140, 254, 184, 58, 173, 224, 75, 167, 7, 81, 101],
-                    holder: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    sender: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    recipient: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
                     amount: 100000000000000000000,
                 },
             }));
@@ -104,8 +104,7 @@ fn test_offchain_worker() {
             assert!(false);
         }
 
-        if let Call::receive_event(chain_id, event_id, event, _signature) = ex2.call {
-            assert_eq!(chain_id, ChainId::Eth);
+        if let mock::Call::Cash(crate::Call::receive_event(ChainId::Eth, event_id, event, _signature)) = ex2.call {
             assert_eq!(event_id, ChainLogId::Eth(3932897, 1));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [165, 200, 2, 78, 105, 154, 92, 48, 235, 150, 94, 71, 181, 21, 124, 6, 199, 111, 59, 114, 107, 255, 55, 122, 10, 83, 51, 165, 97, 242, 86, 72],
@@ -114,7 +113,8 @@ fn test_offchain_worker() {
                 log_index: 1,
                 event: ethereum_client::EthereumEvent::Lock {
                     asset: [216, 123, 167, 165, 11, 46, 126, 102, 15, 103, 138, 137, 94, 75, 114, 231, 203, 76, 205, 156],
-                    holder: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    sender: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    recipient: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
                     amount: 100000000,
                 },
             }));
@@ -122,8 +122,7 @@ fn test_offchain_worker() {
             assert!(false);
         }
 
-        if let Call::receive_event(chain_id, event_id, event, _signature) = ex3.call {
-            assert_eq!(chain_id, ChainId::Eth);
+        if let mock::Call::Cash(crate::Call::receive_event(ChainId::Eth, event_id, event, _signature)) = ex3.call {
             assert_eq!(event_id, ChainLogId::Eth(3858223, 0));
             assert_eq!(event, ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
                 block_hash: [193, 192, 235, 55, 181, 105, 35, 173, 158, 32, 253, 179, 28, 168, 130, 152, 141, 82, 23, 247, 202, 36, 182, 41, 124, 166, 237, 112, 8, 17, 207, 35],
@@ -132,7 +131,8 @@ fn test_offchain_worker() {
                 log_index: 0,
                 event: ethereum_client::EthereumEvent::Lock {
                     asset: [238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238],
-                    holder: [81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31, 14, 135, 38],
+                    sender: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
+                    recipient: [81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31, 14, 135, 38],
                     amount: 5000000000000000,
                 },
             }));
@@ -153,7 +153,7 @@ fn test_offchain_worker_min_in_pending() {
     // `fromBlock` is important, core check of this test, equals hex(11938293)
     let events_call = testing::PendingRequest{
         method: "POST".into(),
-        uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+        uri: "https://goerli-eth.compound.finance".into(),
         body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB602E5", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
         response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
         headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -202,7 +202,7 @@ fn test_offchain_worker_max_in_done() {
     // `fromBlock` is important, core check of this test, equals hex(11938293 + 1)
     let events_call = testing::PendingRequest{
         method: "POST".into(),
-        uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+        uri: "https://goerli-eth.compound.finance".into(),
         body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629F6", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
         response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
         headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -251,7 +251,7 @@ fn test_offchain_worker_max_in_failed() {
     // `fromBlock` is important, core check of this test, equals hex(11938293 + 1)
     let events_call = testing::PendingRequest{
         method: "POST".into(),
-        uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+        uri: "https://goerli-eth.compound.finance".into(),
         body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629F6", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
         response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
         headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -288,7 +288,7 @@ fn test_offchain_worker_max_in_done_and_failed() {
     // `fromBlock` is important, core check of this test, equals hex(11938297 + 1)
     let events_call = testing::PendingRequest{
         method: "POST".into(),
-        uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+        uri: "https://goerli-eth.compound.finance".into(),
         body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629FA", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
         response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
         headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -336,7 +336,7 @@ fn test_offchain_worker_no_events() {
 
     let events_call = testing::PendingRequest{
         method: "POST".into(),
-        uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+        uri: "https://goerli-eth.compound.finance".into(),
         body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "earliest", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
         response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
         headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -370,7 +370,7 @@ fn get_basic_calls(events_call: testing::PendingRequest) -> Vec<testing::Pending
     // Find the latest eth block number
     let latest_block_call = testing::PendingRequest {
         method: "POST".into(),
-        uri: "https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27".into(),
+        uri: "https://goerli-eth.compound.finance".into(),
         body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
         response: Some(LATEST_BLOCK_NUMBER_RESPONSE.to_vec().clone()),
         headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
@@ -378,15 +378,23 @@ fn get_basic_calls(events_call: testing::PendingRequest) -> Vec<testing::Pending
         ..Default::default()
     };
 
+    let PRICE_API_RESPONSE_NO_TEST_DATA = r#"
+    {
+      "messages": [
+      ],
+      "prices": {
+      },
+      "signatures": [
+      ],
+      "timestamp": "1609340760"
+    }
+    "#;
+
     let price_call = testing::PendingRequest {
         method: "GET".into(),
         uri: TEST_OPF_URL.into(),
         body: vec![],
-        response: Some(
-            crate::oracle::tests::API_RESPONSE_NO_TEST_DATA
-                .to_owned()
-                .into_bytes(),
-        ),
+        response: Some(PRICE_API_RESPONSE_NO_TEST_DATA.to_owned().into_bytes()),
         headers: vec![],
         sent: true,
         ..Default::default()

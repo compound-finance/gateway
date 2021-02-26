@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn test_encodes_future_yield_notice() -> Result<(), ethabi::Error> {
         let next_cash_yield = 700u128;
-        let next_cash_yield_start = 200u128;
+        let next_cash_yield_start = 200u64;
         let next_cash_index = 400u128;
 
         let notice = Notice::FutureYieldNotice(FutureYieldNotice::Eth {
