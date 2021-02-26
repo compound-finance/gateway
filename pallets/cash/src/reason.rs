@@ -22,6 +22,7 @@ pub enum Reason {
     BadUnits,
     ChainMismatch,
     CryptoError(compound_crypto::CryptoError),
+    EventAlreadySigned,
     FailedToSubmitExtrinsic,
     FetchError,
     IncorrectNonce(Nonce, Nonce),
@@ -51,6 +52,7 @@ pub enum Reason {
     SignatureMismatch,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
+    UnknownValidator,
     SetYieldNextError(SetYieldNextError),
 }
 
@@ -78,6 +80,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::BadUnits => (1, 7, "bad units"),
             Reason::ChainMismatch => (2, 0, "chain mismatch"),
             Reason::CryptoError(_) => (3, 0, "crypto error"),
+            Reason::EventAlreadySigned => (4, 0, "event already signed"),
             Reason::FailedToSubmitExtrinsic => (5, 0, "failed to submit extrinsic"),
             Reason::FetchError => (6, 0, "fetch error"),
             Reason::IncorrectNonce(_, _) => (6, 0, "incorrect nonce"),
@@ -107,6 +110,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::SignatureMismatch => (20, 1, "signature mismatch"),
             Reason::TimeTravelNotAllowed => (21, 0, "time travel not allowed"),
             Reason::TrxRequestParseError(_) => (22, 0, "trx request parse error"),
+            Reason::UnknownValidator => (23, 0, "unknown validator"),
             Reason::SetYieldNextError(_) => (24, 0, "set yield next error"),
         };
         frame_support::dispatch::DispatchError::Module {
