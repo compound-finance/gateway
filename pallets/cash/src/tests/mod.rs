@@ -164,7 +164,7 @@ fn process_eth_event_fails_for_bad_signature() {
 }
 
 #[test]
-fn process_eth_event_if_not_validator() {
+fn process_eth_event_fails_if_not_validator() {
     new_test_ext().execute_with(|| {
         let event_id = ChainLogId::Eth(3858223, 0);
         let chain_id = ChainId::Eth;
@@ -187,15 +187,9 @@ fn process_eth_event_if_not_validator() {
             118, 138, 220, 196, 6, 153, 77, 35, 141, 6, 78, 46, 97, 167, 242, 188, 141, 102, 167,
             209, 126, 30, 123, 73, 238, 34, 28,
         ];
-
-        // Even though signer is not validator, we still add it to signers of `Pending` event
-        CashModule::receive_event(Origin::none(), chain_id, event_id, event, sig);
-        assert_eq!(
-            CashModule::pending_events(chain_id, event_id),
-            BTreeSet::from_iter(vec![[
-                68, 100, 254, 181, 145, 217, 30, 80, 166, 78, 151, 91, 184, 192, 180, 248, 127, 64,
-                158, 120
-            ]])
+        assert_err!(
+            CashModule::receive_event(Origin::none(), chain_id, event_id, event, sig),
+            Reason::UnknownValidator
         );
     });
 }
