@@ -128,7 +128,6 @@ fn parse_open_price_feed_api_response(
 /// Make the open price feed API request to an unauthenticated http endpoint
 pub fn open_price_feed_request(url: &str) -> Result<OpenPriceFeedApiResponse, OracleError> {
     let response = open_price_feed_request_unchecked(url)?;
-    sanity_check_messages(&response)?;
 
     Ok(response)
 }
@@ -154,50 +153,6 @@ fn open_price_feed_request_unchecked(url: &str) -> Result<OpenPriceFeedApiRespon
     let parsed = parse_open_price_feed_api_response(&body);
 
     parsed
-}
-
-/// Sanity checks on the entire API response payload. Not sure how far we want to go here in terms of
-/// using useful data when it is present. There is a balance between using useful messages that
-/// have good data but the payload is somewhat inconsistent vs not being able to post new prices
-/// due to an inconsistency. The distributed nature of the open price feed should help us here.
-fn sanity_check_messages(api_response: &OpenPriceFeedApiResponse) -> Result<(), OracleError> {
-    if api_response.messages.len() != api_response.signatures.len() {
-        return Err(OracleError::InvalidApiResponse);
-    }
-    let timestamp: Timestamp = api_response
-        .timestamp
-        .parse()
-        .map_err(|_| OracleError::InvalidApiResponse)?;
-
-    // decode messages and check content
-    for message in &api_response.messages {
-        let message = eth_hex_decode_helper(message.as_bytes())?;
-        let decoded_message = parse_message(&message)?;
-
-        if decoded_message.timestamp != timestamp * 1000 {
-            return Err(OracleError::InvalidApiResponse);
-        }
-
-        if !api_response.prices.contains_key(&decoded_message.key) {
-            return Err(OracleError::InvalidApiResponse);
-        }
-
-        let payload_price = api_response
-            .prices
-            .get(&decoded_message.key)
-            .ok_or(OracleError::InvalidApiResponse)?;
-        let price_int = payload_price.replace(".", "");
-        let price_int = price_int.trim_start_matches("0");
-        let message_price = format!("{}", decoded_message.value);
-        let message_price = message_price.trim_end_matches("0");
-        // this check is not very good because the value could still be off by an order of magnitude
-        // but without the associated decimals this is what we can do
-        if price_int != message_price {
-            return Err(OracleError::InvalidApiResponse);
-        }
-    }
-
-    Ok(())
 }
 
 impl OpenPriceFeedApiResponse {
@@ -397,12 +352,6 @@ pub mod tests {
         assert_eq!(actual.prices["BAT"], "0.2052");
         assert_eq!(actual.signatures[2], "0x15a9e7019f2b45c5e64646df571ea944b544dbf9093fbe19e41afea68fa58d721e53449245eebea3f351dbdff4dff09cf303a335cb4455f0d3219f308d448483000000000000000000000000000000000000000000000000000000000000001c");
         assert_eq!(actual.timestamp, "1609340760");
-    }
-
-    #[test]
-    fn test_sanity_check_messages_happy_path() {
-        let actual = get_parsed_test_case();
-        sanity_check_messages(&actual).unwrap();
     }
 
     #[test]

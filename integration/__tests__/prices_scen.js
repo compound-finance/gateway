@@ -21,7 +21,7 @@ buildScenarios('Prices Scenarios', prices_scen_info, [
     only: true,
     name: "Prices from Price Server",
     scenario: async ({ chain, zrx, sleep }) => {
-      await sleep(30000); // Wait for prices to come in naturally
+      await sleep(20000); // Wait for prices to come in naturally
       expect(await zrx.getPrice()).toEqual(0.599453);
     }
   },

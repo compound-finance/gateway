@@ -27,8 +27,9 @@ class Price {
 }
 
 class Prices {
-  constructor(prices, serverPort, serverHost, reporter, ctx) {
+  constructor(prices, timestamp, serverPort, serverHost, reporter, ctx) {
     this.prices = prices;
+    this.timestamp = timestamp;
     this.serverPort = serverPort;
     this.serverHost = serverHost;
     this.reporter = reporter;
@@ -52,7 +53,8 @@ class Prices {
           [pi.key]: pi.price
         };
       }, {}),
-      reporter: this.reporter
+      reporter: this.reporter,
+      timestamp: this.timestamp,
     };
   }
 
@@ -96,6 +98,7 @@ let basePricesInfo = {
   server_port: null,
   server_host: '127.0.0.1',
   reporter: '0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC',
+  timestamp: "1611811500",
   prices: {
     "BTC": {
       price: "31194.11",
@@ -173,6 +176,7 @@ async function buildPrices(tokensInfoHash, ctx) {
   let serverPort = basePricesInfo.server_port || genPort();
   let serverHost = basePricesInfo.server_host;
   let reporter = basePricesInfo.reporter;
+  let timestamp = basePricesInfo.timestamp;
 
   let priceObjects = await entries.reduce(async (acc, [key, priceInfo]) => {
     return [
@@ -181,7 +185,7 @@ async function buildPrices(tokensInfoHash, ctx) {
     ];
   }, Promise.resolve([]));
 
-  let prices = new Prices(priceObjects, serverPort, serverHost, reporter, ctx);
+  let prices = new Prices(priceObjects, timestamp, serverPort, serverHost, reporter, ctx);
   await prices.start();
 
   return prices;
