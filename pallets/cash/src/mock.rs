@@ -9,9 +9,13 @@ use sp_core::{
     H256,
 };
 use sp_runtime::{
+    generic,
     testing::{Header, TestXt},
-    traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
-    MultiSignature as Signature,
+    traits::{
+        BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
+        Verify,
+    },
+    MultiAddress, MultiSignature as Signature,
 };
 
 pub type Extrinsic = TestXt<Call, ()>;
@@ -21,8 +25,17 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 pub const MILLISECS_PER_BLOCK: types::Timestamp = 6000;
 pub const SLOT_DURATION: types::Timestamp = MILLISECS_PER_BLOCK;
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
+pub type Address = MultiAddress<AccountId, ()>;
+pub type SignedExtra = (
+    frame_system::CheckSpecVersion<Test>,
+    frame_system::CheckTxVersion<Test>,
+    frame_system::CheckGenesis<Test>,
+    frame_system::CheckEra<Test>,
+    frame_system::CheckNonce<Test>,
+    frame_system::CheckWeight<Test>,
+);
+pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
+pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 
 frame_support::construct_runtime!(
     pub enum Test where
@@ -30,7 +43,7 @@ frame_support::construct_runtime!(
     NodeBlock = Block,
     UncheckedExtrinsic = UncheckedExtrinsic,
     {
-    System: frame_system::{Module, Call, Config, Storage, Event<T>},
+        System: frame_system::{Module, Call, Config, Storage, Event<T>},
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
         Cash: pallet_cash::{Module, Call, Config, Storage, Event},
     }

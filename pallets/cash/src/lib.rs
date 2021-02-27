@@ -442,10 +442,11 @@ impl<T: Config> Module<T> {
                 <Validators>::get(&validator_keys.substrate_id) == None,
                 "Duplicate validator keys in genesis config"
             );
-            assert!(
-                T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
-                "Could not placate the substrate account existence thing"
-            );
+            // XXX for Substrate 3
+            // assert!(
+            //     T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
+            //     "Could not placate the substrate account existence thing"
+            // );
             <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
         }
     }
