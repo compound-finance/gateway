@@ -52,7 +52,7 @@ sc-keystore = { git = 'https://github.com/compound-finance/substrate', branch = 
 sp-keystore = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-network = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-runtime = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-sc-service = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+sc-service = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-telemetry = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-transaction-pool = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-transaction-pool = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -70,7 +70,7 @@ substrate-frame-rpc-system = { git = 'https://github.com/compound-finance/substr
 
 # Used only for runtime benchmarking
 frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-frame-benchmarking-cli = { git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
+frame-benchmarking-cli = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
 
 # Local dependencies
 compound-chain-runtime = { path = '../runtime' }
@@ -85,8 +85,8 @@ tempfile = "3.1.0"
 
 sc-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-keyring = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-sc-service-test = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-sp-timestamp = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+sc-service-test = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+sp-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
 frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
