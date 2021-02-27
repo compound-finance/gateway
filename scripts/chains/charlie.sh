@@ -16,6 +16,9 @@ if [ "$purge" = true ] ; then
 ./target/release/compound-chain purge-chain --base-path /tmp/chainz/charlie --chain ./compoundChainSpec.json --database paritydb -y
 fi
 
+export ETH_KEY_ID=my_eth_key_id
+export ETH_RPC_URL=https://goerli.infura.io/v3/975c0c48e2ca4649b7b332f310050e27
+export MINER="ETH:0x66613A2d4908D130C908ccF2f298b235bACD427a"
 ./target/release/compound-chain \
   --base-path /tmp/chainz/charlie \
   --chain ./compoundChainSpec.json \
@@ -25,5 +28,6 @@ fi
   --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
   --validator \
   --no-mdns \
+  --charlie \
   --rpc-methods Unsafe \
-  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooW9qtwBHeQryg9mXBVMkz4YivUsj62g1tYBACUukKToKof
+  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWQoFU7AqYZE5cCFdHVHgN4M25dnwZJEjUihV4FD3UmZhZ
