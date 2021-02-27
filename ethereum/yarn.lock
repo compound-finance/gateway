@@ -3642,10 +3642,10 @@ eth-rpc-errors@^3.0.0:
   dependencies:
     fast-safe-stringify "^2.0.6"
 
-eth-saddle@^0.1.22:
-  version "0.1.22"
-  resolved "https://registry.yarnpkg.com/eth-saddle/-/eth-saddle-0.1.22.tgz#35a119b9989574f5d232810dabd9b83269bf0daa"
-  integrity sha512-N8IubyRxJt4b4NUeOUhU7qfNmzQTLU/pQhK4dyLIn/nALf50rI1xf4AWvg4/5v+lFYrVQ1nShSOH5yYC+O5YSQ==
+eth-saddle@^0.1.23:
+  version "0.1.23"
+  resolved "https://registry.yarnpkg.com/eth-saddle/-/eth-saddle-0.1.23.tgz#69c9ffde1211e69892f14bbdfe5e51bfc5952bf7"
+  integrity sha512-kQhidxGEuGr8i2CsqkwCxl5P1lU92Y01sNRN5PBdWS00aS4qjUiF9jRqXzFU4WLxRJm9TuTDCljbNdoHI7guqg==
   dependencies:
     "@0x/subproviders" "=6.0.0"
     "@compound-finance/sol-coverage" "=4.0.10-alpha.7"
