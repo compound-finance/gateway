@@ -17,7 +17,9 @@ ExecStart={{ compound_chain_bin }} \
   --rpc-external \
   --node-key-file {{ node_key_priv_file }} \
   {% for peer in peers -%}
-  --bootnodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
+  --reserved-nodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
   {% endfor -%}
+  --reserved-only \
+  --pruning archive \
   --ws-max-connections 1000 \
   --rpc-cors=all
