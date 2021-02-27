@@ -32,7 +32,7 @@ yarn test
 You can deploy the Starport with the following command:
 
 ```
-npx saddle script deploy -n goerli {admin}
+npx saddle script -n ropsten deploy.js
 ```
 
 ## Console
