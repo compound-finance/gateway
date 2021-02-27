@@ -21,7 +21,7 @@ class CashToken extends Token {
   }
 
   lockEventName() {
-    return 'GoldieLocksCash';
+    return 'LockedCash';
   }
 
   async cashIndex() {

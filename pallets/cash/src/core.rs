@@ -282,21 +282,24 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
         ChainLogEvent::Eth(eth_event) => match eth_event.event {
             ethereum_client::events::EthereumEvent::Lock {
                 asset,
+                sender,
                 recipient,
                 amount,
-                ..
             } => lock_internal::<T>(
                 get_asset::<T>(ChainAsset::Eth(asset))?,
-                ChainAccount::Eth(recipient),
+                ChainAccount::Eth(sender),
+                ChainAccount::Eth(recipient), // TODO: eth not required
                 get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
             ),
 
             ethereum_client::events::EthereumEvent::LockCash {
+                sender,
                 recipient,
                 principal,
                 ..
             } => lock_cash_principal_internal::<T>(
-                ChainAccount::Eth(recipient),
+                ChainAccount::Eth(sender),
+                ChainAccount::Eth(recipient), // TODO: eth not required
                 CashPrincipalAmount(principal),
             ),
 
@@ -408,6 +411,7 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
 
 pub fn lock_internal<T: Config>(
     asset: AssetInfo,
+    sender: ChainAccount,
     holder: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
@@ -438,13 +442,13 @@ pub fn lock_internal<T: Config>(
 
     set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
 
-    // XXX real events
-    <Module<T>>::deposit_event(Event::GoldieLocks(asset.asset, holder, amount.value)); // XXX -> raw amount?
+    <Module<T>>::deposit_event(Event::Locked(asset.asset, sender, holder, amount.value));
 
-    Ok(()) // XXX events?
+    Ok(())
 }
 
 pub fn lock_cash_principal_internal<T: Config>(
+    sender: ChainAccount,
     holder: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<(), Reason> {
@@ -469,9 +473,10 @@ pub fn lock_cash_principal_internal<T: Config>(
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    <Module<T>>::deposit_event(Event::GoldieLocksCash(holder, principal)); // XXX -> raw amount?
+    // XXX read index when moving max back
+    //<Module<T>>::deposit_event(Event::LockedCash(sender, holder, principal, index));
 
-    Ok(()) // XXX should we return events to be deposited?
+    Ok(())
 }
 
 pub fn extract_internal<T: Config>(
@@ -543,7 +548,9 @@ pub fn extract_internal<T: Config>(
         },
     )?;
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::Extract(asset.asset, holder, recipient, amount.value));
+
+    Ok(())
 }
 
 pub fn extract_cash_principal_internal<T: Config>(
@@ -595,7 +602,9 @@ pub fn extract_cash_principal_internal<T: Config>(
         },
     )?;
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::ExtractCash(holder, recipient, principal, index));
+
+    Ok(())
 }
 
 pub fn transfer_internal<T: Config>(
@@ -607,7 +616,6 @@ pub fn transfer_internal<T: Config>(
     let miner = get_some_miner::<T>();
     let index = GlobalCashIndex::get();
 
-    // XXX check asset matches amount asset?
     require!(sender != recipient, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
@@ -679,7 +687,14 @@ pub fn transfer_internal<T: Config>(
     set_asset_balance_internal::<T>(asset.asset, sender, sender_asset_new);
     set_asset_balance_internal::<T>(asset.asset, recipient, recipient_asset_new);
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::Transfer(
+        asset.asset,
+        sender,
+        recipient,
+        amount.value,
+    ));
+
+    Ok(())
 }
 
 pub fn transfer_cash_principal_internal<T: Config>(
@@ -726,7 +741,9 @@ pub fn transfer_cash_principal_internal<T: Config>(
     CashPrincipals::insert(recipient, recipient_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::TransferCash(sender, recipient, principal, index));
+
+    Ok(())
 }
 
 pub fn liquidate_internal<T: Config>(
@@ -872,7 +889,15 @@ pub fn liquidate_internal<T: Config>(
         liquidator_collateral_asset_new,
     );
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::Liquidate(
+        asset.asset,
+        collateral_asset.asset,
+        liquidator,
+        borrower,
+        amount.value,
+    ));
+
+    Ok(())
 }
 
 pub fn liquidate_cash_principal_internal<T: Config>(
@@ -989,7 +1014,15 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         liquidator_collateral_asset_new,
     );
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::LiquidateCash(
+        collateral_asset.asset,
+        liquidator,
+        borrower,
+        principal,
+        index,
+    ));
+
+    Ok(())
 }
 
 pub fn liquidate_cash_collateral_internal<T: Config>(
@@ -1088,7 +1121,14 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     set_asset_balance_internal::<T>(asset.asset, borrower, borrower_asset_new);
     set_asset_balance_internal::<T>(asset.asset, liquidator, liquidator_asset_new);
 
-    Ok(()) // XXX events?
+    <Module<T>>::deposit_event(Event::LiquidateCashCollateral(
+        asset.asset,
+        liquidator,
+        borrower,
+        amount.value,
+    ));
+
+    Ok(())
 }
 
 // Liquidity Checks //
