@@ -78,6 +78,7 @@ gateway-crypto = { path = '../gateway-crypto' }
 our-std = { path = '../our-std' }
 pallet-cash = { path = '../pallets/cash' }
 pallet-cash-runtime-api = { path = '../pallets/cash/runtime-api' }
+pallet-oracle = { path = '../pallets/oracle' }
 runtime-interfaces = { path = '../pallets/runtime-interfaces' }
 
 [dev-dependencies]

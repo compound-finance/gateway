@@ -15,6 +15,7 @@ sp-api = { default-features = false, git = 'https://github.com/compound-finance/
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
 pallet-cash = { path = '..', default-features = false }
+pallet-oracle = { path = '../../oracle', default-features = false }
 
 [features]
 default = ['std']
@@ -22,4 +23,5 @@ std = [
     "sp-api/std",
     "sp-runtime/std",
     "pallet-cash/std",
+    "pallet-oracle/std",
 ]

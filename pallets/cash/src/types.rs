@@ -1,6 +1,7 @@
 use codec::{Decode, Encode};
 use our_std::{
     collections::btree_set::BTreeSet,
+    consts::{int_from_string_with_decimals, static_pow10, uint_from_string_with_decimals},
     convert::{TryFrom, TryInto},
     Deserialize, RuntimeDebug, Serialize,
 };
@@ -12,9 +13,10 @@ use crate::{
     factor::{BigInt, BigUint, Factor},
     rates::InterestRateModel,
     reason::{MathError, Reason},
-    symbol::{static_pow10, Symbol, Ticker, Units, CASH, USD},
+    symbol::{Symbol, Units, CASH, USD},
     SubstrateId,
 };
+use pallet_oracle::{ticker::Ticker, types::Price};
 
 // Type aliases //
 
@@ -48,9 +50,6 @@ pub type CashAmount = Uint;
 /// Type for representing a balance of a specific asset.
 pub type AssetBalance = Int;
 
-/// Type for representing a price, potentially for any symbol.
-pub type AssetPrice = Uint;
-
 /// Type for representing an amount of an asset, together with its units.
 pub type AssetQuantity = Quantity;
 
@@ -69,40 +68,12 @@ pub type MinerShares = Factor;
 /// Type for a code hash.
 pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
 
-/// Type for an open price feed reporter.
-pub type Reporter = <Ethereum as Chain>::Address;
-
 /// Governance Result type
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum GovernanceResult {
     FailedToDecodeCall,
     DispatchSuccess,
     DispatchFailure(DispatchError),
-}
-
-/// Type for a set of open price feed reporters.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Default, RuntimeDebug)]
-pub struct ReporterSet(pub Vec<Reporter>);
-
-impl ReporterSet {
-    pub fn contains(&self, reporter: Reporter) -> bool {
-        self.0.iter().any(|e| e.as_slice() == reporter.as_slice())
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl<'a> TryFrom<Vec<&'a str>> for ReporterSet {
-    type Error = Reason;
-    fn try_from(strings: Vec<&'a str>) -> Result<ReporterSet, Self::Error> {
-        let mut reporters = Vec::with_capacity(strings.len());
-        for string in strings {
-            reporters.push(<Ethereum as Chain>::str_to_address(string)?)
-        }
-        Ok(ReporterSet(reporters))
-    }
 }
 
 /// Type for enumerating sessions.
@@ -177,40 +148,6 @@ impl AssetInfo {
 
     pub const fn as_quantity_nominal(self, s: &'static str) -> Quantity {
         Quantity::from_nominal(s, self.units())
-    }
-}
-
-// XXX ideally we should really impl Ord ourselves for these
-//  and should assert ticker/units is same when comparing
-//   would have to panic, though not for partial ord
-
-/// Type for representing a price (in USD), bound to its ticker.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
-pub struct Price {
-    pub ticker: Ticker,
-    pub value: AssetPrice,
-}
-
-impl Price {
-    pub const DECIMALS: Decimals = USD.decimals; // Note: must be >= USD.decimals
-
-    pub const fn new(ticker: Ticker, value: AssetPrice) -> Self {
-        Price { ticker, value }
-    }
-
-    /// Get a price from a string.
-    /// Only for use in const contexts.
-    pub const fn from_nominal(ticker: Ticker, s: &'static str) -> Self {
-        Price::new(ticker, uint_from_string_with_decimals(Self::DECIMALS, s))
-    }
-
-    /// Take a ratio of prices.
-    // If we generalized prices over the quote type, this would probably be:
-    //  Price<A, Q> / P<B, Q> -> Price<A, B>
-    // But we don't need generalize prices, just enough Decimals, so we have:
-    //  Price<A, { USD }> / Price<B, { USD }> -> Factor(B per A)
-    pub fn ratio(self, rhs: Price) -> Result<Factor, MathError> {
-        Factor::from_fraction(self.value, rhs.value)
     }
 }
 
@@ -645,80 +582,6 @@ impl Default for AssetIndex {
     fn default() -> Self {
         AssetIndex(0)
     }
-}
-
-/// A helper function for from_nominal on Quantity and Price.
-///
-/// Only for use in const contexts.
-pub const fn uint_from_string_with_decimals(decimals: Decimals, s: &'static str) -> Uint {
-    int_from_string_with_decimals(decimals, s) as Uint
-}
-
-/// Only for use in const contexts.
-pub const fn int_from_string_with_decimals(decimals: Decimals, s: &'static str) -> Int {
-    let bytes = s.as_bytes();
-    let mut i = bytes.len();
-    let mut provided_fractional_digits = 0;
-    let mut past_decimal = false;
-    let mut tenpow: Int = 1;
-    let mut qty: Int = 0;
-
-    // note - for loop is not allowed in `const` context
-    // going from the right of the string
-    loop {
-        i -= 1;
-        let byte = bytes[i];
-        if byte == b'-' {
-            if i != 0 {
-                // quit, a dash somewhere it should not be
-                let _should_overflow = byte + u8::max_value();
-            }
-            // negate
-            qty *= -1;
-            break;
-        }
-
-        if byte == b'.' {
-            if past_decimal {
-                // multiple radix - quit.
-                let _should_overflow = byte + u8::max_value();
-            }
-            past_decimal = true;
-            continue;
-        }
-
-        if !past_decimal {
-            provided_fractional_digits += 1;
-        }
-        // will underflow whenever byte < b'0'
-        let byte_as_num = byte - b'0';
-        // will overflow whenever byte > b'9'
-        let _should_overflow = byte + (u8::max_value() - b'9');
-
-        qty += (byte_as_num as Int) * tenpow;
-        tenpow *= 10;
-        if i == 0 {
-            break;
-        }
-    }
-
-    if bytes.len() == 1 && past_decimal {
-        // only a radix provided, quit
-        let _should_overflow = bytes[0] + u8::max_value();
-    }
-
-    // never passed the radix, it is a whole number
-    if !past_decimal {
-        provided_fractional_digits = 0;
-    }
-
-    let number_of_zeros_to_scale_up = decimals - provided_fractional_digits;
-    if number_of_zeros_to_scale_up == 0 {
-        return qty;
-    }
-
-    let scalar = static_pow10(number_of_zeros_to_scale_up) as i128;
-    qty * scalar
 }
 
 /// Multiply floating point numbers represented by a (value, number_of_decimals) pair and specify

@@ -1,13 +1,15 @@
 use codec::{Decode, Encode};
-use our_std::{convert::TryInto, RuntimeDebug};
+use our_std::{
+    convert::TryInto,
+    fixed_width::{label_to_string, str_to_label, WIDTH},
+    RuntimeDebug,
+};
 
 use crate::{
     reason::Reason,
     types::{Decimals, Uint},
 };
-
-/// Fixed symbol width.
-pub const WIDTH: usize = 12;
+use pallet_oracle::ticker::{Ticker, CASH_TICKER, USD_TICKER};
 
 /// Type for the abstract symbol of an asset, not tied to a chain.
 #[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
@@ -38,35 +40,6 @@ impl From<Symbol> for String {
     }
 }
 
-/// Type for an asset price ticker.
-#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
-pub struct Ticker(pub [u8; WIDTH]);
-
-impl Ticker {
-    pub const fn new(ticker_str: &str) -> Self {
-        Ticker(str_to_label(ticker_str))
-    }
-}
-
-impl our_std::str::FromStr for Ticker {
-    type Err = Reason;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut chars: Vec<u8> = s.as_bytes().into();
-        if chars.len() > WIDTH {
-            Err(Reason::BadTicker)
-        } else {
-            chars.resize(WIDTH, 0);
-            Ok(Ticker(chars.try_into().unwrap()))
-        }
-    }
-}
-
-impl From<Ticker> for String {
-    fn from(ticker: Ticker) -> String {
-        label_to_string(ticker.0)
-    }
-}
-
 /// Type for determining whether quantities may be combined.
 #[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
 pub struct Units {
@@ -77,10 +50,16 @@ pub struct Units {
 // Define units used directly by the chain itself
 
 /// Units for CASH.
-pub const CASH: Units = Units::from_ticker_str("CASH", 6);
+pub const CASH: Units = Units {
+    ticker: CASH_TICKER,
+    decimals: 6,
+};
 
 /// Units for USD.
-pub const USD: Units = Units::from_ticker_str("USD", 6);
+pub const USD: Units = Units {
+    ticker: USD_TICKER,
+    decimals: 6,
+};
 
 /// Statically get the Uint corresponding to some number of decimals.
 pub const fn static_pow10(decimals: Decimals) -> Uint {
@@ -93,33 +72,6 @@ pub const fn static_pow10(decimals: Decimals) -> Uint {
         i += 1;
         v *= 10;
     }
-}
-
-pub const fn str_to_label(s: &str) -> [u8; WIDTH] {
-    assert!(s.len() < WIDTH, "Too many chars");
-    let mut bytes = [0u8; WIDTH];
-    let mut i = 0;
-    let raw = s.as_bytes();
-    loop {
-        if i >= s.len() {
-            break;
-        }
-        bytes[i] = raw[i];
-        i += 1;
-    }
-    bytes
-}
-
-pub fn label_to_string(l: [u8; WIDTH]) -> String {
-    let mut s = String::with_capacity(WIDTH);
-    let bytes = &l[..];
-    for i in 0..WIDTH {
-        if bytes[i] == 0 {
-            break;
-        }
-        s.push(bytes[i] as char);
-    }
-    s
 }
 
 impl Units {

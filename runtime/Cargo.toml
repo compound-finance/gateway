@@ -50,6 +50,7 @@ pallet-session = { default-features = false, git = 'https://github.com/compound-
 # Local dependencies
 pallet-cash = { path = '../pallets/cash', default-features = false }
 pallet-cash-runtime-api = { path = '../pallets/cash/runtime-api', default-features = false }
+pallet-oracle = { path = '../pallets/oracle', default-features = false }
 
 our-std = { path = '../our-std', default-features = false }
 
@@ -73,6 +74,7 @@ std = [
     'pallet-aura/std',
     'pallet-cash/std',
     'pallet-cash-runtime-api/std',
+    'pallet-oracle/std',
     'pallet-grandpa/std',
     'pallet-randomness-collective-flip/std',
     'pallet-session/std',

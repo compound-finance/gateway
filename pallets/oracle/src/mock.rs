@@ -1,6 +1,5 @@
-use crate::{self as pallet_cash, *};
+use crate::{self as pallet_oracle, *};
 use codec::alloc::sync::Arc;
-use pallet_oracle;
 use parking_lot::RwLock;
 use sp_core::{
     offchain::{
@@ -10,21 +9,18 @@ use sp_core::{
     H256,
 };
 use sp_runtime::{
-    generic, impl_opaque_keys,
-    testing::{Header, TestXt, UintAuthorityId},
+    generic,
+    testing::{Header, TestXt},
     traits::{
-        BlakeTwo256, Block as BlockT, ConvertInto, Extrinsic as ExtrinsicT, IdentifyAccount,
-        IdentityLookup, OpaqueKeys, Verify,
+        BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
+        Verify,
     },
     MultiAddress, MultiSignature as Signature,
 };
 
 pub type Extrinsic = TestXt<Call, ()>;
-pub type CashModule = Module<Test>;
+pub type OracleModule = Module<Test>;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-
-pub const MILLISECS_PER_BLOCK: types::Timestamp = 6000;
-pub const SLOT_DURATION: types::Timestamp = MILLISECS_PER_BLOCK;
 
 pub type Address = MultiAddress<AccountId, ()>;
 pub type SignedExtra = (
@@ -38,60 +34,8 @@ pub type SignedExtra = (
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 
-// XXX just to compile, these should maybe use the real impls
-pub struct TestShouldEndSession;
-impl pallet_session::ShouldEndSession<u64> for TestShouldEndSession {
-    fn should_end_session(now: u64) -> bool {
-        true
-    }
-}
-use sp_runtime::RuntimeAppPublic;
-
-pub struct TestSessionHandler;
-impl pallet_session::SessionHandler<SubstrateId> for TestSessionHandler {
-    const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
-    fn on_genesis_session<T: OpaqueKeys>(_validators: &[(SubstrateId, T)]) {}
-    fn on_new_session<T: OpaqueKeys>(
-        changed: bool,
-        validators: &[(SubstrateId, T)],
-        _queued_validators: &[(SubstrateId, T)],
-    ) {
-    }
-    fn on_disabled(_validator_index: usize) {}
-    fn on_before_session_ending() {}
-}
-
-pub struct TestSessionManager;
-impl pallet_session::SessionManager<SubstrateId> for TestSessionManager {
-    fn end_session(_: SessionIndex) {}
-    fn start_session(_: SessionIndex) {}
-    fn new_session(_: SessionIndex) -> Option<Vec<SubstrateId>> {
-        None
-    }
-}
-
 pub mod opaque {
-    use super::*;
-
     pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
-
-    /// Opaque block header type.
-    pub type Header = generic::Header<u64, BlakeTwo256>;
-    /// Opaque block type.
-    pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-    /// Opaque block identifier type.
-    pub type BlockId = generic::BlockId<Block>;
-
-    impl_opaque_keys! {
-        pub struct MockSessionKeys {
-            pub dummy: UintAuthorityId,
-        }
-    }
-    impl From<UintAuthorityId> for MockSessionKeys {
-        fn from(dummy: UintAuthorityId) -> Self {
-            Self { dummy }
-        }
-    }
 }
 
 frame_support::construct_runtime!(
@@ -101,17 +45,13 @@ frame_support::construct_runtime!(
     UncheckedExtrinsic = UncheckedExtrinsic,
     {
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
         Oracle: pallet_oracle::{Module, Call, Config, Storage, Event, Inherent},
-        Cash: pallet_cash::{Module, Call, Config, Storage, Event, Inherent},
-        Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
     }
 );
 
 frame_support::parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
-    pub const MinimumPeriod: types::Timestamp = SLOT_DURATION / 2;
 }
 
 impl frame_system::Config for Test {
@@ -139,32 +79,6 @@ impl frame_system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
-impl pallet_session::Config for Test {
-    type Event = pallet_session::Event;
-    type ValidatorId = SubstrateId;
-    type ValidatorIdOf = ConvertInto;
-    type ShouldEndSession = TestShouldEndSession;
-    type NextSessionRotation = ();
-    type SessionManager = TestSessionManager;
-    type SessionHandler = TestSessionHandler;
-    type Keys = opaque::MockSessionKeys;
-    type DisabledValidatorsThreshold = (); //sp_runtime::Perbill::from_percent(33);
-    type WeightInfo = ();
-}
-
-impl pallet_timestamp::Config for Test {
-    /// A timestamp: milliseconds since the unix epoch.
-    type Moment = types::Timestamp;
-    type OnTimestampSet = ();
-    type MinimumPeriod = MinimumPeriod;
-    type WeightInfo = ();
-}
-
-impl pallet_oracle::Config for Test {
-    type Call = Call;
-    type Event = Event;
-}
-
 impl frame_system::offchain::SigningTypes for Test {
     type Public = <Signature as Verify>::Signer;
     type Signature = Signature;
@@ -173,9 +87,6 @@ impl frame_system::offchain::SigningTypes for Test {
 impl Config for Test {
     type Event = Event;
     type Call = Call;
-    type TimeConverter = crate::converters::TimeConverter<Self>;
-    type AccountStore = System;
-    type SessionInterface = Self;
 }
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test

@@ -47,9 +47,9 @@ use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
     rates::APR,
     reason::Reason,
-    symbol::Ticker,
-    types::{AssetBalance, AssetPrice},
+    types::AssetBalance,
 };
+use pallet_oracle::{ticker::Ticker, types::AssetPrice};
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -293,6 +293,11 @@ impl pallet_session::Config for Runtime {
     type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_oracle::Config for Runtime {
+    type Call = Call;
+    type Event = Event;
+}
+
 /// Configure the CASH pallet in pallets/cash.
 impl pallet_cash::Config for Runtime {
     type Event = Event;
@@ -379,8 +384,9 @@ construct_runtime!(
         Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
         Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
-        // Include the custom logic from the CASH pallet in the runtime.
+        // Include the custom logic from the Cash and Oracle pallets in the runtime.
         Cash: pallet_cash::{Module, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
+        Oracle: pallet_oracle::{Module, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
 
         // comes after CASH pallet bc it asks CASH for validators during initialization
         Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
@@ -541,7 +547,7 @@ impl_runtime_apis! {
         }
 
         fn get_price(ticker_str: String) -> Result<AssetPrice, Reason> {
-            Cash::get_price(Ticker::from_str(&ticker_str)?)
+            Oracle::get_price(Ticker::from_str(&ticker_str).map_err(Reason::OracleError)?).map_err(Reason::OracleError)
         }
 
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {

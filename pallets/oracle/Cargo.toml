@@ -1,9 +1,9 @@
 [package]
 authors = ['Compound <https://compound.finance>']
-description = 'Pallet for implementing CASH.'
+description = 'Pallet for implementing Open Price Feed.'
 edition = '2018'
 homepage = 'https://compound.cash'
-name = 'pallet-cash'
+name = 'pallet-oracle'
 repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
 readme = 'README.md'
@@ -37,7 +37,6 @@ frame-system = { default-features = false, git = 'https://github.com/compound-fi
 pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch= 'master' }
 
-pallet-oracle = { path = '../oracle', default-features = false }
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
 ethereum-client = { path = '../../ethereum-client', default-features = false }
 gateway-crypto = { path = '../../gateway-crypto', default-features = false }
@@ -58,6 +57,5 @@ std = [
     'gateway-crypto/std',
     'our-std/std',
     'pallet-session/std',
-    'pallet-oracle/std',
 ]
 runtime-debug = ['our-std/runtime-debug']

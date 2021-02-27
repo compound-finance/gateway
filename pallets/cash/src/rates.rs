@@ -1,12 +1,12 @@
 /// Interest rate related calculations and utilities are concentrated here
 use codec::{Decode, Encode};
-use our_std::{Deserialize, RuntimeDebug, Serialize};
+use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
 
 use crate::{
     factor::Factor,
     params::MILLISECONDS_PER_YEAR,
     reason::{MathError, Reason},
-    types::{uint_from_string_with_decimals, AssetAmount, CashIndex, MinerShares, Timestamp, Uint},
+    types::{AssetAmount, CashIndex, MinerShares, Timestamp, Uint},
 };
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;

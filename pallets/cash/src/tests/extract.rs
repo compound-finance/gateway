@@ -1,4 +1,5 @@
 use super::*;
+use pallet_oracle::{types::Price, Prices};
 
 #[test]
 fn test_extract_asset_without_supply() -> Result<(), Reason> {

@@ -12,9 +12,10 @@ use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
     rates::APR,
     reason::Reason,
-    types::{AssetBalance, AssetPrice},
+    types::AssetBalance,
 };
 use pallet_cash_runtime_api::CashApi as CashRuntimeApi;
+use pallet_oracle::types::AssetPrice;
 
 const RUNTIME_ERROR: i64 = 1;
 const CHAIN_ERROR: i64 = 2;

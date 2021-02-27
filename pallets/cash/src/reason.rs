@@ -6,6 +6,7 @@ use crate::types::Nonce;
 use codec::{Decode, Encode};
 use gateway_crypto::CryptoError;
 use our_std::RuntimeDebug;
+use pallet_oracle::error::OracleError;
 use trx_request;
 
 /// Type for reporting failures for reasons outside of our control.
@@ -185,22 +186,6 @@ pub enum MathError {
     SignMismatch,
     PriceNotUSD,
     UnitsMismatch,
-}
-
-/// Errors coming from the price oracle.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum OracleError {
-    EthAbiParseError,
-    InvalidApiEndpoint,
-    InvalidKind,
-    InvalidSymbol,
-    InvalidTicker,
-    JsonParseError,
-    HexParseError,
-    HttpError,
-    NotAReporter,
-    StalePrice,
-    SubmitError,
 }
 
 /// Error from parsing trx requests.

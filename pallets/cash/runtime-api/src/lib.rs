@@ -2,8 +2,9 @@ use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
     rates::APR,
     reason::Reason,
-    types::{AssetBalance, AssetPrice},
+    types::AssetBalance,
 };
+use pallet_oracle::types::AssetPrice;
 
 sp_api::decl_runtime_apis! {
     pub trait CashApi {

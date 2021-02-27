@@ -1,6 +1,6 @@
 use gateway_runtime::{
     opaque, wasm_binary_unwrap, AccountId, AuraConfig, CashConfig, GenesisConfig, GrandpaConfig,
-    SessionConfig, Signature, SudoConfig, SystemConfig,
+    OracleConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
 };
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
@@ -231,13 +231,6 @@ fn testnet_genesis(
                 },
             ],
 
-            reporters: vec![
-                "0x85615b076615317c80f14cbad6501eec031cd51c",
-                "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
-            ]
-            .try_into()
-            .unwrap(),
-
             // XXX initial authorities should just be Vec<ValidatorKeys>?
             validators: initial_authorities
                 .iter()
@@ -246,6 +239,15 @@ fn testnet_genesis(
                     eth_address: v.1,
                 })
                 .collect::<Vec<_>>(),
+        }),
+
+        pallet_oracle: Some(OracleConfig {
+            reporters: vec![
+                "0x85615b076615317c80f14cbad6501eec031cd51c",
+                "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
+            ]
+            .try_into()
+            .unwrap(),
         }),
     }
 }
