@@ -6,25 +6,159 @@ const {
 } = require('./utils');
 
 describe('CashToken', () => {
+  let proxyAdmin;
+  let cashImpl;
+  let proxy;
   let cash;
   let [root, admin, account1, account2, account3] = saddle.accounts;
 
-  // 1e18
-  let start_cash_index = '1000000000000000000'
-  let startAt = fromNow(0)
+  let startCashIndex = e18(1);
+  let start = fromNow(0);
+
+  // Due the transparent proxy, this is the way to read `implementation` and `admin` when calling not as the admin
+  // Note: we could call as the admin, but it's important to know how to read this way, anyway.
+  async function getProxyImplementation(contract) {
+    return await web3.eth.getStorageAt(contract._address, '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc');
+  }
+
+  async function getProxyAdmin(contract) {
+    return await web3.eth.getStorageAt(contract._address, '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103');
+  }
 
   beforeEach(async () => {
-    cash = await deploy('CashToken', [admin, 0, start_cash_index, startAt], {from: root});
+    proxyAdmin = await deploy('ProxyAdmin', [], { from: root });
+    cashImpl = await deploy('CashToken', [admin], { from: root });
+    proxy = await deploy('TransparentUpgradeableProxy', [
+      cashImpl._address,
+      proxyAdmin._address,
+      cashImpl.methods.initialize(0, start).encodeABI()
+    ], { from: root });
+    cash = await saddle.getContractAt('CashToken', proxy._address);
   });
 
   describe('#constructor', () => {
-    it('should have correct references', async () => {
+    it('should have correct admin and yield references', async () => {
       expect(await call(cash, 'admin')).toMatchAddress(admin);
       let cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
-      let cashYieldStartAt = await call(cash, 'cashYieldStartAt');
+      let cashYieldStart = await call(cash, 'cashYieldStart');
       expect(cashYieldAndIndex.index).toEqualNumber(1e18);
       expect(cashYieldAndIndex.yield).toEqualNumber(0);
-      expect(cashYieldStartAt).toEqualNumber(startAt);
+      expect(cashYieldStart).toEqualNumber(start);
+    });
+
+    it('should have correct admin and yield references when non-zero', async () => {
+      let proxyAdmin = await deploy('ProxyAdmin', [], { from: root });
+      let cashImpl = await deploy('CashToken', [admin], { from: root });
+      let proxy = await deploy('TransparentUpgradeableProxy', [
+        cashImpl._address,
+        proxyAdmin._address,
+        cashImpl.methods.initialize(500, start).encodeABI()
+      ], { from: root });
+      let cash = await saddle.getContractAt('CashToken', proxy._address);
+      let cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
+      expect(cashYieldAndIndex.index).toEqualNumber(1e18);
+      expect(cashYieldAndIndex.yield).toEqualNumber(500);
+    });
+
+    it('should not allow initialize to be called twice', async () => {
+      await expect(cash.methods.initialize(500, start).call()).rejects.toRevert("revert Cash Token already initialized");
+    });
+
+    it('should fail if not initialized', async () => {
+      let proxyAdmin = await deploy('ProxyAdmin', [], { from: root });
+      let cashImpl = await deploy('CashToken', [admin], { from: root });
+      let proxy = await deploy('TransparentUpgradeableProxy', [
+        cashImpl._address,
+        proxyAdmin._address,
+        "0x"
+      ], { from: root });
+      let cash = await saddle.getContractAt('CashToken', proxy._address);
+      await expect(call(cash, 'getCashIndex')).rejects.toRevert("revert Cash Token uninitialized");
+    });
+  });
+
+  describe('Upgradeable', () => {
+    it('should be upgradeable to new logic (without call)', async () => {
+      expect(await getProxyImplementation(cash)).toMatchAddress(cashImpl._address);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+      let cashImpl2 = await deploy('CashToken2', [account3], { from: root });
+      await proxyAdmin.methods.upgrade(cash._address, cashImpl2._address).send({ from: root });
+
+      expect(await getProxyImplementation(cash)).toMatchAddress(cashImpl2._address);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+
+      expect(await cash.methods.admin().call()).toEqual(account3);
+
+      // We'll need this for new function calls
+      cash = await saddle.getContractAt('CashToken2', proxy._address);
+      await cash.methods.count_().send();
+      expect(await cash.methods.counter().call()).toEqualNumber(1);
+    });
+
+    it('should only be upgradeable by the admin', async () => {
+      let cashImpl2 = await deploy('CashToken2', [admin], { from: root });
+      await expect(proxyAdmin.methods.upgrade(cash._address, cashImpl2._address).send({ from: account1 })).rejects.toRevert('revert Ownable: caller is not the owner');
+      expect(await getProxyImplementation(cash)).toMatchAddress(cashImpl._address);
+    });
+
+    it('should allow initialization during upgrade', async () => {
+      let cashImpl2 = await deploy('CashToken2', [admin], { from: root });
+      await proxyAdmin.methods.upgradeAndCall(
+        cash._address,
+        cashImpl2._address,
+        cashImpl2.methods.initialize_(10).encodeABI()
+      ).send({ from: root });
+      expect(await getProxyImplementation(cash)).toMatchAddress(cashImpl2._address);
+      cash = await saddle.getContractAt('CashToken2', proxy._address);
+      expect(await cash.methods.counter().call()).toEqualNumber(10);
+    });
+
+    it('should not allow re-initialization during upgrade', async () => {
+      let cashImpl2 = await deploy('CashToken2', [admin], { from: root });
+      await proxyAdmin.methods.upgradeAndCall(
+        cash._address,
+        cashImpl2._address,
+        cashImpl2.methods.initialize_(10).encodeABI()
+      ).send({ from: root });
+      cash = await saddle.getContractAt('CashToken2', proxy._address);
+      await cash.methods.count_().send();
+      await expect(cash.methods.initialize_(100).call()).rejects.toRevert("revert cannot reinitialize");
+      expect(await cash.methods.counter().call()).toEqualNumber(11);
+    });
+
+    it('should be able to rotate proxy admin', async () => {
+      expect(await proxyAdmin.methods.getProxyAdmin(cash._address).call()).toMatchAddress(proxyAdmin._address);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+      expect(await cash.methods.admin().call()).toMatchAddress(admin);
+      await proxyAdmin.methods.changeProxyAdmin(cash._address, account1).send({ from: root });
+      expect(await getProxyAdmin(cash)).toMatchAddress(account1);
+      expect(await cash.methods.admin().call()).toMatchAddress(admin);
+    });
+
+    it('should not allow rotation unless admin', async () => {
+      expect(await proxyAdmin.methods.getProxyAdmin(cash._address).call()).toMatchAddress(proxyAdmin._address);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+      expect(await cash.methods.admin().call()).toMatchAddress(admin);
+      await expect(proxyAdmin.methods.changeProxyAdmin(cash._address, account1).send({ from: account1 })).rejects.toRevert("revert Ownable: caller is not the owner");
+      expect(await proxyAdmin.methods.getProxyAdmin(cash._address).call()).toMatchAddress(proxyAdmin._address);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+      expect(await cash.methods.admin().call()).toMatchAddress(admin);
+    });
+
+    it('should be able to rotate proxy admin\'s admin', async () => {
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+      await proxyAdmin.methods.transferOwnership(account1).send({ from: root });
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(account1);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+    });
+
+    it('should not be able to rotate proxy admin\'s admin unless from current admin', async () => {
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
+      await expect(proxyAdmin.methods.transferOwnership(account1).send({ from: account1 })).rejects.toRevert("revert Ownable: caller is not the owner");;
+      expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
+      expect(await getProxyAdmin(cash)).toMatchAddress(proxyAdmin._address);
     });
   });
 
@@ -35,37 +169,37 @@ describe('CashToken', () => {
       const nextYieldTimestamp = block.timestamp + 30 * 60;
 
       const yieldAndIndex_before = await call(cash, 'cashYieldAndIndex');
-      const startAt_before = await call(cash, 'cashYieldStartAt');
+      const start_before = await call(cash, 'cashYieldStart');
 
       // Update future yield, first change
       await send(cash, 'setFutureYield', [43628, 1e6, nextYieldTimestamp], { from: admin });
       const yieldAndIndex_change = await call(cash, 'cashYieldAndIndex');
-      const startAt_change = await call(cash, 'cashYieldStartAt');
+      const start_change = await call(cash, 'cashYieldStart');
       const nextYieldAndIndex_change = await call(cash, 'nextCashYieldAndIndex');
-      const nextStartAt_change = await call(cash, 'nextCashYieldStartAt');
+      const nextStart_change = await call(cash, 'nextCashYieldStart');
 
       expect(yieldAndIndex_change.yield).toEqualNumber(yieldAndIndex_before.yield);
       expect(yieldAndIndex_change.index).toEqualNumber(yieldAndIndex_before.index);
-      expect(startAt_change).toEqualNumber(startAt_before);
+      expect(start_change).toEqualNumber(start_before);
       expect(nextYieldAndIndex_change.yield).toEqualNumber(43628);
       expect(nextYieldAndIndex_change.index).toEqualNumber(1e6);
-      expect(nextStartAt_change).toEqualNumber(nextYieldTimestamp);
+      expect(nextStart_change).toEqualNumber(nextYieldTimestamp);
 
       await sendRPC(web3, "evm_increaseTime", [31 * 60]);
 
       // Update future yield, second change, current yield, index and time are set to previous next values
       await send(cash, 'setFutureYield', [43629, 11e5, nextYieldTimestamp + 60 * 60], { from: admin });
       const yieldAndIndex_change2 = await call(cash, 'cashYieldAndIndex');
-      const startAt_change2 = await call(cash, 'cashYieldStartAt');
+      const start_change2 = await call(cash, 'cashYieldStart');
       const nextYieldAndIndex_change2 = await call(cash, 'nextCashYieldAndIndex');
-      const nextStartAt_change2 = await call(cash, 'nextCashYieldStartAt');
+      const nextStart_change2 = await call(cash, 'nextCashYieldStart');
 
       expect(yieldAndIndex_change2.yield).toEqualNumber(nextYieldAndIndex_change.yield);
       expect(yieldAndIndex_change2.index).toEqualNumber(nextYieldAndIndex_change.index);
-      expect(startAt_change2).toEqualNumber(nextStartAt_change);
+      expect(start_change2).toEqualNumber(nextStart_change);
       expect(nextYieldAndIndex_change2.yield).toEqualNumber(43629);
       expect(nextYieldAndIndex_change2.index).toEqualNumber(11e5);
-      expect(nextStartAt_change2).toEqualNumber(nextYieldTimestamp + 60 * 60);
+      expect(nextStart_change2).toEqualNumber(nextYieldTimestamp + 60 * 60);
     });
 
     it('should fail if called not by an admin', async() => {
@@ -285,7 +419,7 @@ describe('CashToken', () => {
       const nextYieldTimestamp = block.timestamp;
 
       // Set non-zero cash yield
-      await send(cash, 'setFutureYield', [300, start_cash_index, nextYieldTimestamp], { from: admin });
+      await send(cash, 'setFutureYield', [300, startCashIndex, nextYieldTimestamp], { from: admin });
 
       // Cash index after 2 minutes
       await sendRPC(web3, "evm_increaseTime", [2 * 60]);
@@ -345,7 +479,7 @@ describe('CashToken', () => {
       const blockNumber = await web3.eth.getBlockNumber();
       const block = await web3.eth.getBlock(blockNumber);
       const nextYieldTimestamp = block.timestamp;
-      await send(cash, 'setFutureYield', [300, start_cash_index, nextYieldTimestamp], { from: admin });
+      await send(cash, 'setFutureYield', [300, startCashIndex, nextYieldTimestamp], { from: admin });
 
       // Mint cash tokens
       expect(await call(cash, 'totalSupply')).toEqualNumber(0);
