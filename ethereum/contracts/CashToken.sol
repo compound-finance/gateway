@@ -31,13 +31,13 @@ contract CashToken is ICash {
     address immutable public admin;
 
     /// @notice The timestamp when current Cash yield and index are activated
-    uint public cashYieldStartAt;
+    uint public cashYieldStart;
 
     /// @notice The Cash yield and index values
     CashYieldAndIndex public cashYieldAndIndex;
 
     /// @notice The timestamp when next Cash yield and index should be activated
-    uint public nextCashYieldStartAt;
+    uint public nextCashYieldStart;
 
     /// @notice The next Cash yield and index values
     CashYieldAndIndex public nextCashYieldAndIndex;
@@ -52,18 +52,26 @@ contract CashToken is ICash {
     mapping (address => uint128) public cashPrincipal;
 
     /**
-     * @notice Initialize Cash token contract
-     * @param starport The address of admin
-     * @param initialYield The initial value for Cash token APY in BPS
-     * @param initialYieldIndex The initial value of Cash index
-     * @param initialYieldStart The timestamp when Cash index and yield were activated on Compounc chain
+     * @notice Construct a Cash Token
+     * @dev You must call `initialize()` after construction
+     * @param admin_ The address of admin
      */
-	constructor(address starport, uint128 initialYield, uint128 initialYieldIndex, uint initialYieldStart) {
-        admin = starport;
-        // Note: we don't check that this is in the past, but calls will revert until it is.
-        cashYieldStartAt = initialYieldStart;
-        cashYieldAndIndex = CashYieldAndIndex({yield: initialYield, index: initialYieldIndex});
+	constructor(address admin_) {
+        admin = admin_;
 	}
+
+    /**
+     * @notice Initialize Cash token contract
+     * @param initialYield The initial value for Cash token APY in BPS (e.g. 100=1%)
+     * @param initialYieldStart The timestamp when Cash index and yield were activated on Compound Chain
+     */
+    function initialize(uint128 initialYield, uint initialYieldStart) external {
+        require(cashYieldAndIndex.index == 0, "Cash Token already initialized");
+
+        // Note: we don't check that this is in the past, but calls will revert until it is.
+        cashYieldStart = initialYieldStart;
+        cashYieldAndIndex = CashYieldAndIndex({yield: initialYield, index: 1e18});
+    }
 
     /**
      * Section: Ethereum Asset Interface
@@ -109,18 +117,18 @@ contract CashToken is ICash {
      * @dev Cash index denomination is 1e18
      * @param nextYield The new value of Cash APY measured in BPS
      * @param nextIndex The new value of Cash index
-     * @param nextYieldStartAt The timestamp when new values for cash and index are activated
+     * @param nextYieldStart The timestamp when new values for cash and index are activated
      */
-    function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStartAt) external override {
+    function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStart) external override {
         require(msg.sender == admin, "Must be admin");
-        uint nextAt = nextCashYieldStartAt;
+        uint nextStart = nextCashYieldStart;
 
         // Updating cash yield and index to the 'old' next values
-        if (nextAt != 0 && block.timestamp > nextAt) {
-            cashYieldStartAt = nextAt;
+        if (nextStart != 0 && block.timestamp > nextStart) {
+            cashYieldStart = nextStart;
             cashYieldAndIndex = nextCashYieldAndIndex;
         }
-        nextCashYieldStartAt = nextYieldStartAt;
+        nextCashYieldStart = nextYieldStart;
         nextCashYieldAndIndex = CashYieldAndIndex({yield: nextYield, index: nextIndex});
     }
 
@@ -131,11 +139,11 @@ contract CashToken is ICash {
      * @return The current cash index, 18 decimals
      */
     function getCashIndex() public view virtual override returns (uint128) {
-        uint nextAt = nextCashYieldStartAt;
-        if (nextAt != 0 && block.timestamp > nextAt) {
-            return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextAt);
+        uint nextStart = nextCashYieldStart;
+        if (nextStart != 0 && block.timestamp > nextStart) {
+            return calculateIndex(nextCashYieldAndIndex.yield, nextCashYieldAndIndex.index, nextStart);
         } else {
-            return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStartAt);
+            return calculateIndex(cashYieldAndIndex.yield, cashYieldAndIndex.index, cashYieldStart);
         }
     }
 
@@ -258,8 +266,9 @@ contract CashToken is ICash {
     //       current_index = base_index * e^(yield * time_ellapsed)
     //       yield is in BPS, so 300 = 3% = 0.03
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
-    function calculateIndex(uint128 yield, uint128 index, uint startAt) public view returns (uint128) {
-        uint newIndex = index * exponent(yield, block.timestamp - startAt) / expBaseUnit;
+    function calculateIndex(uint128 yield, uint128 index, uint start) public view returns (uint128) {
+        require(index > 0, "Cash Token uninitialized");
+        uint newIndex = index * exponent(yield, block.timestamp - start) / expBaseUnit;
         require(newIndex < type(uint128).max, "calculateIndex::overflow");
         return uint128(newIndex);
     }
@@ -269,7 +278,7 @@ contract CashToken is ICash {
     //       1 + x/1! + x^2/2! + x^3/3!
     // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
     // XXX TODO add ranges for which it works
-    function exponent(uint128 yield, uint time) public view returns (uint) {
+    function exponent(uint128 yield, uint time) public pure returns (uint) {
         uint scale = expBaseUnit / bpsBaseUnit;
         uint epower = yield * time * scale / SECONDS_PER_YEAR;
         uint first = epower * expBaseUnit ** 2;

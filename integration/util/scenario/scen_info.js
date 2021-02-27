@@ -28,7 +28,6 @@ const baseScenInfo = {
   declare_opts: {},
   starport: {},
   cash_token: {
-    initial_yield_index: '1000000000000000000',
     liquidity_factor: 1.0,
   },
   initial_yield: 300, // [env=INITIAL_YIELD]

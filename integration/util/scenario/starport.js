@@ -122,7 +122,7 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
   // Deploy Proxies and Starport
-  let proxyAdmin = await ctx.eth.__deploy('ProxyAdmin', [], { from: ctx.eth.root() });
+  let proxyAdmin = ctx.cashToken.proxyAdmin;
   let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
   let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
     starportImpl._address,
