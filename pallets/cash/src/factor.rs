@@ -1,11 +1,11 @@
 use codec::{Decode, Encode};
 use num_bigint::{BigInt as BigI, BigUint as BigU};
 use num_traits::{CheckedDiv, ToPrimitive};
-use our_std::{Deserialize, RuntimeDebug, Serialize};
+use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
 
 use crate::{
     reason::{MathError, Reason},
-    types::{uint_from_string_with_decimals, Decimals, Int, Uint},
+    types::{Decimals, Int, Uint},
 };
 
 /// Type for wrapping intermediate signed calculations.

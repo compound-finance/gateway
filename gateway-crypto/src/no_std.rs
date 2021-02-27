@@ -1,5 +1,5 @@
 use codec::{Decode, Encode};
-use our_std::RuntimeDebug;
+use our_std::{convert::TryInto, RuntimeDebug};
 use tiny_keccak::Hasher;
 
 pub type SignatureBytes = [u8; 65];
@@ -204,6 +204,21 @@ pub fn eth_decode_hex_ascii(message: &[u8]) -> Result<Vec<u8>, CryptoError> {
     } else {
         hex::decode(&message[2..]).map_err(|_| CryptoError::HexDecodeFailed)
     }
+}
+
+pub fn str_to_address(addr: &str) -> Option<[u8; 20]> {
+    if addr.len() == 42 && &addr[0..2] == "0x" {
+        if let Ok(bytes) = hex::decode(&addr[2..42]) {
+            if let Ok(address) = bytes.try_into() {
+                return Some(address);
+            }
+        }
+    }
+    return None;
+}
+
+pub fn address_string(address: &[u8; 20]) -> String {
+    format!("0x{}", hex::encode(address))
 }
 
 #[cfg(test)]

@@ -2169,6 +2169,7 @@ dependencies = [
  "our-std",
  "pallet-cash",
  "pallet-cash-runtime-api",
+ "pallet-oracle",
  "parity-scale-codec",
  "runtime-interfaces",
  "sc-basic-authorship",
@@ -2249,6 +2250,7 @@ dependencies = [
  "pallet-cash",
  "pallet-cash-runtime-api",
  "pallet-grandpa",
+ "pallet-oracle",
  "pallet-randomness-collective-flip",
  "pallet-session",
  "pallet-sudo",
@@ -4416,6 +4418,7 @@ dependencies = [
  "num-bigint 0.3.1",
  "num-traits",
  "our-std",
+ "pallet-oracle",
  "pallet-session",
  "pallet-timestamp",
  "parity-scale-codec",
@@ -4436,6 +4439,7 @@ name = "pallet-cash-runtime-api"
 version = "1.0.0"
 dependencies = [
  "pallet-cash",
+ "pallet-oracle",
  "sp-api",
  "sp-runtime",
 ]
@@ -4459,6 +4463,38 @@ dependencies = [
  "sp-session",
  "sp-staking",
  "sp-std",
+]
+
+[[package]]
+name = "pallet-oracle"
+version = "1.0.0"
+dependencies = [
+ "ethabi 12.0.0",
+ "ethereum-client",
+ "ethereum-types 0.11.0",
+ "frame-support",
+ "frame-system",
+ "gateway-crypto",
+ "hex",
+ "hex-literal",
+ "lazy_static",
+ "libsecp256k1",
+ "num-bigint 0.3.1",
+ "num-traits",
+ "our-std",
+ "pallet-session",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "parking_lot 0.11.1",
+ "runtime-interfaces",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-inherents",
+ "sp-io",
+ "sp-runtime",
+ "tiny-keccak 2.0.2",
+ "trx-request",
 ]
 
 [[package]]

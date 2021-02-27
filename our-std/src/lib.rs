@@ -1,3 +1,4 @@
+#![feature(const_panic)]
 //! Makes available the things we use from Substrate, no matter std or no-std.
 
 // The ones substrate takes care of already.
@@ -35,6 +36,10 @@ pub mod collections {
 pub mod thread {
     pub use sp_std::thread::panicking;
 }
+
+pub mod consts;
+pub mod fixed_width;
+pub mod log;
 
 // The ones it doesn't.
 #[cfg(feature = "std")]

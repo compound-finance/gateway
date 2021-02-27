@@ -94,28 +94,6 @@ pub fn validate_unsigned<T: Config>(
                 .build()),
             }
         }
-        Call::post_price(payload, signature) => {
-            if internal::oracle::check_signature::<T>(&payload, &signature) == Ok(true) {
-                match source {
-                    TransactionSource::Local => {
-                        Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                            .priority(100)
-                            .and_provides(signature)
-                            .build())
-                    }
-                    _ => match internal::oracle::get_and_check_parsed_price::<T>(payload) {
-                        Ok(_) => Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                            .priority(100)
-                            .and_provides(signature)
-                            .propagate(true)
-                            .build()),
-                        Err(reason) => Err(ValidationError::InvalidPrice(reason)),
-                    },
-                }
-            } else {
-                Err(ValidationError::InvalidPriceSignature)
-            }
-        }
         Call::publish_signature(chain_id, notice_id, signature) => {
             let notice = Notices::get(chain_id, notice_id).ok_or(ValidationError::UnknownNotice)?;
             let signer = signature
@@ -150,10 +128,8 @@ mod tests {
         events::{ChainLogEvent, ChainLogId},
         mock::*,
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
-        reason,
-        symbol::Ticker,
-        types::{ReporterSet, ValidatorKeys, ValidatorSig},
-        Call, NoticeStates, PriceReporters, PriceTimes, Validators,
+        types::{ValidatorKeys, ValidatorSig},
+        Call, NoticeStates, Validators,
     };
     use ethereum_client::{events::EthereumEvent::Lock, EthereumLogEvent};
     use frame_support::storage::StorageMap;
@@ -420,81 +396,6 @@ mod tests {
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
                 Ok(exp)
-            );
-        });
-    }
-
-    #[test]
-    fn test_post_price_invalid_signature() {
-        new_test_ext().execute_with(|| {
-            assert_eq!(
-                validate_unsigned(
-                    TransactionSource::InBlock {},
-                    &Call::post_price::<Test>(vec![], vec![]),
-                ),
-                Err(ValidationError::InvalidPriceSignature)
-            );
-        });
-    }
-
-    #[test]
-    fn test_post_price_stale() {
-        new_test_ext().execute_with(|| {
-            PriceReporters::put(ReporterSet(vec![[133, 97, 91, 7, 102, 21, 49, 124, 128, 241, 76, 186, 214, 80, 30, 236, 3, 28, 213, 28]]));
-            let ticker = Ticker::new("BTC");
-            PriceTimes::insert(ticker, 999999999999999);
-            let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
-            let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
-
-            assert_eq!(
-                validate_unsigned(
-                    TransactionSource::External {},
-                    &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
-                ),
-                Err(ValidationError::InvalidPrice(Reason::OracleError(reason::OracleError::StalePrice)))
-            );
-        });
-    }
-
-    #[test]
-    fn test_post_price_valid_remote() {
-        new_test_ext().execute_with(|| {
-            PriceReporters::put(ReporterSet(vec![[133, 97, 91, 7, 102, 21, 49, 124, 128, 241, 76, 186, 214, 80, 30, 236, 3, 28, 213, 28]]));
-
-            let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
-            let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
-
-            assert_eq!(
-                validate_unsigned(
-                    TransactionSource::External {},
-                    &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
-                ),
-                Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(100)
-                    .and_provides(sig.to_vec())
-                    .propagate(true)
-                    .build())
-            );
-        });
-    }
-
-    #[test]
-    fn test_post_price_valid_local() {
-        new_test_ext().execute_with(|| {
-            PriceReporters::put(ReporterSet(vec![[133, 97, 91, 7, 102, 21, 49, 124, 128, 241, 76, 186, 214, 80, 30, 236, 3, 28, 213, 28]]));
-
-            let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
-            let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
-
-            assert_eq!(
-                validate_unsigned(
-                    TransactionSource::Local {},
-                    &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
-                ),
-                Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(100)
-                    .and_provides(sig.to_vec())
-                    .build())
             );
         });
     }

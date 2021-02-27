@@ -19,13 +19,11 @@ use crate::events::{ChainLogEvent, ChainLogId, EventState};
 use crate::notices::{Notice, NoticeId, NoticeState};
 use crate::rates::{InterestRateModel, APR};
 use crate::reason::Reason;
-use crate::symbol::Ticker;
 use crate::types::{
-    AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, Bips, CashIndex, CashPrincipal,
+    AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
     CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, LiquidityFactor, Nonce,
-    ReporterSet, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
+    SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
 };
-use chains::Chain;
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
@@ -35,12 +33,14 @@ use frame_support::{
     Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{collections::btree_set::BTreeSet, str, vec::Vec, Debuggable};
+use our_std::{collections::btree_set::BTreeSet, error, log, str, vec::Vec, Debuggable};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity,
 };
 
+use pallet_oracle;
+use pallet_oracle::ticker::Ticker;
 use pallet_session;
 use pallet_timestamp;
 
@@ -53,7 +53,6 @@ pub mod core;
 pub mod events;
 pub mod factor;
 pub mod internal;
-pub mod log;
 pub mod notices;
 pub mod params;
 pub mod portfolio;
@@ -78,7 +77,10 @@ pub type SubstrateId = AccountId32;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config:
-    frame_system::Config + CreateSignedTransaction<Call<Self>> + pallet_timestamp::Config
+    frame_system::Config
+    + CreateSignedTransaction<Call<Self>>
+    + pallet_timestamp::Config
+    + pallet_oracle::Config
 {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
@@ -183,15 +185,6 @@ decl_storage! {
         /// The last used nonce for each account, initialized at zero.
         Nonces get(fn nonce): map hasher(blake2_128_concat) ChainAccount => Nonce;
 
-        /// Mapping of latest prices for each price ticker.
-        Prices get(fn price): map hasher(blake2_128_concat) Ticker => Option<AssetPrice>;
-
-        /// Mapping of assets to the last time their price was updated.
-        PriceTimes get(fn price_time): map hasher(blake2_128_concat) Ticker => Option<Timestamp>;
-
-        /// Ethereum addresses of open oracle price reporters.
-        PriceReporters get(fn reporters): ReporterSet; // XXX if > 1, how are we combining?
-
         /// The asset metadata for each supported asset, which will also be synced with the starports.
         SupportedAssets get(fn asset): map hasher(blake2_128_concat) ChainAsset => Option<AssetInfo>;
 
@@ -206,11 +199,9 @@ decl_storage! {
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
-        config(reporters): ReporterSet;
         config(validators): Vec<ValidatorKeys>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
-            Module::<T>::initialize_reporters(config.reporters.clone());
             Module::<T>::initialize_validators(config.validators.clone());
         })
     }
@@ -548,13 +539,6 @@ decl_module! {
             Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset, asset_info))?)
         }
 
-        /// Set the price using the open price feed. [User] [Free]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> dispatch::DispatchResult {
-            ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::oracle::post_price::<T>(payload, signature))?)
-        }
-
         // TODO: Do we need to sign the event id, too?
         #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
@@ -585,15 +569,6 @@ decl_module! {
 
             if fail > 0 {
                 log!("offchain_worker error(s) during process notices: {:?}", failures);
-            }
-
-            // XXX
-            // todo: do this less often perhaps once a minute?
-            // a really simple idea to do it once a minute on average is to just use probability
-            // and only update the feed every now and then. It is a function of how many validators
-            // are running.
-            if let Err(e) = internal::oracle::process_prices::<T>(block_number) {
-                log!("offchain_worker error during open price feed processing: {:?}", e);
             }
         }
 
@@ -637,25 +612,11 @@ impl<T: Config> Module<T> {
         }
     }
 
-    /// Set the initial set of open price feed price reporters from the genesis config
-    fn initialize_reporters(reporters: ReporterSet) {
-        assert!(
-            !reporters.is_empty(),
-            "Open price feed price reporters must be set in the genesis config"
-        );
-        PriceReporters::put(reporters);
-    }
-
     // ** API / View Functions ** //
 
     /// Get the liquidity for the given account.
     pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
         Ok(core::get_liquidity::<T>(account)?.value)
-    }
-
-    /// Get the price for the given asset.
-    pub fn get_price(ticker: Ticker) -> Result<AssetPrice, Reason> {
-        Ok(core::get_price_by_ticker::<T>(ticker)?.value)
     }
 
     /// Get the rates for the given asset.

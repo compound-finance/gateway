@@ -9,15 +9,12 @@ use sp_runtime::offchain::{
 };
 
 use crate::{
-    chains::{Chain, Ethereum},
-    log,
-    params::ORACLE_POLL_INTERVAL_BLOCKS,
-    reason::{OracleError, Reason},
-    symbol::Ticker,
+    error::OracleError,
+    ticker::Ticker,
     types::{AssetPrice, Timestamp},
-    Call, Config, PriceReporters, PriceTimes, Prices,
 };
-use our_std::{collections::btree_map::BTreeMap, str::FromStr, vec::Vec, RuntimeDebug};
+use crate::{Config, PriceReporters, PriceTimes, Prices, ORACLE_POLL_INTERVAL_BLOCKS};
+use our_std::{collections::btree_map::BTreeMap, log, str::FromStr, vec::Vec, RuntimeDebug};
 
 /// A single decoded message from the price oracle
 #[derive(PartialEq, Eq, RuntimeDebug)]
@@ -60,7 +57,7 @@ pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
     let mut abi_decoded =
         ethabi::decode(&types, &message).map_err(|_| OracleError::HexParseError)?;
     if !abi_decoded.len() == 4 {
-        return Err(OracleError::EthAbiParseError);
+        Err(OracleError::EthAbiParseError)?;
     }
 
     let mut abi_drain = abi_decoded.drain(..);
@@ -71,7 +68,7 @@ pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
         .to_string()
         .ok_or(OracleError::EthAbiParseError)?;
     if kind != "prices" {
-        return Err(OracleError::InvalidKind);
+        Err(OracleError::InvalidKind)?;
     }
 
     let timestamp = abi_drain
@@ -88,7 +85,7 @@ pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
         .ok_or(OracleError::EthAbiParseError)?;
 
     if key.len() > MAXIMUM_TICKER_LENGTH {
-        return Err(OracleError::InvalidTicker);
+        Err(OracleError::InvalidTicker)?;
     }
 
     // todo: it is critical to be aware of overflow during the call to as_u64 but it is not clear to me how to accomplish that
@@ -158,31 +155,33 @@ fn open_price_feed_request_unchecked(url: &str) -> Result<OpenPriceFeedApiRespon
 impl OpenPriceFeedApiResponse {
     /// This is provided for convenience making the processing of API messages as extrinsics
     /// more straightforward.
-    pub fn to_message_signature_pairs(
-        self,
-    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, String), OracleError> {
-        let mut res = Vec::new();
+    pub fn to_message_signature_pairs(self) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, u64), OracleError> {
+        let mut pairs = Vec::new();
         // didn't use map here so that we can bail out early using `?` operator
         for (msg, sig) in self.messages.iter().zip(self.signatures) {
             let msg = eth_hex_decode_helper(msg.as_bytes())?;
             let sig = eth_hex_decode_helper(sig.as_bytes())?;
-            res.push((msg, sig));
+            pairs.push((msg, sig));
         }
+        let ts = self
+            .timestamp
+            .parse::<u64>()
+            .map_err(|_| OracleError::InvalidTimestamp)?;
 
-        // XXX possibly introduce a struct here
-        Ok((res, self.timestamp))
+        Ok((pairs, ts))
     }
 }
 
 // OCW storage constants
-const OCW_LATEST_TIMESTAMP: &[u8; 33] = b"cash::latest_price_feed_timestamp";
 const OCW_LATEST_BLOCK_NUMBER: &[u8; 41] = b"cash::latest_price_feed_poll_block_number";
 const OCW_STORAGE_LOCK: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 
-pub fn check_signature<T: Config>(payload: &Vec<u8>, signature: &Vec<u8>) -> Result<bool, Reason> {
+pub fn check_signature<T: Config>(
+    payload: &Vec<u8>,
+    signature: &Vec<u8>,
+) -> Result<bool, OracleError> {
     // check signature
-    let parsed_sig: <Ethereum as Chain>::Signature =
-        gateway_crypto::eth_signature_from_bytes(&signature)?;
+    let parsed_sig: [u8; 65] = gateway_crypto::eth_signature_from_bytes(&signature)?;
 
     // note that this is actually a double-hash situation but that is expected behavior
     // the hashed message is hashed again in the eth convention inside eth_recover
@@ -194,7 +193,7 @@ pub fn check_signature<T: Config>(payload: &Vec<u8>, signature: &Vec<u8>) -> Res
 
 pub fn get_and_check_parsed_price<T: Config>(
     payload: &Vec<u8>,
-) -> Result<(Message, Ticker), Reason> {
+) -> Result<(Message, Ticker), OracleError> {
     // parse message and check it
     let parsed = parse_message(payload)?;
     let ticker = Ticker::from_str(&parsed.key)?;
@@ -207,9 +206,9 @@ pub fn get_and_check_parsed_price<T: Config>(
 
     Ok((parsed, ticker))
 }
-pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Reason> {
+pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), OracleError> {
     if !check_signature::<T>(&payload, &signature)? {
-        Err(OracleError::NotAReporter)?;
+        Err(OracleError::InvalidReporter)?;
     }
 
     let (parsed, ticker) = get_and_check_parsed_price::<T>(&payload)?;
@@ -222,7 +221,7 @@ pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(),
 }
 
 /// Procedure for offchain worker to processes messages coming out of the open price feed
-pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Reason> {
+pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), OracleError> {
     let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK);
     if lock.try_lock().is_err() {
         // working in another thread, no big deal
@@ -253,31 +252,15 @@ pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Rea
     let (messages_and_signatures, timestamp) =
         open_price_feed_request(&url)?.to_message_signature_pairs()?;
 
-    // Check to see if Coinbase api prices were updated or not
-    let latest_price_feed_timestamp_storage = StorageValueRef::persistent(OCW_LATEST_TIMESTAMP);
-    if let Some(Some(latest_price_feed_timestamp)) =
-        latest_price_feed_timestamp_storage.get::<String>()
-    {
-        if latest_price_feed_timestamp == timestamp {
-            log!(
-                "Open oracle prices for timestamp {:?} has been already posted",
-                timestamp
-            );
-            return Ok(());
-        }
+    let curr_ts = runtime_interfaces::price_feed_interface::get_price_data_ts();
+    if curr_ts.map(|v| v < timestamp).unwrap_or(true) {
+        runtime_interfaces::price_feed_interface::set_price_data(
+            messages_and_signatures,
+            timestamp,
+        );
     }
 
-    for (msg, sig) in messages_and_signatures {
-        // adding some debug info in here, this will become very chatty
-        let call = <Call<T>>::post_price(msg, sig);
-        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-            .map_err(|_| OracleError::SubmitError)?;
-        // note - there is a log message in check_failure if this extrinsic fails but we should
-        // still try to update the other prices even if one extrinsic fails, thus the result
-        // is ignored and we continue in this loop
-    }
     latest_price_feed_poll_block_number_storage.set(&block_number);
-    latest_price_feed_timestamp_storage.set(&timestamp);
     Ok(())
 }
 

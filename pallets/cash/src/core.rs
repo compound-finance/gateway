@@ -30,18 +30,20 @@ use crate::{
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
-    symbol::{Ticker, Units, CASH, USD},
+    symbol::{Units, CASH, USD},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
-        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, Price, Quantity,
-        Timestamp, USDQuantity, ValidatorIdentity,
+        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, Quantity, Timestamp,
+        USDQuantity, ValidatorIdentity,
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
     CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
     LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice, Miner, Module, NoticeHashes,
-    NoticeHold, NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
+    NoticeHold, NoticeStates, Notices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets,
 };
+use pallet_oracle;
+use pallet_oracle::types::Price;
 
 #[macro_export]
 macro_rules! require {
@@ -91,22 +93,8 @@ pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
 }
 
 /// Return the USD price associated with the given units.
-pub fn get_price_by_ticker<T: Config>(ticker: Ticker) -> Result<Price, Reason> {
-    match ticker {
-        t if t == USD.ticker => Ok(Price::from_nominal(USD.ticker, "1.0")),
-        t if t == CASH.ticker => Ok(Price::from_nominal(CASH.ticker, "1.0")),
-        _ => Ok(Price::new(
-            ticker,
-            // XXX Prices::get(units.ticker).ok_or(Reason::NoPrice)?,
-            // XXX fix me how to handle no prices during initialization?
-            Prices::get(ticker).unwrap_or(0),
-        )),
-    }
-}
-
-/// Return the USD price associated with the given units.
-pub fn get_price<T: Config>(units: Units) -> Result<Price, Reason> {
-    get_price_by_ticker::<T>(units.ticker)
+pub fn get_price<T: pallet_oracle::Config>(units: Units) -> Result<Price, Reason> {
+    pallet_oracle::get_price_by_ticker::<T>(units.ticker).map_err(Reason::OracleError)
 }
 
 /// Return a quantity with units of the given asset.
@@ -1297,6 +1285,15 @@ pub fn on_initialize<T: Config>() -> Result<frame_support::weights::Weight, Reas
     on_initialize_internal::<T>(get_now::<T>(), LastYieldTimestamp::get())
 }
 
+/// Take a ratio of prices.
+// If we generalized prices over the quote type, this would probably be:
+//  Price<A, Q> / P<B, Q> -> Price<A, B>
+// But we don't need generalize prices, just enough Decimals, so we have:
+//  Price<A, { USD }> / Price<B, { USD }> -> Factor(B per A)
+pub fn ratio(num: Price, denom: Price) -> Result<Factor, MathError> {
+    Factor::from_fraction(num.value, denom.value)
+}
+
 /// Block initialization step that can fail.
 pub fn on_initialize_internal<T: Config>(
     now: Timestamp,
@@ -1331,7 +1328,7 @@ pub fn on_initialize_internal<T: Config>(
         let (asset_cost, asset_yield) = crate::core::get_rates::<T>(asset)?;
         let asset_units = asset_info.units();
         let price_asset = get_price::<T>(asset_units)?;
-        let price_ratio = price_asset.ratio(price_cash)?;
+        let price_ratio = ratio(price_asset, price_cash)?;
         let cash_borrow_principal_per_asset =
             cash_index.cash_principal_per_asset(asset_cost.simple(dt)?, price_ratio)?;
         let cash_hold_principal_per_asset =
@@ -1478,7 +1475,7 @@ mod tests {
         let cash_index = CashIndex::from_nominal("1.5"); // current index value 1.5
         let price_asset = Price::from_nominal(CASH.ticker, "1500"); // $1,500
         let price_cash = Price::from_nominal(CASH.ticker, "1");
-        let price_ratio = price_asset.ratio(price_cash)?;
+        let price_ratio = ratio(price_asset, price_cash)?;
 
         let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("150"); // from hand calc
@@ -1496,7 +1493,7 @@ mod tests {
         let cash_index = CashIndex::from_nominal("1.123");
         let price_asset = Price::from_nominal(CASH.ticker, "1450");
         let price_cash = Price::from_nominal(CASH.ticker, "1");
-        let price_ratio = price_asset.ratio(price_cash)?;
+        let price_ratio = ratio(price_asset, price_cash)?;
 
         let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("39.542520035618878005"); // from hand calc
@@ -1515,7 +1512,7 @@ mod tests {
         let cash_index = CashIndex::from_nominal("4.629065392511782467");
         let price_asset = Price::from_nominal(CASH.ticker, "0.313242");
         let price_cash = Price::from_nominal(CASH.ticker, "1");
-        let price_ratio = price_asset.ratio(price_cash)?;
+        let price_ratio = ratio(price_asset, price_cash)?;
 
         let actual = cash_index.cash_principal_per_asset(asset_rate.simple(dt)?, price_ratio)?;
         let expected = CashPrincipalPerAsset::from_nominal("0.000000002008426366"); // from hand calc
@@ -1589,7 +1586,10 @@ mod tests {
 
             assert!(!has_liquidity_to_reduce_cash::<Test>(account, amount)?);
 
-            Prices::insert(BAT.ticker, Price::from_nominal(BAT.ticker, "0.53").value);
+            pallet_oracle::Prices::insert(
+                BAT.ticker,
+                Price::from_nominal(BAT.ticker, "0.53").value,
+            );
             SupportedAssets::insert(&asset, asset_info);
             AssetBalances::insert(&asset, &account, Balance::from_nominal("25000", BAT).value);
             AssetsWithNonZeroBalance::insert(account, asset, ());
@@ -1624,7 +1624,10 @@ mod tests {
             CashYield::put(APR::from_nominal("0.24")); // 24% APR big number for easy to see interest
             TotalCashPrincipal::put(CashPrincipalAmount::from_nominal("450000")); // 450k cash principal
             CashPrincipals::insert(&miner, CashPrincipal::from_nominal("1"));
-            Prices::insert(asset_info.ticker, 1450_000000 as AssetPrice); // $1450 eth
+            pallet_oracle::Prices::insert(
+                asset_info.ticker,
+                1450_000000 as pallet_oracle::types::AssetPrice,
+            ); // $1450 eth
 
             let result = on_initialize_internal::<Test>(now, last_yield_timestamp);
             assert_eq!(result, Ok(0u64));

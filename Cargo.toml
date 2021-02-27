@@ -5,6 +5,7 @@ panic = 'unwind'
 members = [
     'node',
     'pallets/cash',
+    'pallets/oracle',
     'pallets/runtime-interfaces',
     'runtime',
     'our-std',

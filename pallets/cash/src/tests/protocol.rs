@@ -1,4 +1,5 @@
 use super::*;
+use pallet_oracle::{types::Price, Prices};
 
 #[test]
 fn upload_transfer_download() -> Result<(), Reason> {

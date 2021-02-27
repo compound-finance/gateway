@@ -128,7 +128,7 @@ class Chain {
   }
 
   async postPrice(payload, signature, onFinalize = true) {
-    return await sendAndWaitForEvents(this.api().tx.cash.postPrice(payload, signature), this.api(), { onFinalize });
+    return await sendAndWaitForEvents(this.api().tx.oracle.postPrice(payload, signature), this.api(), { onFinalize });
   }
 
   async setCode(code, onFinalize = true) {

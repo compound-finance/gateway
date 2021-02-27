@@ -425,18 +425,14 @@ impl Chain for Ethereum {
     }
 
     fn str_to_address(addr: &str) -> Result<Self::Address, Reason> {
-        if addr.len() == 42 && &addr[0..2] == "0x" {
-            if let Ok(bytes) = hex::decode(&addr[2..42]) {
-                if let Ok(address) = bytes.try_into() {
-                    return Ok(address);
-                }
-            }
+        match gateway_crypto::str_to_address(addr) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadAddress),
         }
-        return Err(Reason::BadAddress);
     }
 
     fn address_string(address: &Self::Address) -> String {
-        format!("0x{}", hex::encode(address))
+        gateway_crypto::address_string(address)
     }
 }
 

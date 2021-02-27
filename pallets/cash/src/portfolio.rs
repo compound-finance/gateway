@@ -80,8 +80,9 @@ impl Portfolio {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::types::Price;
     use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, types::*, *};
+    use pallet_oracle;
+    use pallet_oracle::types::Price;
 
     struct TestAsset {
         asset: u8,
@@ -128,7 +129,7 @@ pub mod tests {
                 SupportedAssets::insert(asset, asset_info);
 
                 let price = Price::from_nominal(ticker, asset_case.price);
-                Prices::insert(ticker, price.value);
+                pallet_oracle::Prices::insert(ticker, price.value);
 
                 let units = Units::from_ticker_str(&asset_case.ticker, asset_case.decimals);
 

@@ -21,7 +21,7 @@ class Price {
 
   async post() {
     this.ctx.log(`Setting price of ${this.key}...`);
-    let call = this.ctx.api().tx.cash.postPrice(this.priceInfo.payload, this.priceInfo.signature);
+    let call = this.ctx.api().tx.oracle.postPrice(this.priceInfo.payload, this.priceInfo.signature);
     let events = await sendAndWaitForEvents(call, this.ctx.api(), { onFinalize: true, rejectOnFailure: false });
   }
 }

@@ -3,6 +3,7 @@
 use crate::rpc;
 use gateway_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
 use pallet_cash;
+use pallet_oracle;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
 use sc_service::{config::Configuration, error::Error as ServiceError, TaskManager};
@@ -24,6 +25,7 @@ native_executor_instance!(
         runtime_interfaces::config_interface::HostFunctions,
         runtime_interfaces::validator_config_interface::HostFunctions,
         runtime_interfaces::keyring_interface::HostFunctions,
+        runtime_interfaces::price_feed_interface::HostFunctions,
     ),
 );
 
@@ -59,6 +61,9 @@ pub fn new_partial(
     inherent_data_providers
         .register_provider(pallet_cash::internal::miner::InherentDataProvider)
         .expect("Failed to register miner data provider");
+    inherent_data_providers
+        .register_provider(pallet_oracle::inherent::InherentDataProvider)
+        .expect("Failed to register oracle data provider");
 
     let (client, backend, keystore_container, task_manager) =
         sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
