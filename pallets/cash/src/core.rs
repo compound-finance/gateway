@@ -146,8 +146,9 @@ pub fn passes_validation_threshold(
     validators: &BTreeSet<ValidatorIdentity>,
 ) -> bool {
     // Intersection is taken for the situation when some of the signers are not currently active validators
-    let valid_signers: Vec<_> = validators.intersection(&signers).cloned().collect();
-    valid_signers.len() > validators.len() * 2 / 3
+    let valid_signers: Vec<_> = validators.intersection(&signers).collect();
+    // Using ceil(2 * validators.len() / 3)
+    valid_signers.len() >= (2 * validators.len() + 3 - 1) / 3
 }
 
 // XXX use Balances instead of raw balances everywhere and put all fns on types?
