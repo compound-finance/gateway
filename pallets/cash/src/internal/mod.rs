@@ -7,5 +7,6 @@ pub mod miner;
 pub mod next_code;
 pub mod notices;
 pub mod oracle;
+pub mod oracle_inherent;
 pub mod set_yield_next;
 pub mod supply_cap;

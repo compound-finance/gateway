@@ -203,6 +203,7 @@ pub enum OracleError {
     NotAReporter,
     StalePrice,
     SubmitError,
+    NoPriceFeedURL,
 }
 
 /// Error from parsing trx requests.

@@ -28,8 +28,11 @@ pub fn new_config(eth_starport_address: Vec<u8>) -> Config {
     };
 }
 
+type PriceFeedData = (Vec<(Vec<u8>, Vec<u8>)>, u64);
+
 lazy_static! {
     static ref CONFIG: Mutex<Config> = Mutex::new(new_config("".into()));
+    static ref PRICE_FEED_DATA: Mutex<Option<PriceFeedData>> = Mutex::new(None);
 }
 
 /// The configuration interface for offchain workers. This is designed to manage configuration
@@ -147,6 +150,26 @@ pub fn set_validator_config_dev_defaults() {
     set_validator_config_dev_default(ETH_RPC_URL_ENV_VAR, ETH_RPC_URL_ENV_VAR_DEV_DEFAULT);
     set_validator_config_dev_default(OPF_URL_ENV_VAR, OPF_URL_ENV_VAR_DEFAULT);
     set_validator_config_dev_default(MINER_ENV_VAR, "");
+}
+
+#[sp_runtime_interface::runtime_interface]
+pub trait PriceFeedInterface {
+    fn get_price_data() -> Option<PriceFeedData> {
+        match PRICE_FEED_DATA.lock() {
+            Ok(inner) => inner.clone(),
+            _ => None,
+        }
+    }
+
+    /// Get the Ethereum node RPC URL
+    fn set_price_data(prices: Vec<(Vec<u8>, Vec<u8>)>, timestamp: u64) {
+        match PRICE_FEED_DATA.lock() {
+            Ok(mut data_ref) => {
+                *data_ref = Some((prices, timestamp));
+            }
+            _ => (),
+        };
+    }
 }
 
 #[cfg(test)]
