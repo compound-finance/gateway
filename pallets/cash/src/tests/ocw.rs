@@ -182,80 +182,6 @@ fn test_offchain_worker_min_in_pending() {
 }
 
 #[test]
-// OCW fetches events from the next block number after the latest `Done` event
-fn test_offchain_worker_max_in_done() {
-    use frame_support::traits::OffchainWorker;
-    std::env::set_var("OPF_URL", TEST_OPF_URL);
-
-    // `fromBlock` is important, core check of this test, equals hex(11938293 + 1)
-    let events_call = testing::PendingRequest{
-        method: "POST".into(),
-        uri: "https://goerli-eth.compound.finance".into(),
-        body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629F6", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
-        response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
-        headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-        sent: true,
-        ..Default::default()
-    };
-    let calls = get_basic_calls(events_call);
-
-    let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
-
-    t.execute_with(|| {
-        initialize_storage();
-
-        // Set block number
-        let block = 1;
-        System::set_block_number(block);
-
-        // Max block number is here, 11938293 == 0xB629F5
-        DoneEvents::insert(ChainLogId::Eth(11938293, 0), SignersSet::new());
-        DoneEvents::insert(ChainLogId::Eth(11928293, 0), SignersSet::new());
-        DoneEvents::insert(ChainLogId::Eth(11928294, 0), SignersSet::new());
-
-        // Execute offchain worker with no cached block number
-        CashModule::offchain_worker(block);
-    });
-}
-
-#[test]
-// OCW fetches events from the next block number after the latest `Failed` event
-fn test_offchain_worker_max_in_failed() {
-    use frame_support::traits::OffchainWorker;
-    std::env::set_var("OPF_URL", TEST_OPF_URL);
-
-    // `fromBlock` is important, core check of this test, equals hex(11938293 + 1)
-    let events_call = testing::PendingRequest{
-        method: "POST".into(),
-        uri: "https://goerli-eth.compound.finance".into(),
-        body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address": "0xbbde1662bC3ED16aA8C618c9833c801F3543B587", "fromBlock": "0xB629F6", "toBlock": "0xB60498"}],"id":1}"#.to_vec(),
-        response: Some(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec().clone()),
-        headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-        sent: true,
-        ..Default::default()
-    };
-    let calls = get_basic_calls(events_call);
-
-    let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
-
-    t.execute_with(|| {
-        initialize_storage();
-
-        // Set block number
-        let block = 1;
-        System::set_block_number(block);
-
-        // Max block number is here, 11938293 == 0xB629F5
-        FailedEvents::insert(ChainLogId::Eth(11928293, 0), Reason::None);
-        FailedEvents::insert(ChainLogId::Eth(11928294, 0), Reason::None);
-        FailedEvents::insert(ChainLogId::Eth(11938293, 0), Reason::None);
-
-        // Execute offchain worker with no cached block number
-        CashModule::offchain_worker(block);
-    });
-}
-
-#[test]
 // OCW fetches events from the next block number after the latest `Done` and `Failed` event
 fn test_offchain_worker_max_in_done_and_failed() {
     use frame_support::traits::OffchainWorker;
@@ -281,6 +207,8 @@ fn test_offchain_worker_max_in_done_and_failed() {
         // Set block number
         let block = 1;
         System::set_block_number(block);
+
+        DoneFailedEventWithMaxBlock::insert(ChainId::Eth, ChainLogId::Eth(11938297, 0));
 
         // Max block number is `Done` queue, 11938293 == 0xB629F5
         DoneEvents::insert(ChainLogId::Eth(11938293, 0), SignersSet::new());

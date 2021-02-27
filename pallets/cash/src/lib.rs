@@ -166,6 +166,9 @@ decl_storage! {
         /// The mapping of `Failed` events witnessed on a given chain, by event id.
         FailedEvents get(fn failed_events): map hasher(blake2_128_concat) ChainLogId => Reason;
 
+        // The `Failed` or `Done` event with max block number
+        DoneFailedEventWithMaxBlock get(fn done_failed_event_max_block): map hasher(blake2_128_concat) ChainId => ChainLogId;
+
         /// Notices contain information which can be synced to Starports
         Notices get(fn notice): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
 
@@ -398,7 +401,7 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            if let Err(e) = internal::events::fetch_process_events::<T>() {
+            if let Err(e) = internal::events::fetch_and_process_events::<T>() {
                 log!("offchain_worker error during fetch events: {:?}", e);
             }
 

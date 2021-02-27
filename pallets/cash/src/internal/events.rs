@@ -1,7 +1,6 @@
 use codec::Encode;
 use frame_support::storage::{IterableStorageMap, StorageMap};
 use frame_system::offchain::SubmitTransaction;
-use our_std::cmp;
 use our_std::collections::btree_set::BTreeSet;
 use sp_runtime::offchain::{
     storage::StorageValueRef,
@@ -9,13 +8,14 @@ use sp_runtime::offchain::{
 };
 
 use crate::{
-    chains::{Chain, Ethereum},
+    chains::{Chain, ChainId, Ethereum},
     core::{apply_chain_event_internal, passes_validation_threshold},
     events::{encode_block_hex, fetch_eth_events, ChainLogEvent, ChainLogId},
     log,
     reason::Reason,
     types::{SignersSet, ValidatorSig},
-    Call, Config, DoneEvents, Event as EventT, FailedEvents, Module, PendingEvents, Validators,
+    Call, Config, DoneEvents, DoneFailedEventWithMaxBlock, Event as EventT, FailedEvents, Module,
+    PendingEvents, Validators,
 };
 
 // OCW storage constants
@@ -23,7 +23,7 @@ const OCW_STORAGE_LOCK_ETHEREUM_EVENTS: &[u8; 34] = b"cash::storage_lock_ethereu
 const OCW_LATEST_CACHED_ETHEREUM_BLOCK: &[u8; 34] = b"cash::latest_cached_ethereum_block";
 
 // XXX disambiguate whats for ethereum vs not
-pub fn fetch_process_events<T: Config>() -> Result<(), Reason> {
+pub fn fetch_and_process_events<T: Config>() -> Result<(), Reason> {
     let s_info = StorageValueRef::persistent(OCW_LATEST_CACHED_ETHEREUM_BLOCK);
 
     let from_block: String = if let Some(Some(cached_block_num)) = s_info.get::<u64>() {
@@ -40,7 +40,6 @@ pub fn fetch_process_events<T: Config>() -> Result<(), Reason> {
         let pending_blocks: Vec<u64> = PendingEvents::iter()
             .filter_map(|(chain_log_id, _signers)| match chain_log_id {
                 ChainLogId::Eth(block_number, _log_index) => Some(block_number),
-                _ => None,
             })
             .collect();
         let earlist_pending_block = pending_blocks.iter().min();
@@ -49,30 +48,15 @@ pub fn fetch_process_events<T: Config>() -> Result<(), Reason> {
             format!("{:#X}", *earlist_pending_block.unwrap())
         } else {
             // Find max block number of `Failed` and `Done` events
-            let failed_blocks: Vec<u64> = FailedEvents::iter()
-                .filter_map(|(chain_log_id, _reason)| match chain_log_id {
-                    ChainLogId::Eth(block_number, _log_index) => Some(block_number),
-                    _ => None,
-                })
-                .collect();
-            let latest_failed = failed_blocks.iter().max();
-
-            let done_blocks: Vec<u64> = DoneEvents::iter()
-                .filter_map(|(chain_log_id, _signers)| match chain_log_id {
-                    ChainLogId::Eth(block_number, _log_index) => Some(block_number),
-                    _ => None,
-                })
-                .collect();
-            let latest_done = done_blocks.iter().max();
-
-            // XXX possibly analyze `signers` field to see which block this exact validator has already signed
-            let max_done_failed = *cmp::max(latest_failed.unwrap_or(&0), latest_done.unwrap_or(&0));
-
-            if max_done_failed == 0 {
-                // Note: No `Done` or `Failed` events were found, start from the beginning of the chain
-                String::from("earliest")
-            } else {
-                format!("{:#X}", max_done_failed + 1)
+            match DoneFailedEventWithMaxBlock::get(ChainId::Eth) {
+                ChainLogId::Eth(block_number, _log_index) => {
+                    if block_number == 0 {
+                        // Note: No `Done` or `Failed` events were found, start from the beginning of the chain
+                        String::from("earliest")
+                    } else {
+                        format!("{:#X}", block_number + 1)
+                    }
+                }
             }
         }
     };
@@ -166,6 +150,12 @@ pub fn receive_event<T: Config>(
     if passes_validation_threshold(&signers, &validators) {
         match apply_chain_event_internal::<T>(event) {
             Ok(()) => {
+                log!(
+                    "process_chain_event_internal({}) success: {:?}",
+                    event_id.show(),
+                    signers.len()
+                );
+                update_max_done_failed_block(event_id);
                 DoneEvents::insert(event_id, signers);
                 <Module<T>>::deposit_event(EventT::ProcessedChainEvent(event_id));
                 Ok(())
@@ -177,6 +167,7 @@ pub fn receive_event<T: Config>(
                     event_id.show(),
                     reason
                 );
+                update_max_done_failed_block(event_id);
                 FailedEvents::insert(event_id, reason);
                 <Module<T>>::deposit_event(EventT::FailedProcessingChainEvent(event_id, reason));
                 Ok(())
@@ -190,5 +181,21 @@ pub fn receive_event<T: Config>(
         );
         PendingEvents::insert(event_id, signers);
         Ok(())
+    }
+}
+
+// Update the max block number of `Done` and `Failed` events per chain
+// Only Ethereum is supported right now
+fn update_max_done_failed_block(event_id: ChainLogId) {
+    match event_id {
+        ChainLogId::Eth(block_number, _log_index) => {
+            match DoneFailedEventWithMaxBlock::get(ChainId::Eth) {
+                ChainLogId::Eth(max_before, _prev_log_index) => {
+                    if block_number > max_before {
+                        DoneFailedEventWithMaxBlock::insert(ChainId::Eth, event_id)
+                    }
+                }
+            }
+        }
     }
 }

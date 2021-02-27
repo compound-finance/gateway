@@ -32,6 +32,12 @@ impl ChainLogId {
     }
 }
 
+impl Default for ChainLogId {
+    fn default() -> Self {
+        ChainLogId::Eth(0, 0)
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventError {
     EthRpcUrlMissing,
