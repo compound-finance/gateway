@@ -54,15 +54,20 @@ class Starport {
     return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.ctx.eth.root() });
   }
 
-  async executeProposal(title, extrinsics, awaitEvent = true) {
+  async executeProposal(title, extrinsics, awaitEvent = true, awaitNotice = false) {
     let encodedCalls = extrinsics.map(encodeCall);
     let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root() });
     let event;
+    let notice;
+    if (awaitNotice) {
+      notice = await this.ctx.chain.waitForNotice();
+    }
     if (awaitEvent) {
       event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
     }
     return {
       event,
+      notice,
       result
     };
   }
@@ -110,6 +115,12 @@ class Starport {
     }
 
     this.starport = this.ctx.eth.__getContractAtAbi(impl._jsonInterface, this.proxy._address);
+  }
+
+  async supplyCap(tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+
+    return this.starport.methods.supplyCaps(token.ethAddress()).call();
   }
 }
 
