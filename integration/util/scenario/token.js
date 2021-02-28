@@ -54,7 +54,7 @@ class Token {
   }
 
   lockEventName() {
-    return 'GoldieLocks';
+    return 'Locked';
   }
 
   async getBalance(actorLookup) {

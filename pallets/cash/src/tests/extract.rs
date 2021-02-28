@@ -130,7 +130,7 @@ fn test_extract_internal_sufficient_value() -> Result<(), Reason> {
         ); // 50e18
         assert_eq!(total_supply_pre - 50000000000000000000, total_supply_post);
         assert_eq!(total_borrows_pre, total_borrows_post);
-        assert_eq!(events_pre.len() + 1, events_post.len());
+        assert_eq!(events_pre.len() + 2, events_post.len());
 
         assert_eq!(notices_pre.len() + 1, notices_post.len());
         assert_eq!(notice_states_pre.len() + 1, notice_states_post.len());

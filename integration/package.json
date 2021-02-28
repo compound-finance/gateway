@@ -1,8 +1,7 @@
 {
-  "name": "integration",
+  "name": "compound-chain-integration-tests",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT",
   "dependencies": {
     "@polkadot/api": "^3.4.1",
     "chalk": "^4.1.0",
