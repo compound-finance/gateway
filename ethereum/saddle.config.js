@@ -19,7 +19,7 @@ module.exports = {
       providers: [
         {env: "PROVIDER"},
         {file: "~/.ethereum/goerli-url"},               // Load from given file with contents as the URL (e.g. https://infura.io/api-key)
-        {http: "https://goerli.infura.io"}
+        {http: "https://goerli-eth.compound.finance"}
       ],
       web3: {
         gas: [
@@ -38,6 +38,31 @@ module.exports = {
       accounts: [
         {env: "ACCOUNT"},
         {file: "~/.ethereum/goerli"}                    // Load from given file with contents as the private key (e.g. 0x...)
+      ]
+    },
+    ropsten: {
+      providers: [
+        {env: "PROVIDER"},
+        {file: "~/.ethereum/ropsten-url"},               // Load from given file with contents as the URL (e.g. https://infura.io/api-key)
+        {http: "https://ropsten-eth.compound.finance"}
+      ],
+      web3: {
+        gas: [
+          {env: "GAS"},
+          {default: "4600000"}
+        ],
+        gas_price: [
+          {env: "GAS_PRICE"},
+          {default: "1"}
+        ],
+        options: {
+          transactionConfirmationBlocks: 1,
+          transactionBlockTimeout: 5
+        }
+      },
+      accounts: [
+        {env: "ACCOUNT"},
+        {file: "~/.ethereum/ropsten"}                    // Load from given file with contents as the private key (e.g. 0x...)
       ]
     }
   },
