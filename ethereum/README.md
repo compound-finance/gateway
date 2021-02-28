@@ -32,15 +32,17 @@ yarn test
 You can deploy the Starport with the following command:
 
 ```
-npx saddle script -n ropsten deploy {0xAuthority0,0xAuthority1,...}
+npx saddle script -n ropsten deploy 0x2079A734292094702f4D7D64A59e980c20652Cae
 ```
+
+where `0x2079A734292094702f4D7D64A59e980c20652Cae` is the admin, e.g. the Compound Timelock.
 
 ## Console
 
 You can connect to a repl for deployed contracts with the following command:
 
 ```sh
-yarn console -n goerli
+yarn console -n ropsten
 
 > await starport.methods.cash().call();
 ```
