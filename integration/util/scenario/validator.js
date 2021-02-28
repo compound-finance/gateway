@@ -84,6 +84,17 @@ class Validator {
       return ['--reserved-nodes', peer];
     }).flat();
 
+    let env = {
+      ...this.spawnOpts,
+      ETH_RPC_URL: this.ctx.eth.web3Url,
+      ETH_KEY: this.ethPrivateKey,
+      ETH_KEY_ID: "my_eth_key_id",
+      MINER: `Eth:${this.ethAccount}`,
+      OPF_URL: this.ctx.__opfUrl()
+    };
+
+    console.log(`Validator Env: ${JSON.stringify(env)}`);
+
     let ps = spawnValidator(this.ctx, [
       '--chain',
       this.chainSpecFile,
@@ -104,16 +115,7 @@ class Validator {
       ...this.bootnodes,
       ...this.extraArgs,
       ...this.validatorArgs
-    ], {
-      env: {
-        ...this.spawnOpts,
-        ETH_RPC_URL: this.ctx.eth.web3Url,
-        ETH_KEY: this.ethPrivateKey,
-        ETH_KEY_ID: "my_eth_key_id",
-        MINER: `Eth:${this.ethAccount}`,
-        OPF_URL: this.ctx.prices.serverUrl() // TODO: Don't always set?
-      }
-    });
+    ], { env });
 
     process.on('exit', () => {
       ps.kill('SIGTERM'); // No matter what, always kill compound-chain node
