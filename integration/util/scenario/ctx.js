@@ -13,7 +13,7 @@ const { buildValidators } = require('./validator');
 const { buildActors } = require('./actor');
 const { buildTrxReq } = require('./trx_req');
 const { buildChain } = require('./chain');
-const { buildPrices } = require('./price');
+const { buildPrices } = require('./prices');
 
 class Ctx {
   constructor(scenInfo) {
@@ -69,6 +69,14 @@ class Ctx {
 
   __provider() {
     return process.env['PROVIDER'] || this.scenInfo['eth_opts']['provider'];
+  }
+
+  __usePriceServer() {
+    return !process.env['OPF_URL'];
+  }
+
+  __opfUrl() {
+    return process.env['OPF_URL'] ? process.env['OPF_URL'] : this.prices.serverUrl();
   }
 
   debug(...msg) {

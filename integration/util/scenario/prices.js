@@ -186,7 +186,9 @@ async function buildPrices(tokensInfoHash, ctx) {
   }, Promise.resolve([]));
 
   let prices = new Prices(priceObjects, timestamp, serverPort, serverHost, reporter, ctx);
-  await prices.start();
+  if (ctx.__usePriceServer()) {
+    await prices.start();
+  }
 
   return prices;
 }
