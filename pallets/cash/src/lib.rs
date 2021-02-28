@@ -275,6 +275,9 @@ decl_event!(
         /// A sequence of governance actions has been executed. [actions]
         ExecutedGovernance(Vec<(Vec<u8>, bool)>),
 
+        /// A new supply cap has been set. [asset, cap]
+        SetSupplyCap(ChainAsset, AssetAmount),
+
         /// Failed to process a given extrinsic. [reason]
         Failure(Reason),
     }
@@ -378,6 +381,13 @@ decl_module! {
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
+        }
+
+        /// Sets the supply cap for a given chain asset [Root]
+        #[weight = 0] // XXX
+        pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            Ok(check_failure::<T>(internal::supply_cap::set_supply_cap::<T>(asset, amount))?)
         }
 
         /// Set the liquidity factor for an asset [Root]
