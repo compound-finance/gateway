@@ -6,7 +6,7 @@ User=compound
 Group=compound
 WorkingDirectory={{ compound_user_home }}
 Environment="ETH_RPC_URL=https://ropsten-eth.compound.finance"
-Environment="ETH_KEY_ID=arn:aws:kms:us-east-2:926310256153:key/8ab1ec35-e0f2-4aff-987a-eba460442b9c"
+Environment="ETH_KEY_ID={{ eth_key_id }}"
 Environment="ETH_KEY={{ eth_private_key | default(omit) }}"
 Environment="AWS_REGION={{ aws_region | default(omit) }}"
 Environment="KEYRING_TYPE={{ keyring_type | default('IN_MEMORY') }}"
