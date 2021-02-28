@@ -7,6 +7,7 @@ Group=compound
 WorkingDirectory={{ compound_user_home }}
 Environment="ETH_RPC_URL=https://ropsten-eth.compound.finance"
 Environment="ETH_KEY_ID={{ eth_key_id }}"
+Environment="OPF_URL=https://prices.compound.finance/coinbase"
 Environment="ETH_KEY={{ eth_private_key | default(omit) }}"
 Environment="AWS_REGION={{ aws_region | default(omit) }}"
 Environment="KEYRING_TYPE={{ keyring_type | default('IN_MEMORY') }}"
