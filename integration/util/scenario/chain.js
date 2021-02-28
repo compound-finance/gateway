@@ -96,7 +96,7 @@ class Chain {
     opts = {
       sleep: 3000,
       retries: 10,
-      signatures: 2, // TODO: How many signatures do we want? We should ask the validator count? Or wait for Done?
+      signatures: await this.ctx.validators.quorum(),
       ...opts
     };
     let chainId = getNoticeChainId(notice);
@@ -119,7 +119,7 @@ class Chain {
         await sleep(opts.sleep);
         return await this.getNoticeSignatures(notice, { ...opts, retries: opts.retries - 1 });
       } else {
-        throw new Error(`Unable to get signed notice in sufficent retries`);
+        throw new Error(`Unable to get signed notice in sufficient retries`);
       }
     } else {
       return pairs;

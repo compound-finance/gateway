@@ -60,7 +60,7 @@ const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const MINER_ENV_VAR: &str = "MINER";
 const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str = "https://goerli-eth.compound.finance";
 const OPF_URL_ENV_VAR: &str = "OPF_URL";
-const OPF_URL_ENV_VAR_DEFAULT: &str = "";
+const OPF_URL_ENV_VAR_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set

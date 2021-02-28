@@ -39,6 +39,7 @@ const baseScenInfo = {
   profile: 'debug', // or debug [env=PROFILE]
   target: null, // compound-chain binary [env=CHAIN_BIN]
   types_file: null, // types.json file [env=TYPES_FILE]
+  opf_url: null, // use given open price feed [env=OPF_URL]
 };
 
 // Helper function to take an info that might be
