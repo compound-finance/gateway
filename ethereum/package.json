@@ -19,6 +19,7 @@
     "ganache-core": "=2.13.2"
   },
   "devDependencies": {
+    "chalk": "^4.1.0",
     "istanbul": "^0.4.5"
   }
 }
