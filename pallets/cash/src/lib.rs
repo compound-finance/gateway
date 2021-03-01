@@ -539,7 +539,8 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         match call {
-            Call::set_miner(_miner) => ValidTransaction::with_tag_prefix("CashPallet")
+            Call::set_miner(_miner) => ValidTransaction::with_tag_prefix("CashPallet::set_miner")
+                .priority(1)
                 .longevity(10)
                 .propagate(true)
                 .build(),
@@ -551,7 +552,8 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     hex::encode(&signature)
                 );
 
-                ValidTransaction::with_tag_prefix("CashPallet")
+                ValidTransaction::with_tag_prefix("CashPallet::receive_event")
+                    .priority(2)
                     .longevity(10)
                     .and_provides((event_id, signature))
                     .propagate(true)
@@ -566,28 +568,38 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
 
                 match (signer_res, nonce) {
                     (Err(_e), _) => InvalidTransaction::Call.into(),
-                    (Ok(sender), 0) => ValidTransaction::with_tag_prefix("CashPallet")
-                        .longevity(10)
-                        .and_provides((sender, 0))
-                        .propagate(true)
-                        .build(),
-                    (Ok(sender), _) => ValidTransaction::with_tag_prefix("CashPallet")
-                        .longevity(10)
-                        .and_provides((sender, nonce))
-                        .propagate(true)
-                        .build(),
+                    (Ok(sender), 0) => {
+                        ValidTransaction::with_tag_prefix("CashPallet::exec_trx_request")
+                            .priority(4)
+                            .longevity(10)
+                            .and_provides((sender, 0))
+                            .propagate(true)
+                            .build()
+                    }
+                    (Ok(sender), _) => {
+                        ValidTransaction::with_tag_prefix("CashPallet::exec_trx_request")
+                            .priority(3)
+                            .longevity(10)
+                            .and_provides((sender, nonce))
+                            .propagate(true)
+                            .build()
+                    }
                 }
             }
-            Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet")
+            Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet::post_price")
+                .priority(5)
                 .longevity(10)
                 .and_provides(sig)
                 .propagate(true)
                 .build(),
-            Call::publish_signature(_, _, sig) => ValidTransaction::with_tag_prefix("CashPallet")
-                .longevity(10)
-                .and_provides(sig)
-                .propagate(true)
-                .build(),
+            Call::publish_signature(_, _, sig) => {
+                ValidTransaction::with_tag_prefix("CashPallet::publish_signature")
+                    .priority(5)
+                    .longevity(10)
+                    .and_provides(sig)
+                    .propagate(true)
+                    .build()
+            }
             _ => InvalidTransaction::Call.into(),
         }
     }
