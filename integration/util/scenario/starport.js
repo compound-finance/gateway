@@ -48,6 +48,8 @@ class Starport {
     }
   }
 
+  // TODO: Add `lockTo`
+
   async setSupplyCap(token, amount) {
     let weiAmount = token.toWeiAmount(amount);
 
