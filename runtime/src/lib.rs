@@ -161,7 +161,7 @@ parameter_types! {
     pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
         ::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
     pub const SS58Prefix: u8 = 42;
-    pub const Period: BlockNumber = 2;// XXX TODO only use a short period during testing
+    pub const Period: BlockNumber = 50;// XXX TODO only use a short period during testing
     pub const Offset: BlockNumber = 0;
 }
 

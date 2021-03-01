@@ -1,0 +1,34 @@
+
+- name: stop compound chain service
+  when: "'full_node' in group_names"
+  become: true
+  systemd:
+    name: compound-chain.service
+    state: stopped
+
+- name: purge chain
+  become: true
+  when: "'full_node' in group_names"
+  shell: |
+    set -o pipefail
+    {{ compound_chain_bin }} purge-chain -y --chain "{{ compound_user_home }}/chainSpec.json" --base-path {{ chain_data_dir }}  --database paritydb-experimental
+  args:
+    executable: /bin/bash
+  changed_when: False
+
+- name: reinstall Compound Chain systemd unit file (full node)
+  template: src=compound-chain-full-node.j2 dest=/etc/systemd/system/compound-chain.service
+  become: true
+  when: "'full_node' in group_names"
+  vars:
+    peers: "{{ groups['authority_node'] }}"
+  tags:
+    compound-service
+
+# - name: start compound chain service
+#   when: "'full_node' in group_names"
+#   become: true
+#   systemd:
+#     name: compound-chain.service
+#     state: started
+#     daemon_reload: yes

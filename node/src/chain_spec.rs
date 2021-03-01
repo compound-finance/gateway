@@ -55,7 +55,7 @@ pub fn authority_keys_from_seed(
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_starport_address" : "0x3cFD5Ac2afce237689b679912Be1Aca41c68D6Ba"
+        "eth_starport_address" : "0x5dCE7D554f5237F67bb2C6708e45291B3c6e0389"
     });
     let as_object = value.as_object();
     let unwrapped = as_object.unwrap();
@@ -135,8 +135,8 @@ fn staging_testnet_genesis() -> GenesisConfig {
         // Initial PoA authorities
         vec![
             authority_keys_from_seed("Alice", "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7"),
-            authority_keys_from_seed("Bob", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
-            authority_keys_from_seed("Charlie", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
+            // authority_keys_from_seed("Bob", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
+            // authority_keys_from_seed("Charlie", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
         ],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
