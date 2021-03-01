@@ -463,7 +463,7 @@ decl_module! {
         }
 
         /// Execute a transaction request on behalf of a user
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)
