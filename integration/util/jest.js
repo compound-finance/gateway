@@ -1,7 +1,14 @@
 const substrate = require('./substrate');
 
+let fail = (msg) => {
+  return {
+    pass: false,
+    message: () => msg
+  };
+};
+
 let chainEventEqual = (event, eventExpectedArgs) => {
-  expect(substrate.getEventData(event)).toEqual(eventExpectedArgs);
+  expect(substrate.getEventData(event)).toMatchObject(eventExpectedArgs);
 
   return {
     pass: true
@@ -43,7 +50,7 @@ expect.extend({
       };
     }
   },
-  toChainEventEqual(received, eventExpectedArgs) {
+  toMatchChainEvent(received, eventExpectedArgs) {
     return chainEventEqual(received, eventExpectedArgs);
   },
   toHaveChainEvent(received, pallet, eventName, eventExpectedArgs) {
@@ -58,11 +65,39 @@ expect.extend({
 
     return chainEventEqual(event, eventExpectedArgs);
   },
-  toHaveEthEvent(received, pallet, eventName, eventExpectedArgs) {
-    // TODO
+  toHaveEthEvent(received, eventName, args) {
+    if (!received.events) {
+      return fail("Tx does not have `events` key");
+    }
+    let event = received.events[eventName];
+    if (!event) {
+      return fail(`Missing event \`${eventName}\` on tx, found: ${JSON.stringify(Object.keys(received.events))}`);
+    }
+    expect(event.returnValues).toMatchObject(args);
     return {
-      pass: false,
-      message: () => "not implemented"
+      pass: true
+    };
+  },
+  toBeWithinRange(received, floor, ceiling) {
+    const pass = received >= floor && received <= ceiling;
+    if (pass) {
+      return {
+        message: () =>
+          `expected ${received} not to be within range ${floor} - ${ceiling}`,
+        pass: true,
+      };
+    } else {
+      return {
+        message: () =>
+          `expected ${received} to be within range ${floor} - ${ceiling}`,
+        pass: false,
+      };
+    }
+  },
+  toEthRevert(actual, msg='revert') {
+    return {
+      pass: !!actual['message'] && actual.message === `VM Exception while processing transaction: ${msg}`,
+      message: () => `expected revert, got: ${actual && actual.message ? actual : JSON.stringify(actual)}`
     }
   }
 });
