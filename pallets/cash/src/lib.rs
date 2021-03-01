@@ -355,7 +355,7 @@ decl_module! {
         /// Sets the miner of the this block via inherent
         #[weight = (
             0,
-            DispatchClass::Mandatory
+            DispatchClass::Operational
         )]
         fn set_miner(origin, miner: ChainAccount) {
             ensure_none(origin)?;
@@ -365,77 +365,77 @@ decl_module! {
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn change_validators(origin, validators: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::change_validators::change_validators::<T>(validators))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn allow_next_code_with_hash(origin, hash: CodeHash) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::next_code::allow_next_code_with_hash::<T>(hash))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [User] [Free]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
         }
 
         /// Sets the supply cap for a given chain asset [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::supply_cap::set_supply_cap::<T>(asset, amount))?)
         }
 
         /// Set the liquidity factor for an asset [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_liquidity_factor::<T>(asset, factor))?)
         }
 
         /// Update the interest rate model for a given asset. [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
         }
 
         /// Set the cash yield rate at some point in the future. [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start))?)
         }
 
         /// Adds the asset to the runtime by defining it as a supported asset. [Root]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn support_asset(origin, asset: ChainAsset, asset_info: AssetInfo) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset, asset_info))?)
         }
 
         /// Set the price using the open price feed. [User] [Free]
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn post_price(origin, payload: Vec<u8>, signature: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::oracle::post_price::<T>(payload, signature))?)
         }
 
         // TODO: Do we need to sign the event id, too?
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
             log!("receive_event(origin,event_id,event,signature): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
         }
 
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::notices::publish_signature(chain_id, notice_id, signature))?)
@@ -463,7 +463,7 @@ decl_module! {
         }
 
         /// Execute a transaction request on behalf of a user
-        #[weight = (1, DispatchClass::Mandatory, Pays::No)] // XXX
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)
