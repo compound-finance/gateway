@@ -95,6 +95,15 @@ function concatArray(a, b) {
 
 let arrayToHex = (x) => Buffer.from(x).toString('hex');
 
+function bytes32(x) {
+  if (!x.startsWith("0x")) {
+    x = Web3Utils.asciiToHex(x);
+  }
+
+  let padding = 66 - x.length;
+  return x.toLowerCase() + [...new Array(padding)].map((i) => "0").join("");
+}
+
 module.exports = {
   arrayToHex,
   concatArray,
@@ -107,4 +116,5 @@ module.exports = {
   lookupBy,
   arrayEquals,
   keccak256: Web3Utils.keccak256,
+  bytes32,
 };

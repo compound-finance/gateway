@@ -159,21 +159,29 @@ class Actor {
 
   async lock(amount, asset, awaitEvent = true) {
     return await this.declare("lock", [amount, asset], async () => {
-      let lockRes = await this.ctx.starport.lock(this, amount, asset);
+      let tx = await this.ctx.starport.lock(this, amount, asset);
+      let event;
       if (awaitEvent) {
-        await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
+        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
       }
-      return lockRes;
+      return {
+        event,
+        tx,
+      };
     });
   }
 
   async lockTo(amount, asset, recipient, awaitEvent = true) {
     return await this.declare("lock", [amount, asset, "to", recipient], async () => {
-      let lockRes = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
+      let tx = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
+      let event;
       if (awaitEvent) {
-        await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
+        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
       }
-      return lockRes;
+      return {
+        event,
+        tx
+      };
     });
   }
 
