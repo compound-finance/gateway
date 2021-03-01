@@ -54,15 +54,20 @@ class Starport {
     return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.ctx.eth.root() });
   }
 
-  async executeProposal(title, extrinsics, awaitEvent = true) {
+  async executeProposal(title, extrinsics, awaitEvent = true, awaitNotice = false) {
     let encodedCalls = extrinsics.map(encodeCall);
     let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root() });
     let event;
+    let notice;
+    if (awaitNotice) {
+      notice = await this.ctx.chain.waitForNotice();
+    }
     if (awaitEvent) {
       event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
     }
     return {
       event,
+      notice,
       result
     };
   }
@@ -111,6 +116,12 @@ class Starport {
 
     this.starport = this.ctx.eth.__getContractAtAbi(impl._jsonInterface, this.proxy._address);
   }
+
+  async supplyCap(tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+
+    return this.starport.methods.supplyCaps(token.ethAddress()).call();
+  }
 }
 
 async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
@@ -122,7 +133,7 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
   // Deploy Proxies and Starport
-  let proxyAdmin = await ctx.eth.__deploy('ProxyAdmin', [], { from: ctx.eth.root() });
+  let proxyAdmin = ctx.cashToken.proxyAdmin;
   let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
   let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
     starportImpl._address,

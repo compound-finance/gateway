@@ -28,6 +28,7 @@ integration/*.xml
 
 # Builds Ethereum contracts
 ethereum/.build/contracts.json
+ethereum/networks/development*
 
 # Coverage files
 *.profdata

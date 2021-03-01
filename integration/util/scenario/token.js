@@ -54,7 +54,7 @@ class Token {
   }
 
   lockEventName() {
-    return 'GoldieLocks';
+    return 'Locked';
   }
 
   async getBalance(actorLookup) {
@@ -120,7 +120,12 @@ class Token {
     if (['USD', 'CASH'].includes(this.priceTicker)) {
       return 1.0;
     } else {
-      return descale(await this.ctx.api().query.cash.prices(await this.getAssetInfo('ticker')), 6);
+      let price = await this.ctx.api().query.cash.prices(await this.getAssetInfo('ticker'));
+      if (price.isSome) {
+        return descale(price.unwrap(), 6);
+      } else {
+        return null;
+      }
     }
   }
 

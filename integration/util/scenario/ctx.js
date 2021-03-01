@@ -13,7 +13,7 @@ const { buildValidators } = require('./validator');
 const { buildActors } = require('./actor');
 const { buildTrxReq } = require('./trx_req');
 const { buildChain } = require('./chain');
-const { buildPrices } = require('./price');
+const { buildPrices } = require('./prices');
 
 class Ctx {
   constructor(scenInfo) {
@@ -71,6 +71,14 @@ class Ctx {
     return process.env['PROVIDER'] || this.scenInfo['eth_opts']['provider'];
   }
 
+  __usePriceServer() {
+    return !process.env['OPF_URL'];
+  }
+
+  __opfUrl() {
+    return process.env['OPF_URL'] ? process.env['OPF_URL'] : this.prices.serverUrl();
+  }
+
   debug(...msg) {
     debug(...msg);
   }
@@ -123,6 +131,10 @@ class Ctx {
       await this.eth.teardown();
     }
 
+    if (this.prices) {
+      await this.prices.teardown();
+    }
+
     await sleep(1000); // Give things a second to close
   }
 }
@@ -153,18 +165,21 @@ async function buildCtx(scenInfo={}) {
 
   // Note: `3` below is the number of transactions we expect to occur between now and when
   //       the Starport token is deployed.
-  //       That's now: deploy Cash Token (1), deploy ProxyAdmin (2), deploy Starport Impl (3).
-  let starportAddress = await ctx.eth.getNextContractAddress(3);
+  //       That's now: deploy Proxy Admin (1), Cash Token Impl (2), Starport Impl (3), Proxy (4)
+  let starportAddress = await ctx.eth.getNextContractAddress(4);
 
   ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
   ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
+  ctx.prices = await buildPrices(scenInfo.tokens, ctx);
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
   ctx.trxReq = await buildTrxReq(ctx);
   ctx.chain = await buildChain(ctx);
-  ctx.prices = await buildPrices(scenInfo.tokens, ctx);
+  ctx.sleep = sleep;
+
+  // TODO: Post prices?
 
   aliasBy(ctx, ctx.actors.all(), 'name');
   aliasBy(ctx, ctx.tokens.all(), 'ticker');

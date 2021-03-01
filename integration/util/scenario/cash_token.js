@@ -2,10 +2,13 @@ const { readContractsFile } = require('../ethereum');
 const { Token } = require('./token');
 
 class CashToken extends Token {
-  constructor(cashToken, liquidityFactor, owner, ctx) {
+  constructor(cashToken, proxyAdmin, cashImpl, proxy, liquidityFactor, owner, ctx) {
     super('cash', 'CASH', 'Cash Token', 6, 'CASH', liquidityFactor, cashToken, owner, ctx);
 
     this.cashToken = cashToken;
+    this.proxyAdmin = proxyAdmin;
+    this.cashImpl = cashImpl;
+    this.proxy = proxy;
   }
 
   toTrxArg() {
@@ -21,7 +24,7 @@ class CashToken extends Token {
   }
 
   lockEventName() {
-    return 'GoldieLocksCash';
+    return 'LockedCash';
   }
 
   async cashIndex() {
@@ -45,11 +48,17 @@ class CashToken extends Token {
 
 async function buildCashToken(cashTokenInfo, ctx, owner) {
   ctx.log("Deploying cash token...");
-  let initial_yield_index = cashTokenInfo.initial_yield_index;
 
-  let cashToken = await ctx.eth.__deploy('CashToken', [owner, ctx.__initialYield(), initial_yield_index, ctx.__initialYieldStart()]);
+  let proxyAdmin = await ctx.eth.__deploy('ProxyAdmin', [], { from: ctx.eth.root() });
+  let cashImpl = await ctx.eth.__deploy('CashToken', [owner]);
+  let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
+    cashImpl._address,
+    proxyAdmin._address,
+    cashImpl.methods.initialize(ctx.__initialYield(), ctx.__initialYieldStart()).encodeABI()
+  ], { from: ctx.eth.root() });
+  let cashToken = await ctx.eth.__getContractAt('CashToken', proxy._address);
 
-  return new CashToken(cashToken, cashTokenInfo.liquidity_factor, owner, ctx);
+  return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, ctx);
 }
 
 module.exports = {

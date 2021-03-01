@@ -12,7 +12,7 @@
   "AssetQuantity": "Quantity",
   "CashQuantity": "Quantity",
   "USDQuantity": "Quantity",
-  "LiquidityFactor": "u128",
+  "LiquidityFactor": "(u128)",
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
@@ -276,6 +276,7 @@
       "InsufficientTotalFunds": "",
       "InvalidAPR": "",
       "InvalidCodeHash": "",
+      "InvalidLiquidation": "",
       "InvalidUTF8": "",
       "KeyNotFound": "",
       "MathError": "(MathError)",
@@ -293,6 +294,7 @@
       "RepayTooMuch": "",
       "SelfTransfer": "",
       "SetYieldNextError": "(SetYieldNextError)",
+      "SerdeError": "",
       "SignatureAccountMismatch": "",
       "SignatureMismatch": "",
       "TimeTravelNotAllowed": "",
@@ -379,11 +381,13 @@
     "_enum": {
       "Lock": {
         "asset": "[u8; 20]",
-        "holder": "[u8; 20]",
+        "sender": "[u8; 20]",
+        "recipient": "[u8; 20]",
         "amount": "u128"
       },
       "LockCash": {
-        "holder": "[u8; 20]",
+        "sender": "[u8; 20]",
+        "recipient": "[u8; 20]",
         "amount": "u128",
         "principal": "u128"
       },

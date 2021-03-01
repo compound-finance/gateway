@@ -2641,6 +2641,14 @@ chalk@^3.0.0:
     ansi-styles "^4.1.0"
     supports-color "^7.1.0"
 
+chalk@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/chalk/-/chalk-4.1.0.tgz#4e14870a618d9e2edd97dd8345fd9d9dc315646a"
+  integrity sha512-qwx12AxXe2Q5xQ43Ac//I6v5aXTipYrSESdOgzrN+9XjgEpyjpKuvSGaN4qE93f7TQTlerQQ8S+EQ0EyDoVL1A==
+  dependencies:
+    ansi-styles "^4.1.0"
+    supports-color "^7.1.0"
+
 check-error@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/check-error/-/check-error-1.0.2.tgz#574d312edd88bb5dd8912e9286dd6c0aed4aac82"
@@ -3642,10 +3650,10 @@ eth-rpc-errors@^3.0.0:
   dependencies:
     fast-safe-stringify "^2.0.6"
 
-eth-saddle@^0.1.22:
-  version "0.1.22"
-  resolved "https://registry.yarnpkg.com/eth-saddle/-/eth-saddle-0.1.22.tgz#35a119b9989574f5d232810dabd9b83269bf0daa"
-  integrity sha512-N8IubyRxJt4b4NUeOUhU7qfNmzQTLU/pQhK4dyLIn/nALf50rI1xf4AWvg4/5v+lFYrVQ1nShSOH5yYC+O5YSQ==
+eth-saddle@^0.1.23:
+  version "0.1.23"
+  resolved "https://registry.yarnpkg.com/eth-saddle/-/eth-saddle-0.1.23.tgz#69c9ffde1211e69892f14bbdfe5e51bfc5952bf7"
+  integrity sha512-kQhidxGEuGr8i2CsqkwCxl5P1lU92Y01sNRN5PBdWS00aS4qjUiF9jRqXzFU4WLxRJm9TuTDCljbNdoHI7guqg==
   dependencies:
     "@0x/subproviders" "=6.0.0"
     "@compound-finance/sol-coverage" "=4.0.10-alpha.7"

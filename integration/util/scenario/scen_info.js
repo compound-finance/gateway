@@ -28,7 +28,6 @@ const baseScenInfo = {
   declare_opts: {},
   starport: {},
   cash_token: {
-    initial_yield_index: '1000000000000000000',
     liquidity_factor: 1.0,
   },
   initial_yield: 300, // [env=INITIAL_YIELD]
@@ -39,6 +38,7 @@ const baseScenInfo = {
   profile: 'debug', // or debug [env=PROFILE]
   target: null, // compound-chain binary [env=CHAIN_BIN]
   types_file: null, // types.json file [env=TYPES_FILE]
+  opf_url: null, // use given open price feed [env=OPF_URL]
 };
 
 // Helper function to take an info that might be

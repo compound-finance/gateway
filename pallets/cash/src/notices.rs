@@ -88,7 +88,7 @@ pub enum SetSupplyCapNotice {
         id: NoticeId,
         parent: <Ethereum as Chain>::Hash,
         asset: <Ethereum as Chain>::Address,
-        amount: <Ethereum as Chain>::Amount,
+        cap: <Ethereum as Chain>::Amount,
     },
 }
 
@@ -240,12 +240,12 @@ impl EncodeNotice for SetSupplyCapNotice {
                 id,
                 parent,
                 asset,
-                amount,
+                cap,
             } => encode_notice_params(
                 id,
                 parent,
                 *SET_SUPPLY_CAP_SIG,
-                &[Token::Address(asset.into()), Token::Uint((*amount).into())],
+                &[Token::Address(asset.into()), Token::Uint((*cap).into())],
             ),
         }
     }
@@ -531,13 +531,13 @@ mod tests {
     #[test]
     fn test_encodes_set_supply_cap_notice() -> Result<(), ethabi::Error> {
         let asset = [2u8; 20];
-        let amount = 50;
+        let cap = 50;
 
         let notice = Notice::SetSupplyCapNotice(SetSupplyCapNotice::Eth {
             id: NoticeId(80, 1),
             parent: [3u8; 32],
             asset,
-            amount,
+            cap,
         });
 
         let expected = [
@@ -552,14 +552,14 @@ mod tests {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
             2, 2, 2, // asset
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 50, // amount
+            0, 0, 50, // cap
         ];
         let encoded = notice.encode_notice();
         assert_eq!(encoded, expected);
 
         // Test against auto-encoding
         let asset_token = Token::Address(asset.into());
-        let amount_token = Token::Uint(amount.into());
+        let supply_cap_token = Token::Uint(cap.into());
 
         let set_supply_cap_fn = Function {
             name: String::from("setSupplyCap"),
@@ -569,7 +569,7 @@ mod tests {
                     kind: ParamType::Address,
                 },
                 Param {
-                    name: String::from("amount"),
+                    name: String::from("supplyCap"),
                     kind: ParamType::Uint(256),
                 },
             ],
@@ -577,7 +577,7 @@ mod tests {
             constant: false,
         };
         assert_eq!(
-            &set_supply_cap_fn.encode_input(&[asset_token, amount_token])?[..],
+            &set_supply_cap_fn.encode_input(&[asset_token, supply_cap_token])?[..],
             &expected[100..]
         );
         Ok(())

@@ -75,21 +75,29 @@ describe('Starport', () => {
   let testChangeAuthoritiesNotice;
 
   beforeEach(async () => {
+    proxyAdmin = await deploy('ProxyAdmin', [], { from: root });
+
     const rootNonce = await web3.eth.getTransactionCount(root);
     const cashAddress = getNextContractAddress(root, rootNonce + 4);
 
-    proxyAdmin = await deploy('ProxyAdmin', [], { from: root });
     starportImpl = await deploy('StarportHarness', [cashAddress, root], { from: root });
     proxy = await deploy('TransparentUpgradeableProxy', [
       starportImpl._address,
       proxyAdmin._address,
       "0x"
     ], { from: root });
+    cashImpl = await deploy('CashToken', [proxy._address], { from: root });
+
     starport = await saddle.getContractAt('StarportHarness', proxy._address);
     await starport.methods.changeAuthorities(authorityAddresses).send({ from: root });
-    // 1e18
-    let start_cash_index = '1000000000000000000';
-    cash = await deploy('CashToken', [starport._address, 0, start_cash_index, fromNow(0)], { from: root });
+
+    let cashProxy = await deploy('TransparentUpgradeableProxy', [
+      cashImpl._address,
+      proxyAdmin._address,
+      cashImpl.methods.initialize(0, fromNow(0)).encodeABI()
+    ], { from: root });
+    cash = await saddle.getContractAt('CashToken', cashProxy._address);
+
     expect(cash._address).toMatchAddress(cashAddress); // Make sure we counted correctly above
 
     // Give some 100e6 CASH to account1
@@ -207,7 +215,7 @@ describe('Starport', () => {
       expect(await proxyAdmin.methods.owner().call()).toMatchAddress(root);
       expect(await getProxyAdmin(starport)).toMatchAddress(proxyAdmin._address);
     });
-  })
+  });
 
   describe('#getQuorum_', () => {
     it('should calculate quorum correctly', async () => {
@@ -1393,7 +1401,7 @@ describe('Starport', () => {
         yield: "0",
         index: "1000000000000000000", // 1e18
       });
-      expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(0);
+      expect(await call(cash, 'nextCashYieldStart')).toEqualNumber(0);
       expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
         yield: "0",
         index: "0",
@@ -1411,7 +1419,7 @@ describe('Starport', () => {
         yield: "0",
         index: "1000000000000000000", // 1e18
       });
-      expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(nextCashYieldStart);
+      expect(await call(cash, 'nextCashYieldStart')).toEqualNumber(nextCashYieldStart);
       expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
         yield: "1200",
         index: "1234",
@@ -1432,7 +1440,7 @@ describe('Starport', () => {
         yield: "0",
         index: "1000000000000000000", //1e18
       });
-      expect(await call(cash, 'nextCashYieldStartAt')).toEqualNumber(nextCashYieldStart);
+      expect(await call(cash, 'nextCashYieldStart')).toEqualNumber(nextCashYieldStart);
       expect(await call(cash, 'nextCashYieldAndIndex')).toMatchObject({
         yield: "1200",
         index: "1234",
