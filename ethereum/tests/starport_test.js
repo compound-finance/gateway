@@ -273,6 +273,42 @@ describe('Starport', () => {
       });
     });
 
+    it('should fail to lock with insufficient allowance', async () => {
+      await send(tokenA, "allocateTo", [account1, e18(10)]);
+      await send(tokenA, "approve", [starport._address, 0], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenA._address, e18(10)], { from: root });
+
+      const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
+      await expect(send(starport, 'lock', [e18(1), tokenA._address], { from: account1 })).rejects.toRevert("revert TransferFrom: Inadequate allowance");
+      const balancePost = bigInt(await call(tokenA, 'balanceOf', [account1]));
+
+      expect(balancePre).toEqualNumber(balancePost);
+    });
+
+    it('should fail to lock with insufficient balance', async () => {
+      await send(tokenA, "allocateTo", [account1, e18(0)]);
+      await send(tokenA, "approve", [starport._address, e18(10)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenA._address, e18(10)], { from: root });
+
+      const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
+      await expect(send(starport, 'lock', [e18(1), tokenA._address], { from: account1 })).rejects.toRevert("revert TransferFrom: Inadequate balance");
+      const balancePost = bigInt(await call(tokenA, 'balanceOf', [account1]));
+
+      expect(balancePre).toEqualNumber(balancePost);
+    });
+
+    it.skip('should fail to lock with zero balance', async () => {
+      await send(tokenA, "allocateTo", [account1, e18(0)]);
+      await send(tokenA, "approve", [starport._address, e18(0)], { from: account1 });
+      await send(starport, "setSupplyCap", [tokenA._address, e18(10)], { from: root });
+
+      const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
+      await expect(send(starport, 'lock', [e18(0), tokenA._address], { from: account1 })).rejects.toRevert("revert TransferFrom: Inadequate balance");
+      const balancePost = bigInt(await call(tokenA, 'balanceOf', [account1]));
+
+      expect(balancePre).toEqualNumber(balancePost);
+    });
+
     it('should fail to lock when supply cap exceeded', async () => {
       await send(tokenA, "allocateTo", [account1, e18(10)]);
       await send(tokenA, "approve", [starport._address, e18(10)], { from: account1 });
@@ -342,6 +378,8 @@ describe('Starport', () => {
       });
     });
 
+    // TODO: Fail to lock a fee token when balance after fee is zero
+
     it('should not calculate supply cap against fee', async () => {
       await send(tokenFee, "transfer", [account1, e18(10)], { from: root });
       await send(tokenFee, "approve", [starport._address, e18(10)], { from: account1 });
@@ -391,6 +429,19 @@ describe('Starport', () => {
       });
     });
 
+    it('should fail to lock cash with insufficient balance', async () => {
+      const lockAmount = e6(1);
+      await send(cash, 'approve', [starport._address, lockAmount], {from: account1});
+      const balancePre = bigInt(await call(cash, 'balanceOf', [account1]));
+      await send(cash, 'transfer', [starport._address, balancePre], {from: account1}); // Empty the account
+      await expect(send(starport, 'lock', [lockAmount, cash._address], { from: account1 })).rejects.toRevert("revert");
+      const balancePost = bigInt(await call(cash, 'balanceOf', [account1]));
+
+      expect(balancePost).toEqualNumber(0);
+    });
+
+    it.todo('should fail to lock zero cash');
+
     it('should not lock eth via lock()', async () => {
       const lockAmount = e18(1);
       const starportEthPre = await web3.eth.getBalance(starport._address);
@@ -419,6 +470,8 @@ describe('Starport', () => {
         amount: lockAmount.toString()
       });
     });
+
+    it.todo('should fail to lock zero eth');
 
     it('should enforce supply cap for Eth', async () => {
       const lockAmount = e18(2);

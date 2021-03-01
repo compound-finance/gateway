@@ -154,6 +154,7 @@ pub fn passes_validation_threshold(
     for v in validators {
         validator_set.insert(*v);
     }
+    // TODO: Fix this math
     signer_set.len() > validator_set.len() * 2 / 3
 }
 
@@ -194,7 +195,7 @@ fn sub_amount_from_balance(
     Ok(balance.checked_sub(signed).ok_or(MathError::Underflow)?)
 }
 
-fn sub_principal_amounts(
+pub fn sub_principal_amounts(
     a: CashPrincipalAmount,
     b: CashPrincipalAmount,
     underflow: Reason,
@@ -234,7 +235,7 @@ fn repay_and_supply_amount(
     )
 }
 
-fn withdraw_and_borrow_amount(
+pub fn withdraw_and_borrow_amount(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> (AssetQuantity, AssetQuantity) {
@@ -250,7 +251,7 @@ fn withdraw_and_borrow_amount(
     )
 }
 
-fn repay_and_supply_principal(
+pub fn repay_and_supply_principal(
     balance: CashPrincipal,
     principal: CashPrincipalAmount,
 ) -> (CashPrincipalAmount, CashPrincipalAmount) {
@@ -290,6 +291,7 @@ fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount,
 
 pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(), Reason> {
     log!("apply_chain_event_internal(event): {:?}", &event);
+
     match event {
         ChainLogEvent::Eth(eth_event) => match eth_event.event {
             ethereum_client::events::EthereumEvent::Lock {
@@ -323,7 +325,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 recipient,
                 principal,
                 ..
-            } => lock_cash_principal_internal::<T>(
+            } => internal::lock::lock_cash_principal_internal::<T>(
                 ChainAccount::Eth(sender),
                 get_chain_account(chain, recipient)?,
                 CashPrincipalAmount(principal),
@@ -488,38 +490,6 @@ pub fn lock_internal<T: Config>(
     set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
 
     <Module<T>>::deposit_event(Event::Locked(asset.asset, sender, holder, amount.value));
-
-    Ok(())
-}
-
-pub fn lock_cash_principal_internal<T: Config>(
-    sender: ChainAccount,
-    holder: ChainAccount,
-    principal: CashPrincipalAmount,
-) -> Result<(), Reason> {
-    let holder_cash_principal = CashPrincipals::get(holder);
-    let (holder_repay_principal, _holder_supply_principal) =
-        repay_and_supply_principal(holder_cash_principal, principal);
-
-    let chain_id = holder.chain_id();
-    let chain_cash_principal_new = sub_principal_amounts(
-        ChainCashPrincipals::get(chain_id),
-        principal,
-        Reason::InsufficientChainCash,
-    )?;
-    let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
-    let total_cash_principal_new = sub_principal_amounts(
-        TotalCashPrincipal::get(),
-        holder_repay_principal,
-        Reason::RepayTooMuch,
-    )?;
-
-    ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
-    CashPrincipals::insert(holder, holder_cash_principal_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
-
-    // XXX read index when moving max back
-    //<Module<T>>::deposit_event(Event::LockedCash(sender, holder, principal, index));
 
     Ok(())
 }

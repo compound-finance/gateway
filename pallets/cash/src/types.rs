@@ -435,6 +435,10 @@ impl CashPrincipal {
             Ok(CashPrincipalAmount(0))
         }
     }
+
+    pub fn negate(self) -> Self {
+        Self(-self.0)
+    }
 }
 
 /// Type for representing an amount of CASH Principal.
@@ -461,6 +465,28 @@ impl CashPrincipalAmount {
         Ok(CashPrincipalAmount(
             self.0.checked_sub(rhs.0).ok_or(MathError::Underflow)?,
         ))
+    }
+}
+
+impl TryInto<CashPrincipal> for CashPrincipalAmount {
+    type Error = Reason;
+
+    fn try_into(self) -> Result<CashPrincipal, Reason> {
+        match i128::try_from(self.0) {
+            Ok(v) => Ok(CashPrincipal(v)),
+            Err(_) => Err(Reason::MathError(MathError::SignMismatch)),
+        }
+    }
+}
+
+impl TryInto<CashPrincipalAmount> for CashPrincipal {
+    type Error = Reason;
+
+    fn try_into(self) -> Result<CashPrincipalAmount, Reason> {
+        match u128::try_from(self.0) {
+            Ok(v) => Ok(CashPrincipalAmount(v)),
+            Err(_) => Err(Reason::MathError(MathError::SignMismatch)),
+        }
     }
 }
 

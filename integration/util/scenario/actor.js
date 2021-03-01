@@ -167,9 +167,12 @@ class Actor {
       let tx = await this.ctx.starport.lock(this, amount, asset);
       let event;
       if (opts.awaitEvent) {
-        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
+        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
       }
-      return { tx, event };
+      return {
+        event,
+        tx,
+      };
     });
   }
 
@@ -182,9 +185,12 @@ class Actor {
       let tx = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
       let event;
       if (opts.awaitEvent) {
-        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
+        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
       }
-      return { tx, event };
+      return {
+        event,
+        tx
+      };
     });
   }
 

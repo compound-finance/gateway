@@ -88,7 +88,7 @@ class Token {
     // Double check the balance is properly set now
     let newBalance = await this.getBalance(actor);
     if (newBalance.toString() !== tokenAmount.toString()) { // Use string comparisons since these numbers are weird
-      throw new Error(`setBalance failed, balance not set for ${actor.name}: newBalance=${newBalance}, weiAmount=${weiAmount}`)
+      console.warn(`setBalance failed, balance not set for ${actor.name}: newBalance=${newBalance}, weiAmount=${weiAmount}`)
     }
   }
 
@@ -254,6 +254,15 @@ function tokenInfoMap(ctx) {
         await contract.methods.configureMinter(owner, dec(1000000, 6)).send({ from: owner });
         await contract.methods.mint(owner, dec(1000000, 6)).send({ from: owner });
       }
+    },
+    fee: {
+      build: 'contracts.json',
+      contract: 'FeeToken',
+      decimals: 6,
+      constructor_args: [1000000e6, "Fee Token", 6, "FEE"],
+      supply_cap: 1000000,
+      liquidity_factor: 0.8,
+      price_ticker: 'USD'
     }
   }
 }

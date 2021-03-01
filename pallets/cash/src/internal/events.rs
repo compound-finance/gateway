@@ -108,6 +108,13 @@ pub fn receive_event<T: Config>(
     event: ChainLogEvent,
     signature: ValidatorSig,
 ) -> Result<(), Reason> {
+    log!(
+        "receive_event({:?}, {:?}, {})",
+        &event_id,
+        &event,
+        hex::encode(signature)
+    );
+
     // XXX sig
     // XXX do we want to store/check hash to allow replaying?
     // TODO: use more generic function?

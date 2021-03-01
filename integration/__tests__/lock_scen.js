@@ -2,12 +2,14 @@ const {
   years,
   buildScenarios
 } = require('../util/scenario');
-const { getNotice } = require('../util/substrate');
+const { getEventData, getNotice } = require('../util/substrate');
+const { bytes32 } = require('../util/util');
 
 let lock_scen_info = {
   tokens: [
     { token: 'usdc', balances: { ashley: 1000 } }
   ],
+  validators: ['alice']
 };
 
 async function getCash({ ashley, usdc, cash, chain, starport }) {
@@ -23,23 +25,20 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Lock Collateral',
     scenario: async ({ ashley, usdc, chain }) => {
-      await ashley.lock(100, usdc, false);
+      await ashley.lock(100, usdc);
       expect(await ashley.tokenBalance(usdc)).toEqual(900);
-      await chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
       expect(await ashley.chainBalance(usdc)).toEqual(100);
     }
   },
   {
     name: 'Lock Eth',
     scenario: async ({ ashley, chain, ether }) => {
-      await ashley.lock(0.01, ether, false);
+      await ashley.lock(0.01, ether);
       expect(await ashley.tokenBalance(ether)).toEqual(99.99);
-      await chain.waitForEthProcessEvent('cash', 'GoldieLocks'); // Replace with real event
       expect(await ashley.chainBalance(ether)).toEqual(0.01);
     }
   },
   {
-    only: true,
     before: getCash,
     name: 'Lock Cash',
     scenario: async ({ ashley, cash, chain }) => {
@@ -49,65 +48,95 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
     }
   },
   {
-    name: 'Lock Too Little Collateral',
+    name: 'No minimum on lock collateral',
     scenario: async ({ ashley, usdc, chain }) => {
-      await ashley.lock(0.1, usdc, { awaitEvent: false });
+      await ashley.lock(0.1, usdc);
       expect(await ashley.tokenBalance(usdc)).toEqual(999.9);
-      let failure = await chain.waitForEthProcessFailure();
-      expect(failure).toHaveReason('MinTxValueNotMet');
-      expect(await ashley.chainBalance(usdc)).toEqual(0);
+      expect(await ashley.chainBalance(usdc)).toEqual(0.1);
     }
   },
   {
-    skip: true,
     name: 'Lock Collateral Events',
     scenario: async ({ ashley, usdc }) => {
-      let tx = await ashley.lock(100, usdc);
+      let {tx, event} = await ashley.lock(100, usdc);
       expect(tx).toHaveEthEvent('Lock', {
         asset: usdc.ethAddress(),
-        holder: ashley.ethAddress(),
-        amount: usdc.toWeiAmount(100)
+        sender: ashley.ethAddress(),
+        chain: 'ETH',
+        recipient: bytes32(ashley.ethAddress()),
+        amount: usdc.toWeiAmount(100).toString()
       });
-      expect(await ashley.tokenBalance(usdc)).toEqual(900);
-      let event = await chain.waitForEvent('cash', 'GoldieLocks');
-      expect(event).toChainEventEqual({
-        'Yabba': 'Dabba'
+      expect(event).toMatchChainEvent({
+        AssetAmount: 100000000,
+        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
+        ChainAsset: { Eth: usdc.ethAddress().toLowerCase() }
       });
-      expect(await ashley.chainBalance(usdc)).toEqual(100);
     }
   },
-  // TODO: Lock Eth Events
   {
-    skip: true,
-    name: 'Lock Collateral - Insufficient Balance',
+    name: 'Lock Eth Events',
+    scenario: async ({ ashley, ether }) => {
+      let {tx, event} = await ashley.lock(0.01, ether);
+      expect(tx).toHaveEthEvent('Lock', {
+        asset: ether.ethAddress(),
+        sender: ashley.ethAddress(),
+        chain: 'ETH',
+        recipient: bytes32(ashley.ethAddress()),
+        amount: ether.toWeiAmount(0.01).toString()
+      });
+      expect(event).toMatchChainEvent({
+        AssetAmount: "0x0000000000000000002386f26fc10000",
+        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
+        ChainAsset: { Eth: ether.ethAddress().toLowerCase() }
+      });
+    }
+  },
+  {
+    before: getCash,
+    name: 'Lock Cash Events',
+    scenario: async ({ ashley, cash, chain }) => {
+      let {tx, event} = await ashley.lock(100, cash);
+      expect(tx).toHaveEthEvent('LockCash', {
+        sender: ashley.ethAddress(),
+        chain: 'ETH',
+        recipient: bytes32(ashley.ethAddress()),
+        amount: cash.toWeiAmount(100).toString()
+      });
+      // Note: we don't differentiate between the two "ChainAccount" arguments here.
+      expect(event).toMatchChainEvent({
+        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
+      });
+      let data = getEventData(event);
+      expect(data.CashPrincipalAmount).toBeCloseTo(99999996);
+      expect(data.CashIndex).toBeWithinRange(1000000000000000000, 1000000100000000000);
+    }
+  },
+  {
+    name: 'Not Lock Collateral with Insufficient Balance',
     scenario: async ({ ashley, usdc }) => {
-      await expect(ashley.lock(2000, usdc)).toEthRevert('insufficient balance');
+      await expect(ashley.lock(2000, usdc)).rejects.toEthRevert('revert');
       expect(await ashley.tokenBalance(usdc)).toEqual(1000);
       expect(await ashley.chainBalance(usdc)).toEqual(0);
     }
   },
   {
-    skip: true,
-    name: 'Lock Collateral - Reverting Token',
-    info: {
-      tokens: [{ token: 'reverter', balances: { ashley: 1000 } }]
-    },
-    scenario: async ({ ashley, reverter }) => {
-      await expect(ashley.supply(1000, reverter)).toEthRevert('token reversion');
-      expect(await ashley.tokenBalance(reverter)).toEqual(1000);
-      expect(await ashley.chainBalance(reverter)).toEqual(0);
+    name: 'Not Lock Cash with Insufficient Balance',
+    scenario: async ({ ashley, cash }) => {
+      await expect(ashley.lock(2000, cash)).rejects.toEthRevert('revert');
+      expect(await ashley.tokenBalance(cash)).toEqual(0);
+      expect(await ashley.chainBalance(cash)).toEqual(0);
     }
   },
   {
-    skip: true,
-    name: 'Supply Collateral - Fee Token',
+    name: 'Supply Fee Token',
     info: {
       tokens: [{ token: 'fee', balances: { ashley: 1000 } }]
     },
     scenario: async ({ ashley, fee }) => {
-      await ashley.supply(100, fee);
-      expect(await ashley.tokenBalance(fee)).toEqual(900);
-      expect(await ashley.chainBalance(fee)).toEqual(80);
+      expect(await ashley.tokenBalance(fee)).toEqual(500);
+      await ashley.lock(200, fee);
+      expect(await ashley.tokenBalance(fee)).toEqual(300);
+      expect(await ashley.chainBalance(fee)).toEqual(100);
     }
   },
   {
@@ -125,5 +154,4 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       expect(await ashley.chainBalance(cash)).toEqual(10);
     }
   }
-  // TODO: Test below minimum threshold
 ]);
