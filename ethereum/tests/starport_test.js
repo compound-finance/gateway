@@ -40,6 +40,15 @@ describe('Starport', () => {
     return web3.utils.keccak256(notice);
   }
 
+  function toBytes32(x) {
+    if (!x.startsWith("0x")) {
+      x = web3.utils.asciiToHex(x);
+    }
+
+    let padding = 66 - x.length;
+    return x.toLowerCase() + [...new Array(padding)].map((i) => "0").join("");
+  }
+
   function buildNotice(call, opts = {}) {
     if (opts.newEra) {
       eraId++;
@@ -259,7 +268,8 @@ describe('Starport', () => {
         asset: tokenA._address,
         amount: lockAmount.toString(),
         sender: account1,
-        recipient: account1
+        chain: 'ETH',
+        recipient: toBytes32(account1)
       });
     });
 
@@ -304,7 +314,8 @@ describe('Starport', () => {
         asset: tokenNS._address,
         amount: lockAmount.toString(),
         sender: account1,
-        recipient: account1,
+        chain: 'ETH',
+        recipient: toBytes32(account1),
       });
     });
 
@@ -326,7 +337,8 @@ describe('Starport', () => {
         asset: tokenFee._address,
         amount: lockReceiptAmount.toString(),
         sender: account1,
-        recipient: account1,
+        chain: 'ETH',
+        recipient: toBytes32(account1),
       });
     });
 
@@ -348,7 +360,8 @@ describe('Starport', () => {
         asset: tokenFee._address,
         amount: lockReceiptAmount.toString(),
         sender: account1,
-        recipient: account1,
+        chain: 'ETH',
+        recipient: toBytes32(account1),
       });
     });
 
@@ -368,11 +381,13 @@ describe('Starport', () => {
       expect(await call(starport, 'cash')).toMatchAddress(cash._address);
 
       const cashIndex = await call(cash, 'getCashIndex');
+
       expect(tx.events.LockCash.returnValues).toMatchObject({
         amount: lockAmount.toString(),
         principal: toPrincipal(lockAmount, cashIndex).toString(),
         sender: account1,
-        recipient: account1,
+        chain: 'ETH',
+        recipient: toBytes32(account1),
       });
     });
 
@@ -399,7 +414,8 @@ describe('Starport', () => {
       expect(tx.events.Lock.returnValues).toMatchObject({
         asset: ETH_ADDRESS,
         sender: account1,
-        recipient: account1,
+        chain: 'ETH',
+        recipient: toBytes32(account1),
         amount: lockAmount.toString()
       });
     });
@@ -434,7 +450,8 @@ describe('Starport', () => {
       expect(events[0].returnValues).toMatchObject({
         asset: ETH_ADDRESS,
         sender: account1,
-        recipient: account1,
+        chain: 'ETH',
+        recipient: toBytes32(account1),
         amount: lockAmount.toString()
       });
     });
@@ -448,7 +465,7 @@ describe('Starport', () => {
 
       const lockAmount = e18(1);
       const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
-      const tx = await send(starport, 'lockTo', [lockAmount, tokenA._address, account2], { from: account1 });
+      const tx = await send(starport, 'lockTo', [lockAmount, tokenA._address, 'ETH', account2], { from: account1 });
       const balancePost = bigInt(await call(tokenA, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(lockAmount);
@@ -458,7 +475,8 @@ describe('Starport', () => {
         asset: tokenA._address,
         amount: lockAmount.toString(),
         sender: account1,
-        recipient: account2,
+        chain: 'ETH',
+        recipient: toBytes32(account2),
       });
     });
 
@@ -469,7 +487,7 @@ describe('Starport', () => {
 
       const lockAmount = e18(2);
       const balancePre = bigInt(await call(tokenA, 'balanceOf', [account1]));
-      await expect(send(starport, 'lockTo', [lockAmount, tokenA._address, account2], { from: account1 })).rejects.toRevert('revert Supply Cap Exceeded');
+      await expect(send(starport, 'lockTo', [lockAmount, tokenA._address, 'ETH', account2], { from: account1 })).rejects.toRevert('revert Supply Cap Exceeded');
       const balancePost = bigInt(await call(tokenA, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(0);
@@ -482,7 +500,7 @@ describe('Starport', () => {
       await send(starport, "setSupplyCap", [tokenA._address, e18(1)], { from: root });
 
       const lockAmount = e18(1);
-      await send(starport, 'lockTo', [lockAmount, tokenA._address, account2], { from: account1 });
+      await send(starport, 'lockTo', [lockAmount, tokenA._address, 'ETH', account2], { from: account1 });
       await expect(send(starport, 'lock', [lockAmount, tokenA._address], { from: account1 })).rejects.toRevert('revert Supply Cap Exceeded');
     });
 
@@ -493,7 +511,7 @@ describe('Starport', () => {
 
       const lockAmount = e18(1);
       const balancePre = bigInt(await call(tokenNS, 'balanceOf', [account1]));
-      const tx = await send(starport, 'lockTo', [lockAmount, tokenNS._address, account2], { from: account1 });
+      const tx = await send(starport, 'lockTo', [lockAmount, tokenNS._address, 'ETH', account2], { from: account1 });
       const balancePost = bigInt(await call(tokenNS, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(lockAmount);
@@ -503,7 +521,8 @@ describe('Starport', () => {
         asset: tokenNS._address,
         amount: lockAmount.toString(),
         sender: account1,
-        recipient: account2
+        chain: 'ETH',
+        recipient: toBytes32(account2)
       });
     });
 
@@ -515,7 +534,7 @@ describe('Starport', () => {
       const lockAmount = e18(1);
       const lockReceiptAmount = e18(1) / 2n;
       const balancePre = bigInt(await call(tokenFee, 'balanceOf', [account1]));
-      const tx = await send(starport, 'lockTo', [lockAmount, tokenFee._address, account2], { from: account1 });
+      const tx = await send(starport, 'lockTo', [lockAmount, tokenFee._address, 'ETH', account2], { from: account1 });
       const balancePost = bigInt(await call(tokenFee, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(lockAmount);
@@ -525,7 +544,8 @@ describe('Starport', () => {
         asset: tokenFee._address,
         amount: lockReceiptAmount.toString(),
         sender: account1,
-        recipient: account2
+        chain: 'ETH',
+        recipient: toBytes32(account2)
       });
     });
 
@@ -537,7 +557,7 @@ describe('Starport', () => {
       const lockAmount = e18(2);
       const lockReceiptAmount = e18(2) / 2n;
       const balancePre = bigInt(await call(tokenFee, 'balanceOf', [account1]));
-      const tx = await send(starport, 'lockTo', [lockAmount, tokenFee._address, account2], { from: account1 });
+      const tx = await send(starport, 'lockTo', [lockAmount, tokenFee._address, 'ETH', account2], { from: account1 });
       const balancePost = bigInt(await call(tokenFee, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(lockAmount);
@@ -547,7 +567,8 @@ describe('Starport', () => {
         asset: tokenFee._address,
         amount: lockReceiptAmount.toString(),
         sender: account1,
-        recipient: account2
+        chain: 'ETH',
+        recipient: toBytes32(account2)
       });
     });
 
@@ -558,7 +579,7 @@ describe('Starport', () => {
       // Approve starport to move tokens first
       await send(cash, 'approve', [starport._address, lockAmount], {from: account1});
 
-      const tx = await send(starport, 'lockTo', [lockAmount, cash._address, account2], { from: account1 });
+      const tx = await send(starport, 'lockTo', [lockAmount, cash._address, 'ETH', account2], { from: account1 });
       const balancePost = bigInt(await call(cash, 'balanceOf', [account1]));
 
       expect(balancePre - balancePost).toEqualNumber(lockAmount);
@@ -571,7 +592,8 @@ describe('Starport', () => {
         amount: lockAmount.toString(),
         principal: toPrincipal(lockAmount, cashIndex).toString(),
         sender: account1,
-        recipient: account2
+        chain: 'ETH',
+        recipient: toBytes32(account2)
       });
     });
 
@@ -581,7 +603,7 @@ describe('Starport', () => {
 
       expect(starportEthPre).toEqualNumber(0);
 
-      await expect(call(starport, 'lockTo', [lockAmount, ETH_ADDRESS, account2], { from: account1 })).rejects.toRevert('revert Please use lockEth');
+      await expect(call(starport, 'lockTo', [lockAmount, ETH_ADDRESS, 'ETH', account2], { from: account1 })).rejects.toRevert('revert Please use lockEth');
     });
 
     it('should lock eth via lockEthTo()', async () => {
@@ -591,14 +613,15 @@ describe('Starport', () => {
 
       expect(starportEthPre).toEqualNumber(0);
 
-      const tx = await send(starport, 'lockEthTo', [account2], { from: account1, value: Number(lockAmount) });
+      const tx = await send(starport, 'lockEthTo', ['ETH', account2], { from: account1, value: Number(lockAmount) });
       const starportEthPost = await web3.eth.getBalance(starport._address);
 
       expect(starportEthPost).toEqualNumber(lockAmount);
       expect(tx.events.Lock.returnValues).toMatchObject({
         asset: ETH_ADDRESS,
         sender: account1,
-        recipient: account2,
+        chain: 'ETH',
+        recipient: toBytes32(account2),
         amount: lockAmount.toString()
       });
     });
@@ -610,7 +633,7 @@ describe('Starport', () => {
 
       expect(starportEthPre).toEqualNumber(0);
 
-      await expect(send(starport, 'lockEthTo', [account2], { from: account1, value: Number(lockAmount) })).rejects.toRevert('revert Supply Cap Exceeded');
+      await expect(send(starport, 'lockEthTo', ['ETH', account2], { from: account1, value: Number(lockAmount) })).rejects.toRevert('revert Supply Cap Exceeded');
       const starportEthPost = await web3.eth.getBalance(starport._address);
 
       expect(starportEthPost).toEqualNumber(0);
