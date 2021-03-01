@@ -17,11 +17,16 @@ ExecStart={{ compound_chain_bin }} \
   --chain "{{ compound_user_home }}/chainSpec.json" \
   --port 30333 \
   --ws-port 9944 \
+  --ws-external \
   --rpc-port 9933 \
   --rpc-methods Unsafe \
+  --rpc-external \
   --no-mdns \
   --node-key-file {{ node_key_priv_file }} \
   {% for bootnode_multi_addr in peers -%}
   --bootnodes {{ bootnode_multi_addr }} \
   {% endfor -%}
-  --validator
+  --validator \
+  --log=debug \
+  --ws-max-connections 1000 \
+  --rpc-cors=all
