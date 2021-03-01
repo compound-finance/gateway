@@ -110,7 +110,7 @@ pub fn initialize_storage() {
             eth_address: <Ethereum as Chain>::str_to_address(
                 "0x8ad1b2918c34ee5d3e881a57c68574ea9dbecb81",
             )
-            .unwrap(),
+            .unwrap(), // pk: 6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d
         },
     ]);
 }
@@ -136,6 +136,8 @@ fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();
         // Dispatch a signed extrinsic.
+        SupportedAssets::insert(&Eth, eth);
+
         let event_id = ChainLogId::Eth(3858223, 0);
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
             block_hash: [3; 32],
@@ -143,30 +145,42 @@ fn process_eth_event_happy_path() {
             transaction_index: 0,
             log_index: 0,
             event: ethereum_client::EthereumEvent::Lock {
-                asset: [1; 20],
+                asset: [
+                    238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
+                    238, 238, 238, 238,
+                ],
                 sender: [3; 20],
                 recipient: [2; 20],
                 amount: 10,
             },
         });
         let payload = event.encode();
-        let signature = <Ethereum as Chain>::sign_message(&payload).unwrap(); // Sign with our "shared" private key for now XXX
+
+        // Sign event by the first validator
+        let signature_validator_1 = <Ethereum as Chain>::sign_message(&payload).unwrap(); // Sign with our "shared" private key for now XXX
+
+        // Switch validator context, sign event by the second validator
+        std::env::set_var(
+            "ETH_KEY",
+            "6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d",
+        );
+
+        let signature_validator_2 = <Ethereum as Chain>::sign_message(&payload).unwrap(); // Sign with our "shared" private key for now XXX
 
         assert_ok!(CashModule::receive_event(
             Origin::none(),
-            event_id,
-            event,
-            signature
+            event_id.clone(),
+            event.clone(),
+            signature_validator_1
         ));
 
+        // Event is in `Pending` queue now, waiting fro more validators' votes
         assert_eq!(
             CashModule::pending_events(event_id),
-            BTreeSet::from_iter(vec![hex::decode(
-                "6a72a2f14577d9cd0167801efdd54a07b40d2b61"
-            )
-            .unwrap()
-            .try_into()
-            .unwrap()])
+            BTreeSet::from_iter(vec![[
+                106, 114, 162, 241, 69, 119, 217, 205, 1, 103, 128, 30, 253, 213, 74, 7, 180, 13,
+                43, 97
+            ]])
         );
 
         assert_eq!(
@@ -175,6 +189,43 @@ fn process_eth_event_happy_path() {
         );
 
         assert_eq!(CashModule::failed_events(event_id), Reason::None);
+
+        assert_eq!(
+            CashModule::done_failed_event_max_block(ChainId::Eth),
+            ChainLogId::Eth(0, 0)
+        );
+
+        assert_ok!(CashModule::receive_event(
+            Origin::none(),
+            event_id.clone(),
+            event.clone(),
+            signature_validator_2
+        ));
+
+        // Event is in `Done` queue now, received enough validators' votes
+        assert_eq!(
+            CashModule::done_events(event_id),
+            BTreeSet::from_iter(vec![
+                [
+                    106, 114, 162, 241, 69, 119, 217, 205, 1, 103, 128, 30, 253, 213, 74, 7, 180,
+                    13, 43, 97
+                ],
+                [
+                    138, 209, 178, 145, 140, 52, 238, 93, 62, 136, 26, 87, 198, 133, 116, 234, 157,
+                    190, 203, 129
+                ]
+            ])
+        );
+        assert_eq!(
+            CashModule::pending_events(event_id),
+            BTreeSet::from_iter(vec![])
+        );
+        assert_eq!(CashModule::failed_events(event_id), Reason::None);
+
+        assert_eq!(
+            CashModule::done_failed_event_max_block(ChainId::Eth),
+            event_id
+        );
     });
 }
 
