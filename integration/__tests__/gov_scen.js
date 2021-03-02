@@ -11,8 +11,9 @@ let gov_scen_info = {
 
 buildScenarios('Gov Scenarios', gov_scen_info, [
   {
+    only: true,
     name: "Update Interest Rate Model by Governance",
-    scenario: async ({ ctx, zrx, chain, starport }) => {
+    scenario: async ({ ctx, zrx, chain, starport, sleep }) => {
       let newKink = {
         Kink: {
           zero_rate: 100,
@@ -22,8 +23,13 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
         }
       };
       let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
-      await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
-      expect(await chain.interestRateModel(zrx)).toEqual(newKink);
+      starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
+      // expect(await chain.interestRateModel(zrx)).toEqual(newKink);
+
+      while (true) {
+        await chain.displayBlock();
+        await sleep(1000);
+      }
     }
   },
   {
