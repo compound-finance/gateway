@@ -66,6 +66,17 @@ module.exports = {
       ]
     }
   },
+  read_network_file: (network) => {
+    const fs = require('fs');
+    const path = require('path');
+    const util = require('util');
+    const env = require('process').env;
+
+    const networkFile = env['NETWORK_FILE'] || path.join(process.cwd(), 'networks', `${network}.json`);
+    return util.promisify(fs.readFile)(networkFile).then((json) => {
+      return JSON.parse(json)['Contracts'] || {};
+    });
+  },
   scripts: {
     "deploy": "deploy.js"
   }                                                     // Aliases for scripts

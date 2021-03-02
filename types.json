@@ -42,6 +42,13 @@
   "AccountId32": "[u8;32]",
   "AccountId": "AccountId32",
   "SubstrateId": "AccountId32",
+  "GovernanceResult": {
+    "_enum": {
+      "FailedToDecodeCall": "",
+      "DispatchSuccess": "",
+      "DispatchFailure": "(DispatchError)"
+    }
+  },
 
   "Source1": "SymbolRS",
   "Symbol": "[u8; 12]",
@@ -377,34 +384,39 @@
     "log_index": "u64",
     "event": "EthereumEvent"
   },
+  "LockEvent": {
+    "asset": "[u8; 20]",
+    "sender": "[u8; 20]",
+    "recipient": "[u8; 20]",
+    "amount": "u128"
+  },
+  "LockCashEvent": {
+    "sender": "[u8; 20]",
+    "recipient": "[u8; 20]",
+    "amount": "u128",
+    "principal": "u128"
+  },
+  "ExecTrxRequest": {
+    "account": "[u8; 20]",
+    "trx_request": "String"
+  },
+  "ExecuteProposalEvent": {
+    "title": "String",
+    "extrinsics": "Vec<Vec<u8>>"
+  },
+  "NoticeInvokedEvent": {
+    "era_id": "u32",
+    "era_index": "u32",
+    "notice_hash": "[u8; 32]",
+    "result": "Vec<u8>"
+  },
   "EthereumEvent": {
     "_enum": {
-      "Lock": {
-        "asset": "[u8; 20]",
-        "sender": "[u8; 20]",
-        "recipient": "[u8; 20]",
-        "amount": "u128"
-      },
-      "LockCash": {
-        "sender": "[u8; 20]",
-        "recipient": "[u8; 20]",
-        "amount": "u128",
-        "principal": "u128"
-      },
-      "ExecTrxRequest": {
-        "account": "[u8; 20]",
-        "trx_request": "String"
-      },
-      "ExecuteProposal": {
-        "title": "String",
-        "extrinsics": "Vec<Vec<u8>>"
-      },
-      "NoticeInvoked": {
-        "era_id": "u32",
-        "era_index": "u32",
-        "notice_hash": "[u8; 32]",
-        "result": "Vec<u8>"
-      }
+      "Lock": "LockEvent",
+      "LockCash": "LockCashEvent",
+      "ExecTrxRequest": "ExecTrxRequestEvent",
+      "ExecuteProposal": "ExecuteProposalEvent",
+      "NoticeInvoked": "NoticeInvokedEvent"
     }
   },
 

@@ -12,7 +12,7 @@
     "compile": "npx saddle compile",
     "test": "npx saddle compile && npx saddle test",
     "coverage": "npx saddle compile --trace && npx saddle coverage && npx istanbul report --root=./coverage lcov json",
-    "console": "npx -n --experimental-repl-await saddle console"
+    "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
   "resolutions": {
     "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",

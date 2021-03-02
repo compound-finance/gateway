@@ -22,8 +22,8 @@ use crate::reason::Reason;
 use crate::symbol::Ticker;
 use crate::types::{
     AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetPrice, Bips, CashIndex, CashPrincipal,
-    CashPrincipalAmount, CodeHash, EncodedNotice, LiquidityFactor, Nonce, ReporterSet,
-    SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
+    CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, LiquidityFactor, Nonce,
+    ReporterSet, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
 };
 use codec::alloc::string::String;
 use frame_support::{
@@ -275,7 +275,7 @@ decl_event!(
         SignedNotice(ChainId, NoticeId, EncodedNotice, ChainSignatureList),
 
         /// A sequence of governance actions has been executed. [actions]
-        ExecutedGovernance(Vec<(Vec<u8>, bool)>),
+        ExecutedGovernance(Vec<(Vec<u8>, GovernanceResult)>),
 
         /// A new supply cap has been set. [asset, cap]
         SetSupplyCap(ChainAsset, AssetAmount),

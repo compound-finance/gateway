@@ -33,8 +33,8 @@ use crate::{
     symbol::{Ticker, Units, CASH, USD},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
-        CashPrincipal, CashPrincipalAmount, CashQuantity, Price, Quantity, Timestamp, USDQuantity,
-        ValidatorIdentity,
+        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, Price, Quantity,
+        Timestamp, USDQuantity, ValidatorIdentity,
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
     CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
@@ -378,7 +378,7 @@ fn set_asset_balance_internal<T: Config>(
 pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Result<(), Reason> {
     // Decode a SCALE-encoded set of extrinsics from the event
     // For each extrinsic, dispatch the given extrinsic as Root
-    let results: Vec<_> = extrinsics
+    let results: Vec<(Vec<u8>, GovernanceResult)> = extrinsics
         .into_iter()
         .map(|payload| {
             log!(
@@ -390,15 +390,23 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
                 Ok(call) => {
                     log!("dispatch_extrinsics_internal:: dispatching {:?}", call);
                     let res = call.dispatch_bypass_filter(frame_system::RawOrigin::Root.into());
+
+                    let gov_res = match res {
+                        Ok(_) => GovernanceResult::DispatchSuccess,
+                        Err(error_with_post_info) => {
+                            GovernanceResult::DispatchFailure(error_with_post_info.error)
+                        }
+                    };
+
                     log!("dispatch_extrinsics_internal:: res {:?}", res);
-                    (payload, res.is_ok())
+                    (payload, gov_res)
                 }
                 _ => {
                     log!(
                         "dispatch_extrinsics_internal:: failed to decode extrinsic {}",
                         hex::encode(&payload)
                     );
-                    (payload, false)
+                    (payload, GovernanceResult::FailedToDecodeCall)
                 }
             }
         })

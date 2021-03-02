@@ -4,6 +4,8 @@ use our_std::{
     Deserialize, RuntimeDebug, Serialize,
 };
 
+use frame_support::sp_runtime::DispatchError;
+
 use crate::{
     chains::{Chain, ChainAsset, Ethereum},
     factor::{BigInt, BigUint, Factor},
@@ -68,6 +70,14 @@ pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
 
 /// Type for an open price feed reporter.
 pub type Reporter = <Ethereum as Chain>::Address;
+
+/// Governance Result type
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum GovernanceResult {
+    FailedToDecodeCall,
+    DispatchSuccess,
+    DispatchFailure(DispatchError),
+}
 
 /// Type for a set of open price feed reporters.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, Default, RuntimeDebug)]
