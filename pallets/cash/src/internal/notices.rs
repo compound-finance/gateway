@@ -6,7 +6,7 @@ use crate::{
     log,
     notices::{has_signer, EncodeNotice, NoticeId, NoticeState},
     reason::Reason,
-    require, Call, Config, NoticeHashes, NoticeStates, Notices,
+    require, Call, Config, NoticeHashes, NoticeHold, NoticeStates, Notices,
 };
 
 pub fn handle_notice_invoked<T: Config>(
@@ -27,30 +27,37 @@ pub fn handle_notice_invoked<T: Config>(
 pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> Result<(), Reason> {
     // TODO: Do we want to return a failure here in any case, or collect them, etc?
     for (chain_id, notice_id, notice_state) in NoticeStates::iter() {
-        match notice_state {
-            NoticeState::Pending { signature_pairs } => {
-                let signer = chain_id.signer_address()?;
-                if !has_signer(&signature_pairs, signer) {
-                    // find parent
-                    // id = notice.gen_id(parent)
+        let mut notice_hold = false;
+        if let Some(hold) = NoticeHold::get(chain_id) {
+            notice_hold = hold.era_id() > notice_id.era_id();
+        }
+        if !notice_hold {
+            match notice_state {
+                NoticeState::Pending { signature_pairs } => {
+                    let signer = chain_id.signer_address()?;
+                    if !has_signer(&signature_pairs, signer) {
+                        // find parent
+                        // id = notice.gen_id(parent)
 
-                    // XXX
-                    // submit onchain call for aggregating the price
-                    let notice = Notices::get(chain_id, notice_id)
-                        .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
-                    let signature: ChainSignature = notice.sign_notice()?;
-                    log!("Posting Signature for [{},{}]", notice_id.0, notice_id.1);
-                    let call = <Call<T>>::publish_signature(chain_id, notice_id, signature);
+                        // XXX
+                        // submit onchain call for aggregating the price
+                        let notice = Notices::get(chain_id, notice_id)
+                            .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
+                        let signature: ChainSignature = notice.sign_notice()?;
+                        log!("Posting Signature for [{},{}]", notice_id.0, notice_id.1);
+                        let call = <Call<T>>::publish_signature(chain_id, notice_id, signature);
 
-                    // TODO: Do we want to short-circuit on an error here?
-                    let _res =
-                        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-                            .map_err(|()| Reason::FailedToSubmitExtrinsic);
+                        // TODO: Do we want to short-circuit on an error here?
+                        let _res = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(
+                            call.into(),
+                        )
+                        .map_err(|()| Reason::FailedToSubmitExtrinsic);
+                    }
+
+                    ()
                 }
-
-                ()
+                _ => (),
             }
-            _ => (),
         }
     }
     Ok(())

@@ -22,6 +22,7 @@ pub enum Reason {
     BadTicker,
     BadUnits,
     ChainMismatch,
+    ChangeValidatorsError,
     CryptoError(CryptoError),
     EventAlreadySigned,
     FailedToSubmitExtrinsic,
@@ -57,6 +58,7 @@ pub enum Reason {
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
+    PendingEraNotice,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -112,6 +114,8 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::TimeTravelNotAllowed => (24, 0, "time travel not allowed"),
             Reason::TrxRequestParseError(_) => (25, 0, "trx request parse error"),
             Reason::UnknownValidator => (26, 0, "unknown validator"),
+            Reason::ChangeValidatorsError => (27, 0, "change validators error"),
+            Reason::PendingEraNotice => (28, 0, "era-changing notice already pending"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

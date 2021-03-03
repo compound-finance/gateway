@@ -295,6 +295,7 @@
       "SelfTransfer": "",
       "SetYieldNextError": "(SetYieldNextError)",
       "SerdeError": "",
+      "ChangeValidatorsError": "",
       "SignatureAccountMismatch": "",
       "SignatureMismatch": "",
       "TimeTravelNotAllowed": "",

@@ -286,8 +286,8 @@ impl pallet_session::Config for Runtime {
     type Event = Event;
     type ValidatorId = <Self as frame_system::Config>::AccountId;
     type ValidatorIdOf = IdConverter<Self>;
-    type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
-    type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
+    type ShouldEndSession = Cash;
+    type NextSessionRotation = Cash;
     type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
     type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: aura and grandpa
     type Keys = opaque::SessionKeys;

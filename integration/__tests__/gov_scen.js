@@ -116,7 +116,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
   {
     name: "Add new auth with session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
-      // spins up new validator charlie and adds to auth set 
+      // spins up new validator charlie and adds to auth set
       const keyring = ctx.actors.keyring;
       const peer_id = "12D3KooW9qtwBHeQryg9mXBVMkz4YivUsj62g1tYBACUukKToKof";
       const node_key = "0x0000000000000000000000000000000000000000000000000000000000000002";
