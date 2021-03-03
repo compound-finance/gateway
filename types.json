@@ -205,9 +205,9 @@
   },
   "NoticeState": {
     "_enum": {
-      "Missing": [],
+      "Missing": "",
       "Pending": "NoticeStatePending",
-      "Executed": []
+      "Executed": ""
     }
   },
   "NoticeStatePending": {
