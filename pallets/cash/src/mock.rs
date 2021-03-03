@@ -10,10 +10,11 @@ use sp_core::{
 };
 use sp_runtime::{
     generic,
-    testing::{Header, TestXt},
+    impl_opaque_keys,
+    testing::{Header, TestXt, UintAuthorityId},
     traits::{
         BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
-        Verify,
+        Verify, ConvertInto,
     },
     MultiAddress, MultiSignature as Signature,
 };
@@ -36,6 +37,43 @@ pub type SignedExtra = (
 );
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
+
+// XXX just to compile, these should maybe use the real impls
+pub struct TestShouldEndSession;
+impl pallet_session::ShouldEndSession<u64> for TestShouldEndSession {
+	fn should_end_session(now: u64) -> bool {
+            true
+	}
+}
+
+pub struct TestSessionHandler;
+impl pallet_session::SessionHandler<u64> for TestSessionHandler {
+	const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
+	fn on_genesis_session<T: pallet_session::OpaqueKeys>(_validators: &[(u64, T)]) {}
+	fn on_new_session<T: pallet_session::OpaqueKeys>(
+		changed: bool,
+		validators: &[(u64, T)],
+		_queued_validators: &[(u64, T)],
+	) {}
+	fn on_disabled(_validator_index: usize) {}
+	fn on_before_session_ending() {}
+}
+
+pub struct TestSessionManager;
+impl pallet_session::SessionManager<u64> for TestSessionManager {
+	fn end_session(_: SessionIndex) {}
+	fn start_session(_: SessionIndex) {}
+	fn new_session(_: SessionIndex) -> Option<Vec<u64>> {
+            None
+	}
+}
+
+impl_opaque_keys! {
+    pub struct MockSessionKeys {
+	pub dummy: UintAuthorityId,
+    }
+}
+
 
 frame_support::construct_runtime!(
     pub enum Test where
@@ -80,6 +118,19 @@ impl frame_system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
+impl pallet_session::Config for Test {
+    type Event = ();
+    type ValidatorId = u64;
+    type ValidatorIdOf = ConvertInto;
+    type ShouldEndSession = TestShouldEndSession;
+    type NextSessionRotation = ();
+    type SessionManager = TestSessionManager;
+    type SessionHandler = TestSessionHandler;
+    type Keys = MockSessionKeys;
+    type DisabledValidatorsThreshold = sp_runtime::Perbill::from_percent(33);
+    type WeightInfo = ();
+}
+
 impl pallet_timestamp::Config for Test {
     /// A timestamp: milliseconds since the unix epoch.
     type Moment = types::Timestamp;
@@ -98,6 +149,7 @@ impl Config for Test {
     type Call = Call;
     type TimeConverter = crate::converters::TimeConverter<Self>;
     type AccountStore = System;
+    type SessionInterface = Self;
 }
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test

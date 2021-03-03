@@ -94,7 +94,7 @@ pub trait Config:
 
     /// Placate substrate's `HandleLifetime` trait.
     type AccountStore: StoredMap<SubstrateId, ()>;
-    type SessionInterface: self::SessionInterface<AccountId32>;
+    type SessionInterface: self::SessionInterface<SubstrateId>;
 }
 
 decl_storage! {
@@ -308,11 +308,11 @@ pub trait SessionInterface<AccountId>: frame_system::Config {
     fn is_valid_keys(x: AccountId) -> bool;
 }
 
-impl<T: Config> SessionInterface<AccountId32> for T
+impl<T: Config> SessionInterface<SubstrateId> for T
 where
-    T: pallet_session::Config<ValidatorId = AccountId32>,
+    T: pallet_session::Config<ValidatorId = SubstrateId>,
 {
-    fn is_valid_keys(x: AccountId32) -> bool {
+    fn is_valid_keys(x: SubstrateId) -> bool {
         match <pallet_session::Module<T>>::next_keys(x as T::ValidatorId) {
             Some(_keys) => true,
             None => false,
