@@ -1,4 +1,4 @@
-const { sendAndWaitForEvents, waitForEvent, getEventData } = require('../substrate');
+const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
 const {
   getNoticeChainId,
@@ -37,25 +37,25 @@ class Chain {
   }
 
   async waitForEvent(pallet, eventName, onFinalize = true, failureEvent = null) {
-    return await waitForEvent(this.api(), pallet, eventName, onFinalize, failureEvent);
+    return await waitForEvent(this.api(), pallet, eventName, { failureEvent });
   }
 
   // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingEthEvent` event
   async waitForEthProcessEvent(pallet, eventName, onFinalize = true) {
-    return this.waitForEvent(pallet, eventName, onFinalize, ['cash', 'FailedProcessingEthEvent']);
+    return this.waitForEvent(pallet, eventName, { failureEvent: ['cash', 'FailedProcessingEthEvent'] });
   }
 
   async waitForEthProcessFailure(onFinalize = true) {
-    return this.waitForEvent('cash', 'FailedProcessingEthEvent', onFinalize);
+    return this.waitForEvent('cash', 'FailedProcessingEthEvent');
   }
 
   async waitForChainProcessed(onFinalize = true, failureEvent = null) {
     // TODO: Match transaction id?
-    return await waitForEvent(this.api(), 'cash', 'ProcessedChainEvent', onFinalize, failureEvent);
+    return await waitForEvent(this.api(), 'cash', 'ProcessedChainEvent', { failureEvent });
   }
 
   async waitForNotice(onFinalize = true, failureEvent = null) {
-    return getEventData(await waitForEvent(this.api(), 'cash', 'Notice', onFinalize, failureEvent));
+    return getEventData(await waitForEvent(this.api(), 'cash', 'Notice', { failureEvent }));
   }
 
   async getNoticeChain(notice) {
@@ -127,7 +127,14 @@ class Chain {
   }
 
   async postPrice(payload, signature, onFinalize = true) {
-    return await sendAndWaitForEvents(this.api().tx.cash.postPrice(payload, signature), this.api(), onFinalize);
+    return await sendAndWaitForEvents(this.api().tx.cash.postPrice(payload, signature), this.api(), { onFinalize });
+  }
+
+  async setCode(code, onFinalize = true) {
+    let api = this.api();
+    const sudoKey = await api.query.sudo.key();
+    const sudoPair = this.ctx.actors.first().chainKey;
+    return await sendAndWaitForEvents(api.tx.sudo.sudoUncheckedWeight(api.tx.system.setCode(code), 0), api, { onFinalize, signer: sudoPair });
   }
 
   async cashIndex() {
@@ -160,6 +167,36 @@ class Chain {
     return asset.unwrap().rate_model.toJSON();
   }
 
+  async nextCodeHash() {
+    return mapToJson(await this.ctx.api().query.cash.allowedNextCodeHash());
+  }
+
+  async setNextCode(code, onFinalize = true) {
+    let events = await sendAndWaitForEvents(this.api().tx.cash.setNextCodeViaHash(code), this.api(), { onFinalize });
+    return getEventData(findEvent(events, 'cash', 'AttemptedSetCodeByHash'));
+  }
+
+  async version() {
+    return (await this.api().consts.system.version).toJSON();
+  }
+
+  async lastRuntimeUpgrade() {
+    return mapToJson(await this.api().query.system.lastRuntimeUpgrade());
+  }
+
+  async getRuntimeVersion() {
+    return (await this.api().rpc.state.getRuntimeVersion()).toJSON();
+  }
+
+  async getSemVer() {
+    let {
+      authoringVersion,
+      specVersion,
+      implVersion
+    } = await this.getRuntimeVersion();
+
+    return [authoringVersion, specVersion, implVersion];
+  }
 
   async pendingCashValidators() {
     let vals = await this.ctx.api().query.cash.nextValidators.entries();

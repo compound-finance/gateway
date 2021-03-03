@@ -1,7 +1,7 @@
 const {
   buildScenarios
 } = require('../util/scenario');
-const { decodeCall } = require('../util/substrate');
+const { decodeCall, getEventData } = require('../util/substrate');
 
 let gov_scen_info = {
   tokens: [
@@ -11,7 +11,6 @@ let gov_scen_info = {
 
 buildScenarios('Gov Scenarios', gov_scen_info, [
   {
-    only: true,
     name: "Update Interest Rate Model by Governance",
     scenario: async ({ ctx, zrx, chain, starport, sleep }) => {
       let newKink = {
@@ -25,6 +24,57 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
       await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
       expect(await chain.interestRateModel(zrx)).toEqual(newKink);
+    }
+  },
+  {
+    name: "Upgrade Chain WASM [Set Code]",
+    info: {
+      versions: ['v1.1.1'],
+      genesis_version: 'v1.1.1',
+      validators: {
+        alice: {
+          version: 'v1.1.1',
+        }
+      }
+    },
+    scenario: async ({ ctx, zrx, chain, starport, curr, sleep }) => {
+      expect(await chain.getSemVer()).toEqual([1, 1, 1]);
+
+      let event = await chain.setCode(await curr.wasm());
+
+      expect(await chain.getSemVer()).toEqual([1, 2, 2]);
+    }
+  },
+  {
+    skip: true,
+    name: "Upgrade Chain WASM [Allow Next Code]",
+    info: {
+      versions: ['v1.2.1'],
+      genesis_version: 'v1.2.1',
+      validators: {
+        alice: {
+          version: 'v1.2.1',
+        }
+      },
+    },
+    scenario: async ({ ctx, zrx, chain, starport, curr, sleep }) => {
+      expect(await chain.getSemVer()).toEqual([1, 2, 1]);
+      let currHash = await curr.hash();
+      let extrinsic = ctx.api().tx.cash.allowNextCodeWithHash(currHash);
+
+      await starport.executeProposal("Upgrade from v1.2.1 to Current [Allow Next Code]", [extrinsic]);
+
+      expect(await chain.nextCodeHash()).toEqual(currHash);
+
+      let event = await chain.setNextCode(await curr.wasm());
+      expect(event).toEqual({
+        CodeHash: currHash,
+        DispatchResult: {
+          Ok: []
+        }
+      });
+
+      expect(await chain.getSemVer()).not.toEqual([1, 2, 1]);
     }
   },
   {

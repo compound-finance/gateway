@@ -52,7 +52,7 @@ let validatorInfoMap = {
 };
 
 class Validator {
-  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, chainSpecFile) {
+  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, chainSpecFile) {
     this.ctx = ctx;
     this.name = name;
     this.info = info;
@@ -67,6 +67,7 @@ class Validator {
     this.validatorArgs = validatorArgs;
     this.ethPrivateKey = ethPrivateKey;
     this.ethAccount = ethAccount;
+    this.version = version;
     this.chainSpecFile = chainSpecFile;
     this.wsProvider = null;
     this.api = null;
@@ -93,6 +94,16 @@ class Validator {
       OPF_URL: this.ctx.__opfUrl()
     };
 
+    let versioning = [];
+    if (this.version) {
+      versioning = [
+        "--wasm-runtime-overrides",
+        this.version.releasePath(),
+        "--execution",
+        "Wasm",
+      ];
+    }
+
     console.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let ps = spawnValidator(this.ctx, [
@@ -112,6 +123,7 @@ class Validator {
       this.nodeKey,
       '-lruntime=debug',
       '--reserved-only',
+      ...versioning,
       ...this.bootnodes,
       ...this.extraArgs,
       ...this.validatorArgs
@@ -254,9 +266,10 @@ function buildValidator(validatorName, validatorInfo, ctx) {
     throw new Error(`Must initialize chain spec before starting validator`);
   }
 
+  let version = validatorInfo.version ? ctx.versions.mustFind(validatorInfo.version) : null;
   let chainSpecFile = ctx.chainSpec.file();
 
-  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, chainSpecFile);
+  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, chainSpecFile);
 }
 
 async function getValidatorsInfo(validatorsInfoHash, ctx) {

@@ -68,7 +68,7 @@ class Actor {
     let [sig, currentNonce] = await this.signWithNonce(trxReq);
     let call = this.ctx.api().tx.cash.execTrxRequest(trxReq, sig, currentNonce);
 
-    return await sendAndWaitForEvents(call, this.ctx.api(), false);
+    return await sendAndWaitForEvents(call, this.ctx.api(), { onFinalize: false });
   }
 
   async ethBalance() {
@@ -239,6 +239,10 @@ class Actors {
 
   all() {
     return this.actors;
+  }
+
+  first() {
+    return this.actors[0];
   }
 
   get(lookup) {

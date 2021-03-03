@@ -14,6 +14,7 @@ const { buildActors } = require('./actor');
 const { buildTrxReq } = require('./trx_req');
 const { buildChain } = require('./chain');
 const { buildPrices } = require('./prices');
+const { buildVersions } = require('./versions');
 
 class Ctx {
   constructor(scenInfo) {
@@ -23,6 +24,10 @@ class Ctx {
 
   __startTime() {
     return this.startTime;
+  }
+
+  __repoUrl() {
+    return process.env['REPO_URL'] || this.scenInfo['repo_url'];
   }
 
   __initialYield() {
@@ -60,11 +65,19 @@ class Ctx {
   }
 
   __target() {
-    return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'compound-chain')
+    return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'compound-chain');
+  }
+
+  __wasmFile() {
+    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'compound-chain-runtime', 'compound_chain_runtime.compact.wasm');
+  }
+
+  __genesisVersion() {
+    return process.env['GENESIS_VERSION'] || this.scenInfo['genesis_version'];
   }
 
   __typesFile() {
-    return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json')
+    return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json');
   }
 
   __provider() {
@@ -172,6 +185,7 @@ async function buildCtx(scenInfo={}) {
   ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
+  ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
   ctx.prices = await buildPrices(scenInfo.tokens, ctx);
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
@@ -184,6 +198,7 @@ async function buildCtx(scenInfo={}) {
   aliasBy(ctx, ctx.actors.all(), 'name');
   aliasBy(ctx, ctx.tokens.all(), 'ticker');
   aliasBy(ctx, ctx.validators.all(), 'name');
+  aliasBy(ctx, ctx.versions.all(), 'symbolized');
 
   return ctx;
 }
