@@ -208,7 +208,7 @@
     "_enum": {
       "Missing": [],
       "Pending": "NoticeStatePending",
-      "Done": []
+      "Executed": []
     }
   },
   "NoticeStatePending": {
@@ -234,13 +234,7 @@
 
   "Source5": "RatesRS",
   "RatesError": {
-    "_enum": [
-      "ModelRateOutOfBounds",
-      "ZeroAboveKink",
-      "KinkAboveFull",
-      "KinkUtilizationTooHigh",
-      "Overflowed"
-    ]
+    "_enum": ["ModelRateOutOfBounds", "ZeroAboveKink", "KinkAboveFull", "KinkUtilizationTooHigh", "Overflowed"]
   },
   "Factor": "(Uint)",
   "MinerShares": "Factor",
@@ -310,14 +304,7 @@
     }
   },
   "MathError": {
-    "_enum": [
-      "Overflow",
-      "Underflow",
-      "SignMismatch",
-      "SymbolMismatch",
-      "PriceNotUSD",
-      "DivisionByZero"
-    ]
+    "_enum": ["Overflow", "Underflow", "SignMismatch", "SymbolMismatch", "PriceNotUSD", "DivisionByZero"]
   },
   "OracleError": {
     "_enum": [
