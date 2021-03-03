@@ -15,7 +15,6 @@ contract Starport {
     address immutable public admin;
     address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     bytes4 constant MAGIC_HEADER = "ETH:";
-    string constant ETH_CHAIN = "ETH";
     address[] public authorities;
     mapping(address => uint) public supplyCaps;
 
@@ -25,8 +24,8 @@ contract Starport {
     event NoticeInvoked(uint32 indexed eraId, uint32 indexed eraIndex, bytes32 indexed noticeHash, bytes result);
     event NoticeReplay(bytes32 indexed noticeHash);
 
-    event Lock(address indexed asset, address indexed sender, string chain, bytes32 indexed recipient, uint amount);
-    event LockCash(address indexed sender, string chain, bytes32 indexed recipient, uint amount, uint128 principal);
+    event Lock(address indexed asset, address indexed sender, address indexed recipient, uint amount);
+    event LockCash(address indexed sender, address indexed recipient, uint amount, uint128 principal);
     event ExecTrxRequest(address indexed account, string trxRequest);
     event Unlock(address indexed account, uint amount, address asset);
     event UnlockCash(address indexed account, uint amount, uint128 principal);
@@ -51,7 +50,7 @@ contract Starport {
      * @param asset The asset to lock in the Starport
      */
     function lock(uint amount, address asset) external {
-        lockTo(amount, asset, ETH_CHAIN, toBytes32(msg.sender));
+        lockTo(amount, asset, msg.sender);
     }
 
     /**
@@ -59,16 +58,15 @@ contract Starport {
      * @dev Use `lockEth` to lock Ether. Note: locking CASH will burn the CASH from Ethereum.
      * @param amount The amount (in the asset's native wei) to lock
      * @param asset The asset to lock in the Starport
-     * @param chain The chain of the recipient, e.g. "ETH" for Ethereum
      * @param recipient The recipient of the asset in Compound Chain
      */
-    function lockTo(uint amount, address asset, string memory chain, bytes32 recipient) public {
+    function lockTo(uint amount, address asset, address recipient) public {
         require(asset != ETH_ADDRESS, "Please use lockEth");
 
         if (asset == address(cash)) {
-            lockCashInternal(amount, chain, recipient);
+            lockCashInternal(amount, recipient);
         } else {
-            lockAssetInternal(amount, asset, chain, recipient);
+            lockAssetInternal(amount, asset, recipient);
         }
     }
 
@@ -77,18 +75,17 @@ contract Starport {
      * @dev Use `lock` to lock CASH or collateral assets.
      */
     function lockEth() public payable {
-        lockEthTo(ETH_CHAIN, toBytes32(msg.sender));
+        lockEthTo(msg.sender);
     }
 
     /*
      * @notice Transfer Eth to Compound Chain via locking it in the Starport
-     * @param chain The chain of the recipient, e.g. "ETH" for Ethereum
      * @param recipient The recipient of the Eth on Compound Chain
      * @dev Use `lock` to lock CASH or collateral assets.
      */
-    function lockEthTo(string memory chain, bytes32 recipient) public payable {
+    function lockEthTo(address recipient) public payable {
         require(address(this).balance <= supplyCaps[ETH_ADDRESS], "Supply Cap Exceeded");
-        emit Lock(ETH_ADDRESS, msg.sender, chain, recipient, msg.value);
+        emit Lock(ETH_ADDRESS, msg.sender, recipient, msg.value);
     }
 
     /*
@@ -104,25 +101,17 @@ contract Starport {
      * @notice Internal function for locking CASH (as opposed to collateral assets)
      * @dev Locking CASH will burn the CASH (as it's being transfer to Compound Chain)
      * @param amount The amount of CASH to lock and burn.
-     * @param chain The chain of the recipient, e.g. "ETH" for Ethereum
-     * @param recipient The recipient of the asset in Compound Chain
      */
-    function lockCashInternal(uint amount, string memory chain, bytes32 recipient) internal {
+    function lockCashInternal(uint amount, address recipient) internal {
         uint128 principal = cash.burn(msg.sender, amount);
-        emit LockCash(msg.sender, chain, recipient, amount, principal);
+        emit LockCash(msg.sender, recipient, amount, principal);
     }
 
-    /**
-     * @notice Internal function for locking non-ETH collateral assets
-     * @param amount The amount of the asset to lock.
-     * @param asset The asset to lock.
-     * @param chain The chain of the recipient, e.g. "ETH" for Ethereum
-     * @param recipient The recipient of the asset in Compound Chain
-     */
-    function lockAssetInternal(uint amount, address asset, string memory chain, bytes32 recipient) internal {
+    // Internal function for locking non-ETH collateral assets
+    function lockAssetInternal(uint amount, address asset, address recipient) internal {
         uint amountTransferred = transferAssetIn(msg.sender, amount, asset);
         require(IERC20(asset).balanceOf(address(this)) <= supplyCaps[asset], "Supply Cap Exceeded");
-        emit Lock(asset, msg.sender, chain, recipient, amountTransferred);
+        emit Lock(asset, msg.sender, recipient, amountTransferred);
     }
 
     // Transfer in an asset, returning the balance actually accrued (i.e. less token fees)
@@ -477,9 +466,5 @@ contract Starport {
             _returnData := add(_returnData, 0x04)
         }
         return abi.decode(_returnData, (string)); // All that remains is the revert string
-    }
-
-    function toBytes32(address addr) public pure returns (bytes32) {
-        return bytes32(bytes20(addr));
     }
 }
