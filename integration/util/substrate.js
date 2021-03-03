@@ -28,7 +28,13 @@ function subscribeEvents(api) {
   });
 }
 
-function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = null, trackLastEvent = true) {
+function waitForEvent(api, pallet, method, opts = {}) {
+  opts = {
+    failureEvent: null,
+    trackLastEvent: true,
+    ...opts
+  };
+
   if (!subscribed) {
     subscribeEvents(api);
     subscribed = true;
@@ -44,17 +50,17 @@ function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = nul
     if (!resolved) {
       // Loop through the Vec<EventRecord>
       events.forEach(({ event }, i) => {
-        if (trackLastEvent && i <= lastEvent) {
+        if (opts.trackLastEvent && i <= lastEvent) {
           return;
         }
 
         if (event.section === pallet && event.method === method) {
-          if (trackLastEvent) {
+          if (opts.trackLastEvent) {
             lastEvent = i;
           }
           resolved = true;
           return resolve(event);
-        } else if (failureEvent && event.section === failureEvent[0] && event.method === failureEvent[1]) {
+        } else if (opts.failureEvent && event.section === opts.failureEvent[0] && event.method === opts.failureEvent[1]) {
           resolved = true;
           return reject(new Error(`Found failure event ${event.section}:${event.method} - ${JSON.stringify(getEventData(event))}`));
         }
@@ -69,7 +75,14 @@ function waitForEvent(api, pallet, method, onFinalize = true, failureEvent = nul
 }
 
 
-function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = true) {
+function sendAndWaitForEvents(call, api, opts = {}) {
+  opts = {
+    onFinalize: true,
+    rejectOnFailure: true,
+    sender: null,
+    ...opts
+  };
+
   return new Promise(async (resolve, reject) => {
     const  id = trxId++;
     const debugMsg = (msg) => {
@@ -119,24 +132,28 @@ function sendAndWaitForEvents(call, api, onFinalize = true, rejectOnFailure = tr
         ...systemFailures
       ];
 
-      if (rejectOnFailure && failures.length > 0) {
+      if (opts.rejectOnFailure && failures.length > 0) {
         reject(failures[0]);
       } else {
         resolve(events);
       }
     };
 
-    const unsub = await call.send(({ events = [], status }) => {
+    let doCall = opts.signer
+      ? (cb) => call.signAndSend(opts.signer, cb)
+      : (cb) => call.send(cb);
+
+    const unsub = await doCall(({ events = [], status }) => {
       debugMsg(`Current status is ${status}`);
 
       if (status.isInBlock) {
         debugMsg(`Transaction included at blockHash ${status.asInBlock}`);
-        if (!onFinalize) {
+        if (!opts.onFinalize) {
           doResolve(events);
         }
       } else if (status.isFinalized) {
         debugMsg(`Transaction finalized at blockHash ${status.asFinalized}`);
-        if (onFinalize) {
+        if (opts.onFinalize) {
           doResolve(events);
         }
       } else if (status.isInvalid) {
@@ -195,6 +212,14 @@ function descale(val, decimals) {
   return Number(`${val}e-${decimals}`);
 }
 
+function mapToJson(v) {
+  if (v.isSome) {
+    return v.unwrap().toJSON();
+  } else {
+    return null;
+  }
+}
+
 module.exports = {
   decodeCall,
   encodeCall,
@@ -205,4 +230,5 @@ module.exports = {
   waitForEvent,
   getNotice,
   getEventName,
+  mapToJson,
 };

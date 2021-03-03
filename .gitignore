@@ -35,3 +35,6 @@ ethereum/networks/development*
 *.profraw
 lcov.info
 .vscode
+
+# Releases
+releases

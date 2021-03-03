@@ -60,6 +60,25 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     };
   }
 
+  let frameSystem = {};
+  if (ctx.__genesisVersion()) {
+    let version = ctx.versions.mustFind(ctx.__genesisVersion());
+    frameSystem = {
+      frameSystem: {
+        code: await version.wasm()
+      }
+    };
+  }
+
+  let palletSudo = {}
+  if (ctx.actors.first()) {
+    palletSudo = {
+      palletSudo: {
+        key: ctx.actors.first().chainKey.address
+      }
+    };
+  }
+
   return {
     name: 'Integration Test Network',
     properties: {
@@ -68,6 +87,8 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     },
     genesis: {
       runtime: {
+        ...frameSystem,
+        ...palletSudo,
         palletCash: {
           assets,
           ...initialYieldConfig,
