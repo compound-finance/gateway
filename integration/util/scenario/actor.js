@@ -169,7 +169,7 @@ class Actor {
 
   async lockTo(amount, asset, recipient, awaitEvent = true) {
     return await this.declare("lock", [amount, asset, "to", recipient], async () => {
-      let lockRes = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
+      let lockRes = await this.ctx.starport.lockTo(this, amount, asset, recipient);
       if (awaitEvent) {
         await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
       }

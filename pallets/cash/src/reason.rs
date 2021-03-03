@@ -57,7 +57,6 @@ pub enum Reason {
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
-    InvalidChain,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -113,7 +112,6 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::TimeTravelNotAllowed => (24, 0, "time travel not allowed"),
             Reason::TrxRequestParseError(_) => (25, 0, "trx request parse error"),
             Reason::UnknownValidator => (26, 0, "unknown validator"),
-            Reason::InvalidChain => (27, 0, "invalid chain"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
