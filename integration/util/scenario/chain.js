@@ -157,7 +157,7 @@ class Chain {
 
   async interestRateModel(token) {
     let asset = await this.ctx.api().query.cash.supportedAssets(token.toChainAsset());
-    return asset.rate_model.toJSON();
+    return asset.unwrap().rate_model.toJSON();
   }
 
 

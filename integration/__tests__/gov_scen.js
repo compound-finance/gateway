@@ -23,13 +23,8 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
         }
       };
       let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
-      starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
-      // expect(await chain.interestRateModel(zrx)).toEqual(newKink);
-
-      while (true) {
-        await chain.displayBlock();
-        await sleep(1000);
-      }
+      await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
+      expect(await chain.interestRateModel(zrx)).toEqual(newKink);
     }
   },
   {
