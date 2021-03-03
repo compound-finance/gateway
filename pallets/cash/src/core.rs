@@ -37,10 +37,10 @@ use crate::{
         Timestamp, USDQuantity, ValidatorIdentity,
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
-    CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
-    LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice, Miner, Module, NoticeHashes,
-    NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets,
+    CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex,
+    IsEraChangePending, LastIndices, LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice,
+    Miner, Module, NoticeHashes, NoticeHold, NoticeStates, Notices, PendingEraNotices, Prices,
+    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 
 #[macro_export]
@@ -374,14 +374,30 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
 pub fn dispatch_notice_internal<T: Config>(
     chain_id: ChainId,
     recipient_opt: Option<ChainAccount>,
+    should_increment_era: bool,
     notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,
 ) -> Result<(), Reason> {
     // XXX this cannot fail, should not return result
     let (latest_notice_id, parent_hash) =
         LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
-    let notice_id = latest_notice_id.seq();
+
+    let notice_id = if should_increment_era {
+        require!(
+            PendingEraNotices::iter().count() == 0,
+            Reason::PendingEraNotice
+        );
+        latest_notice_id.seq_era()
+    } else {
+        latest_notice_id.seq()
+    };
 
     let notice = notice_fn(notice_id, parent_hash)?; // XXX fixme cannot fail
+
+    if should_increment_era {
+        NoticeHold::insert(chain_id, notice_id);
+        PendingEraNotices::insert(chain_id, notice_id);
+        IsEraChangePending::put(true);
+    }
 
     // Add to notices, notice states, track the latest notice and index by account
     let notice_hash = notice.hash();
@@ -544,6 +560,7 @@ pub fn extract_internal<T: Config>(
     dispatch_notice_internal::<T>(
         recipient.chain_id(),
         Some(recipient),
+        false,
         &|notice_id, parent_hash| {
             Ok(Notice::ExtractionNotice(
                 match (chain_asset_account, parent_hash) {
@@ -601,6 +618,7 @@ pub fn extract_cash_principal_internal<T: Config>(
     dispatch_notice_internal::<T>(
         recipient.chain_id(),
         Some(recipient),
+        false,
         &|notice_id, parent_hash| {
             // XXX bound to eth?
             Ok(Notice::CashExtractionNotice(match (holder, parent_hash) {
@@ -1387,6 +1405,14 @@ pub fn on_initialize_internal<T: Config>(
     TotalCashPrincipal::put(total_cash_principal_new);
     LastMinerSharePrincipal::put(miner_share_principal);
     LastYieldTimestamp::put(now);
+
+    // undo the hold placed on notice signing during era changes
+    for (chain_id, notice_id) in PendingEraNotices::iter() {
+        if NoticeStates::get(chain_id, notice_id) == NoticeState::Executed {
+            NoticeHold::take(chain_id);
+            PendingEraNotices::take(chain_id);
+        }
+    }
 
     // Possibly rotate in any scheduled next CASH rate
     if let Some((next_apr, next_start)) = CashYieldNext::get() {

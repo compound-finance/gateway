@@ -29,8 +29,9 @@ use chains::{Chain, Ethereum};
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
-    traits::StoredMap,
-    weights::{DispatchClass, Pays},
+    sp_runtime::traits::Convert,
+    traits::{StoredMap, UnfilteredDispatchable},
+    weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
@@ -39,9 +40,6 @@ use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
 };
-
-use frame_support::sp_runtime::traits::Convert;
-use frame_support::{traits::{StoredMap, UnfilteredDispatchable}, weights::GetDispatchInfo};
 
 use pallet_session;
 use pallet_timestamp;
@@ -175,6 +173,15 @@ decl_storage! {
 
         /// The most recent notice emitted for a given chain
         LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
+
+        // Notices that change the starport era. All pending era notices must be signed before new regular notices can be signed
+        PendingEraNotices get(fn pending_auth_notice): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
+
+        // True after era notices have been initiated but before they have been completed and the session has been rotated
+        IsEraChangePending get(fn era_change_pending): bool;
+
+        // If true, stops notices from being signed for this chain
+        NoticeHold get(fn notice_hold): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
 
         /// Index of notices by chain account
         AccountNotices get(fn account_notices): map hasher(blake2_128_concat) ChainAccount => Vec<NoticeId>;
@@ -317,23 +324,8 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
     // return validator set to use in the next session (aura and grandpa also stage new auths associated w these accountIds)
     fn new_session(session_index: SessionIndex) -> Option<Vec<SubstrateId>> {
         if NextValidators::iter().count() != 0 {
-            // make sure all potential next validators have associated session keys before we add them
-            let mut is_valid = true;
-            for (id, _) in NextValidators::iter() {
-                if T::SessionInterface::is_valid_keys(id.clone()) == false {
-                    error!("Next Validator {:#?} has no queued session keys", id);
-                    is_valid = false;
-                }
-            }
-
-            if is_valid == true {
-                // use new validators
-                NextSessionIndex::put(session_index);
-                Some(NextValidators::iter().map(|x| x.0).collect::<Vec<_>>())
-            } else {
-                // keep old validators
-                Some(Validators::iter().map(|x| x.0).collect::<Vec<_>>())
-            }
+            NextSessionIndex::put(session_index);
+            Some(NextValidators::iter().map(|x| x.0).collect::<Vec<_>>())
         } else {
             Some(Validators::iter().map(|x| x.0).collect::<Vec<_>>())
         }
@@ -358,6 +350,53 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
     }
     fn end_session(_: SessionIndex) {
         ()
+    }
+}
+
+/*
+-- Block N --
+changeAuth extrinsic, nextValidators set, pendingEraNotices set, IsEraChangePending set true
+
+-- Block N + 1 --
+Must end session to get through the already-planned session
+* "ShouldEndSession" should be true bc nextValidators not empty
+* "new_session" returns nextValidators to queue them and deletes the storage
+
+-- Afterwards --
+"ShouldEndSession" when
+* era notices were signed
+
+The next session will finally have the NextValidators, and notice signing can continue
+
+*/
+
+// periodic except when new authorities are pending and when an era notice has just been completed
+impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
+    fn should_end_session(now: T::BlockNumber) -> bool {
+        if NextValidators::iter().count() > 0 {
+            // we have not planned the new auth session yet
+            true
+        } else if IsEraChangePending::get() == true && PendingEraNotices::iter().count() == 0 {
+            // era change has just occured and we are ready to switch sessions
+            IsEraChangePending::put(false);
+            true
+        } else {
+            // no era changes pending, periodic
+            let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+            (now % period) == <T>::BlockNumber::from(0 as u32)
+        }
+    }
+}
+
+impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumber> for Module<T> {
+    fn estimate_next_session_rotation(now: T::BlockNumber) -> Option<T::BlockNumber> {
+        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+        Some(now + period - now % period)
+    }
+
+    // The validity of this weight depends on the implementation of `estimate_next_session_rotation`
+    fn weight(_now: T::BlockNumber) -> Weight {
+        0
     }
 }
 

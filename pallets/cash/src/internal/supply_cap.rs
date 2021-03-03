@@ -26,21 +26,26 @@ pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> R
     <Module<T>>::deposit_event(Event::SetSupplyCap(chain_asset, cap));
 
     // XXX fix me this cannot fail
-    dispatch_notice_internal::<T>(chain_asset.chain_id(), None, &|notice_id, parent_hash| {
-        Ok(Notice::SetSupplyCapNotice(
-            match (chain_asset, parent_hash) {
-                (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
-                    Ok(SetSupplyCapNotice::Eth {
-                        id: notice_id,
-                        parent: eth_parent_hash,
-                        asset: eth_asset,
-                        cap: cap,
-                    })
-                }
-                _ => Err(Reason::AssetNotSupported),
-            }?,
-        ))
-    })?;
+    dispatch_notice_internal::<T>(
+        chain_asset.chain_id(),
+        None,
+        true,
+        &|notice_id, parent_hash| {
+            Ok(Notice::SetSupplyCapNotice(
+                match (chain_asset, parent_hash) {
+                    (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
+                        Ok(SetSupplyCapNotice::Eth {
+                            id: notice_id,
+                            parent: eth_parent_hash,
+                            asset: eth_asset,
+                            cap: cap,
+                        })
+                    }
+                    _ => Err(Reason::AssetNotSupported),
+                }?,
+            ))
+        },
+    )?;
 
     Ok(())
 }

@@ -29,7 +29,7 @@ class Chain {
   // https://www.shawntabrizi.com/substrate/querying-substrate-storage-via-rpc/
   getStorageKey(moduleName, valueName) {
     let moduleHash = xxhashAsHex(moduleName, 128);
-    let functionHash = xxhashAsHex(valueName, 128); 
+    let functionHash = xxhashAsHex(valueName, 128);
     return moduleHash + functionHash.slice(2);
   }
 
@@ -259,14 +259,14 @@ class Chain {
 
   async rotateKeys(validator) {
     const keysRaw = await validator.api.rpc.author.rotateKeys();
-    return  this.ctx.api().createType('SessionKeys', keysRaw);
+    return this.ctx.api().createType('SessionKeys', keysRaw);
   }
 
   async setKeys(signer, keys) {
     const call = this.ctx.api().tx.session.setKeys(keys, new Uint8Array());
     await signAndSend(call, signer);
   }
-  
+
   async waitUntilSession(num) {
     const timer = ms => new Promise(res => setTimeout(res, ms));
     const checkIdx = async () => {

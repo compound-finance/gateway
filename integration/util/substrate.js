@@ -84,7 +84,7 @@ function waitForEvent(api, pallet, method, opts = {}) {
 async function signAndSend(call, signer) {
   const unsub = await call.signAndSend(signer, ({ status, events }) => {
     if (status.isInBlock || status.isFinalized) {
-      console.log("STATUS", status);
+      debug(() => `signAndSend ${status}`);
       unsub();
     }
   });

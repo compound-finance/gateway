@@ -59,7 +59,7 @@ pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Re
 
     // For ChainChains:
     // Add FutureYieldNotice(NextAPR, NextAPRStart, NextYieldIndex) to NoticeQueueChain
-    dispatch_notice_internal::<T>(ChainId::Eth, None, &|notice_id, parent_hash| {
+    dispatch_notice_internal::<T>(ChainId::Eth, None, true, &|notice_id, parent_hash| {
         Ok(Notice::FutureYieldNotice(match parent_hash {
             ChainHash::Eth(eth_parent_hash) => FutureYieldNotice::Eth {
                 id: notice_id,
