@@ -25,6 +25,7 @@ use crate::types::{
     CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, LiquidityFactor, Nonce,
     ReporterSet, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
 };
+use chains::{Chain, Ethereum};
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
@@ -544,6 +545,21 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                 .longevity(10)
                 .propagate(true)
                 .build(),
+            Call::set_next_code_via_hash(next_code) => {
+                // Allow this call only if we're waiting on new code
+                // TODO: Is this check too expensive?
+                let hash = <Ethereum as Chain>::hash_bytes(&next_code);
+                if AllowedNextCodeHash::exists() {
+                    ValidTransaction::with_tag_prefix("CashPallet::set_next_code_via_hash")
+                        .priority(1)
+                        .longevity(10)
+                        .and_provides(hash)
+                        .propagate(true)
+                        .build()
+                } else {
+                    InvalidTransaction::Call.into()
+                }
+            }
             Call::receive_event(event_id, event, signature) => {
                 log!(
                     "validating receive_event({:?},{:?},{}))",
