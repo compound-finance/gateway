@@ -7,7 +7,7 @@ use crate::{
     reason::Reason,
     require,
     types::{CashIndex, Timestamp},
-    CashYield, CashYieldNext, Config, GlobalCashIndex, Module, Event
+    CashYield, CashYieldNext, Config, Event, GlobalCashIndex, Module,
 };
 use codec::{Decode, Encode};
 use frame_support::storage::StorageValue;
