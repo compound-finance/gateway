@@ -142,7 +142,8 @@ fn process_eth_event_happy_path() {
             event: ethereum_client::EthereumEvent::Lock {
                 asset: [1; 20],
                 sender: [3; 20],
-                recipient: [2; 20],
+                chain: String::from("ETH"),
+                recipient: [2; 32],
                 amount: 10,
             },
         });
@@ -183,7 +184,8 @@ fn process_eth_event_fails_for_bad_signature() {
             event: ethereum_client::EthereumEvent::Lock {
                 asset: [1; 20],
                 sender: [3; 20],
-                recipient: [2; 20],
+                chain: String::from("ETH"),
+                recipient: [2; 32],
                 amount: 10,
             },
         });
@@ -208,7 +210,8 @@ fn process_eth_event_fails_if_not_validator() {
             event: ethereum_client::EthereumEvent::Lock {
                 asset: [1; 20],
                 sender: [3; 20],
-                recipient: [2; 20],
+                chain: String::from("ETH"),
+                recipient: [2; 32],
                 amount: 10,
             },
         });
@@ -430,8 +433,9 @@ fn offchain_worker_test() {
                 event: ethereum_client::EthereumEvent::Lock {
                     asset: [228, 232, 31, 166, 177, 99, 39, 212, 183, 140, 254, 184, 58, 173, 224, 75, 167, 7, 81, 101],
                     sender: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
-                    recipient: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
-                    amount: 100000000000000000000,
+                    chain: String::from("ETH"),
+                    recipient: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    amount: 1000000000000000000,
                 },
             }));
         } else {
@@ -448,8 +452,9 @@ fn offchain_worker_test() {
                 event: ethereum_client::EthereumEvent::Lock {
                     asset: [216, 123, 167, 165, 11, 46, 126, 102, 15, 103, 138, 137, 94, 75, 114, 231, 203, 76, 205, 156],
                     sender: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
-                    recipient: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
-                    amount: 100000000,
+                    chain: String::from("ETH"),
+                    recipient: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49, 0, 0, 0, 0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0],
+                    amount: 1000000000000000000,
                 },
             }));
         } else {
@@ -466,8 +471,9 @@ fn offchain_worker_test() {
                 event: ethereum_client::EthereumEvent::Lock {
                     asset: [238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238],
                     sender: [254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125, 95, 244, 112, 49],
-                    recipient: [81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31, 14, 135, 38],
-                    amount: 5000000000000000,
+                    chain: String::from("ETH"),
+                    recipient: [81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31, 14, 135, 38, 0, 0, 0, 0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0],
+                    amount: 1000000000000000000,
                 },
             }));
         } else {
