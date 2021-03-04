@@ -9,12 +9,11 @@ use sp_core::{
     H256,
 };
 use sp_runtime::{
-    generic,
-    impl_opaque_keys,
+    generic, impl_opaque_keys,
     testing::{Header, TestXt, UintAuthorityId},
     traits::{
-        BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
-        Verify, ConvertInto, OpaqueKeys
+        BlakeTwo256, Block as BlockT, ConvertInto, Extrinsic as ExtrinsicT, IdentifyAccount,
+        IdentityLookup, OpaqueKeys, Verify,
     },
     MultiAddress, MultiSignature as Signature,
 };
@@ -41,35 +40,34 @@ pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 // XXX just to compile, these should maybe use the real impls
 pub struct TestShouldEndSession;
 impl pallet_session::ShouldEndSession<u64> for TestShouldEndSession {
-	fn should_end_session(now: u64) -> bool {
-            true
-	}
+    fn should_end_session(now: u64) -> bool {
+        true
+    }
 }
 use sp_runtime::RuntimeAppPublic;
 
 pub struct TestSessionHandler;
 impl pallet_session::SessionHandler<SubstrateId> for TestSessionHandler {
-	const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
-	fn on_genesis_session<T: OpaqueKeys>(_validators: &[(SubstrateId, T)]) {}
-	fn on_new_session<T: OpaqueKeys>(
-		changed: bool,
-		validators: &[(SubstrateId, T)],
-		_queued_validators: &[(SubstrateId, T)],
-	) {}
-	fn on_disabled(_validator_index: usize) {}
-	fn on_before_session_ending() {}
+    const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
+    fn on_genesis_session<T: OpaqueKeys>(_validators: &[(SubstrateId, T)]) {}
+    fn on_new_session<T: OpaqueKeys>(
+        changed: bool,
+        validators: &[(SubstrateId, T)],
+        _queued_validators: &[(SubstrateId, T)],
+    ) {
+    }
+    fn on_disabled(_validator_index: usize) {}
+    fn on_before_session_ending() {}
 }
 
 pub struct TestSessionManager;
 impl pallet_session::SessionManager<SubstrateId> for TestSessionManager {
-	fn end_session(_: SessionIndex) {}
-	fn start_session(_: SessionIndex) {}
-	fn new_session(_: SessionIndex) -> Option<Vec<SubstrateId>> {
-            None
-	}
+    fn end_session(_: SessionIndex) {}
+    fn start_session(_: SessionIndex) {}
+    fn new_session(_: SessionIndex) -> Option<Vec<SubstrateId>> {
+        None
+    }
 }
-
-
 
 pub mod opaque {
     use super::*;
@@ -94,7 +92,6 @@ pub mod opaque {
         }
     }
 }
-
 
 frame_support::construct_runtime!(
     pub enum Test where
@@ -149,7 +146,7 @@ impl pallet_session::Config for Test {
     type SessionManager = TestSessionManager;
     type SessionHandler = TestSessionHandler;
     type Keys = opaque::MockSessionKeys;
-    type DisabledValidatorsThreshold = ();//sp_runtime::Perbill::from_percent(33);
+    type DisabledValidatorsThreshold = (); //sp_runtime::Perbill::from_percent(33);
     type WeightInfo = ();
 }
 
