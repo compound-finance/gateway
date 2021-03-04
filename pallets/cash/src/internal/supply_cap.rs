@@ -109,7 +109,8 @@ mod tests {
             let notice_state = notice_state_post.into_iter().next().unwrap();
             let notice = Notices::get(notice_state.0, notice_state.1);
 
-            let expected_notice_id = NoticeId(0, 1);
+            // bumps era
+            let expected_notice_id = NoticeId(1, 0);
             let expected_notice = Notice::SetSupplyCapNotice(SetSupplyCapNotice::Eth {
                 id: expected_notice_id,
                 parent: [0u8; 32],
@@ -130,7 +131,7 @@ mod tests {
             assert_eq!(notice, Some(expected_notice.clone()));
             assert_eq!(
                 LatestNotice::get(ChainId::Eth),
-                Some((NoticeId(0, 1), expected_notice.hash()))
+                Some((expected_notice_id, expected_notice.hash()))
             );
         });
     }
