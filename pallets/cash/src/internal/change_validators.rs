@@ -7,7 +7,7 @@ use crate::{
     reason::Reason,
     require,
     types::ValidatorKeys,
-    Config, NextValidators, SessionInterface, Module, Event
+    Config, Event, Module, NextValidators, SessionInterface,
 };
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
@@ -41,4 +41,3 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
 
     Ok(())
 }
-
