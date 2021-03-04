@@ -119,7 +119,12 @@ class Starport {
     return await this.starport.methods.invokeChain(encodedTarget, encodedNotices).send({ from: this.ctx.eth.defaultFrom, gas: 5000000 });
   }
 
-  async upgrade(impl, upgradeCall=null) {
+  async upgradeTo(version) {
+    let newImpl = await this.ctx.eth.__deploy('Starport', [this.ctx.cashToken.ethAddress(), this.ctx.eth.root()], { version });
+    await this.upgrade(newImpl);
+  }
+
+  async upgrade(impl, upgradeCall = null) {
     if (upgradeCall) {
       await this.proxyAdmin.methods.upgradeAndCall(
         this.starport._address,

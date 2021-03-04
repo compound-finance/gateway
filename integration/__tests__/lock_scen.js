@@ -51,7 +51,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Lock Too Little Collateral',
     scenario: async ({ ashley, usdc, chain }) => {
-      await ashley.lock(0.1, usdc, false);
+      await ashley.lock(0.1, usdc, { awaitEvent: false });
       expect(await ashley.tokenBalance(usdc)).toEqual(999.9);
       let failure = await chain.waitForEthProcessFailure();
       expect(failure).toHaveReason('MinTxValueNotMet');

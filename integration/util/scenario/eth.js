@@ -5,13 +5,15 @@ const { readContractsFile, deployContract, getContractAt } = require('../ethereu
 const { genPort } = require('../util');
 
 class Eth {
-  constructor(ethInfo, web3, web3Url, accounts, ganacheServer, ctx) {
+  // TODO: Do the construct
+  constructor(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx) {
     this.ethInfo = ethInfo;
     this.web3 = web3;
     this.web3Url = web3Url;
     this.accounts = accounts;
     this.defaultFrom = accounts[0];
     this.ganacheServer = ganacheServer;
+    this.version = version;
     this.ctx = ctx;
     this.contractsFiles = {};
   }
@@ -31,15 +33,24 @@ class Eth {
   }
 
   async __deploy(contractName, contractArgs, opts = {}) {
-    return await this.__deployFull(this.ctx.__getContractsFile(), contractName, contractArgs, opts);
+    opts = {
+      version: this.version,
+      ...opts
+    };
+    return await this.__deployFull(opts.version.contractsFile(), contractName, contractArgs, opts);
   }
 
   async __deployFull(contractsFile, contractName, contractArgs, opts = {}) {
+    opts = {
+      from: this.defaultFrom,
+      ...opts
+    };
+    console.log("Deploying " + contractName + " from " + contractsFile)
     let contracts = await this.getContractsFile(contractsFile);
 
     let contract = await deployContract(
       this.web3,
-      opts.from || this.defaultFrom,
+      opts.from,
       contracts,
       contractName,
       contractArgs
@@ -50,8 +61,12 @@ class Eth {
     return contract;
   }
 
-  async __getContractAt(contractName, contractAddress) {
-    return await this.__getContractAtFull(this.ctx.__getContractsFile(), contractName, contractAddress);
+  async __getContractAt(contractName, contractAddress, opts = {}) {
+    opts = {
+      version: this.version,
+      ...opts
+    };
+    return await this.__getContractAtFull(opts.version.contractsFile(), contractName, contractAddress, opts);
   }
 
   async __getContractAtFull(contractsFile, contractName, contractAddress) {
@@ -132,7 +147,10 @@ async function buildEth(ethInfo, ctx) {
   // We'll enumerate accounts early so we don't need to repeat often.
   let accounts = await web3.eth.personal.getAccounts();
 
-  return new Eth(ethInfo, web3, web3Url, accounts, ganacheServer, ctx);
+  // Possibly set version
+  let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
+
+  return new Eth(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx);
 }
 
 module.exports = {

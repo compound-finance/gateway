@@ -32,6 +32,7 @@ function waitForEvent(api, pallet, method, opts = {}) {
   opts = {
     failureEvent: null,
     trackLastEvent: true,
+    timeout: 20000,
     ...opts
   };
 
@@ -42,6 +43,11 @@ function waitForEvent(api, pallet, method, opts = {}) {
 
   let resolve, reject;
   let promise = new Promise((resolve_, reject_) => {
+    if (opts.timeout) {
+      setTimeout(() => {
+        reject_(new Error(`Timeout waiting for event ${pallet}:${method}`));
+      }, opts.timeout);
+    }
     resolve = resolve_;
     reject = reject_;
   });

@@ -174,6 +174,7 @@ async function buildCtx(scenInfo={}) {
   debug(() => `Builing ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
   debug(() => `test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   let ctx = new Ctx(scenInfo);
+  ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
 
   // Note: `3` below is the number of transactions we expect to occur between now and when
@@ -185,7 +186,6 @@ async function buildCtx(scenInfo={}) {
   ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
-  ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
   ctx.prices = await buildPrices(scenInfo.tokens, ctx);
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
