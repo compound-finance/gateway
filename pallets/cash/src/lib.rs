@@ -289,6 +289,12 @@ decl_event!(
         /// A new supply cap has been set. [asset, cap]
         SetSupplyCap(ChainAsset, AssetAmount),
 
+        /// A new validator set has been chosen
+        ChangeValidators(Vec<ValidatorKeys>),
+
+        /// A new yield rate has been chosen
+        SetYieldNext(APR, Timestamp),
+
         /// Failed to process a given extrinsic. [reason]
         Failure(Reason),
     }

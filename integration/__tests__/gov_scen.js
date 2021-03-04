@@ -1,12 +1,7 @@
 const {
   buildScenarios
 } = require('../util/scenario');
-<<<<<<< HEAD:integration/__tests__/gov_scen.js
-const { decodeCall, getEventData } = require('../util/substrate');
-
-=======
 const { decodeCall } = require('../util/substrate');
->>>>>>> set_keys invalid sig:integration/__tests__/gov_test.js
 let gov_scen_info = {
   tokens: [
     { token: "zrx" }
@@ -32,7 +27,6 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-<<<<<<< HEAD:integration/__tests__/gov_scen.js
     name: "Upgrade Chain WASM [Set Code]",
     info: {
       versions: ['v1.1.1'],
@@ -84,10 +78,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    name: "Update Auth",
-=======
     name: "Remove Auth",
->>>>>>> set_keys invalid sig:integration/__tests__/gov_test.js
     scenario: async ({ ctx, chain, starport, validators }) => {
       const alice = validators.validatorInfoMap.alice;
       const alice_account_id = alice.aura_key;
