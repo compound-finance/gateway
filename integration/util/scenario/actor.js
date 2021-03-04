@@ -157,23 +157,34 @@ class Actor {
     return await this.cash() + liquidityForTokens.reduce((acc, el) => acc + el, 0);
   }
 
-  async lock(amount, asset, awaitEvent = true) {
+  async lock(amount, asset, opts = {}) {
+    opts = {
+      awaitEvent: true,
+      ...opts
+    };
+
     return await this.declare("lock", [amount, asset], async () => {
-      let lockRes = await this.ctx.starport.lock(this, amount, asset);
-      if (awaitEvent) {
-        await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
+      let tx = await this.ctx.starport.lock(this, amount, asset);
+      let event;
+      if (opts.awaitEvent) {
+        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
       }
-      return lockRes;
+      return { tx, event };
     });
   }
 
-  async lockTo(amount, asset, recipient, awaitEvent = true) {
+  async lockTo(amount, asset, recipient, opts = {}) {
+    opts = {
+      awaitEvent: true,
+      ...opts
+    };
     return await this.declare("lock", [amount, asset, "to", recipient], async () => {
-      let lockRes = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
-      if (awaitEvent) {
-        await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
+      let tx = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
+      let event;
+      if (opts.awaitEvent) {
+        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName()); // Replace with real event
       }
-      return lockRes;
+      return { tx, event };
     });
   }
 

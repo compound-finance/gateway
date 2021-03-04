@@ -19,24 +19,46 @@ function download(url, path, options = {}, handle = null) {
     ...options,
   };
   return new Promise(async (resolve, reject) => {
-    let f = handle || await fs.open(path, 'w');
     let bail = false;
+    let f_;
+    let writeF = async (chunk) => {
+      if (!f_) {
+        f_ = handle ? await handle : await fs.open(path, 'w');
+      }
+
+      await f_.write(chunk);
+    }
+
+    let closeF = async () => {
+      if (f_) {
+        await f_.close();
+      }
+    }
+
+    let err = async (error) => {
+      bail = true;
+      await closeF();
+      reject(error);
+    };
+
     let callback = (response) => {
       if (response.statusCode === 301 || response.statusCode === 302) {
         let location = response.headers['location'];
         if (!location) {
-          reject(new Error(`Redirect response does not include \`Location\` header`));
+          err(new Error(`Redirect response does not include \`Location\` header`))
         } else {
           bail = true; // Nuts to you.
-          download(location, path, options, f).then(() => resolve());
+          download(location, path, options, f_).then(() => resolve());
         }
+      } else if (response.statusCode !== 200) {
+        err(new Error(`Server Response: ${JSON.stringify(response.statusCode)} retreiving ${url}`));
       }
       let promises = [];
       response.on('data', async (chunk) => {
         if (!bail) {
           let promise = new Promise((resolve, reject) => {
             Promise.all(promises).then(() => {
-              f.write(chunk).then(() => resolve());
+              writeF(chunk).then(() => resolve());
             });
           });
           promises.push(promise);
@@ -45,7 +67,7 @@ function download(url, path, options = {}, handle = null) {
       response.on('end', async () => {
         if (!bail) {
           await Promise.all(promises);
-          await f.close()
+          await closeF();
           resolve(null);
         }
       });

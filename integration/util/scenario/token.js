@@ -270,7 +270,7 @@ async function buildToken(ticker, tokenInfo, ctx) {
   ctx.log(`Deploying ${ticker}...`);
 
   let owner = ctx.eth.defaultFrom;
-  let tokenContract = await ctx.eth.__deployFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, {from: owner});
+  let tokenContract = await ctx.eth.__deployFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, { from: owner });
   if (typeof (tokenInfo.afterDeploy) === 'function') {
     await tokenInfo.afterDeploy(tokenContract, owner);
   }
