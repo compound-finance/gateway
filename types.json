@@ -12,7 +12,7 @@
   "AssetQuantity": "Quantity",
   "CashQuantity": "Quantity",
   "USDQuantity": "Quantity",
-  "LiquidityFactor": "(u128)",
+  "LiquidityFactor": "Factor",
   "ReporterSet": "Vec<[u8; 20]>",
   "SignedPayload": "Vec<u8>",
   "ValidatorSig": "[u8; 65]",
@@ -414,7 +414,6 @@
     }
   },
   "Source10": "AccountRS",
-  "LiquidityFactor": "u128",
   "Address": "MultiAddress",
   "LookupSource": "MultiAddress",
   "VersionedAuthorityList": {

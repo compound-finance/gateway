@@ -143,7 +143,7 @@ class Chain {
   }
 
   async upgradeTo(version) {
-    ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
+    this.ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
     let versionHash = await version.hash();
     let extrinsic = this.ctx.api().tx.cash.allowNextCodeWithHash(versionHash);
 
@@ -156,7 +156,7 @@ class Chain {
         Ok: []
       }
     });
-    ctx.log(chalk.blueBright(`Upgrade to version ${version.version} complete.`));
+    this.ctx.log(chalk.blueBright(`Upgrade to version ${version.version} complete.`));
   }
 
   async displayBlock() {
