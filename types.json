@@ -370,6 +370,18 @@
     "log_index": "u64",
     "event": "EthereumEvent"
   },
+  "LockOld": {
+    "asset": "[u8; 20]",
+    "sender": "[u8; 20]",
+    "recipient": "[u8; 20]",
+    "amount": "u128"
+  },
+  "LockCashOld": {
+    "sender": "[u8; 20]",
+    "recipient": "[u8; 20]",
+    "amount": "u128",
+    "principal": "u128"
+  },
   "LockEvent": {
     "asset": "[u8; 20]",
     "sender": "[u8; 20]",
