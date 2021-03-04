@@ -5,7 +5,6 @@ const { readContractsFile, deployContract, getContractAt } = require('../ethereu
 const { genPort } = require('../util');
 
 class Eth {
-  // TODO: Do the construct
   constructor(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx) {
     this.ethInfo = ethInfo;
     this.web3 = web3;
@@ -147,7 +146,6 @@ async function buildEth(ethInfo, ctx) {
   // We'll enumerate accounts early so we don't need to repeat often.
   let accounts = await web3.eth.personal.getAccounts();
 
-  // Possibly set version
   let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
 
   return new Eth(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx);

@@ -336,7 +336,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 recipient,
                 principal,
                 ..
-            } => lock_cash_principal_internal::<T>(
+            } => internal::lock::lock_cash_principal_internal::<T>(
                 ChainAccount::Eth(sender),
                 ChainAccount::Eth(recipient),
                 CashPrincipalAmount(principal),

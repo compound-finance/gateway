@@ -132,7 +132,7 @@ class Starport {
         upgradeCall
       ).send({ from: this.ctx.eth.root() });
     } else {
-      await this.proxyAdmin.methods.upgrade(this.starport._address, impl._address).send({ from: this.ctx.eth.root() });
+      let tx = await this.proxyAdmin.methods.upgrade(this.starport._address, impl._address).send({ from: this.ctx.eth.root() });
     }
 
     this.starport = this.ctx.eth.__getContractAtAbi(impl._jsonInterface, this.proxy._address);
