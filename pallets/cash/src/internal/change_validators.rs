@@ -7,7 +7,7 @@ use crate::{
     reason::Reason,
     require,
     types::ValidatorKeys,
-    Config, NextValidators, SessionInterface,
+    Config, NextValidators, SessionInterface, Module, Event
 };
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
@@ -26,6 +26,8 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
         <NextValidators>::insert(&keys.substrate_id, keys);
     }
 
+    <Module<T>>::deposit_event(Event::ChangeValidators(validators.clone()));
+
     dispatch_notice_internal::<T>(ChainId::Eth, None, true, &|notice_id, parent_hash| {
         Ok(Notice::ChangeAuthorityNotice(match parent_hash {
             ChainHash::Eth(eth_parent_hash) => ChangeAuthorityNotice::Eth {
@@ -40,7 +42,3 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
     Ok(())
 }
 
-// TODO:
-// #[cfg(test)]
-// mod tests {
-// }
