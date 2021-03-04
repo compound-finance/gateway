@@ -274,6 +274,18 @@ fn withdraw_and_borrow_principal(
     )
 }
 
+fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount, Reason> {
+    match &chain.to_ascii_uppercase()[..] {
+        "ETH" => {
+            let mut eth_recipient: [u8; 20] = [0; 20];
+            eth_recipient[..].clone_from_slice(&recipient[0..20]);
+
+            Ok(ChainAccount::Eth(eth_recipient))
+        }
+        _ => Err(Reason::InvalidChain),
+    }
+}
+
 // Protocol interface //
 
 pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(), Reason> {
@@ -283,23 +295,48 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
             ethereum_client::events::EthereumEvent::Lock {
                 asset,
                 sender,
+                chain,
                 recipient,
                 amount,
             } => lock_internal::<T>(
                 get_asset::<T>(ChainAsset::Eth(asset))?,
                 ChainAccount::Eth(sender),
-                ChainAccount::Eth(recipient), // TODO: eth not required
+                get_chain_account(chain, recipient)?,
+                get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
+            ),
+
+            ethereum_client::events::EthereumEvent::LockOld {
+                asset,
+                sender,
+                recipient,
+                amount,
+            } => lock_internal::<T>(
+                get_asset::<T>(ChainAsset::Eth(asset))?,
+                ChainAccount::Eth(sender),
+                ChainAccount::Eth(recipient),
                 get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
             ),
 
             ethereum_client::events::EthereumEvent::LockCash {
+                sender,
+                chain,
+                recipient,
+                principal,
+                ..
+            } => lock_cash_principal_internal::<T>(
+                ChainAccount::Eth(sender),
+                get_chain_account(chain, recipient)?,
+                CashPrincipalAmount(principal),
+            ),
+
+            ethereum_client::events::EthereumEvent::LockCashOld {
                 sender,
                 recipient,
                 principal,
                 ..
             } => lock_cash_principal_internal::<T>(
                 ChainAccount::Eth(sender),
-                ChainAccount::Eth(recipient), // TODO: eth not required
+                ChainAccount::Eth(recipient),
                 CashPrincipalAmount(principal),
             ),
 
