@@ -13,6 +13,11 @@
     "jest-junit": "^12.0.0"
   },
   "scripts": {
-    "test": "jest --runInBand"
+    "postinstall": "cd node_modules/solidity-parser-antlr && yarn install && yarn build",
+    "test": "jest --runInBand",
+    "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
+  },
+  "resolutions": {
+    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",
   }
 }
