@@ -3,25 +3,25 @@ const ABICoder = require('web3-eth-abi');
 
 function getNoticeChainId(notice) {
   if (notice.Notice.ExtractionNotice && notice.Notice.ExtractionNotice.Eth) {
-    return "Eth";
+    return 'Eth';
   } else if (notice.Notice.CashExtractionNotice && notice.Notice.CashExtractionNotice.Eth) {
-    return "Eth";
+    return 'Eth';
   } else if (notice.Notice.FutureYieldNotice && notice.Notice.FutureYieldNotice.Eth) {
-    return "Eth";
+    return 'Eth';
   } else if (notice.Notice.SetSupplyCapNotice && notice.Notice.SetSupplyCapNotice.Eth) {
-    return "Eth";
+    return 'Eth';
   } else if (notice.Notice.ChangeAuthorityNotice && notice.Notice.ChangeAuthorityNotice.Eth) {
-    return "Eth";
+    return 'Eth';
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`
+    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
 function encodeNoticeWith(notice, signature, args) {
-  let magic = Web3Utils.asciiToHex("ETH:");
+  let magic = Web3Utils.asciiToHex('ETH:');
   let [eraId, eraIndex] = notice.id;
   let parentHash = notice.parent;
-  let header = ABICoder.encodeParameters(["uint256", "uint256", "uint256"], [eraId, eraIndex, parentHash]);
+  let header = ABICoder.encodeParameters(['uint256', 'uint256', 'uint256'], [eraId, eraIndex, parentHash]);
   let call = ABICoder.encodeFunctionCall(signature, args);
 
   return `${magic}${header.slice(2)}${call.slice(2)}`;
@@ -34,14 +34,14 @@ function encodeNotice(notice) {
     return encodeNoticeWith(
       ethNotice,
       {
-        name: "unlock",
+        name: 'unlock',
         type: 'function',
         inputs: [
-          { name: '', type: "address" },
-          { name: '', type: "uint256" },
-          { name: '', type: "address" },
+          { name: '', type: 'address' },
+          { name: '', type: 'uint256' },
+          { name: '', type: 'address' },
         ],
-        outputs: []
+        outputs: [],
       },
       [ethNotice.asset, ethNotice.amount, ethNotice.account]
     );
@@ -51,16 +51,15 @@ function encodeNotice(notice) {
     return encodeNoticeWith(
       ethNotice,
       {
-        name: "unlockCash",
+        name: 'unlockCash',
         type: 'function',
         inputs: [
-          { name: '', type: "address" },
-          { name: '', type: "uint256" },
-          { name: '', type: "uint256" },
+          { name: '', type: 'address' },
+          { name: '', type: 'uint128' },
         ],
-        outputs: []
+        outputs: [],
       },
-      [ethNotice.account, ethNotice.amount, ethNotice.cash_index]
+      [ethNotice.account, ethNotice.principal]
     );
   } else if (notice.FutureYieldNotice && notice.FutureYieldNotice.Eth) {
     let ethNotice = notice.FutureYieldNotice.Eth;
@@ -68,14 +67,14 @@ function encodeNotice(notice) {
     return encodeNoticeWith(
       ethNotice,
       {
-        name: "setFutureYield",
+        name: 'setFutureYield',
         type: 'function',
         inputs: [
-          { name: '', type: "uint256" },
-          { name: '', type: "uint256" },
-          { name: '', type: "uint256" },
+          { name: '', type: 'uint256' },
+          { name: '', type: 'uint256' },
+          { name: '', type: 'uint256' },
         ],
-        outputs: []
+        outputs: [],
       },
       [ethNotice.next_cash_yield, ethNotice.next_cash_yield_start_at, ethNotice.next_cash_index]
     );
@@ -85,13 +84,13 @@ function encodeNotice(notice) {
     return encodeNoticeWith(
       ethNotice,
       {
-        name: "setSupplyCap",
+        name: 'setSupplyCap',
         type: 'function',
         inputs: [
-          { name: '', type: "address" },
-          { name: '', type: "uint256" },
+          { name: '', type: 'address' },
+          { name: '', type: 'uint256' },
         ],
-        outputs: []
+        outputs: [],
       },
       [ethNotice.asset, ethNotice.amount]
     );
@@ -101,17 +100,15 @@ function encodeNotice(notice) {
     return encodeNoticeWith(
       ethNotice,
       {
-        name: "changeAuthorities",
+        name: 'changeAuthorities',
         type: 'function',
-        inputs: [
-          { name: '', type: "address[]" },
-        ],
-        outputs: []
+        inputs: [{ name: '', type: 'address[]' }],
+        outputs: [],
       },
       [ethNotice.new_authorities]
     );
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`
+    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
@@ -127,7 +124,7 @@ function getNoticeParentHash(notice) {
   } else if (notice.ChangeAuthorityNotice && notice.ChangeAuthorityNotice.Eth) {
     return notice.ChangeAuthorityNotice.Eth.parent;
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`
+    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
@@ -143,7 +140,7 @@ function getNoticeId(notice) {
   } else if (notice.ChangeAuthorityNotice) {
     return notice.ChangeAuthorityNotice.id;
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`
+    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
