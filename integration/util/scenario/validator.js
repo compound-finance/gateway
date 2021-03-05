@@ -44,7 +44,7 @@ let validatorInfoMap = {
     aura_key: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
     grandpa_key: "5GoNkf6WdbxCFnPdAnYYQyCjAKPJgLNxXwPjwTh6DGg6gN3E",
     eth_private_key: "6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d",
-    eth_account: "0x8ad1b2918c34ee5d3e881a57c68574ea9dbecb81",
+    eth_account: "0x8AD1b2918C34EE5d3E881A57c68574EA9dbEcB81",
     node_key: '0x0000000000000000000000000000000000000000000000000000000000000002',
     peer_id: '12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD', // I have _no idea_ how this is generated
     spawn_args: ['--bob'],
@@ -217,6 +217,15 @@ class Validators {
   async start() {
     let peers = this.validators.map((validator) => validator.asPeer());
     await Promise.all(this.validators.map((validator) => validator.start(peers)));
+  }
+
+  async addValidator(name, validatorInfo) {
+    let newValidator = buildValidator(name, validatorInfo, this.ctx);
+    await Promise.all(this.all().map((validator) => validator.api.rpc.system.addReservedPeer(newValidator.asPeer())));
+    let existingPeers = this.validators.map((validator) => validator.asPeer());
+    await newValidator.start(existingPeers);
+    this.validators.push(newValidator);
+    return newValidator;
   }
 
   async teardown() {

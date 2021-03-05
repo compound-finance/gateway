@@ -9,11 +9,11 @@ use sp_core::{
     H256,
 };
 use sp_runtime::{
-    generic,
-    testing::{Header, TestXt},
+    generic, impl_opaque_keys,
+    testing::{Header, TestXt, UintAuthorityId},
     traits::{
-        BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
-        Verify,
+        BlakeTwo256, Block as BlockT, ConvertInto, Extrinsic as ExtrinsicT, IdentifyAccount,
+        IdentityLookup, OpaqueKeys, Verify,
     },
     MultiAddress, MultiSignature as Signature,
 };
@@ -37,6 +37,62 @@ pub type SignedExtra = (
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 
+// XXX just to compile, these should maybe use the real impls
+pub struct TestShouldEndSession;
+impl pallet_session::ShouldEndSession<u64> for TestShouldEndSession {
+    fn should_end_session(now: u64) -> bool {
+        true
+    }
+}
+use sp_runtime::RuntimeAppPublic;
+
+pub struct TestSessionHandler;
+impl pallet_session::SessionHandler<SubstrateId> for TestSessionHandler {
+    const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
+    fn on_genesis_session<T: OpaqueKeys>(_validators: &[(SubstrateId, T)]) {}
+    fn on_new_session<T: OpaqueKeys>(
+        changed: bool,
+        validators: &[(SubstrateId, T)],
+        _queued_validators: &[(SubstrateId, T)],
+    ) {
+    }
+    fn on_disabled(_validator_index: usize) {}
+    fn on_before_session_ending() {}
+}
+
+pub struct TestSessionManager;
+impl pallet_session::SessionManager<SubstrateId> for TestSessionManager {
+    fn end_session(_: SessionIndex) {}
+    fn start_session(_: SessionIndex) {}
+    fn new_session(_: SessionIndex) -> Option<Vec<SubstrateId>> {
+        None
+    }
+}
+
+pub mod opaque {
+    use super::*;
+
+    pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
+
+    /// Opaque block header type.
+    pub type Header = generic::Header<u64, BlakeTwo256>;
+    /// Opaque block type.
+    pub type Block = generic::Block<Header, UncheckedExtrinsic>;
+    /// Opaque block identifier type.
+    pub type BlockId = generic::BlockId<Block>;
+
+    impl_opaque_keys! {
+        pub struct MockSessionKeys {
+            pub dummy: UintAuthorityId,
+        }
+    }
+    impl From<UintAuthorityId> for MockSessionKeys {
+        fn from(dummy: UintAuthorityId) -> Self {
+            Self { dummy }
+        }
+    }
+}
+
 frame_support::construct_runtime!(
     pub enum Test where
     Block = Block,
@@ -46,6 +102,7 @@ frame_support::construct_runtime!(
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
         Cash: pallet_cash::{Module, Call, Config, Storage, Event},
+        Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
     }
 );
 
@@ -80,6 +137,19 @@ impl frame_system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
+impl pallet_session::Config for Test {
+    type Event = pallet_session::Event;
+    type ValidatorId = SubstrateId;
+    type ValidatorIdOf = ConvertInto;
+    type ShouldEndSession = TestShouldEndSession;
+    type NextSessionRotation = ();
+    type SessionManager = TestSessionManager;
+    type SessionHandler = TestSessionHandler;
+    type Keys = opaque::MockSessionKeys;
+    type DisabledValidatorsThreshold = (); //sp_runtime::Perbill::from_percent(33);
+    type WeightInfo = ();
+}
+
 impl pallet_timestamp::Config for Test {
     /// A timestamp: milliseconds since the unix epoch.
     type Moment = types::Timestamp;
@@ -98,6 +168,7 @@ impl Config for Test {
     type Call = Call;
     type TimeConverter = crate::converters::TimeConverter<Self>;
     type AccountStore = System;
+    type SessionInterface = Self;
 }
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test

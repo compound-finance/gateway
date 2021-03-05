@@ -26,21 +26,26 @@ pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> R
     <Module<T>>::deposit_event(Event::SetSupplyCap(chain_asset, cap));
 
     // XXX fix me this cannot fail
-    dispatch_notice_internal::<T>(chain_asset.chain_id(), None, &|notice_id, parent_hash| {
-        Ok(Notice::SetSupplyCapNotice(
-            match (chain_asset, parent_hash) {
-                (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
-                    Ok(SetSupplyCapNotice::Eth {
-                        id: notice_id,
-                        parent: eth_parent_hash,
-                        asset: eth_asset,
-                        cap: cap,
-                    })
-                }
-                _ => Err(Reason::AssetNotSupported),
-            }?,
-        ))
-    })?;
+    dispatch_notice_internal::<T>(
+        chain_asset.chain_id(),
+        None,
+        true,
+        &|notice_id, parent_hash| {
+            Ok(Notice::SetSupplyCapNotice(
+                match (chain_asset, parent_hash) {
+                    (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
+                        Ok(SetSupplyCapNotice::Eth {
+                            id: notice_id,
+                            parent: eth_parent_hash,
+                            asset: eth_asset,
+                            cap: cap,
+                        })
+                    }
+                    _ => Err(Reason::AssetNotSupported),
+                }?,
+            ))
+        },
+    )?;
 
     Ok(())
 }
@@ -104,7 +109,8 @@ mod tests {
             let notice_state = notice_state_post.into_iter().next().unwrap();
             let notice = Notices::get(notice_state.0, notice_state.1);
 
-            let expected_notice_id = NoticeId(0, 1);
+            // bumps era
+            let expected_notice_id = NoticeId(1, 0);
             let expected_notice = Notice::SetSupplyCapNotice(SetSupplyCapNotice::Eth {
                 id: expected_notice_id,
                 parent: [0u8; 32],
@@ -125,7 +131,7 @@ mod tests {
             assert_eq!(notice, Some(expected_notice.clone()));
             assert_eq!(
                 LatestNotice::get(ChainId::Eth),
-                Some((NoticeId(0, 1), expected_notice.hash()))
+                Some((expected_notice_id, expected_notice.hash()))
             );
         });
     }

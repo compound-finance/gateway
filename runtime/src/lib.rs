@@ -161,8 +161,6 @@ parameter_types! {
     pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
         ::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
     pub const SS58Prefix: u8 = 42;
-    pub const Period: BlockNumber = 50;// XXX TODO only use a short period during testing
-    pub const Offset: BlockNumber = 0;
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -286,8 +284,8 @@ impl pallet_session::Config for Runtime {
     type Event = Event;
     type ValidatorId = <Self as frame_system::Config>::AccountId;
     type ValidatorIdOf = IdConverter<Self>;
-    type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
-    type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
+    type ShouldEndSession = Cash;
+    type NextSessionRotation = Cash;
     type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
     type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: aura and grandpa
     type Keys = opaque::SessionKeys;
@@ -301,6 +299,7 @@ impl pallet_cash::Config for Runtime {
     type Call = Call;
     type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
     type AccountStore = System;
+    type SessionInterface = Self;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------

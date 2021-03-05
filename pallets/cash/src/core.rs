@@ -39,7 +39,7 @@ use crate::{
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
     CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
     LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice, Miner, Module, NoticeHashes,
-    NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
+    NoticeHold, NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets,
 };
 
@@ -374,14 +374,25 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
 pub fn dispatch_notice_internal<T: Config>(
     chain_id: ChainId,
     recipient_opt: Option<ChainAccount>,
+    should_increment_era: bool,
     notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,
 ) -> Result<(), Reason> {
     // XXX this cannot fail, should not return result
     let (latest_notice_id, parent_hash) =
         LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
-    let notice_id = latest_notice_id.seq();
+
+    let notice_id = if should_increment_era {
+        require!(NoticeHold::iter().count() == 0, Reason::PendingEraNotice);
+        latest_notice_id.seq_era()
+    } else {
+        latest_notice_id.seq()
+    };
 
     let notice = notice_fn(notice_id, parent_hash)?; // XXX fixme cannot fail
+
+    if should_increment_era {
+        NoticeHold::insert(chain_id, notice_id);
+    }
 
     // Add to notices, notice states, track the latest notice and index by account
     let notice_hash = notice.hash();
@@ -544,6 +555,7 @@ pub fn extract_internal<T: Config>(
     dispatch_notice_internal::<T>(
         recipient.chain_id(),
         Some(recipient),
+        false,
         &|notice_id, parent_hash| {
             Ok(Notice::ExtractionNotice(
                 match (chain_asset_account, parent_hash) {
@@ -601,6 +613,7 @@ pub fn extract_cash_principal_internal<T: Config>(
     dispatch_notice_internal::<T>(
         recipient.chain_id(),
         Some(recipient),
+        false,
         &|notice_id, parent_hash| {
             // XXX bound to eth?
             Ok(Notice::CashExtractionNotice(match (holder, parent_hash) {

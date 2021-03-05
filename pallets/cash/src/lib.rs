@@ -29,19 +29,17 @@ use chains::{Chain, Ethereum};
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
-    traits::StoredMap,
-    weights::{DispatchClass, Pays},
+    sp_runtime::traits::Convert,
+    traits::{StoredMap, UnfilteredDispatchable},
+    weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{str, vec::Vec};
+use our_std::{cmp::min, collections::btree_set::BTreeSet, str, vec::Vec, Debuggable};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
 };
-
-use frame_support::sp_runtime::traits::Convert;
-use frame_support::{traits::UnfilteredDispatchable, weights::GetDispatchInfo};
 
 use pallet_session;
 use pallet_timestamp;
@@ -96,6 +94,7 @@ pub trait Config:
 
     /// Placate substrate's `HandleLifetime` trait.
     type AccountStore: StoredMap<SubstrateId, ()>;
+    type SessionInterface: self::SessionInterface<SubstrateId>;
 }
 
 decl_storage! {
@@ -174,6 +173,9 @@ decl_storage! {
 
         /// The most recent notice emitted for a given chain
         LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
+
+        // If true, stops notices from being signed for this chain
+        NoticeHold get(fn notice_hold): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
 
         /// Index of notices by chain account
         AccountNotices get(fn account_notices): map hasher(blake2_128_concat) ChainAccount => Vec<NoticeId>;
@@ -281,6 +283,12 @@ decl_event!(
         /// A new supply cap has been set. [asset, cap]
         SetSupplyCap(ChainAsset, AssetAmount),
 
+        /// A new validator set has been chosen
+        ChangeValidators(Vec<ValidatorKeys>),
+
+        /// A new yield rate has been chosen
+        SetYieldNext(APR, Timestamp),
+
         /// Failed to process a given extrinsic. [reason]
         Failure(Reason),
     }
@@ -294,6 +302,22 @@ fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
         log!("Cash Failure {:#?}", err);
     }
     res
+}
+
+pub trait SessionInterface<AccountId>: frame_system::Config {
+    fn is_valid_keys(x: AccountId) -> bool;
+}
+
+impl<T: Config> SessionInterface<SubstrateId> for T
+where
+    T: pallet_session::Config<ValidatorId = SubstrateId>,
+{
+    fn is_valid_keys(x: SubstrateId) -> bool {
+        match <pallet_session::Module<T>>::next_keys(x as T::ValidatorId) {
+            Some(_keys) => true,
+            None => false,
+        }
+    }
 }
 
 impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
@@ -326,6 +350,111 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
     }
     fn end_session(_: SessionIndex) {
         ()
+    }
+}
+
+/*
+-- Block N --
+changeAuth extrinsic, nextValidators set,  set true
+
+-- Block N + 1 --
+Must end session to get through the already-planned session
+* "ShouldEndSession" should be true bc nextValidators not empty
+* "new_session" returns nextValidators to queue them and deletes the storage
+
+-- Afterwards --
+"ShouldEndSession" when
+* era notices were signed
+
+The next session will finally have the NextValidators, and notice signing can continue
+
+*/
+
+fn intersection_count<T: Ord + Debuggable>(a: Vec<T>, b: Vec<T>) -> usize {
+    let a_count = a.iter().count();
+    let b_count = b.iter().count();
+
+    let mut a_set = BTreeSet::<T>::new();
+    for v in a {
+        a_set.insert(v);
+    }
+
+    let mut b_set = BTreeSet::<T>::new();
+    for v in b {
+        b_set.insert(v);
+    }
+
+    let count = a_set.intersection(&b_set).into_iter().count();
+    println!("a={}, b={}, count={}", a_count, b_count, count);
+    // count
+    // TODO: Fix me
+    min(a_count, b_count)
+}
+
+fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<ValidatorKeys>) -> bool {
+    let validator_count = validators.iter().count();
+    let quorum_count = validator_count; // TODO: Add a real quorum count
+
+    match notice_state {
+        NoticeState::Pending { signature_pairs } => match signature_pairs {
+            ChainSignatureList::Eth(signature_pairs) => {
+                intersection_count(
+                    signature_pairs.iter().map(|p| p.0).collect(),
+                    validators.iter().map(|v| v.eth_address).collect(),
+                ) >= quorum_count
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+// periodic except when new authorities are pending and when an era notice has just been completed
+impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
+    fn should_end_session(now: T::BlockNumber) -> bool {
+        if NextValidators::iter().count() > 0 {
+            println!("should_end_session=true[next_validators]");
+            true
+        } else if NoticeHold::iter().count() > 0 {
+            // Check if we should end the hold
+            let validators: Vec<_> = Validators::iter().map(|v| v.1).collect();
+            let every_notice_hold_executed = NoticeHold::iter().all(|(chain_id, notice_id)| {
+                has_requisite_signatures(NoticeStates::get(chain_id, notice_id), &validators)
+            });
+
+            if every_notice_hold_executed {
+                for (chain_id, _) in NoticeHold::iter() {
+                    NoticeHold::take(chain_id);
+                }
+
+                println!("should_end_session=true[notices_executed]");
+                true
+            } else {
+                println!("should_end_session=false[notices_held]");
+                false
+            }
+        } else {
+            // no era changes pending, periodic
+            let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+            let is_new_period = (now % period) == <T>::BlockNumber::from(0 as u32);
+            println!(
+                "should_end_session={}[periodic {:?}%{:?}]",
+                is_new_period, now, period
+            );
+            is_new_period
+        }
+    }
+}
+
+impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumber> for Module<T> {
+    fn estimate_next_session_rotation(now: T::BlockNumber) -> Option<T::BlockNumber> {
+        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+        Some(now + period - now % period)
+    }
+
+    // The validity of this weight depends on the implementation of `estimate_next_session_rotation`
+    fn weight(_now: T::BlockNumber) -> Weight {
+        0
     }
 }
 

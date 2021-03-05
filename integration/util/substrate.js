@@ -80,12 +80,11 @@ function waitForEvent(api, pallet, method, opts = {}) {
   return promise;
 }
 
-
 function sendAndWaitForEvents(call, api, opts = {}) {
   opts = {
     onFinalize: true,
     rejectOnFailure: true,
-    sender: null,
+    signer: null,
     ...opts
   };
 
