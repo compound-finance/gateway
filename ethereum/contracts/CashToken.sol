@@ -203,7 +203,6 @@ contract CashToken is ICash {
      *
      * Emits an {Approval} event.
      */
-     // XXX double check that issue won't occur in transferFrom
     function approve(address spender, uint amount) external override returns (bool) {
         allowances[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
@@ -232,7 +231,7 @@ contract CashToken is ICash {
      * @notice Returns the name of the token.
      */
     function name() external pure returns (string memory) {
-        return "SECRET, change";
+        return "Cash";
     }
 
     /**
@@ -240,7 +239,7 @@ contract CashToken is ICash {
      * name.
      */
     function symbol() external pure returns (string memory) {
-        return "SECRET";
+        return "CASH";
     }
 
     /**
@@ -265,7 +264,6 @@ contract CashToken is ICash {
     // Note: Formula for continuos compounding interest -> A = Pe^rt,
     //       current_index = base_index * e^(yield * time_ellapsed)
     //       yield is in BPS, so 300 = 3% = 0.03
-    // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
     function calculateIndex(uint128 yield, uint128 index, uint start) public view returns (uint128) {
         require(index > 0, "Cash Token uninitialized");
         uint newIndex = index * exponent(yield, block.timestamp - start) / expBaseUnit;
@@ -276,8 +274,6 @@ contract CashToken is ICash {
     // Helper function to calculate e^rt part from countinous compounding interest formula
     // Note: We use the third degree approximation of Taylor Series
     //       1 + x/1! + x^2/2! + x^3/3!
-    // XXX TODO: check if it's really safe if time_elapsed > 1 day and yield is high
-    // XXX TODO add ranges for which it works
     function exponent(uint128 yield, uint time) public pure returns (uint) {
         uint scale = expBaseUnit / bpsBaseUnit;
         uint epower = yield * time * scale / SECONDS_PER_YEAR;

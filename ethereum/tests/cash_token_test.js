@@ -293,13 +293,13 @@ describe('CashToken', () => {
 
   describe('#name', () => {
     it('should return Cash token name', async () => {
-      expect(await call(cash, 'name', [])).toEqual("SECRET, change");
+      expect(await call(cash, 'name', [])).toEqual("Cash");
     });
   });
 
   describe('#symbol', () => {
     it('should return Cash token symbol', async () => {
-      expect(await call(cash, 'symbol', [])).toEqual("SECRET");
+      expect(await call(cash, 'symbol', [])).toEqual("CASH");
     });
   });
 
