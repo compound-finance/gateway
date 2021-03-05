@@ -29,11 +29,11 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
   {
     name: "Upgrade Chain WASM [Set Code]",
     info: {
-      versions: ['v1.1.1'],
-      genesis_version: 'v1.1.1',
+      versions: ['m1'],
+      genesis_version: 'm1',
       validators: {
         alice: {
-          version: 'v1.1.1',
+          version: 'm1',
         }
       }
     },
@@ -49,11 +49,11 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     skip: true,
     name: "Upgrade Chain WASM [Allow Next Code]",
     info: {
-      versions: ['v1.2.1'],
-      genesis_version: 'v1.2.1',
+      versions: ['m2'],
+      genesis_version: 'm2',
       validators: {
         alice: {
-          version: 'v1.2.1',
+          version: 'm2',
         }
       },
     },
@@ -62,7 +62,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       let currHash = await curr.hash();
       let extrinsic = ctx.api().tx.cash.allowNextCodeWithHash(currHash);
 
-      await starport.executeProposal("Upgrade from v1.2.1 to Current [Allow Next Code]", [extrinsic]);
+      await starport.executeProposal("Upgrade from m2 to Current [Allow Next Code]", [extrinsic]);
 
       expect(await chain.nextCodeHash()).toEqual(currHash);
 
