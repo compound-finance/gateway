@@ -220,7 +220,7 @@ impl ChainAccountSignature {
     pub fn recover_account(self, message: &[u8]) -> Result<ChainAccount, Reason> {
         match self {
             ChainAccountSignature::Eth(eth_account, eth_sig) => {
-                let recovered = <Ethereum as Chain>::recover_address(message, eth_sig)?;
+                let recovered = <Ethereum as Chain>::recover_user_address(message, eth_sig)?;
                 if eth_account == recovered {
                     Ok(ChainAccount::Eth(recovered))
                 } else {
@@ -310,6 +310,7 @@ pub trait Chain {
 
     fn zero_hash() -> Self::Hash;
     fn hash_bytes(data: &[u8]) -> Self::Hash;
+    fn recover_user_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
     fn signer_address() -> Result<Self::Address, Reason>;
@@ -343,6 +344,10 @@ impl Chain for Compound {
     }
 
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
@@ -386,8 +391,12 @@ impl Chain for Ethereum {
         hash
     }
 
-    fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
+    fn recover_user_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
         Ok(compound_crypto::eth_recover(data, &signature, true)?)
+    }
+
+    fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
+        Ok(compound_crypto::eth_recover(data, &signature, false)?)
     }
 
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason> {
@@ -436,6 +445,10 @@ impl Chain for Polkadot {
         panic!("XXX not implemented");
     }
 
+    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
     fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
@@ -471,6 +484,10 @@ impl Chain for Solana {
         panic!("XXX not implemented");
     }
 
+    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
     fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
@@ -503,6 +520,10 @@ impl Chain for Tezos {
     }
 
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 

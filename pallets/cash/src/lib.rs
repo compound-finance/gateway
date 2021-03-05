@@ -448,9 +448,16 @@ decl_module! {
                 log!("offchain_worker error during fetch events: {:?}", e);
             }
 
-            // XXX is this end times?
-           if let Err(e) = internal::notices::process_notices::<T>(block_number) {
-                log!("offchain_worker error during process notices: {:?}", e);
+            let (succ, skip, failures) = internal::notices::process_notices::<T>(block_number);
+
+            let fail: usize = failures.iter().count();
+
+            if succ > 0 || skip > 0 || fail > 0 {
+                log!("offchain_worker process_notices: {} succ, {} skip, {} fail", succ, skip, fail);
+            }
+
+            if fail > 0 {
+                log!("offchain_worker error(s) during process notices: {:?}", failures);
             }
 
             // XXX
