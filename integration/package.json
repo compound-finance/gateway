@@ -18,6 +18,6 @@
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
   "resolutions": {
-    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",
+    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git"
   }
 }
