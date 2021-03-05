@@ -14,7 +14,7 @@ compound-chain> cargo +nightly build
 Note: if you require deeper debugging, you may want to enable the `runtime-debug` feature, via:
 
 ```sh
-compound-chain> cargo +nightly build -Zpackage-features --features "runtime-debug"
+compound-chain> cargo +nightly build --features "runtime-debug"
 ```
 
 This will remove `wasm-stripped` messages at the cost of a larger wasm runtime blob. This should not be used for production builds.

@@ -7,6 +7,7 @@ const {
   getNoticeId,
   getRawHash,
 } = require('./types');
+const chalk = require('chalk');
 
 const { u8aToHex } = require('@polkadot/util');
 const { xxhashAsHex } = require('@polkadot/util-crypto');
@@ -139,6 +140,23 @@ class Chain {
 
   async cashIndex() {
     return await this.ctx.api().query.cash.globalCashIndex();
+  }
+
+  async upgradeTo(version) {
+    this.ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
+    let versionHash = await version.hash();
+    let extrinsic = this.ctx.api().tx.cash.allowNextCodeWithHash(versionHash);
+
+    await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, [extrinsic]);
+    expect(await this.nextCodeHash()).toEqual(versionHash);
+    let event = await this.setNextCode(await version.wasm());
+    expect(event).toEqual({
+      CodeHash: versionHash,
+      DispatchResult: {
+        Ok: []
+      }
+    });
+    this.ctx.log(chalk.blueBright(`Upgrade to version ${version.version} complete.`));
   }
 
   async displayBlock() {

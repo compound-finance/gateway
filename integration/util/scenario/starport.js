@@ -48,6 +48,8 @@ class Starport {
     }
   }
 
+  // TODO: Add `lockTo`
+
   async setSupplyCap(token, amount) {
     let weiAmount = token.toWeiAmount(amount);
 
@@ -117,7 +119,12 @@ class Starport {
     return await this.starport.methods.invokeChain(encodedTarget, encodedNotices).send({ from: this.ctx.eth.defaultFrom, gas: 5000000 });
   }
 
-  async upgrade(impl, upgradeCall=null) {
+  async upgradeTo(version) {
+    let newImpl = await this.ctx.eth.__deploy('Starport', [this.ctx.cashToken.ethAddress(), this.ctx.eth.root()], { version });
+    await this.upgrade(newImpl);
+  }
+
+  async upgrade(impl, upgradeCall = null) {
     if (upgradeCall) {
       await this.proxyAdmin.methods.upgradeAndCall(
         this.starport._address,
@@ -125,7 +132,7 @@ class Starport {
         upgradeCall
       ).send({ from: this.ctx.eth.root() });
     } else {
-      await this.proxyAdmin.methods.upgrade(this.starport._address, impl._address).send({ from: this.ctx.eth.root() });
+      let tx = await this.proxyAdmin.methods.upgrade(this.starport._address, impl._address).send({ from: this.ctx.eth.root() });
     }
 
     this.starport = this.ctx.eth.__getContractAtAbi(impl._jsonInterface, this.proxy._address);

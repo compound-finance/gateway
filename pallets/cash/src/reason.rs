@@ -59,6 +59,7 @@ pub enum Reason {
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
     PendingEraNotice,
+    InvalidChain,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -116,6 +117,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::UnknownValidator => (26, 0, "unknown validator"),
             Reason::ChangeValidatorsError => (27, 0, "change validators error"),
             Reason::PendingEraNotice => (28, 0, "era-changing notice already pending"),
+            Reason::InvalidChain => (27, 0, "invalid chain"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

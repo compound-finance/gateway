@@ -6,7 +6,7 @@ const { constants } = require('fs');
 const path = require('path');
 
 function releaseUrl(repoUrl, version, file) {
-  return `${repoUrl}/releases/download/${version}/artifacts.${file}`;
+  return `${repoUrl}/releases/download/${version}/${file}`;
 }
 
 function baseReleasePath(version) {
@@ -31,15 +31,23 @@ function releaseTypesInfo(repoUrl, version) {
   };
 }
 
+function releaseContractsInfo(repoUrl, version) {
+  return {
+    url: releaseUrl(repoUrl, version, 'contracts.json'),
+    path: releasePath(version, 'contracts.json'),
+  };
+}
+
 async function pullVersion(repoUrl, version) {
   console.log(`Fetching version: ${version}...`);
 
   let wasmInfo = releaseWasmInfo(repoUrl, version);
   let typesInfo = releaseTypesInfo(repoUrl, version);
+  let contractsInfo = releaseContractsInfo(repoUrl, version);
 
   await fs.mkdir(baseReleasePath(version), { recursive: true });
 
-  await Promise.all([wasmInfo, typesInfo].map(async ({ url, path }) => {
+  await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
     console.log(`Downloading ${url} to ${path}`);
     await download(url, path);
   }));
@@ -57,8 +65,9 @@ async function checkFile(path) {
 async function checkVersion(repoUrl, version) {
   let wasmInfo = releaseWasmInfo(repoUrl, version);
   let typesInfo = releaseTypesInfo(repoUrl, version);
+  let contractsInfo = releaseContractsInfo(repoUrl, version);
 
-  let exists = await Promise.all([wasmInfo, typesInfo].map(async ({ url, path }) => {
+  let exists = await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
     return checkFile(path);
   }));
 
@@ -97,6 +106,10 @@ class Version {
     return releaseTypesInfo(this.ctx.__repoUrl(), this.version).path;
   }
 
+  contractsFile() {
+    return releaseContractsInfo(this.ctx.__repoUrl(), this.version).path;
+  }
+
   async ensure() {
     let exists = await this.check();
     if (!exists) {
@@ -129,6 +142,10 @@ class CurrentVersion extends Version {
     return this.ctx.__typesFile();
   }
 
+  contractsFile() {
+    return this.ctx.__getContractsFile();
+  }
+
   async check() {
     if (!await checkFile(this.wasmFile())) {
       console.warn(`Missing wasm file at ${this.wasmFile()}`)
@@ -138,13 +155,18 @@ class CurrentVersion extends Version {
       console.warn(`Missing types file at ${this.typesJson()}`)
     }
 
+    if (!await checkFile(this.contractsFile())) {
+      console.warn(`Missing contracts file at ${this.contractsFile()}`)
+    }
+
     return true;
   }
 }
 
 class Versions {
-  constructor(versions, ctx) {
+  constructor(versions, current, ctx) {
     this.versions = versions;
+    this.current = current;
     this.ctx = ctx;
   }
 
@@ -181,14 +203,15 @@ async function buildVersions(versionsInfo, ctx) {
     ];
   }, Promise.resolve([]));
 
-  versions.push(new CurrentVersion(ctx));
+  let current = new CurrentVersion(ctx);
+  versions.push(current);
 
   console.log({versions});
 
   // Make sure we have all included versions
   await Promise.all(versions.map((version) => version.ensure()));
 
-  return new Versions(versions, ctx);
+  return new Versions(versions, current, ctx);
 }
 
 module.exports = {
