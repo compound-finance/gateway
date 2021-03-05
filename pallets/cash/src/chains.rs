@@ -7,7 +7,7 @@ use crate::types::{AssetAmount, CashIndex, Timestamp};
 
 use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
-use our_std::{convert::TryInto, str::FromStr, Debuggable, Deserialize, RuntimeDebug, Serialize};
+use our_std::{str::FromStr, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
 /// Type for representing the selection of a supported chain.
 #[derive(Serialize, Deserialize)] // used in config
@@ -184,16 +184,6 @@ impl From<ChainAsset> for String {
             _ => panic!("XXX not implemented"),
         }
     }
-}
-
-/// Type for chain assets paired with an account
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainAssetAccount {
-    Gate(<Gateway as Chain>::Address, <Gateway as Chain>::Address),
-    Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Address),
-    Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Address),
-    Sol(<Solana as Chain>::Address, <Solana as Chain>::Address),
-    Tez(<Tezos as Chain>::Address, <Tezos as Chain>::Address),
 }
 
 /// Type for a signature and account tied to a chain.

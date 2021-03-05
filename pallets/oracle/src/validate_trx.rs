@@ -1,7 +1,6 @@
 use crate::{error::OracleError, oracle, Call, Config};
 use codec::Decode;
 use codec::Encode;
-use frame_support::storage::StorageValue;
 use our_std::RuntimeDebug;
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
@@ -97,7 +96,7 @@ pub fn validate_unsigned<T: Config>(
 mod tests {
     use super::*;
     use crate::{mock::*, ticker::Ticker, types::ReporterSet, Call, PriceReporters, PriceTimes};
-    use frame_support::storage::StorageMap;
+    use frame_support::storage::{StorageMap, StorageValue};
 
     #[test]
     fn test_post_price_invalid_signature() {

@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
 use frame_support;
 use gateway_crypto::CryptoError;
-use our_std::{Debuggable, RuntimeDebug};
+use our_std::Debuggable;
 
 /// Errors coming from the price oracle.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]

@@ -1,9 +1,4 @@
-use frame_support::{
-    dispatch::DispatchResultWithPostInfo,
-    storage::StorageValue,
-    traits::UnfilteredDispatchable,
-    weights::{Pays, PostDispatchInfo},
-};
+use frame_support::{dispatch::DispatchResultWithPostInfo, storage::StorageValue};
 
 use crate::{
     chains::{Chain, Ethereum},
@@ -21,6 +16,7 @@ pub fn allow_next_code_with_hash<T: Config>(hash: CodeHash) -> Result<(), Reason
 
 #[cfg(not(test))]
 fn dispatch_call<T: Config>(code: Vec<u8>) -> DispatchResultWithPostInfo {
+    use frame_support::traits::UnfilteredDispatchable;
     let call = frame_system::Call::<T>::set_code(code);
     call.dispatch_bypass_filter(frame_system::RawOrigin::Root.into())
 }
@@ -43,19 +39,17 @@ pub fn set_next_code_via_hash<T: Config>(code: Vec<u8>) -> Result<(), Reason> {
 
 #[cfg(test)]
 fn dispatch_call<T: Config>(_code: Vec<u8>) -> DispatchResultWithPostInfo {
-    Ok(PostDispatchInfo {
+    Ok(frame_support::weights::PostDispatchInfo {
         actual_weight: None,
-        pays_fee: Pays::No,
+        pays_fee: frame_support::weights::Pays::No,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock;
-    use crate::mock::*;
-    use frame_support::{storage, storage::StorageValue};
-    use sp_core::storage::well_known_keys;
+    use crate::{mock, mock::*};
+    use frame_support::storage::StorageValue;
 
     #[test]
     fn test_allow_next_code_with_hash() {

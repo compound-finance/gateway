@@ -4,12 +4,173 @@ use frame_support::storage::{
 use frame_system::offchain::SubmitTransaction;
 
 use crate::{
-    chains::{ChainAccount, ChainHash, ChainId, ChainSignature, ChainSignatureList},
+    chains::{ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature, ChainSignatureList},
     log,
-    notices::{has_signer, EncodeNotice, NoticeId, NoticeState},
-    reason::Reason,
-    require, Call, Config, NoticeHashes, NoticeStates, Notices, Validators,
+    notices::{
+        has_signer, CashExtractionNotice, ChangeAuthorityNotice, EncodeNotice, ExtractionNotice,
+        FutureYieldNotice, Notice, NoticeId, NoticeState, SetSupplyCapNotice,
+    },
+    require,
+    types::{
+        AssetAmount, AssetQuantity, CashIndex, CashPrincipalAmount, Reason, Timestamp,
+        ValidatorKeys, APR,
+    },
+    AccountNotices, Call, Config, Event, LatestNotice, Module, NoticeHashes, NoticeHolds,
+    NoticeStates, Notices, Validators,
 };
+
+pub fn dispatch_extraction_notice<T: Config>(
+    asset: ChainAsset,
+    recipient: ChainAccount,
+    amount: AssetQuantity,
+) {
+    dispatch_notice::<T>(
+        recipient.chain_id(),
+        Some(recipient),
+        false,
+        &|notice_id, parent_hash| {
+            Notice::ExtractionNotice(match (asset, recipient, parent_hash) {
+                (
+                    ChainAsset::Eth(eth_asset),
+                    ChainAccount::Eth(eth_account),
+                    ChainHash::Eth(eth_parent_hash),
+                ) => ExtractionNotice::Eth {
+                    id: notice_id,
+                    parent: eth_parent_hash,
+                    asset: eth_asset,
+                    account: eth_account,
+                    amount: amount.value,
+                },
+
+                _ => panic!("XXX not implemented"), // generate these w/ macros?
+            })
+        },
+    )
+}
+
+pub fn dispatch_cash_extraction_notice<T: Config>(
+    recipient: ChainAccount,
+    principal: CashPrincipalAmount,
+) {
+    dispatch_notice::<T>(
+        recipient.chain_id(),
+        Some(recipient),
+        false,
+        &|notice_id, parent_hash| {
+            Notice::CashExtractionNotice(match (recipient, parent_hash) {
+                (ChainAccount::Eth(eth_account), ChainHash::Eth(eth_parent_hash)) => {
+                    CashExtractionNotice::Eth {
+                        id: notice_id,
+                        parent: eth_parent_hash,
+                        account: eth_account,
+                        principal: principal.0,
+                    }
+                }
+
+                _ => panic!("XXX not implemented"), // generate these w/ macros?
+            })
+        },
+    )
+}
+
+pub fn dispatch_supply_cap_notice<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) {
+    dispatch_notice::<T>(
+        chain_asset.chain_id(),
+        None,
+        true,
+        &|notice_id, parent_hash| {
+            Notice::SetSupplyCapNotice(match (chain_asset, parent_hash) {
+                (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
+                    SetSupplyCapNotice::Eth {
+                        id: notice_id,
+                        parent: eth_parent_hash,
+                        asset: eth_asset,
+                        cap,
+                    }
+                }
+
+                _ => panic!("XXX not implemented"), // generate these w/ macros?
+            })
+        },
+    )
+}
+
+pub fn dispatch_future_yield_notice<T: Config>(
+    next_yield: APR,
+    next_yield_index: CashIndex,
+    next_yield_start: Timestamp,
+) {
+    // XXX for each chain id
+    let chain_id = ChainId::Eth;
+    dispatch_notice::<T>(chain_id, None, true, &|notice_id, parent_hash| {
+        Notice::FutureYieldNotice(match parent_hash {
+            ChainHash::Eth(eth_parent_hash) => FutureYieldNotice::Eth {
+                id: notice_id,
+                parent: eth_parent_hash,
+                next_cash_yield: next_yield.0,
+                next_cash_index: next_yield_index.0,
+                next_cash_yield_start: next_yield_start,
+            },
+
+            _ => panic!("XXX not implemented"), // generate these w/ macros?
+        })
+    })
+}
+
+pub fn dispatch_change_authority_notice<T: Config>(validators: Vec<ValidatorKeys>) {
+    // XXX for each chain id
+    let chain_id = ChainId::Eth;
+    dispatch_notice::<T>(chain_id, None, true, &|notice_id, parent_hash| {
+        Notice::ChangeAuthorityNotice(match parent_hash {
+            ChainHash::Eth(eth_parent_hash) => ChangeAuthorityNotice::Eth {
+                id: notice_id,
+                parent: eth_parent_hash,
+                new_authorities: validators.iter().map(|x| x.eth_address).collect::<Vec<_>>(),
+            },
+
+            _ => panic!("XXX not implemented"), // generate these w/ macros?
+        })
+    })
+}
+
+/// Add a notice to the queue and all the secondary indices.
+/// Called from effects phase and thus may not fail.
+fn dispatch_notice<T: Config>(
+    chain_id: ChainId,
+    maybe_recipient: Option<ChainAccount>,
+    should_increment_era: bool,
+    notice_fn: &dyn Fn(NoticeId, ChainHash) -> Notice,
+) {
+    let (latest_notice_id, parent_hash) =
+        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
+
+    let notice_id = if should_increment_era {
+        // XXXXXX where does this belong?
+        //  require!(NoticeHolds::iter().count() == 0, Reason::PendingEraNotice);
+        latest_notice_id.seq_era()
+    } else {
+        latest_notice_id.seq()
+    };
+
+    if should_increment_era {
+        NoticeHolds::insert(chain_id, notice_id);
+    }
+
+    // Add to notices, notice states, track the latest notice and index by account
+    let notice = notice_fn(notice_id, parent_hash);
+    let notice_hash = notice.hash();
+    Notices::insert(chain_id, notice_id, &notice);
+    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
+    LatestNotice::insert(chain_id, (notice_id, notice_hash));
+    NoticeHashes::insert(notice_hash, notice_id);
+    if let Some(recipient) = maybe_recipient {
+        AccountNotices::append(recipient, notice_id);
+    }
+
+    // Deposit Notice Event
+    let encoded_notice = notice.encode_notice();
+    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
+}
 
 pub fn handle_notice_invoked<T: Config>(
     chain_id: ChainId,

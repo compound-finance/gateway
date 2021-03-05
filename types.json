@@ -88,15 +88,6 @@
       "Tez": ["[u8; 20]"]
     }
   },
-  "ChainAssetAccount": {
-    "_enum": {
-      "Comp": "([u8; 20], [u8; 20])",
-      "Eth": "([u8; 20], [u8; 20])",
-      "Dot": "([u8; 20], [u8; 20])",
-      "Sol": "([u8; 20], [u8; 20])",
-      "Tez": "([u8; 20], [u8; 20])"
-    }
-  },
   "ChainAccountSignature": {
     "_enum": {
       "Comp": "([u8; 20], [u8; 65])",

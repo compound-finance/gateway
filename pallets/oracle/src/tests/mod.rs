@@ -1,7 +1,6 @@
 use crate::{error::OracleError, ticker::Ticker};
 use crate::{mock::*, *};
 
-use codec::Decode;
 use sp_core::offchain::testing;
 
 pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
