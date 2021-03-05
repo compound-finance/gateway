@@ -729,7 +729,7 @@ describe('Starport', () => {
     it('should not authorize duplicate sigs', async () => {
       const duplicateAccounts = Array(3).fill(authorityWallets[0]);
       const signatures = signAll(testUnlockNotice, duplicateAccounts);
-      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Duplicated authority signer');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Below quorum threshold');
     });
 
     it('should not authorize with too few signatures', async () => {
@@ -740,7 +740,7 @@ describe('Starport', () => {
     it('should not authorize with an unauthorized signer', async () => {
       const badAccounts = nRandomWallets(2);
       const signatures = signAll(testUnlockNotice, badAccounts);
-      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Unauthorized authority signer');
+      await expect(call(starport, 'checkNoticeSignerAuthorized_', [testUnlockNoticeHash, authorityAddresses, signatures])).rejects.toRevert('revert Below quorum threshold');
     });
   });
 

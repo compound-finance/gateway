@@ -370,14 +370,19 @@ contract Starport {
         bytes[] calldata signatures
     ) internal pure {
         address[] memory sigs = new address[](signatures.length);
+        uint sigsLen = 0;
+        uint authorityCount = authorities_.length;
+
         for (uint i = 0; i < signatures.length; i++) {
             address signer = recover(noticeHash, signatures[i]);
-            require(contains(sigs, signer) == false, "Duplicated authority signer");
-            require(contains(authorities_, signer) == true, "Unauthorized authority signer");
-            sigs[i] = signer;
+            bool duplicate = contains(sigs, signer, sigsLen);
+            bool authorized = contains(authorities_, signer, authorityCount);
+            if (authorized && !duplicate) {
+                sigs[sigsLen++] = signer;
+            }
         }
 
-        require(sigs.length >= getQuorum(authorities_.length), "Below quorum threshold");
+        require(sigsLen >= getQuorum(authorities_.length), "Below quorum threshold");
     }
 
     /**
@@ -411,8 +416,8 @@ contract Starport {
     }
 
     // Helper function to check if a given list contains an element
-    function contains(address[] memory arr, address elem) internal pure returns (bool) {
-        for (uint i = 0; i < arr.length; i++) {
+    function contains(address[] memory arr, address elem, uint len) internal pure returns (bool) {
+        for (uint i = 0; i < len; i++) {
             if (arr[i] == elem) {
                 return true;
             }
