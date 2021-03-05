@@ -265,6 +265,7 @@
       "BadTicker": "",
       "BadUnits": "",
       "ChainMismatch": "",
+      "ChangeValidatorsError": "",
       "CryptoError": "(CryptoError)",
       "EventAlreadySigned": "",
       "FailedToSubmitExtrinsic": "",
@@ -295,12 +296,13 @@
       "SelfTransfer": "",
       "SetYieldNextError": "(SetYieldNextError)",
       "SerdeError": "",
-      "ChangeValidatorsError": "",
       "SignatureAccountMismatch": "",
       "SignatureMismatch": "",
       "TimeTravelNotAllowed": "",
       "TrxRequestParseError": "(TrxReqParseError)",
-      "UnknownValidator": ""
+      "UnknownValidator": "",
+      "PendingEraNotice": "",
+      "InvalidChain": ""
     }
   },
   "MathError": {

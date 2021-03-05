@@ -221,7 +221,7 @@ class Validators {
 
   async addValidator(name, validatorInfo) {
     let newValidator = buildValidator(name, validatorInfo, this.ctx);
-    await this.ctx.api().rpc.system.addReservedPeer(newValidator.asPeer());
+    await Promise.all(this.all().map((validator) => validator.api.rpc.system.addReservedPeer(newValidator.asPeer())));
     let existingPeers = this.validators.map((validator) => validator.asPeer());
     await newValidator.start(existingPeers);
     this.validators.push(newValidator);

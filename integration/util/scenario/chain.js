@@ -263,20 +263,26 @@ class Chain {
   }
 
   async setKeys(signer, keys) {
-    const call = this.ctx.api().tx.session.setKeys(keys, new Uint8Array());
+    const call = this.ctx.api().tx.session.setKeys(keys, "0x5566");
     await sendAndWaitForEvents(call, this.api(), { signer });
   }
 
-  async waitUntilSession(num) {
+  async waitUntilSession(target, retries = 60) {
     const timer = ms => new Promise(res => setTimeout(res, ms));
-    const checkIdx = async () => {
+    const checkIdx = async (r) => {
       const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
-      if (idx <= num) {
-        await timer(1000);
-        await checkIdx();
+      if (idx < target) {
+        console.log(`Waiting for session=${target}, curr=${idx}`);
+
+        if (r === 0) {
+          throw new Error(`Unable to get session ${target} after ${retries} retries`);
+        } else {
+          await timer(1000);
+          await checkIdx(r - 1);
+        }
       }
     };
-    await checkIdx();
+    await checkIdx(retries);
   }
 }
 
