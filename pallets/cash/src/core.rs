@@ -37,10 +37,10 @@ use crate::{
         Timestamp, USDQuantity, ValidatorIdentity,
     },
     AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
-    CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex,
-    IsEraChangePending, LastIndices, LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice,
-    Miner, Module, NoticeHashes, NoticeHold, NoticeStates, Notices, PendingEraNotices, Prices,
-    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
+    LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice, Miner, Module, NoticeHashes,
+    NoticeHold, NoticeStates, Notices, Prices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets,
 };
 
 #[macro_export]
@@ -382,10 +382,7 @@ pub fn dispatch_notice_internal<T: Config>(
         LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
 
     let notice_id = if should_increment_era {
-        require!(
-            PendingEraNotices::iter().count() == 0,
-            Reason::PendingEraNotice
-        );
+        require!(NoticeHold::iter().count() == 0, Reason::PendingEraNotice);
         latest_notice_id.seq_era()
     } else {
         latest_notice_id.seq()
@@ -395,8 +392,6 @@ pub fn dispatch_notice_internal<T: Config>(
 
     if should_increment_era {
         NoticeHold::insert(chain_id, notice_id);
-        PendingEraNotices::insert(chain_id, notice_id);
-        IsEraChangePending::put(true);
     }
 
     // Add to notices, notice states, track the latest notice and index by account
@@ -1405,14 +1400,6 @@ pub fn on_initialize_internal<T: Config>(
     TotalCashPrincipal::put(total_cash_principal_new);
     LastMinerSharePrincipal::put(miner_share_principal);
     LastYieldTimestamp::put(now);
-
-    // undo the hold placed on notice signing during era changes
-    for (chain_id, notice_id) in PendingEraNotices::iter() {
-        if NoticeStates::get(chain_id, notice_id) == NoticeState::Executed {
-            NoticeHold::take(chain_id);
-            PendingEraNotices::take(chain_id);
-        }
-    }
 
     // Possibly rotate in any scheduled next CASH rate
     if let Some((next_apr, next_start)) = CashYieldNext::get() {

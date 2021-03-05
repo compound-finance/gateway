@@ -264,7 +264,7 @@ class Chain {
 
   async setKeys(signer, keys) {
     const call = this.ctx.api().tx.session.setKeys(keys, new Uint8Array());
-    await signAndSend(call, signer);
+    await sendAndWaitForEvents(call, this.api(), { signer });
   }
 
   async waitUntilSession(num) {

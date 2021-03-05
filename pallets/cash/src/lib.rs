@@ -174,12 +174,6 @@ decl_storage! {
         /// The most recent notice emitted for a given chain
         LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
 
-        // Notices that change the starport era. All pending era notices must be signed before new regular notices can be signed
-        PendingEraNotices get(fn pending_auth_notice): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
-
-        // True after era notices have been initiated but before they have been completed and the session has been rotated
-        IsEraChangePending get(fn era_change_pending): bool;
-
         // If true, stops notices from being signed for this chain
         NoticeHold get(fn notice_hold): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
 
@@ -361,7 +355,7 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
 
 /*
 -- Block N --
-changeAuth extrinsic, nextValidators set, pendingEraNotices set, IsEraChangePending set true
+changeAuth extrinsic, nextValidators set,  set true
 
 -- Block N + 1 --
 Must end session to get through the already-planned session
@@ -382,10 +376,22 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
         if NextValidators::iter().count() > 0 {
             // we have not planned the new auth session yet
             true
-        } else if IsEraChangePending::get() == true && PendingEraNotices::iter().count() == 0 {
-            // era change has just occured and we are ready to switch sessions
-            IsEraChangePending::put(false);
-            true
+        } else if NoticeHold::iter().count() > 0 {
+            // check if we should end the hold
+            let mut should_end_hold = true;
+            for (chain_id, notice_id) in NoticeHold::iter() {
+                if NoticeStates::get(chain_id, notice_id) != NoticeState::Executed {
+                    should_end_hold = false;
+                }
+            }
+            if should_end_hold {
+                for (chain_id, _) in NoticeHold::iter() {
+                    NoticeHold::take(chain_id);
+                }
+                true
+            } else {
+                false
+            }
         } else {
             // no era changes pending, periodic
             let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
