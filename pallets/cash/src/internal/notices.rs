@@ -1,4 +1,6 @@
-use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, IterableStorageMap, StorageMap};
+use frame_support::storage::{
+    IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap,
+};
 use frame_system::offchain::SubmitTransaction;
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
     log,
     notices::{has_signer, EncodeNotice, NoticeId, NoticeState},
     reason::Reason,
-    require, Call, Config, NoticeHashes, NoticeStates, Notices, Validators
+    require, Call, Config, NoticeHashes, NoticeStates, Notices, Validators,
 };
 
 pub fn handle_notice_invoked<T: Config>(
@@ -24,7 +26,11 @@ pub fn handle_notice_invoked<T: Config>(
     Ok(())
 }
 
-fn process_notice_state<T: Config>(chain_id: ChainId, notice_id: NoticeId, notice_state: NoticeState) -> Result<bool, Reason> {
+fn process_notice_state<T: Config>(
+    chain_id: ChainId,
+    notice_id: NoticeId,
+    notice_state: NoticeState,
+) -> Result<bool, Reason> {
     match notice_state {
         NoticeState::Pending { signature_pairs } => {
             let signer = chain_id.signer_address()?;
@@ -78,7 +84,7 @@ pub fn publish_signature(
             let has_signer_v = has_signer(&signature_pairs, signer);
 
             if has_signer_v {
-                return Ok(()) // Ignore for double-signs
+                return Ok(()); // Ignore for double-signs
             }
 
             // TODO: Can this be easier?
@@ -96,7 +102,7 @@ pub fn publish_signature(
             }?;
 
             // Note: we currently iterate all potentially all validators to check validity
-            if !Validators::iter().any(|(_,v)| ChainAccount::Eth(v.eth_address) == signer) {
+            if !Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
                 Err(Reason::UnknownValidator)?
             }
 
@@ -118,7 +124,7 @@ pub fn publish_signature(
 mod tests {
     use super::*;
     use crate::{
-        chains::{Ethereum, Chain, ChainSignatureList},
+        chains::{Chain, ChainSignatureList, Ethereum},
         mock::*,
         notices::{ExtractionNotice, Notice},
         types::ValidatorKeys,
@@ -298,7 +304,9 @@ mod tests {
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let signer = <Ethereum as Chain>::signer_address().unwrap();
-            let notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![(signer, [0u8; 65])]) };
+            let notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![(signer, [0u8; 65])]),
+            };
 
             assert_eq!(
                 process_notice_state::<Test>(chain_id, notice_id, notice_state),
@@ -358,7 +366,9 @@ mod tests {
 
             // Missing
             let notice_id_3 = NoticeId(5, 8);
-            let notice_state_3 = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![]) };
+            let notice_state_3 = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![]),
+            };
             NoticeStates::insert(chain_id, notice_id_3, notice_state_3);
 
             assert_eq!(
@@ -379,10 +389,7 @@ mod tests {
             let signature = ChainSignature::Eth([1u8; 65]);
             NoticeStates::insert(chain_id, notice_id, notice_state);
 
-            assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
-                Ok(())
-            );
+            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
         });
     }
 
@@ -395,10 +402,7 @@ mod tests {
             let signature = ChainSignature::Eth([1u8; 65]);
             NoticeStates::insert(chain_id, notice_id, notice_state);
 
-            assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
-                Ok(())
-            );
+            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
         });
     }
 
@@ -418,21 +422,28 @@ mod tests {
             let signature = notice.sign_notice().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
-                _ => panic!("absurd")
+                _ => panic!("absurd"),
             };
-            let notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![]) };
+            let notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![]),
+            };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
             let substrate_id = AccountId32::new([0u8; 32]);
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
-            Validators::insert(substrate_id.clone(), ValidatorKeys { substrate_id, eth_address });
-
-            let expected_notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![(eth_address, eth_signature)]) };
-
-            assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
-                Ok(())
+            Validators::insert(
+                substrate_id.clone(),
+                ValidatorKeys {
+                    substrate_id,
+                    eth_address,
+                },
             );
+
+            let expected_notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![(eth_address, eth_signature)]),
+            };
+
+            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
 
             assert_eq!(
                 NoticeStates::get(chain_id, notice_id),
@@ -480,17 +491,16 @@ mod tests {
             let signature = notice.sign_notice().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
-                _ => panic!("absurd")
+                _ => panic!("absurd"),
             };
             let signer = <Ethereum as Chain>::signer_address().unwrap();
-            let notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![(signer, eth_signature)]) };
+            let notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![(signer, eth_signature)]),
+            };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
 
-            assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
-                Ok(())
-            );
+            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
         });
     }
 
@@ -510,10 +520,12 @@ mod tests {
             let signature = notice.sign_notice().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
-                _ => panic!("invalid signature")
+                _ => panic!("invalid signature"),
             };
             let signer = <Ethereum as Chain>::signer_address().unwrap();
-            let notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Comp(vec![(signer, eth_signature)]) };
+            let notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Comp(vec![(signer, eth_signature)]),
+            };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
 
@@ -538,7 +550,9 @@ mod tests {
                 account: [2; 20],
             });
             let signature = ChainSignature::Eth([1u8; 65]);
-            let notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![([1u8; 20], [1u8; 65])]) };
+            let notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![([1u8; 20], [1u8; 65])]),
+            };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
 
@@ -567,11 +581,13 @@ mod tests {
                 ChainSignature::Eth(ref mut a) => {
                     a[64] = 2;
                     a
-                },
-                _ => panic!("invalid signature")
+                }
+                _ => panic!("invalid signature"),
             };
             let signer = <Ethereum as Chain>::signer_address().unwrap();
-            let notice_state = NoticeState::Pending { signature_pairs: ChainSignatureList::Eth(vec![(signer, *eth_signature)]) };
+            let notice_state = NoticeState::Pending {
+                signature_pairs: ChainSignatureList::Eth(vec![(signer, *eth_signature)]),
+            };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
 
