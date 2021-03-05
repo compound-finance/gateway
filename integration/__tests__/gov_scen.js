@@ -81,13 +81,15 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     name: "Remove Auth",
     scenario: async ({ ctx, chain, starport, validators }) => {
       const alice = validators.validatorInfoMap.alice;
-      const alice_account_id = alice.aura_key;
-      const newAuthsRaw = [{ substrate_id: ctx.actors.keyring.decodeAddress(alice_account_id), eth_address: alice.eth_account }];
+      const newAuthsRaw = [{ substrate_id: ctx.actors.keyring.decodeAddress(alice.aura_key), eth_address: alice.eth_account }];
+
       let extrinsic = ctx.api().tx.cash.changeValidators(newAuthsRaw);
+
       await starport.executeProposal("Update authorities", [extrinsic]);
+
       const pending = await chain.pendingCashValidators();
 
-      const newAuths = [[alice_account_id, { eth_address: alice.eth_account }]];
+      const newAuths = [[alice.aura_key, { eth_address: alice.eth_account }]];
       expect(pending).toEqual(newAuths);
 
       await chain.waitUntilSession(3);
@@ -95,7 +97,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       expect(newVals).toEqual(newAuths);
 
       const newSessionAuths = await chain.sessionValidators();
-      expect(newSessionAuths).toEqual([alice_account_id]);
+      expect(newSessionAuths).toEqual([alice.aura_key]);
 
       const grandpaAuths = await chain.getGrandpaAuthorities();
       expect(grandpaAuths).toEqual([alice.grandpa_key]);
@@ -105,16 +107,18 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
+    only: true,
     name: "Add new auth with session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
-      // spins up new validator charlie and adds to auth set
+      // Spin up new validator Charlie and add to auth set
       const keyring = ctx.actors.keyring;
-      const peer_id = "12D3KooW9qtwBHeQryg9mXBVMkz4YivUsj62g1tYBACUukKToKof";
-      const node_key = "0x0000000000000000000000000000000000000000000000000000000000000002";
       const eth_private_key = "0xb1b07e7078273a09c64ef9bd52f49636535ba26624c7c75a57e1286b13c8f7ea";
       const eth_account = "0x9c00B0af5586aE099649137ca6d00a641aD30736";
+      const node_key = "0x0000000000000000000000000000000000000000000000000000000000000003";
+      const peer_id = "12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x";
+      const spawn_args = ['--charlie'];
 
-      const newValidator = await validators.addValidator("Charlie", { peer_id, node_key, eth_private_key, eth_account });
+      const newValidator = await validators.addValidator("Charlie", { peer_id, node_key, eth_private_key, eth_account, spawn_args });
 
       const newValidatorKeys = await chain.rotateKeys(newValidator);
 
