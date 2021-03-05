@@ -17,33 +17,27 @@ use frame_support::{
     },
 };
 
-// Import these traits so we can interact with the substrate storage modules.
+use pallet_oracle::types::Price;
+
 use crate::{
-    chains::{ChainAccount, ChainAsset, ChainAssetAccount, ChainHash, ChainId},
+    chains::{ChainAccount, ChainAsset, ChainHash, ChainId},
     events::ChainLogEvent,
     factor::Factor,
     internal, log,
-    notices::{
-        CashExtractionNotice, EncodeNotice, ExtractionNotice, Notice, NoticeId, NoticeState,
-    },
     params::{MIN_TX_VALUE, TRANSFER_FEE},
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
-    symbol::{Units, CASH, USD},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
-        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, Quantity, Timestamp,
-        USDQuantity, ValidatorIdentity,
+        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, NoticeId, Quantity,
+        Timestamp, USDQuantity, Units, ValidatorIdentity, CASH,
     },
-    AccountNotices, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
-    CashYield, CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
-    LastMinerSharePrincipal, LastYieldTimestamp, LatestNotice, Miner, Module, NoticeHashes,
-    NoticeHold, NoticeStates, Notices, SupplyIndices, SupportedAssets, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets,
+    AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
+    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
+    LastMinerSharePrincipal, LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets,
+    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
-use pallet_oracle;
-use pallet_oracle::types::Price;
 
 #[macro_export]
 macro_rules! require {
@@ -68,18 +62,6 @@ macro_rules! require_min_tx_value {
 // let's just give the initial rewards to some burn account.
 pub fn get_some_miner<T: Config>() -> ChainAccount {
     Miner::get().unwrap_or(ChainAccount::Eth([0; 20]))
-}
-
-pub fn try_chain_asset_account(
-    asset: ChainAsset,
-    account: ChainAccount,
-) -> Option<ChainAssetAccount> {
-    match (asset, account) {
-        (ChainAsset::Eth(eth_asset), ChainAccount::Eth(eth_account)) => {
-            Some(ChainAssetAccount::Eth(eth_asset, eth_account))
-        }
-        _ => None,
-    }
 }
 
 pub fn get_now<T: Config>() -> Timestamp {
@@ -351,45 +333,6 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
     }
 }
 
-pub fn dispatch_notice_internal<T: Config>(
-    chain_id: ChainId,
-    recipient_opt: Option<ChainAccount>,
-    should_increment_era: bool,
-    notice_fn: &dyn Fn(NoticeId, ChainHash) -> Result<Notice, Reason>,
-) -> Result<(), Reason> {
-    // XXX this cannot fail, should not return result
-    let (latest_notice_id, parent_hash) =
-        LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
-
-    let notice_id = if should_increment_era {
-        require!(NoticeHold::iter().count() == 0, Reason::PendingEraNotice);
-        latest_notice_id.seq_era()
-    } else {
-        latest_notice_id.seq()
-    };
-
-    let notice = notice_fn(notice_id, parent_hash)?; // XXX fixme cannot fail
-
-    if should_increment_era {
-        NoticeHold::insert(chain_id, notice_id);
-    }
-
-    // Add to notices, notice states, track the latest notice and index by account
-    let notice_hash = notice.hash();
-    Notices::insert(chain_id, notice_id, &notice);
-    NoticeStates::insert(chain_id, notice_id, NoticeState::pending(&notice));
-    LatestNotice::insert(chain_id, (notice_id, notice_hash));
-    NoticeHashes::insert(notice_hash, notice_id);
-    if let Some(recipient) = recipient_opt {
-        AccountNotices::append(recipient, notice_id);
-    }
-
-    // Deposit Notice Event
-    let encoded_notice = notice.encode_notice();
-    Module::<T>::deposit_event(Event::Notice(notice_id, notice, encoded_notice));
-    Ok(()) // XXX cannot fail
-}
-
 /// Update the index of which assets an account has non-zero balances in.
 fn set_asset_balance_internal<T: Config>(
     asset: ChainAsset,
@@ -491,8 +434,6 @@ pub fn extract_internal<T: Config>(
     recipient: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    let chain_asset_account =
-        try_chain_asset_account(asset.asset, recipient).ok_or(Reason::ChainMismatch)?;
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
         has_liquidity_to_reduce_asset::<T>(holder, asset, amount)?,
@@ -531,29 +472,7 @@ pub fn extract_internal<T: Config>(
 
     set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
 
-    // XXX fix me this cannot fail
-    dispatch_notice_internal::<T>(
-        recipient.chain_id(),
-        Some(recipient),
-        false,
-        &|notice_id, parent_hash| {
-            Ok(Notice::ExtractionNotice(
-                match (chain_asset_account, parent_hash) {
-                    (
-                        ChainAssetAccount::Eth(eth_asset, eth_account),
-                        ChainHash::Eth(eth_parent_hash),
-                    ) => Ok(ExtractionNotice::Eth {
-                        id: notice_id,
-                        parent: eth_parent_hash,
-                        asset: eth_asset,
-                        account: eth_account,
-                        amount: amount.value,
-                    }),
-                    _ => Err(Reason::AssetExtractionNotSupported),
-                }?,
-            ))
-        },
-    )?;
+    internal::notices::dispatch_extraction_notice::<T>(asset.asset, recipient, amount);
 
     <Module<T>>::deposit_event(Event::Extract(asset.asset, holder, recipient, amount.value));
 
@@ -589,26 +508,7 @@ pub fn extract_cash_principal_internal<T: Config>(
     CashPrincipals::insert(holder, holder_cash_principal_new);
     TotalCashPrincipal::put(total_cash_principal_new);
 
-    // XXX fix me this cannot fail
-    dispatch_notice_internal::<T>(
-        recipient.chain_id(),
-        Some(recipient),
-        false,
-        &|notice_id, parent_hash| {
-            // XXX bound to eth?
-            Ok(Notice::CashExtractionNotice(match (holder, parent_hash) {
-                (ChainAccount::Eth(eth_account), ChainHash::Eth(eth_parent_hash)) => {
-                    Ok(CashExtractionNotice::Eth {
-                        id: notice_id,
-                        parent: eth_parent_hash,
-                        account: eth_account,
-                        principal: principal.0,
-                    })
-                }
-                _ => Err(Reason::AssetExtractionNotSupported),
-            }?))
-        },
-    )?;
+    internal::notices::dispatch_cash_extraction_notice::<T>(recipient, principal);
 
     <Module<T>>::deposit_event(Event::ExtractCash(holder, recipient, principal, index));
 
@@ -1299,7 +1199,7 @@ pub fn on_initialize_internal<T: Config>(
     now: Timestamp,
     last_yield_timestamp: Timestamp,
 ) -> Result<frame_support::weights::Weight, Reason> {
-    // xxx re-evaluate how we do time, we don't really want this to be zero but there may
+    // XXX re-evaluate how we do time, we don't really want this to be zero but there may
     // not actually be any good way to do "current" time per-se so what we have here is more like
     // the last block's time and the block before
     // XXX also we should try to inject Now (and previous) for tests instead of taking different path

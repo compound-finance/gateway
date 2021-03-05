@@ -1,9 +1,5 @@
 use our_std::{convert::TryInto, str::FromStr};
-use serde::{
-    de,
-    ser::{SerializeMap, SerializeSeq},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{de, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     chains::{Chain, ChainAccount, ChainAsset, Ethereum},

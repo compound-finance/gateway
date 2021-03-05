@@ -11,19 +11,20 @@ extern crate alloc;
 extern crate ethereum_client;
 extern crate trx_request;
 
-use crate::chains::{
-    ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
-    ChainSignatureList,
+use crate::{
+    chains::{
+        ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
+        ChainSignatureList,
+    },
+    events::{ChainLogEvent, ChainLogId, EventState},
+    notices::{Notice, NoticeId, NoticeState},
+    types::{
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
+        CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
+        LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig, APR,
+    },
 };
-use crate::events::{ChainLogEvent, ChainLogId, EventState};
-use crate::notices::{Notice, NoticeId, NoticeState};
-use crate::rates::{InterestRateModel, APR};
-use crate::reason::Reason;
-use crate::types::{
-    AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
-    CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, LiquidityFactor, Nonce,
-    SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
-};
+
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
@@ -164,20 +165,20 @@ decl_storage! {
         /// The mapping of (status of) events witnessed on a given chain, by event id.
         EventStates get(fn event_state): map hasher(blake2_128_concat) ChainLogId => EventState;
 
-        /// Notices contain information which can be synced to Starports
+        /// The mapping of notice id to notice.
         Notices get(fn notice): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
 
-        /// Notice IDs, indexed by the hash of the notice itself
+        /// Notice IDs, indexed by the hash of the notice itself.
         NoticeHashes get(fn notice_hash): map hasher(blake2_128_concat) ChainHash => Option<NoticeId>;
 
-        /// The state of a notice in regards to signing and execution, as tracked by the chain
+        /// The state of a notice in regards to signing and execution, as tracked by the chain.
         NoticeStates get(fn notice_state): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => NoticeState;
 
-        /// The most recent notice emitted for a given chain
+        /// The most recent notice emitted for a given chain.
         LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
 
-        // If true, stops notices from being signed for this chain
-        NoticeHold get(fn notice_hold): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
+        /// Notices which we are waiting to be fully signed before we allow the next session to end.
+        NoticeHolds get(fn notice_hold): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
 
         /// Index of notices by chain account
         AccountNotices get(fn account_notices): map hasher(blake2_128_concat) ChainAccount => Vec<NoticeId>;
@@ -362,9 +363,6 @@ The next session will finally have the NextValidators, and notice signing can co
 */
 
 fn intersection_count<T: Ord + Debuggable>(a: Vec<T>, b: Vec<T>) -> usize {
-    let a_count = a.iter().count();
-    let b_count = b.iter().count();
-
     let mut a_set = BTreeSet::<T>::new();
     for v in a {
         a_set.insert(v);
@@ -396,22 +394,23 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     }
 }
 
+// XXX should this have all these printlns?
 // periodic except when new authorities are pending and when an era notice has just been completed
 impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
     fn should_end_session(now: T::BlockNumber) -> bool {
         if NextValidators::iter().count() > 0 {
             println!("should_end_session=true[next_validators]");
             true
-        } else if NoticeHold::iter().count() > 0 {
+        } else if NoticeHolds::iter().count() > 0 {
             // Check if we should end the hold
             let validators: Vec<_> = Validators::iter().map(|v| v.1).collect();
-            let every_notice_hold_executed = NoticeHold::iter().all(|(chain_id, notice_id)| {
+            let every_notice_hold_executed = NoticeHolds::iter().all(|(chain_id, notice_id)| {
                 has_requisite_signatures(NoticeStates::get(chain_id, notice_id), &validators)
             });
 
             if every_notice_hold_executed {
-                for (chain_id, _) in NoticeHold::iter() {
-                    NoticeHold::take(chain_id);
+                for (chain_id, _) in NoticeHolds::iter() {
+                    NoticeHolds::take(chain_id);
                 }
                 println!("should_end_session=true[notices_executed]");
                 true

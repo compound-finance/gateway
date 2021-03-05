@@ -1,7 +1,6 @@
 use crate::{
-    chains::{ChainHash, ChainId},
-    core::{dispatch_notice_internal, get_now},
-    notices::{FutureYieldNotice, Notice},
+    core::get_now,
+    internal,
     params::MIN_NEXT_SYNC_TIME,
     rates::APR,
     reason::Reason,
@@ -28,9 +27,12 @@ fn get_cash_yield_index_after<T: Config>(change_in_time: Timestamp) -> Result<Ca
         .map_err(Reason::MathError)
 }
 
-pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Result<(), Reason> {
+pub fn set_yield_next<T: Config>(
+    next_yield: APR,
+    next_yield_start: Timestamp,
+) -> Result<(), Reason> {
     let now = get_now::<T>();
-    let change_in_time = next_apr_start
+    let change_in_time = next_yield_start
         .checked_sub(now)
         .ok_or(Reason::TimeTravelNotAllowed)?;
 
@@ -47,45 +49,31 @@ pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Re
     // Note: Any already pending change cannot be canceled unless the min sync time is also met for the cancel.
     // Read Require NextAPRStartNow+ParamsMinNextSyncTime
     require!(
-        next_apr_start >= now + MIN_NEXT_SYNC_TIME,
+        next_yield_start >= now + MIN_NEXT_SYNC_TIME,
         Reason::SetYieldNextError(SetYieldNextError::TimestampTooSoonToNow)
     );
 
+    // XXX fix this up
     // Read NextYieldIndex=GetCashYieldIndexAt(NextAPRStart)
     let next_yield_index: CashIndex = get_cash_yield_index_after::<T>(change_in_time)?;
 
-    // Set CashYieldNext=(NextAPR, NextAPRStart)
-    CashYieldNext::put((next_apr, next_apr_start));
+    CashYieldNext::put((next_yield, next_yield_start));
 
-    <Module<T>>::deposit_event(Event::SetYieldNext(next_apr, next_apr_start));
-    // For ChainChains:
-    // Add FutureYieldNotice(NextAPR, NextAPRStart, NextYieldIndex) to NoticeQueueChain
-    dispatch_notice_internal::<T>(ChainId::Eth, None, true, &|notice_id, parent_hash| {
-        Ok(Notice::FutureYieldNotice(match parent_hash {
-            ChainHash::Eth(eth_parent_hash) => FutureYieldNotice::Eth {
-                id: notice_id,
-                parent: eth_parent_hash,
-                next_cash_yield: next_apr.0,
-                next_cash_index: next_yield_index.0,
-                next_cash_yield_start: next_apr_start,
-            },
-            _ => panic!("not supported"), // TODO: Panic?
-        }))
-    })?;
+    <Module<T>>::deposit_event(Event::SetYieldNext(next_yield, next_yield_start));
 
-    // XXX Events
+    internal::notices::dispatch_future_yield_notice::<T>(
+        next_yield,
+        next_yield_index,
+        next_yield_start,
+    );
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        chains::ChainSignatureList,
-        mock::*,
-        notices::{NoticeId, NoticeState},
-        LatestNotice, NoticeStates, Notices,
-    };
+    use crate::{chains::*, mock::*, notices::*, LatestNotice, NoticeStates, Notices};
     use frame_support::storage::{
         IterableStorageDoubleMap, StorageDoubleMap, StorageMap, StorageValue,
     };

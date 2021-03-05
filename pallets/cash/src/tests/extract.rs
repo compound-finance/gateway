@@ -284,7 +284,6 @@ fn test_extract_internal_notice_ids() -> Result<(), Reason> {
             account: eth_recipient,
             amount: 50000000000000000000,
         });
-        let expected_notice_encoded_2 = expected_notice_2.encode_notice();
         let expected_notice_hash_2 = expected_notice_2.hash();
 
         assert_eq!(notice_2, expected_notice_2.clone());

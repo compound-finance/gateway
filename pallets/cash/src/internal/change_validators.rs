@@ -1,13 +1,8 @@
 use frame_support::storage::{IterableStorageMap, StorageMap};
 
 use crate::{
-    chains::{ChainHash, ChainId},
-    core::dispatch_notice_internal,
-    notices::{ChangeAuthorityNotice, Notice},
-    reason::Reason,
-    require,
-    types::ValidatorKeys,
-    Config, Event, Module, NextValidators, SessionInterface,
+    internal, reason::Reason, require, types::ValidatorKeys, Config, Event, Module, NextValidators,
+    SessionInterface,
 };
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
@@ -28,16 +23,7 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
 
     <Module<T>>::deposit_event(Event::ChangeValidators(validators.clone()));
 
-    dispatch_notice_internal::<T>(ChainId::Eth, None, true, &|notice_id, parent_hash| {
-        Ok(Notice::ChangeAuthorityNotice(match parent_hash {
-            ChainHash::Eth(eth_parent_hash) => ChangeAuthorityNotice::Eth {
-                id: notice_id,
-                parent: eth_parent_hash,
-                new_authorities: validators.iter().map(|x| x.eth_address).collect::<Vec<_>>(),
-            },
-            _ => panic!("not supported"), // TODO: Panic?
-        }))
-    })?;
+    internal::notices::dispatch_change_authority_notice::<T>(validators);
 
     Ok(())
 }

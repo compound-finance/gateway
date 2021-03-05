@@ -1,10 +1,9 @@
 use crate::chains::{eth, ChainId, ChainSignature};
 use crate::log;
 use crate::reason::Reason;
-use crate::types::{SignersSet, ValidatorIdentity};
+use crate::types::SignersSet;
 use codec::alloc::string::String;
 use codec::{Decode, Encode};
-use our_std::collections::btree_set::BTreeSet;
 use our_std::{vec::Vec, RuntimeDebug};
 
 extern crate ethereum_client;

@@ -1,12 +1,10 @@
 use frame_support::storage::StorageMap;
 
 use crate::{
-    chains::{ChainAsset, ChainHash},
-    core::dispatch_notice_internal,
-    notices::{Notice, SetSupplyCapNotice},
+    internal,
     reason::Reason,
     require,
-    types::{AssetAmount, AssetInfo},
+    types::{AssetAmount, ChainAsset},
     Config, Event, Module, SupportedAssets,
 };
 
@@ -25,27 +23,7 @@ pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> R
 
     <Module<T>>::deposit_event(Event::SetSupplyCap(chain_asset, cap));
 
-    // XXX fix me this cannot fail
-    dispatch_notice_internal::<T>(
-        chain_asset.chain_id(),
-        None,
-        true,
-        &|notice_id, parent_hash| {
-            Ok(Notice::SetSupplyCapNotice(
-                match (chain_asset, parent_hash) {
-                    (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
-                        Ok(SetSupplyCapNotice::Eth {
-                            id: notice_id,
-                            parent: eth_parent_hash,
-                            asset: eth_asset,
-                            cap: cap,
-                        })
-                    }
-                    _ => Err(Reason::AssetNotSupported),
-                }?,
-            ))
-        },
-    )?;
+    internal::notices::dispatch_supply_cap_notice::<T>(chain_asset, cap);
 
     Ok(())
 }
@@ -54,12 +32,7 @@ pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> R
 mod tests {
     use super::*;
     use crate::{
-        chains::{ChainId, ChainSignatureList},
-        mock,
-        mock::*,
-        notices::{NoticeId, NoticeState},
-        symbol::USD,
-        LatestNotice, NoticeStates, Notices,
+        chains::*, mock, mock::*, notices::*, types::*, LatestNotice, NoticeStates, Notices,
     };
     use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
 

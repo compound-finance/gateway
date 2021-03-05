@@ -259,7 +259,7 @@ fn test_set_interest_rate_model() {
 #[test]
 fn offchain_worker_test() {
     use frame_support::traits::OffchainWorker;
-    let mut calls: Vec<testing::PendingRequest> =
+    let calls: Vec<testing::PendingRequest> =
         events::tests::get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
 
     let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);

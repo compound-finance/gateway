@@ -41,7 +41,7 @@ pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 // XXX just to compile, these should maybe use the real impls
 pub struct TestShouldEndSession;
 impl pallet_session::ShouldEndSession<u64> for TestShouldEndSession {
-    fn should_end_session(now: u64) -> bool {
+    fn should_end_session(_now: u64) -> bool {
         true
     }
 }
@@ -52,8 +52,8 @@ impl pallet_session::SessionHandler<SubstrateId> for TestSessionHandler {
     const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
     fn on_genesis_session<T: OpaqueKeys>(_validators: &[(SubstrateId, T)]) {}
     fn on_new_session<T: OpaqueKeys>(
-        changed: bool,
-        validators: &[(SubstrateId, T)],
+        _changed: bool,
+        _validators: &[(SubstrateId, T)],
         _queued_validators: &[(SubstrateId, T)],
     ) {
     }
@@ -74,13 +74,6 @@ pub mod opaque {
     use super::*;
 
     pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
-
-    /// Opaque block header type.
-    pub type Header = generic::Header<u64, BlakeTwo256>;
-    /// Opaque block type.
-    pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-    /// Opaque block identifier type.
-    pub type BlockId = generic::BlockId<Block>;
 
     impl_opaque_keys! {
         pub struct MockSessionKeys {

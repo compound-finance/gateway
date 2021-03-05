@@ -1,5 +1,4 @@
 use frame_support::storage::{StorageMap, StorageValue};
-use frame_system::offchain::SubmitTransaction;
 use serde::Deserialize;
 use sp_runtime::offchain::{
     http,
@@ -14,7 +13,7 @@ use crate::{
     types::{AssetPrice, Timestamp},
 };
 use crate::{Config, PriceReporters, PriceTimes, Prices, ORACLE_POLL_INTERVAL_BLOCKS};
-use our_std::{collections::btree_map::BTreeMap, log, str::FromStr, vec::Vec, RuntimeDebug};
+use our_std::{collections::btree_map::BTreeMap, str::FromStr, vec::Vec, RuntimeDebug};
 
 /// A single decoded message from the price oracle
 #[derive(PartialEq, Eq, RuntimeDebug)]
