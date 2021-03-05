@@ -310,7 +310,10 @@ pub trait Chain {
 
     fn zero_hash() -> Self::Hash;
     fn hash_bytes(data: &[u8]) -> Self::Hash;
-    fn recover_user_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
+    fn recover_user_address(
+        data: &[u8],
+        signature: Self::Signature,
+    ) -> Result<Self::Address, Reason>;
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason>;
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
     fn signer_address() -> Result<Self::Address, Reason>;
@@ -347,7 +350,10 @@ impl Chain for Compound {
         panic!("XXX not implemented");
     }
 
-    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+    fn recover_user_address(
+        _data: &[u8],
+        _signature: Self::Signature,
+    ) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
@@ -391,7 +397,10 @@ impl Chain for Ethereum {
         hash
     }
 
-    fn recover_user_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
+    fn recover_user_address(
+        data: &[u8],
+        signature: Self::Signature,
+    ) -> Result<Self::Address, Reason> {
         Ok(compound_crypto::eth_recover(data, &signature, true)?)
     }
 
@@ -445,7 +454,10 @@ impl Chain for Polkadot {
         panic!("XXX not implemented");
     }
 
-    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+    fn recover_user_address(
+        _data: &[u8],
+        _signature: Self::Signature,
+    ) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
@@ -484,7 +496,10 @@ impl Chain for Solana {
         panic!("XXX not implemented");
     }
 
-    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+    fn recover_user_address(
+        _data: &[u8],
+        _signature: Self::Signature,
+    ) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
@@ -523,7 +538,10 @@ impl Chain for Tezos {
         panic!("XXX not implemented");
     }
 
-    fn recover_user_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+    fn recover_user_address(
+        _data: &[u8],
+        _signature: Self::Signature,
+    ) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 

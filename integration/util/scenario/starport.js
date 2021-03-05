@@ -1,6 +1,7 @@
 const { getValidatorsInfo } = require('./validator');
 const { EtherToken } = require('./token');
 const { encodeCall } = require('../substrate');
+const web3 = require('web3');
 
 class Starport {
   constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx) {
@@ -90,6 +91,10 @@ class Starport {
 
   async isNoticeUsed(noticeHash) {
     return await this.starport.methods.isNoticeUsed(noticeHash).call();
+  }
+
+  async getAuthorities() {
+    return (await this.starport.methods.getAuthorities().call()).map(web3.utils.toChecksumAddress);
   }
 
   async execTrxRequest(actorLookup, trxReq, awaitEvent = true) {

@@ -7,7 +7,7 @@ use crate::{
     reason::Reason,
     require,
     types::{CashIndex, Timestamp},
-    CashYield, CashYieldNext, Config, GlobalCashIndex,
+    CashYield, CashYieldNext, Config, Event, GlobalCashIndex, Module,
 };
 use codec::{Decode, Encode};
 use frame_support::storage::StorageValue;
@@ -57,9 +57,10 @@ pub fn set_yield_next<T: Config>(next_apr: APR, next_apr_start: Timestamp) -> Re
     // Set CashYieldNext=(NextAPR, NextAPRStart)
     CashYieldNext::put((next_apr, next_apr_start));
 
+    <Module<T>>::deposit_event(Event::SetYieldNext(next_apr, next_apr_start));
     // For ChainChains:
     // Add FutureYieldNotice(NextAPR, NextAPRStart, NextYieldIndex) to NoticeQueueChain
-    dispatch_notice_internal::<T>(ChainId::Eth, None, &|notice_id, parent_hash| {
+    dispatch_notice_internal::<T>(ChainId::Eth, None, true, &|notice_id, parent_hash| {
         Ok(Notice::FutureYieldNotice(match parent_hash {
             ChainHash::Eth(eth_parent_hash) => FutureYieldNotice::Eth {
                 id: notice_id,
@@ -131,7 +132,8 @@ mod tests {
                 .expect("missing notice state");
             let notice = Notices::get(notice_state.0, notice_state.1);
 
-            let expected_notice_id = NoticeId(0, 1);
+            // bumps era
+            let expected_notice_id = NoticeId(1, 0);
             let expected_notice = Notice::FutureYieldNotice(FutureYieldNotice::Eth {
                 id: expected_notice_id,
                 parent: [0u8; 32],
@@ -155,7 +157,7 @@ mod tests {
 
             assert_eq!(
                 LatestNotice::get(ChainId::Eth),
-                Some((NoticeId(0, 1), expected_notice.hash()))
+                Some((expected_notice_id, expected_notice.hash()))
             );
         });
     }

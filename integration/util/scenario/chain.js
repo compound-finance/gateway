@@ -1,4 +1,4 @@
-const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson } = require('../substrate');
+const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
 const {
   getNoticeChainId,
@@ -29,7 +29,7 @@ class Chain {
   // https://www.shawntabrizi.com/substrate/querying-substrate-storage-via-rpc/
   getStorageKey(moduleName, valueName) {
     let moduleHash = xxhashAsHex(moduleName, 128);
-    let functionHash = xxhashAsHex(valueName, 128); 
+    let functionHash = xxhashAsHex(valueName, 128);
     return moduleHash + functionHash.slice(2);
   }
 
@@ -256,17 +256,33 @@ class Chain {
     const auths = this.ctx.api().createType('Authorities', rawAuths.value);
     return auths.map(e => this.ctx.actors.keyring.encodeAddress(e));
   }
-  
-  async waitUntilSession(num) {
+
+  async rotateKeys(validator) {
+    const keysRaw = await validator.api.rpc.author.rotateKeys();
+    return this.ctx.api().createType('SessionKeys', keysRaw);
+  }
+
+  async setKeys(signer, keys) {
+    const call = this.ctx.api().tx.session.setKeys(keys, "0x5566");
+    await sendAndWaitForEvents(call, this.api(), { signer });
+  }
+
+  async waitUntilSession(target, retries = 60) {
     const timer = ms => new Promise(res => setTimeout(res, ms));
-    const checkIdx = async () => {
+    const checkIdx = async (r) => {
       const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
-      if (idx <= num) {
-        await timer(1000);
-        await checkIdx();
+      if (idx < target) {
+        console.log(`Waiting for session=${target}, curr=${idx}`);
+
+        if (r === 0) {
+          throw new Error(`Unable to get session ${target} after ${retries} retries`);
+        } else {
+          await timer(1000);
+          await checkIdx(r - 1);
+        }
       }
     };
-    await checkIdx();
+    await checkIdx(retries);
   }
 }
 
