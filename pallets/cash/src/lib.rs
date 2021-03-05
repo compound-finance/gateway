@@ -35,7 +35,7 @@ use frame_support::{
     Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{str, vec::Vec, collections::btree_set::BTreeSet, Debuggable, cmp::{min},};
+use our_std::{cmp::min, collections::btree_set::BTreeSet, str, vec::Vec, Debuggable};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
@@ -396,18 +396,16 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     let quorum_count = validator_count; // TODO: Add a real quorum count
 
     match notice_state {
-        NoticeState::Pending { signature_pairs } => {
-            match signature_pairs {
-                ChainSignatureList::Eth(signature_pairs) => {
-                    intersection_count(
-                        signature_pairs.iter().map(|p| p.0).collect(),
-                        validators.iter().map(|v| v.eth_address).collect()
-                    ) >= quorum_count
-                },
-                _ => false
+        NoticeState::Pending { signature_pairs } => match signature_pairs {
+            ChainSignatureList::Eth(signature_pairs) => {
+                intersection_count(
+                    signature_pairs.iter().map(|p| p.0).collect(),
+                    validators.iter().map(|v| v.eth_address).collect(),
+                ) >= quorum_count
             }
+            _ => false,
         },
-        _ => false
+        _ => false,
     }
 }
 
@@ -439,7 +437,10 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
             // no era changes pending, periodic
             let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
             let is_new_period = (now % period) == <T>::BlockNumber::from(0 as u32);
-            println!("should_end_session={}[periodic {:?}%{:?}]", is_new_period, now, period);
+            println!(
+                "should_end_session={}[periodic {:?}%{:?}]",
+                is_new_period, now, period
+            );
             is_new_period
         }
     }

@@ -135,7 +135,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       ];
 
       const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);
-      await starport.executeProposal("Update authorities", [extrinsic]);
+      const {notice} = await starport.executeProposal("Update authorities", [extrinsic], {awaitNotice: true});
 
       await chain.waitUntilSession(3);
 
@@ -147,6 +147,13 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
 
       const grandpaAuths = await chain.getGrandpaAuthorities();
       expect(grandpaAuths.sort()).toEqual([alice.grandpa_key, bob.grandpa_key, keyring.encodeAddress(newValidatorKeys.grandpa)].sort());
+
+
+      let signatures = await chain.getNoticeSignatures(notice);
+      let tx = await starport.invoke(notice, signatures);
+
+      const starportAuths = await starport.getAuthorities();
+      expect(starportAuths.slice().sort()).toEqual([alice.eth_account, bob.eth_account, eth_account].sort());
     }
   },
   {

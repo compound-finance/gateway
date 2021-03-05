@@ -25,4 +25,4 @@ pub const ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
 pub const SESSION_PERIOD: u32 = 2;
 
 #[cfg(not(debug_assertions))]
-pub const SESSION_PERIOD: u32 = 10000;
+pub const SESSION_PERIOD: u32 = 14400; // @ 6s blocks, 1 period per day
