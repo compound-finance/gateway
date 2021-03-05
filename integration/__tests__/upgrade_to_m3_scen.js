@@ -10,18 +10,18 @@ let scen_info = {
   ],
 };
 
-buildScenarios('Upgrade to 1.3.1', scen_info, [
+buildScenarios('Upgrade to m3', scen_info, [
   {
-    name: "Upgrade from 1.2.1 to 1.3.1 with Live Events",
+    name: "Upgrade from m2 to m3 with Live Events",
     info: {
-      versions: ['v1.2.1'],
-      genesis_version: 'v1.2.1',
+      versions: ['m2'],
+      genesis_version: 'm2',
       eth_opts: {
-        version: 'v1.2.1',
+        version: 'm2',
       },
       validators: {
         alice: {
-          version: 'v1.2.1',
+          version: 'm2',
         }
       },
     },
@@ -50,7 +50,7 @@ buildScenarios('Upgrade to 1.3.1', scen_info, [
       });
       expect(await ashley.chainBalance(zrx)).toEqual(300);
 
-      // Next, upgrade the Starport to 1.3.1
+      // Next, upgrade the Starport to m3
       await starport.upgradeTo(curr);
 
       // Lock an asset (Lock New) and make sure it passes

@@ -15,6 +15,7 @@
   "scripts": {
     "postinstall": "cd node_modules/solidity-parser-antlr && yarn install && yarn build",
     "test": "jest --runInBand",
+    "build": "cargo build && (cd ../ethereum && yarn compile)",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
   "resolutions": {
