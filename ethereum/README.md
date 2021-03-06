@@ -37,10 +37,16 @@ yarn script deploy -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae
 
 where `0x2079A734292094702f4D7D64A59e980c20652Cae` is the admin, e.g. the Compound Timelock.
 
-And to upgrade to 131:
+And to upgrade to m3:
 
 ```
-yarn script deploy:131 -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae
+yarn script deploy:m3 -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae
+```
+
+And to upgrade to m4:
+
+```
+yarn script deploy:m4 -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae
 ```
 
 ## Console
