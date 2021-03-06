@@ -107,7 +107,6 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    only: true,
     name: "Add new auth with session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
       // Spin up new validator Charlie and add to auth set
@@ -157,6 +156,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
+    only: true,
     name: "Does not add auth w/o session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
       // spins up new validator charlie, doesnt add session keys, change validators should fail
