@@ -37,12 +37,13 @@ const main = async () => {
   } catch (e) {
     error = e;
   }
-  if (!error.message.includes('revert Below quorum threshold')) {
+  if (!error.message.includes('Below quorum threshold')) {
     throw new Error(`Invalid Starport (expected quorum threshold error, got "${error.message}"). Have you compiled recent contracts?`);
   }
 
   await saveNetwork({
     StarportImpl: starportImpl
+    CashImpl: cashImpl
   }, saddle, env, network);
 
   console.log(chalk.yellow(`\n\nNote: you will need to manually upgrade the Starport and Cash delegator to use the new StarportImpl and CashImpl\n`));
