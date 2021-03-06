@@ -265,7 +265,6 @@
       "BadTicker": "",
       "BadUnits": "",
       "ChainMismatch": "",
-      "ChangeValidatorsError": "",
       "CryptoError": "(CryptoError)",
       "EventAlreadySigned": "",
       "FailedToSubmitExtrinsic": "",
@@ -286,7 +285,7 @@
       "None": "",
       "NoPrice": "",
       "NoSuchAsset": "",
-      "NoticeAlreadySigned": "",
+      "DeprecatedNoticeAlreadySigned": "",
       "NoticeHashMismatch": "",
       "NoticeMissing": "(ChainId, NoticeId)",
       "NotImplemented": "",
@@ -301,8 +300,9 @@
       "TimeTravelNotAllowed": "",
       "TrxRequestParseError": "(TrxReqParseError)",
       "UnknownValidator": "",
+      "InvalidChain": "",
       "PendingEraNotice": "",
-      "InvalidChain": ""
+      "ChangeValidatorsError": ""
     }
   },
   "MathError": {

@@ -22,7 +22,6 @@ pub enum Reason {
     BadTicker,
     BadUnits,
     ChainMismatch,
-    ChangeValidatorsError,
     CryptoError(CryptoError),
     EventAlreadySigned,
     FailedToSubmitExtrinsic,
@@ -60,6 +59,7 @@ pub enum Reason {
     UnknownValidator,
     InvalidChain,
     PendingEraNotice,
+    ChangeValidatorsError,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -116,8 +116,8 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::TrxRequestParseError(_) => (27, 0, "trx request parse error"),
             Reason::UnknownValidator => (28, 0, "unknown validator"),
             Reason::InvalidChain => (29, 0, "invalid chain"),
-            Reason::ChangeValidatorsError => (27, 0, "change validators error"),
-            Reason::PendingEraNotice => (28, 0, "era-changing notice already pending"),
+            Reason::PendingEraNotice => (30, 0, "era-changing notice already pending"),
+            Reason::ChangeValidatorsError => (31, 0, "change validators error"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
