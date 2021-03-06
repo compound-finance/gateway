@@ -409,6 +409,7 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
 impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
     fn should_end_session(now: T::BlockNumber) -> bool {
         if NextValidators::iter().count() > 0 {
+            println!("should_end_session=true[next_validators]");
             true
         } else if NoticeHold::iter().count() > 0 {
             // Check if we should end the hold
@@ -421,14 +422,23 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
                 for (chain_id, _) in NoticeHold::iter() {
                     NoticeHold::take(chain_id);
                 }
+                println!("should_end_session=true[notices_executed]");
                 true
             } else {
+                println!("should_end_session=false[notices_held]");
                 false
             }
         } else {
             // no era changes pending, periodic
             let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
             let is_new_period = (now % period) == <T>::BlockNumber::from(0 as u32);
+            
+            if is_new_period {
+                println!(
+                    "should_end_session={}[periodic {:?}%{:?}]",
+                    is_new_period, now, period
+                );
+            }
             is_new_period
         }
     }
