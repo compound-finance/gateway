@@ -33,16 +33,42 @@ class CashToken extends Token {
 
   async getCashPrincipal(actorLookup) {
     let actor = this.ctx.actors.get(actorLookup);
-    return Number(await this.token.methods.cashPrincipal(actor.ethAddress()).call());
+    return Number(await this.cashToken.methods.cashPrincipal(actor.ethAddress()).call());
   }
 
   async getTotalCashPrincipal() {
-    return Number(await this.token.methods.totalCashPrincipal().call());
+    return Number(await this.cashToken.methods.totalCashPrincipal().call());
   }
 
   async getCashYieldAndIndex() {
-    // TODO: How to parse result?
-    return await this.token.methods.cashYieldAndIndex().call();
+    return await this.cashToken.methods.cashYieldAndIndex().call();
+  }
+
+  async upgradeTo(version) {
+    let newImpl = await this.ctx.eth.__deploy('CashToken', [this.ctx.starport.ethAddress()], { version });
+    await this.upgrade(newImpl);
+  }
+
+  async getName() {
+    return await this.cashToken.methods.name().call();
+  }
+
+  async getSymbol() {
+    return await this.cashToken.methods.symbol().call();
+  }
+
+  async upgrade(impl, upgradeCall = null) {
+    if (upgradeCall) {
+      await this.proxyAdmin.methods.upgradeAndCall(
+        this.cashToken._address,
+        impl._address,
+        upgradeCall
+      ).send({ from: this.ctx.eth.root() });
+    } else {
+      let tx = await this.proxyAdmin.methods.upgrade(this.cashToken._address, impl._address).send({ from: this.ctx.eth.root() });
+    }
+
+    this.cashToken = this.ctx.eth.__getContractAtAbi(impl._jsonInterface, this.proxy._address);
   }
 }
 
