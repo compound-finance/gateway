@@ -83,6 +83,7 @@ module.exports = {
   },
   scripts: {
     "deploy": "scripts/deploy.js",
-    "deploy:131": "scripts/migrations/131.js"
+    "deploy:m3": "scripts/migrations/m3.js",
+    "deploy:m4": "scripts/migrations/m4.js"
   }                                                     // Aliases for scripts
 }

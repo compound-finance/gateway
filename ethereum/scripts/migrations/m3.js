@@ -9,7 +9,7 @@ const {
 const NEW_LOCK_EVENT_TOPIC = '0xc459acef3ffe957663bb49d644b20d0c790bcb41573893752a72ba6f023b9386';
 
 const main = async () => {
-  console.log(chalk.yellow(`\n\nDeploying Compound Chain 1.3.1 to ${network}\n`));
+  console.log(chalk.yellow(`\n\nDeploying Compound Chain m3 to ${network}\n`));
 
   const root = saddle.account;
 
