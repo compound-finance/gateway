@@ -1,4 +1,4 @@
-//! Compound Chain CLI library.
+//! Gateway CLI library.
 #![warn(missing_docs)]
 
 mod chain_spec;

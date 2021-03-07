@@ -2,8 +2,8 @@
 authors = ['Compound <https://compound.finance>']
 edition = '2018'
 homepage = 'https://compound.cash'
-name = 'compound-chain-runtime'
-repository = 'https://github.com/compound-finance/compound-chain/'
+name = 'gateway-runtime'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
 
 [package.metadata.docs.rs]

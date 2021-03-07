@@ -1,16 +1,16 @@
 
-- name: add compound group
+- name: add gateway group
   group:
-    name: compound
+    name: gateway
   become: true
   tags:
     system-accounts
 
-- name: add compound user
+- name: add gateway user
   user:
-    name: compound
-    comment: Compound User
-    group: compound
+    name: gateway
+    comment: Gateway User
+    group: gateway
   become: true
   tags:
     system-accounts

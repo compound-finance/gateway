@@ -94,7 +94,7 @@ jobs:
 
       - name: Cargo Test
         run: |
-          PACKAGES="pallet-cash runtime-interfaces compound-crypto ethereum-client open-oracle-mock-reporter trx-request"
+          PACKAGES="pallet-cash runtime-interfaces gateway-crypto ethereum-client open-oracle-mock-reporter trx-request"
           for PKG in $PACKAGES; do
               RUSTFLAGS="-Z instrument-coverage" cargo +nightly test -p $PKG --no-run --message-format=json > messages
               EXE=`scripts/list_executables.py < messages`
@@ -235,7 +235,7 @@ jobs:
           cd ethereum
           yarn compile
 
-      - name: Build Compound Chain
+      - name: Build Gateway
         run: |
           cargo build
 

@@ -1,0 +1,4 @@
+
+- name: restart Gateway
+  systemd: 'state={{ gateway_service_state }} name=gateway daemon_reload=yes'
+  become: true

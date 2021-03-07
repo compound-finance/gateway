@@ -1,10 +1,10 @@
 [package]
 authors = ['Compound <https://compound.finance>']
-description = 'Cryptographic operations for compound chain'
+description = 'Cryptographic operations for gateway'
 edition = '2018'
 homepage = 'https://compound.cash'
 name = 'open-oracle-mock-reporter'
-repository = 'https://github.com/compound-finance/compound-chain/'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '0.1.0'
 
 [dependencies]
@@ -17,4 +17,4 @@ rocket_contrib = "0.4.6"
 serde = "1.0.118"
 serde_json = "1.0.61"
 
-compound-crypto = { path = "../../compound-crypto" }
+gateway-crypto = { path = "../../gateway-crypto" }

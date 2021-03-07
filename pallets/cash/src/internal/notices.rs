@@ -129,7 +129,7 @@ mod tests {
         notices::{ExtractionNotice, Notice},
         types::ValidatorKeys,
     };
-    use compound_crypto::CryptoError;
+    use gateway_crypto::CryptoError;
     use sp_core::crypto::AccountId32;
 
     /** `handle_notice_invoked` tests **/

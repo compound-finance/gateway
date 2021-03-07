@@ -4,7 +4,7 @@ description = 'Pallet for implementing CASH runtime interfaces.'
 edition = '2018'
 homepage = 'https://compound.cash'
 name = 'runtime-interfaces'
-repository = 'https://github.com/compound-finance/compound-chain/'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
 
 [dependencies]
@@ -15,7 +15,7 @@ sp-runtime-interface = { default-features = false, git = 'https://github.com/com
 sp-externalities = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-io = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
-compound-crypto = { path = "../../compound-crypto", default-features = false }
+gateway-crypto = { path = "../../gateway-crypto", default-features = false }
 our-std = { path = "../../our-std", default-features = false }
 
 [features]
@@ -25,5 +25,5 @@ std = [
     'sp-externalities/std',
     'sp-io/std',
     'sp-runtime-interface/std',
-    'compound-crypto/std',
+    'gateway-crypto/std',
 ]

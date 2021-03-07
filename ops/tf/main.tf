@@ -17,17 +17,17 @@ variable "az_secondary" {
   default = "us-east-1c"
 }
 
-variable "compound_chain_private_subnet_cidr" {
+variable "gateway_private_subnet_cidr" {
   type = string
   default = "10.0.1.0/24"
 }
 
-variable "compound_chain_public_subnet_cidr" {
+variable "gateway_public_subnet_cidr" {
   type = string
   default = "10.0.2.0/24"
 }
 
-variable "compound_chain_public_secondary_subnet_cidr" {
+variable "gateway_public_secondary_subnet_cidr" {
   type = string
   default = "10.0.3.0/24"
 }
@@ -40,7 +40,7 @@ variable "node_root_disk_size" {
 
 variable "authority_node_instance_type" {
   type = string
-  description = "Instance ID (AMI) to use for compound chain nodes"
+  description = "Instance ID (AMI) to use for gateway nodes"
   default = "m6g.large" # TODO: Choose best default instance type
 }
 
@@ -89,38 +89,38 @@ resource "aws_key_pair" "admin_key_pair" {
   public_key = var.admin_public_key
 }
 
-# Create a VPC for our compound chain instances
-resource "aws_vpc" "compound_chain_vpc" {
+# Create a VPC for our gateway instances
+resource "aws_vpc" "gateway_vpc" {
   cidr_block = "10.0.0.0/16"
 }
 
-resource "aws_subnet" "compound_chain_private" {
+resource "aws_subnet" "gateway_private" {
   availability_zone = var.az
-  vpc_id = aws_vpc.compound_chain_vpc.id
-  cidr_block = var.compound_chain_private_subnet_cidr
+  vpc_id = aws_vpc.gateway_vpc.id
+  cidr_block = var.gateway_private_subnet_cidr
 
   tags = {
-    Name = "compound_chain_private_subnet"
+    Name = "gateway_private_subnet"
   }
 }
 
-resource "aws_subnet" "compound_chain_public" {
+resource "aws_subnet" "gateway_public" {
   availability_zone = var.az
-  vpc_id = aws_vpc.compound_chain_vpc.id
-  cidr_block = var.compound_chain_public_subnet_cidr
+  vpc_id = aws_vpc.gateway_vpc.id
+  cidr_block = var.gateway_public_subnet_cidr
 
   tags = {
-    Name = "compound_chain_public_subnet"
+    Name = "gateway_public_subnet"
   }
 }
 
-resource "aws_subnet" "compound_chain_public_secondary" {
+resource "aws_subnet" "gateway_public_secondary" {
   availability_zone = var.az_secondary
-  vpc_id = aws_vpc.compound_chain_vpc.id
-  cidr_block = var.compound_chain_public_secondary_subnet_cidr
+  vpc_id = aws_vpc.gateway_vpc.id
+  cidr_block = var.gateway_public_secondary_subnet_cidr
 
   tags = {
-    Name = "compound_chain_public_secondary_subnet"
+    Name = "gateway_public_secondary_subnet"
   }
 }
 
@@ -128,7 +128,7 @@ resource "aws_subnet" "compound_chain_public_secondary" {
 resource "aws_security_group" "full_node_sg" {
   name        = "full_node_sg"
   description = "Allow traffic ... for now."
-  vpc_id      = aws_vpc.compound_chain_vpc.id
+  vpc_id      = aws_vpc.gateway_vpc.id
 
   # Currently, we'll allow all communication
   ingress {
@@ -153,7 +153,7 @@ resource "aws_security_group" "full_node_sg" {
 resource "aws_security_group" "authority_node_sg" {
   name        = "authority_node_sg"
   description = "Allow traffic from public subnet."
-  vpc_id      = aws_vpc.compound_chain_vpc.id
+  vpc_id      = aws_vpc.gateway_vpc.id
 
   # Currently, we'll allow all communication
   ingress {
@@ -178,7 +178,7 @@ resource "aws_security_group" "authority_node_sg" {
 resource "aws_security_group" "bastion_node_sg" {
   name        = "bastion_node_sg"
   description = "Allow all traffic."
-  vpc_id      = aws_vpc.compound_chain_vpc.id
+  vpc_id      = aws_vpc.gateway_vpc.id
 
   ingress {
     from_port   = 0
@@ -214,11 +214,11 @@ resource "aws_security_group" "bastion_node_sg" {
 }
 
 # Open communication on public subnet
-resource "aws_network_acl" "compound_chain_public_subnet_acl" {
-  vpc_id = aws_vpc.compound_chain_vpc.id
+resource "aws_network_acl" "gateway_public_subnet_acl" {
+  vpc_id = aws_vpc.gateway_vpc.id
   subnet_ids = [
-    aws_subnet.compound_chain_public.id,
-    aws_subnet.compound_chain_public_secondary.id
+    aws_subnet.gateway_public.id,
+    aws_subnet.gateway_public_secondary.id
   ]
 
   # TODO: Consider adding deeper ACL rules
@@ -259,21 +259,21 @@ resource "aws_network_acl" "compound_chain_public_subnet_acl" {
   }
 
   tags = {
-    Name = "compound_chain_public_subnet_acl"
+    Name = "gateway_public_subnet_acl"
   }
 }
 
 # Restrict communication on private subnet to only traffic from public
-resource "aws_network_acl" "compound_chain_private_subnet_acl" {
-  vpc_id = aws_vpc.compound_chain_vpc.id
-  subnet_ids = [aws_subnet.compound_chain_private.id]
+resource "aws_network_acl" "gateway_private_subnet_acl" {
+  vpc_id = aws_vpc.gateway_vpc.id
+  subnet_ids = [aws_subnet.gateway_private.id]
 
   # TODO: Consider adding deeper ACL rules
   egress {
     protocol   = "-1"
     rule_no    = 200
     action     = "allow"
-    cidr_block = aws_subnet.compound_chain_public.cidr_block
+    cidr_block = aws_subnet.gateway_public.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -282,7 +282,7 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
     protocol   = "-1"
     rule_no    = 201
     action     = "allow"
-    cidr_block = aws_subnet.compound_chain_public_secondary.cidr_block
+    cidr_block = aws_subnet.gateway_public_secondary.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -329,7 +329,7 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
     protocol   = "-1"
     rule_no    = 100
     action     = "allow"
-    cidr_block = aws_subnet.compound_chain_public.cidr_block
+    cidr_block = aws_subnet.gateway_public.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -338,7 +338,7 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
     protocol   = "-1"
     rule_no    = 101
     action     = "allow"
-    cidr_block = aws_subnet.compound_chain_public_secondary.cidr_block
+    cidr_block = aws_subnet.gateway_public_secondary.cidr_block
     from_port  = 0
     to_port    = 0
   }
@@ -362,7 +362,7 @@ resource "aws_network_acl" "compound_chain_private_subnet_acl" {
   }
 
   tags = {
-    Name = "compound_chain_private_subnet_acl"
+    Name = "gateway_private_subnet_acl"
   }
 }
 
@@ -382,7 +382,7 @@ resource "aws_instance" "full_node_public" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.full_node_sg.id]
-  subnet_id                   = aws_subnet.compound_chain_public.id
+  subnet_id                   = aws_subnet.gateway_public.id
   associate_public_ip_address = true
 
   root_block_device {
@@ -401,7 +401,7 @@ resource "aws_instance" "full_node_public_secondary" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.full_node_sg.id]
-  subnet_id                   = aws_subnet.compound_chain_public_secondary.id
+  subnet_id                   = aws_subnet.gateway_public_secondary.id
   associate_public_ip_address = true
 
   root_block_device {
@@ -420,7 +420,7 @@ resource "aws_instance" "authority_node" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy
   vpc_security_group_ids      = [aws_security_group.authority_node_sg.id]
-  subnet_id                   = aws_subnet.compound_chain_private.id
+  subnet_id                   = aws_subnet.gateway_private.id
   associate_public_ip_address = true
   iam_instance_profile        = module.keystore.instance_profile_for_access.name
 
@@ -438,27 +438,27 @@ resource "aws_instance" "bastion" {
   key_name                    = aws_key_pair.admin_key_pair.key_name
   tenancy                     = var.tenancy # Same tenacy as authority node?
   vpc_security_group_ids      = [aws_security_group.bastion_node_sg.id]
-  subnet_id                   = aws_subnet.compound_chain_public.id
+  subnet_id                   = aws_subnet.gateway_public.id
   associate_public_ip_address = true
 }
 
-resource "aws_eip" "compound_chain_nat_gw_eip" {
+resource "aws_eip" "gateway_nat_gw_eip" {
   vpc = true
 
   tags = {
-    Name = "compound_chain_nat_gw_eip"
+    Name = "gateway_nat_gw_eip"
   }
 }
 
-resource "aws_internet_gateway" "compound_chain_ig_gw" {
-  vpc_id = aws_vpc.compound_chain_vpc.id
+resource "aws_internet_gateway" "gateway_ig_gw" {
+  vpc_id = aws_vpc.gateway_vpc.id
 }
 
-resource "aws_nat_gateway" "compound_chain_nat_gw" {
-  allocation_id = aws_eip.compound_chain_nat_gw_eip.id
-  subnet_id     = aws_subnet.compound_chain_public.id
+resource "aws_nat_gateway" "gateway_nat_gw" {
+  allocation_id = aws_eip.gateway_nat_gw_eip.id
+  subnet_id     = aws_subnet.gateway_public.id
 
-  depends_on = [aws_internet_gateway.compound_chain_ig_gw]
+  depends_on = [aws_internet_gateway.gateway_ig_gw]
 }
 
 resource "aws_lb" "full_node_ext_rpc_load_balancer" {
@@ -466,7 +466,7 @@ resource "aws_lb" "full_node_ext_rpc_load_balancer" {
   internal                   = false
   load_balancer_type         = "network"
   drop_invalid_header_fields = true
-  subnets                    = [aws_subnet.compound_chain_public.id, aws_subnet.compound_chain_public_secondary.id]
+  subnets                    = [aws_subnet.gateway_public.id, aws_subnet.gateway_public_secondary.id]
   idle_timeout               = 60
 
   tags = {
@@ -478,7 +478,7 @@ resource "aws_lb_target_group" "full_node_ext_rpc_lb_target_group" {
   name     = "full-node-ext-rpc-lb-tg-rpc"
   port     = 9933
   protocol = "TCP"
-  vpc_id   = aws_vpc.compound_chain_vpc.id
+  vpc_id   = aws_vpc.gateway_vpc.id
 
   health_check {
     protocol = "TCP"
@@ -516,7 +516,7 @@ resource "aws_lb" "full_node_ext_ws_load_balancer" {
   internal                   = false
   load_balancer_type         = "network"
   drop_invalid_header_fields = true
-  subnets                    = [aws_subnet.compound_chain_public.id, aws_subnet.compound_chain_public_secondary.id]
+  subnets                    = [aws_subnet.gateway_public.id, aws_subnet.gateway_public_secondary.id]
   idle_timeout               = 60
 
   tags = {
@@ -528,7 +528,7 @@ resource "aws_lb_target_group" "full_node_ext_ws_lb_target_group" {
   name     = "full-node-ext-ws-lb-tg"
   port     = 9944
   protocol = "TCP"
-  vpc_id   = aws_vpc.compound_chain_vpc.id
+  vpc_id   = aws_vpc.gateway_vpc.id
 
   health_check {
     protocol = "TCP"
@@ -566,7 +566,7 @@ resource "aws_lb" "authority_node_ext_gossip_load_balancer" {
   internal                   = false
   load_balancer_type         = "network"
   drop_invalid_header_fields = true
-  subnets                    = [aws_subnet.compound_chain_public.id, aws_subnet.compound_chain_public_secondary.id]
+  subnets                    = [aws_subnet.gateway_public.id, aws_subnet.gateway_public_secondary.id]
   idle_timeout               = 60
 
   tags = {
@@ -578,7 +578,7 @@ resource "aws_lb_target_group" "authority_node_ext_gossip_lb_target_group" {
   name     = "authority-node-ext-gossip-lb-tg"
   port     = 30333
   protocol = "TCP"
-  vpc_id   = aws_vpc.compound_chain_vpc.id
+  vpc_id   = aws_vpc.gateway_vpc.id
 
   health_check {
     protocol = "TCP"
@@ -604,11 +604,11 @@ resource "aws_lb_target_group_attachment" "authority_node_ext_gossip_lb_target_g
 }
 
 resource "aws_route_table" "public_ig_route" {
-  vpc_id = aws_vpc.compound_chain_vpc.id
+  vpc_id = aws_vpc.gateway_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.compound_chain_ig_gw.id
+    gateway_id = aws_internet_gateway.gateway_ig_gw.id
   }
 
   tags = {
@@ -617,21 +617,21 @@ resource "aws_route_table" "public_ig_route" {
 }
 
 resource "aws_route_table_association" "public_subnet_ig_route_association" {
-  subnet_id      = aws_subnet.compound_chain_public.id
+  subnet_id      = aws_subnet.gateway_public.id
   route_table_id = aws_route_table.public_ig_route.id
 }
 
 resource "aws_route_table_association" "public_secondary_subnet_ig_route_association" {
-  subnet_id      = aws_subnet.compound_chain_public_secondary.id
+  subnet_id      = aws_subnet.gateway_public_secondary.id
   route_table_id = aws_route_table.public_ig_route.id
 }
 
 resource "aws_route_table" "private_nat_ig_route" {
-  vpc_id = aws_vpc.compound_chain_vpc.id
+  vpc_id = aws_vpc.gateway_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.compound_chain_nat_gw.id
+    nat_gateway_id = aws_nat_gateway.gateway_nat_gw.id
   }
 
   tags = {
@@ -640,7 +640,7 @@ resource "aws_route_table" "private_nat_ig_route" {
 }
 
 resource "aws_route_table_association" "private_subnet_nat_ig_route_association" {
-  subnet_id      = aws_subnet.compound_chain_private.id
+  subnet_id      = aws_subnet.gateway_private.id
   route_table_id = aws_route_table.private_nat_ig_route.id
 }
 

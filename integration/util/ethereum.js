@@ -48,7 +48,7 @@ async function readContractsFile(contractsFile) {
   try {
     return JSON.parse(await fs.readFile(contractsFile, 'utf8')).contracts;
   } catch (e) {
-    throw new Error(`Compiled contracts missing-- please run \`yarn compile\` in compound-chain/ethereum directory first. ${e.toString()}`)
+    throw new Error(`Compiled contracts missing-- please run \`yarn compile\` in gateway/ethereum directory first. ${e.toString()}`)
   }
 }
 

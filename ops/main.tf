@@ -37,17 +37,17 @@ variable "az_secondary" {
   default = "us-east-1c"
 }
 
-variable "compound_chain_private_subnet_cidr" {
+variable "gateway_private_subnet_cidr" {
   type = string
   default = "10.0.1.0/24"
 }
 
-variable "compound_chain_public_subnet_cidr" {
+variable "gatew_public_subnet_cidr" {
   type = string
   default = "10.0.2.0/24"
 }
 
-variable "compound_chain_public_secondary_subnet_cidr" {
+variable "gatew_public_secondary_subnet_cidr" {
   type = string
   default = "10.0.3.0/24"
 }
@@ -60,7 +60,7 @@ variable "node_root_disk_size" {
 
 variable "authority_node_instance_type" {
   type = string
-  description = "Instance ID (AMI) to use for compound chain nodes"
+  description = "Instance ID (AMI) to use for gateway nodes"
   default = "m6g.large" # TODO: Choose best default instance type
 }
 
@@ -110,9 +110,9 @@ module tf {
   region = var.region
   az = var.az
   az_secondary = var.az_secondary
-  compound_chain_private_subnet_cidr = var.compound_chain_private_subnet_cidr
-  compound_chain_public_subnet_cidr = var.compound_chain_public_subnet_cidr
-  compound_chain_public_secondary_subnet_cidr = var.compound_chain_public_secondary_subnet_cidr
+  gatew_private_subnet_cidr = var.gatew_private_subnet_cidr
+  gatew_public_subnet_cidr = var.gatew_public_subnet_cidr
+  gatew_public_secondary_subnet_cidr = var.gatew_public_secondary_subnet_cidr
   authority_node_instance_type = var.authority_node_instance_type
   node_root_disk_size = var.node_root_disk_size
   tenancy = var.tenancy

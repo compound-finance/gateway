@@ -843,123 +843,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "compound-chain"
-version = "1.0.0"
-dependencies = [
- "compound-chain-runtime",
- "compound-crypto",
- "frame-benchmarking",
- "frame-benchmarking-cli",
- "frame-system",
- "futures 0.3.13",
- "hex",
- "jsonrpc-core",
- "jsonrpc-core-client",
- "jsonrpc-derive",
- "our-std",
- "pallet-cash",
- "pallet-cash-runtime-api",
- "parity-scale-codec",
- "runtime-interfaces",
- "sc-basic-authorship",
- "sc-chain-spec",
- "sc-cli",
- "sc-client-api",
- "sc-client-db",
- "sc-consensus",
- "sc-consensus-aura",
- "sc-consensus-epochs",
- "sc-consensus-slots",
- "sc-executor",
- "sc-finality-grandpa",
- "sc-finality-grandpa-rpc",
- "sc-keystore",
- "sc-network",
- "sc-rpc",
- "sc-rpc-api",
- "sc-service",
- "sc-service-test",
- "sc-sync-state-rpc",
- "sc-telemetry",
- "sc-transaction-pool",
- "serde",
- "serde_json",
- "sp-api",
- "sp-block-builder",
- "sp-blockchain",
- "sp-chain-spec",
- "sp-consensus",
- "sp-consensus-aura",
- "sp-core",
- "sp-finality-grandpa",
- "sp-inherents",
- "sp-keyring",
- "sp-keystore",
- "sp-runtime",
- "sp-timestamp",
- "sp-transaction-pool",
- "structopt",
- "substrate-build-script-utils",
- "substrate-frame-rpc-system",
- "tempfile",
- "wasm-timer",
-]
-
-[[package]]
-name = "compound-chain-runtime"
-version = "1.0.0"
-dependencies = [
- "frame-benchmarking",
- "frame-executive",
- "frame-support",
- "frame-system",
- "frame-system-benchmarking",
- "frame-system-rpc-runtime-api",
- "hex-literal",
- "our-std",
- "pallet-aura",
- "pallet-cash",
- "pallet-cash-runtime-api",
- "pallet-grandpa",
- "pallet-randomness-collective-flip",
- "pallet-session",
- "pallet-sudo",
- "pallet-timestamp",
- "parity-scale-codec",
- "serde",
- "sp-api",
- "sp-block-builder",
- "sp-consensus-aura",
- "sp-core",
- "sp-inherents",
- "sp-offchain",
- "sp-runtime",
- "sp-session",
- "sp-std",
- "sp-transaction-pool",
- "sp-version",
- "substrate-wasm-builder",
-]
-
-[[package]]
-name = "compound-crypto"
-version = "1.0.0"
-dependencies = [
- "bytes 0.5.6",
- "der-parser",
- "hex",
- "lazy_static",
- "libsecp256k1",
- "our-std",
- "parity-scale-codec",
- "rusoto_core",
- "rusoto_kms",
- "sp-core",
- "tiny-keccak 2.0.2",
- "tokio 0.2.25",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2267,6 +2150,123 @@ dependencies = [
  "futures 0.3.13",
  "memchr",
  "pin-project 0.4.27",
+]
+
+[[package]]
+name = "gateway"
+version = "1.0.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-benchmarking-cli",
+ "frame-system",
+ "futures 0.3.13",
+ "gateway-crypto",
+ "gateway-runtime",
+ "hex",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "our-std",
+ "pallet-cash",
+ "pallet-cash-runtime-api",
+ "parity-scale-codec",
+ "runtime-interfaces",
+ "sc-basic-authorship",
+ "sc-chain-spec",
+ "sc-cli",
+ "sc-client-api",
+ "sc-client-db",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-consensus-epochs",
+ "sc-consensus-slots",
+ "sc-executor",
+ "sc-finality-grandpa",
+ "sc-finality-grandpa-rpc",
+ "sc-keystore",
+ "sc-network",
+ "sc-rpc",
+ "sc-rpc-api",
+ "sc-service",
+ "sc-service-test",
+ "sc-sync-state-rpc",
+ "sc-telemetry",
+ "sc-transaction-pool",
+ "serde",
+ "serde_json",
+ "sp-api",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-chain-spec",
+ "sp-consensus",
+ "sp-consensus-aura",
+ "sp-core",
+ "sp-finality-grandpa",
+ "sp-inherents",
+ "sp-keyring",
+ "sp-keystore",
+ "sp-runtime",
+ "sp-timestamp",
+ "sp-transaction-pool",
+ "structopt",
+ "substrate-build-script-utils",
+ "substrate-frame-rpc-system",
+ "tempfile",
+ "wasm-timer",
+]
+
+[[package]]
+name = "gateway-crypto"
+version = "1.0.0"
+dependencies = [
+ "bytes 0.5.6",
+ "der-parser",
+ "hex",
+ "lazy_static",
+ "libsecp256k1",
+ "our-std",
+ "parity-scale-codec",
+ "rusoto_core",
+ "rusoto_kms",
+ "sp-core",
+ "tiny-keccak 2.0.2",
+ "tokio 0.2.25",
+]
+
+[[package]]
+name = "gateway-runtime"
+version = "1.0.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-executive",
+ "frame-support",
+ "frame-system",
+ "frame-system-benchmarking",
+ "frame-system-rpc-runtime-api",
+ "hex-literal",
+ "our-std",
+ "pallet-aura",
+ "pallet-cash",
+ "pallet-cash-runtime-api",
+ "pallet-grandpa",
+ "pallet-randomness-collective-flip",
+ "pallet-session",
+ "pallet-sudo",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "serde",
+ "sp-api",
+ "sp-block-builder",
+ "sp-consensus-aura",
+ "sp-core",
+ "sp-inherents",
+ "sp-offchain",
+ "sp-runtime",
+ "sp-session",
+ "sp-std",
+ "sp-transaction-pool",
+ "sp-version",
+ "substrate-wasm-builder",
 ]
 
 [[package]]
@@ -4270,8 +4270,8 @@ name = "open-oracle-mock-reporter"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "compound-crypto",
  "ethabi 11.0.0",
+ "gateway-crypto",
  "hex",
  "libsecp256k1",
  "rocket",
@@ -4403,12 +4403,12 @@ dependencies = [
 name = "pallet-cash"
 version = "1.0.0"
 dependencies = [
- "compound-crypto",
  "ethabi 12.0.0",
  "ethereum-client",
  "ethereum-types 0.11.0",
  "frame-support",
  "frame-system",
+ "gateway-crypto",
  "hex",
  "hex-literal",
  "lazy_static",
@@ -5661,7 +5661,7 @@ dependencies = [
 name = "runtime-interfaces"
 version = "1.0.0"
 dependencies = [
- "compound-crypto",
+ "gateway-crypto",
  "lazy_static",
  "our-std",
  "parity-scale-codec",

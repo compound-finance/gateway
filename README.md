@@ -1,8 +1,8 @@
-# Compound Chain
+# Gateway
 
 An interest-bearing stablecoin bridge between all DeFi chains.
 
-Compound Chain is built on [Substrate](https://substrate.dev).
+Gateway is built on [Substrate](https://substrate.dev).
 
 ## Local Development
 
@@ -24,7 +24,7 @@ Find manual setup instructions at the
 
 ### Build
 
-Once the development environment is set up, build Compound Chain. This command will build the
+Once the development environment is set up, build Gateway. This command will build the
 [Wasm](https://substrate.dev/docs/en/knowledgebase/advanced/executor#wasm-execution) and
 [native](https://substrate.dev/docs/en/knowledgebase/advanced/executor#native-execution) code:
 
@@ -41,25 +41,25 @@ Note that we require the rust `nightly` toolchain as we rely on unstable feature
 Purge any existing dev chain state:
 
 ```bash
-./target/release/compound-chain purge-chain --dev
+./target/release/gateway purge-chain --dev
 ```
 
 If all else fails the chain state can be purged (on Mac OS X) like:
 
 ```bash
-rm -rf ~/Library/Application\ Support/compound-chain/chains/dev
+rm -rf ~/Library/Application\ Support/gateway/chains/dev
 ```
 
 Start a dev chain:
 
 ```bash
-./target/release/compound-chain --dev
+./target/release/gateway --dev
 ```
 
 Or, start a dev chain with detailed logging:
 
 ```bash
-RUST_LOG=debug RUST_BACKTRACE=1 ./target/release/compound-chain -lruntime=debug --dev
+RUST_LOG=debug RUST_BACKTRACE=1 ./target/release/gateway -lruntime=debug --dev
 ```
 
 ### Multi-Node Local Testnet
@@ -103,9 +103,9 @@ cargo +nightly run -- \
   --validator
 ```
 
-Execute `cargo +nightly run -- --help` to learn more about the Compound Chain''s CLI options.
+Execute `cargo +nightly run -- --help` to learn more about the Gateway's CLI options.
 
-## Compound Chain Structure
+## Gateway Structure
 
 A Substrate project such as this consists of a number of components that are spread across a few
 directories.
@@ -148,7 +148,7 @@ After the node has been [built](#build), refer to the embedded documentation to 
 capabilities and configuration parameters that it exposes:
 
 ```shell
-./target/release/compound-chain --help
+./target/release/gateway --help
 ```
 
 ### Runtime
@@ -165,7 +165,7 @@ called "pallets". At the heart of FRAME is a helpful
 create pallets and flexibly compose them to create blockchains that can address
 [a variety of needs](https://www.substrate.io/substrate-users/).
 
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in Compound Chain and note
+Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in Gateway and note
 the following:
 
 -   This file configures several pallets to include in the runtime. Each pallet configuration is
@@ -208,15 +208,15 @@ Then run the following command to start a single node development chain.
 ```
 
 This command will firstly compile your code, and then start a local development network. You can
-also replace the default command (`cargo +nightly build --release && ./target/release/compound-chain --dev --ws-external`)
+also replace the default command (`cargo +nightly build --release && ./target/release/gateway --dev --ws-external`)
 by appending your own. A few useful ones are as follow.
 
 ```bash
 # Run Substrate node without re-compiling
-./scripts/docker_run.sh ./target/release/compound-chain --dev --ws-external
+./scripts/docker_run.sh ./target/release/gateway --dev --ws-external
 
 # Purge the local dev chain
-./scripts/docker_run.sh ./target/release/compound-chain purge-chain --dev
+./scripts/docker_run.sh ./target/release/gateway purge-chain --dev
 
 # Check whether the code is compilable
 ./scripts/docker_run.sh cargo +nightly check

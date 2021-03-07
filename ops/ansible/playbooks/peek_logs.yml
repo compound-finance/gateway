@@ -6,7 +6,7 @@
       - name: peep logs
         shell: |
           set -o pipefail
-          journalctl -u compound-chain --no-pager > /root/chainpound.log
+          journalctl -u gateway --no-pager > /root/chainpound.log
           tail -n 10000 /root/chainpound.log
         become: yes
         args:

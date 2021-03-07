@@ -182,12 +182,12 @@ const OCW_STORAGE_LOCK: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Reason> {
     // check signature
     let parsed_sig: <Ethereum as Chain>::Signature =
-        compound_crypto::eth_signature_from_bytes(&signature)?;
+        gateway_crypto::eth_signature_from_bytes(&signature)?;
 
     // note that this is actually a double-hash situation but that is expected behavior
     // the hashed message is hashed again in the eth convention inside eth_recover
-    let hashed = compound_crypto::keccak(&payload);
-    let recovered = compound_crypto::eth_recover(&hashed, &parsed_sig, true)?;
+    let hashed = gateway_crypto::keccak(&payload);
+    let recovered = gateway_crypto::eth_recover(&hashed, &parsed_sig, true)?;
     if !PriceReporters::get().contains(recovered) {
         return Err(OracleError::NotAReporter.into());
     }
@@ -280,7 +280,7 @@ pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Rea
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use compound_crypto::eth_signature_from_bytes;
+    use gateway_crypto::eth_signature_from_bytes;
 
     pub static API_RESPONSE_TEST_DATA: &str = r#"
     {
@@ -358,9 +358,9 @@ pub mod tests {
     fn test_recover() {
         let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
         let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
-        let hashed = compound_crypto::keccak(&msg);
+        let hashed = gateway_crypto::keccak(&msg);
         let recovered =
-            compound_crypto::eth_recover(&hashed, &eth_signature_from_bytes(&sig).unwrap(), true)
+            gateway_crypto::eth_recover(&hashed, &eth_signature_from_bytes(&sig).unwrap(), true)
                 .unwrap();
         assert_eq!(
             hex::encode(recovered),

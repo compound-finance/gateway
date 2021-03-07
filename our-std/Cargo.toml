@@ -4,7 +4,7 @@ description = "Things we use from std, in pallets."
 edition = "2018"
 homepage = "https://compound.cash"
 name = "our-std"
-repository = "https://github.com/compound-finance/compound-chain/"
+repository = "https://github.com/compound-finance/gateway/"
 version = "0.0.1"
 
 [package.metadata.docs.rs]

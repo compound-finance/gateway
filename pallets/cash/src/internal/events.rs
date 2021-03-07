@@ -120,7 +120,7 @@ pub fn receive_event<T: Config>(
     // TODO: use more generic function?
     // XXX why is this using eth for validator sig though?
     let signer: crate::types::ValidatorIdentity =
-        compound_crypto::eth_recover(&event.encode()[..], &signature, false)?;
+        gateway_crypto::eth_recover(&event.encode()[..], &signature, false)?;
     let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
     if !validators.contains(&signer) {
         log!(

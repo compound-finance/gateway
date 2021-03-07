@@ -9,7 +9,7 @@ const {
 const TEST_SIGNATURE = '0xc86ba4a27a0938efd58b397cf49e453e4abb3f3283acc64644a419c7734ede3c6a5704ded16ff1852340925ee6149c8fe76e9f1610af8c73bcf9b8d28ef086fd1c';
 
 const main = async () => {
-  console.log(chalk.yellow(`\n\nDeploying Compound Chain m4 to ${network}\n`));
+  console.log(chalk.yellow(`\n\nDeploying Gateway m4 to ${network}\n`));
 
   const root = saddle.account;
 

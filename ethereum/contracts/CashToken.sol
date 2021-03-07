@@ -4,9 +4,9 @@ pragma solidity ^0.8.1;
 import "./ICash.sol";
 
 /**
- * @title Compound Cash Token
+ * @title Gateway Cash Token
  * @author Compound Finance
- * @notice The Compound Cash Token for Ethereum
+ * @notice The Gateway Cash Token for Ethereum
  */
 contract CashToken is ICash {
     // @notice Structure to save gas while storing yield and index
@@ -63,7 +63,7 @@ contract CashToken is ICash {
     /**
      * @notice Initialize Cash token contract
      * @param initialYield The initial value for Cash token APY in BPS (e.g. 100=1%)
-     * @param initialYieldStart The timestamp when Cash index and yield were activated on Compound Chain
+     * @param initialYieldStart The timestamp when Cash index and yield were activated on Gateway
      */
     function initialize(uint128 initialYield, uint initialYieldStart) external {
         require(cashYieldAndIndex.index == 0, "Cash Token already initialized");
@@ -80,7 +80,7 @@ contract CashToken is ICash {
     /**
      * @notice Mint Cash tokens for the given account
      * @dev Invoked by Starport contract
-     * @dev principal is `u128` to be compliant with Compound Chain
+     * @dev principal is `u128` to be compliant with Gateway
      * @param account The owner of minted Cash tokens
      * @param principal The principal amount of minted Cash tokens
      * @return The minted amount of Cash tokens = principal * index
@@ -97,7 +97,7 @@ contract CashToken is ICash {
     /**
      * @notice Burn Cash tokens for the given account
      * @dev Invoked by Starport contract
-     * @dev principal is `u128` to be compliant with Compound Chain
+     * @dev principal is `u128` to be compliant with Gateway
      * @param account The owner of burned Cash tokens
      * @param amount The amount of burned Cash tokens
      * @return The amount of burned principal = amount / index
@@ -112,7 +112,7 @@ contract CashToken is ICash {
     }
 
     /**
-     * @notice Update yield and index to be in sync with Compound chain
+     * @notice Update yield and index to be in sync with Gateway
      * @dev It is expected to be called at least once per day
      * @dev Cash index denomination is 1e18
      * @param nextYield The new value of Cash APY measured in BPS

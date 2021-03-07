@@ -130,7 +130,7 @@ class Validator {
     ], { env });
 
     process.on('exit', () => {
-      ps.kill('SIGTERM'); // No matter what, always kill compound-chain node
+      ps.kill('SIGTERM'); // No matter what, always kill gateway node
     });
 
     ps.on('error', (err) => {
@@ -170,7 +170,7 @@ class Validator {
     }
 
     if (this.ps) {
-      this.ps.kill('SIGTERM'); // Kill compound-chain node
+      this.ps.kill('SIGTERM'); // Kill gateway node
     }
   }
 }

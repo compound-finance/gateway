@@ -4,7 +4,7 @@ description = 'Pallet for implementing CASH.'
 edition = '2018'
 homepage = 'https://compound.cash'
 name = 'pallet-cash'
-repository = 'https://github.com/compound-finance/compound-chain/'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
 readme = 'README.md'
 
@@ -39,7 +39,7 @@ pallet-timestamp = { default-features = false, git = 'https://github.com/compoun
 
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
 ethereum-client = { path = '../../ethereum-client', default-features = false }
-compound-crypto = { path = '../../compound-crypto', default-features = false }
+gateway-crypto = { path = '../../gateway-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
 our-std = { path = '../../our-std', default-features = false }
 
@@ -54,7 +54,7 @@ std = [
     'sp-core/std',
     'sp-runtime/std',
     'runtime-interfaces/std',
-    'compound-crypto/std',
+    'gateway-crypto/std',
     'our-std/std',
     'pallet-session/std',
 ]

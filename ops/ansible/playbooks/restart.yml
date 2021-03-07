@@ -3,15 +3,15 @@
     - full_node
     - authority_node
   tasks:
-    - name: stop compound chain service
+    - name: stop gateway service
       become: true
       systemd:
-        name: compound-chain.service
+        name: gateway.service
         state: stopped
 
-    - name: start compound chain service
+    - name: start gateway service
       become: true
       systemd:
-        name: compound-chain.service
+        name: gateway.service
         state: started
         daemon_reload: yes

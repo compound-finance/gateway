@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use compound_chain_runtime::{opaque::Block, AccountId, BlockNumber, Hash, Index};
+use gateway_runtime::{opaque::Block, AccountId, BlockNumber, Hash, Index};
 use sc_client_api::AuxStore;
 use sc_finality_grandpa::{
     FinalityProofProvider, GrandpaJustificationStream, SharedAuthoritySet, SharedVoterState,
@@ -133,8 +133,8 @@ where
         ),
     ));
 
-    io.extend_with(crate::api::CompoundRpcApi::to_delegate(
-        crate::api::CompoundRpcHandler::new(client),
+    io.extend_with(crate::api::GatewayRpcApi::to_delegate(
+        crate::api::GatewayRpcHandler::new(client),
     ));
 
     io

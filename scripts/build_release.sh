@@ -21,13 +21,13 @@ echo "*** Building Solidity ***"
 
 contracts="./ethereum/.build/contracts.json"
 
-echo "*** Building release compound chain ***"
+echo "*** Building release gateway ***"
 
 cargo build --release
 
-bin="./target/release/compound-chain"
+bin="./target/release/gateway"
 types="./types.json"
-wasm="./target/release/wbuild/compound-chain-runtime/compound_chain_runtime.compact.wasm"
+wasm="./target/release/wbuild/gateway-runtime/gateway_runtime.compact.wasm"
 
 if [ ! -f "$bin" -o ! -f "$wasm" -o ! -f "$types" -o ! -f "$contracts" ]; then
 	echo "Missing one of the following build files: $bin, $wasm, $types, $contracts"
@@ -40,13 +40,13 @@ checksum="$(node ./ethereum/scripts/utils/keccak.js "$wasm")"
 release_dir="./releases/$version"
 
 mkdir -p "$release_dir"
-cp "$wasm" "$release_dir/compound_chain_runtime.compact.wasm"
-echo "$checksum" > "$release_dir/compound_chain_runtime.checksum"
+cp "$wasm" "$release_dir/gateway_runtime.compact.wasm"
+echo "$checksum" > "$release_dir/gateway_runtime.checksum"
 cp "$types" "$release_dir/types.json"
 cp "$contracts" "$release_dir/contracts.json"
 
 echo "Built release $version"
-echo "  wasm: $release_dir/compound_chain_runtime.compact.wasm"
-echo "  wasm.checksum: $release_dir/compound_chain_runtime.checksum"
+echo "  wasm: $release_dir/gateway_runtime.compact.wasm"
+echo "  wasm.checksum: $release_dir/gateway_runtime.checksum"
 echo "  types: $release_dir/types.json"
 echo "  contracts: $release_dir/contracts.json"

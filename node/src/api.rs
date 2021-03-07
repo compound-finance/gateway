@@ -45,7 +45,7 @@ fn chain_err(reason: Reason) -> RpcError {
 }
 
 #[rpc]
-pub trait CompoundRpcApi<BlockHash> {
+pub trait GatewayRpcApi<BlockHash> {
     #[rpc(name = "get_liquidity")]
     fn get_liquidity(
         &self,
@@ -60,12 +60,12 @@ pub trait CompoundRpcApi<BlockHash> {
     fn get_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
 }
 
-pub struct CompoundRpcHandler<C, B> {
+pub struct GatewayRpcHandler<C, B> {
     client: Arc<C>,
     _block: PhantomData<B>,
 }
 
-impl<C, B> CompoundRpcHandler<C, B> {
+impl<C, B> GatewayRpcHandler<C, B> {
     pub fn new(client: Arc<C>) -> Self {
         Self {
             client,
@@ -74,7 +74,7 @@ impl<C, B> CompoundRpcHandler<C, B> {
     }
 }
 
-impl<C, B> CompoundRpcApi<B::Hash> for CompoundRpcHandler<C, B>
+impl<C, B> GatewayRpcApi<B::Hash> for GatewayRpcHandler<C, B>
 where
     B: BlockT,
     C: 'static + Send + Sync + ProvideRuntimeApi<B> + HeaderBackend<B>,

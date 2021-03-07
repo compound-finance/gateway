@@ -5,7 +5,7 @@ use secp256k1::SecretKey;
 use sp_core::ecdsa::Pair as EcdsaPair;
 use std::collections::hash_map::HashMap;
 
-/// The crypto module for compound chain.
+/// The crypto module for gateway.
 ///
 /// This entire crate is STD and designed to be exposed via
 /// a runtime interface in the runtime-interfaces crate.

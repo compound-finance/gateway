@@ -1,49 +1,49 @@
 
-- name: stop compound chain service
+- name: stop gateway service
   become: true
   systemd:
-    name: compound-chain.service
+    name: gateway.service
     state: stopped
 
 - name: bring chain spec
   become: true
   ansible.builtin.copy:
     src: "{{ chain_spec }}"
-    dest: "{{ compound_user_home }}/chainSpec.json"
-    owner: compound
+    dest: "{{ gateway_user_home }}/chainSpec.json"
+    owner: gateway
     mode: '0644'
 
 - name: purge chain
   become: true
   shell: |
     set -o pipefail
-    {{ compound_chain_bin }} purge-chain -y --chain "{{ compound_user_home }}/chainSpec.json" --base-path {{ chain_data_dir }}  --database paritydb
+    {{ gateway_bin }} purge-chain -y --chain "{{ gateway_user_home }}/chainSpec.json" --base-path {{ chain_data_dir }}  --database paritydb
   args:
     executable: /bin/bash
   changed_when: False
 
-- name: reinstall Compound Chain systemd unit file (authority node)
-  template: src=compound-chain-authority-node.j2 dest=/etc/systemd/system/compound-chain.service
+- name: reinstall Gateway systemd unit file (authority node)
+  template: src=gateway-authority-node.j2 dest=/etc/systemd/system/gateway.service
   become: true
   when: "'authority_node' in group_names"
   vars:
     peers: "{{ bootnodes }}"
     authority: "{{ authority }}"
   tags:
-    compound-service
+    gateway-service
 
-- name: reinstall Compound Chain systemd unit file (full node)
-  template: src=compound-chain-full-node.j2 dest=/etc/systemd/system/compound-chain.service
+- name: reinstall Gateway systemd unit file (full node)
+  template: src=gateway-full-node.j2 dest=/etc/systemd/system/gateway.service
   become: true
   when: "'full_node' in group_names"
   vars:
     peers: "{{ groups['authority_node'] }}"
   tags:
-    compound-service
+    gateway-service
 
-- name: start compound chain service
+- name: start gateway service
   become: true
   systemd:
-    name: compound-chain.service
+    name: gateway.service
     state: started
     daemon_reload: yes

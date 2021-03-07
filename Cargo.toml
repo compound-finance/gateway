@@ -8,7 +8,7 @@ members = [
     'pallets/runtime-interfaces',
     'runtime',
     'our-std',
-    'compound-crypto',
+    'gateway-crypto',
     'ethereum-client',
     'test-utils/open-oracle-mock-reporter',
     'trx-request'

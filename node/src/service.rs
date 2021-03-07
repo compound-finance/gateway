@@ -1,7 +1,7 @@
 //! Service implementation. Specialized wrapper over substrate service.
 
 use crate::rpc;
-use compound_chain_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
+use gateway_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
 use pallet_cash;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
