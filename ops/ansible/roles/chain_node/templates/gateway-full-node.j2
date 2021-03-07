@@ -1,14 +1,14 @@
 [Unit]
-Description=Compound Chain Full Node
+Description=Gateway Full Node
 
 [Service]
-User=compound
-Group=compound
-WorkingDirectory={{ compound_user_home }}
+User=gateway
+Group=gateway
+WorkingDirectory={{ gateway_user_home }}
 Environment="MINER={{ miner }}"
-ExecStart={{ compound_chain_bin }} \
+ExecStart={{ gateway_bin }} \
   --base-path {{ chain_data_dir }} \
-  --chain "{{ compound_user_home }}/chainSpec.json" \
+  --chain "{{ gateway_user_home }}/chainSpec.json" \
   --port 30333 \
   --ws-port 9944 \
   --ws-external \
@@ -17,7 +17,7 @@ ExecStart={{ compound_chain_bin }} \
   --rpc-external \
   --node-key-file {{ node_key_priv_file }} \
   {% for peer in peers -%}
-  --reserved-nodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.compound_chain.public_key }} \
+  --reserved-nodes /ip4/{{ peer }}/tcp/30333/p2p/{{ hostvars[peer].ansible_local.substrate.gateway.public_key }} \
   {% endfor -%}
   --reserved-only \
   --pruning archive \

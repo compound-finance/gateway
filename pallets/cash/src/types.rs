@@ -490,7 +490,7 @@ impl TryInto<CashPrincipalAmount> for CashPrincipal {
     }
 }
 
-/// Type for representing a multiplicative index on Compound Chain.
+/// Type for representing a multiplicative index on Gateway.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
 pub struct CashIndex(pub Uint);
 pub type CashPerCashPrincipal = CashIndex;

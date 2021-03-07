@@ -4,7 +4,7 @@ use crate::notices::NoticeId;
 use crate::rates::RatesError;
 use crate::types::Nonce;
 use codec::{Decode, Encode};
-use compound_crypto::CryptoError;
+use gateway_crypto::CryptoError;
 use our_std::RuntimeDebug;
 use trx_request;
 

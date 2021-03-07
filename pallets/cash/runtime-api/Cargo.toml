@@ -4,7 +4,7 @@ description = 'Runtime API for CASH pallet RPC.'
 edition = '2018'
 homepage = 'https://compound.cash'
 name = 'pallet-cash-runtime-api'
-repository = 'https://github.com/compound-finance/compound-chain/'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
 
 [package.metadata.docs.rs]

@@ -283,7 +283,7 @@ fn test_post_price_invalid_signature() {
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
         assert_err!(
             result,
-            Reason::CryptoError(compound_crypto::CryptoError::RecoverError)
+            Reason::CryptoError(gateway_crypto::CryptoError::RecoverError)
         );
     });
 }
@@ -298,7 +298,7 @@ fn test_post_price_invalid_reporter() {
         let result = CashModule::post_price(Origin::none(), test_payload, test_signature);
         assert_err!(
             result,
-            Reason::CryptoError(compound_crypto::CryptoError::RecoverError)
+            Reason::CryptoError(gateway_crypto::CryptoError::RecoverError)
         );
         // XXX is this testing the right thing?
         //  should it be:

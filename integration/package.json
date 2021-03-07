@@ -1,5 +1,5 @@
 {
-  "name": "compound-chain-integration-tests",
+  "name": "gateway-integration-tests",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {

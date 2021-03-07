@@ -6,14 +6,14 @@ use crate::reason::Reason;
 use crate::types::{AssetAmount, CashIndex, Timestamp};
 
 use codec::{Decode, Encode};
-use compound_crypto::public_key_bytes_to_eth_address;
+use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::{convert::TryInto, str::FromStr, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
 /// Type for representing the selection of a supported chain.
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainId {
-    Comp,
+    Gate,
     Eth,
     Dot,
     Sol,
@@ -23,7 +23,7 @@ pub enum ChainId {
 impl ChainId {
     pub fn to_account(self, addr: &str) -> Result<ChainAccount, Reason> {
         match self {
-            ChainId::Comp => Ok(ChainAccount::Comp(Compound::str_to_address(addr)?)),
+            ChainId::Gate => Ok(ChainAccount::Gate(Gateway::str_to_address(addr)?)),
             ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::str_to_address(addr)?)),
             ChainId::Sol => Ok(ChainAccount::Sol(Solana::str_to_address(addr)?)),
@@ -33,7 +33,7 @@ impl ChainId {
 
     pub fn to_asset(self, addr: &str) -> Result<ChainAsset, Reason> {
         match self {
-            ChainId::Comp => Ok(ChainAsset::Comp(Compound::str_to_address(addr)?)),
+            ChainId::Gate => Ok(ChainAsset::Gate(Gateway::str_to_address(addr)?)),
             ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::str_to_address(addr)?)),
             ChainId::Sol => Ok(ChainAsset::Sol(Solana::str_to_address(addr)?)),
@@ -43,7 +43,7 @@ impl ChainId {
 
     pub fn signer_address(self) -> Result<ChainAccount, Reason> {
         match self {
-            ChainId::Comp => Ok(ChainAccount::Comp(<Compound as Chain>::signer_address()?)),
+            ChainId::Gate => Ok(ChainAccount::Gate(<Gateway as Chain>::signer_address()?)),
             ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
             ChainId::Dot => Ok(ChainAccount::Dot(<Polkadot as Chain>::signer_address()?)),
             ChainId::Sol => Ok(ChainAccount::Sol(<Solana as Chain>::signer_address()?)),
@@ -53,7 +53,7 @@ impl ChainId {
 
     pub fn hash_bytes(self, data: &[u8]) -> ChainHash {
         match self {
-            ChainId::Comp => ChainHash::Comp(<Compound as Chain>::hash_bytes(data)),
+            ChainId::Gate => ChainHash::Gate(<Gateway as Chain>::hash_bytes(data)),
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::hash_bytes(data)),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::hash_bytes(data)),
             ChainId::Sol => ChainHash::Sol(<Solana as Chain>::hash_bytes(data)),
@@ -63,7 +63,7 @@ impl ChainId {
 
     pub fn sign(self, message: &[u8]) -> Result<ChainSignature, Reason> {
         match self {
-            ChainId::Comp => Ok(ChainSignature::Comp(<Compound as Chain>::sign_message(
+            ChainId::Gate => Ok(ChainSignature::Gate(<Gateway as Chain>::sign_message(
                 message,
             )?)),
             ChainId::Eth => Ok(ChainSignature::Eth(<Ethereum as Chain>::sign_message(
@@ -83,7 +83,7 @@ impl ChainId {
 
     pub fn zero_hash(self) -> ChainHash {
         match self {
-            ChainId::Comp => ChainHash::Comp(<Compound as Chain>::zero_hash()),
+            ChainId::Gate => ChainHash::Gate(<Gateway as Chain>::zero_hash()),
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
             ChainId::Sol => ChainHash::Sol(<Solana as Chain>::zero_hash()),
@@ -101,7 +101,7 @@ impl Default for ChainId {
 /// Type for an account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainAccount {
-    Comp(<Compound as Chain>::Address),
+    Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
     Sol(<Solana as Chain>::Address),
@@ -145,7 +145,7 @@ impl From<ChainAccount> for String {
 /// Type for an asset tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainAsset {
-    Comp(<Compound as Chain>::Address),
+    Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
     Sol(<Solana as Chain>::Address),
@@ -189,7 +189,7 @@ impl From<ChainAsset> for String {
 /// Type for chain assets paired with an account
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainAssetAccount {
-    Comp(<Compound as Chain>::Address, <Compound as Chain>::Address),
+    Gate(<Gateway as Chain>::Address, <Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Address),
     Sol(<Solana as Chain>::Address, <Solana as Chain>::Address),
@@ -199,7 +199,7 @@ pub enum ChainAssetAccount {
 /// Type for a signature and account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainAccountSignature {
-    Comp(<Compound as Chain>::Address, <Compound as Chain>::Signature),
+    Gate(<Gateway as Chain>::Address, <Gateway as Chain>::Signature),
     Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature),
     Sol(<Solana as Chain>::Address, <Solana as Chain>::Signature),
@@ -209,7 +209,7 @@ pub enum ChainAccountSignature {
 impl ChainAccountSignature {
     pub fn to_chain_signature(self) -> ChainSignature {
         match self {
-            ChainAccountSignature::Comp(_, sig) => ChainSignature::Comp(sig),
+            ChainAccountSignature::Gate(_, sig) => ChainSignature::Gate(sig),
             ChainAccountSignature::Eth(_, sig) => ChainSignature::Eth(sig),
             ChainAccountSignature::Dot(_, sig) => ChainSignature::Dot(sig),
             ChainAccountSignature::Sol(_, sig) => ChainSignature::Sol(sig),
@@ -235,7 +235,7 @@ impl ChainAccountSignature {
 /// Type for an hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainHash {
-    Comp(<Compound as Chain>::Hash),
+    Gate(<Gateway as Chain>::Hash),
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
     Sol(<Solana as Chain>::Hash),
@@ -245,7 +245,7 @@ pub enum ChainHash {
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignature {
-    Comp(<Compound as Chain>::Signature),
+    Gate(<Gateway as Chain>::Signature),
     Eth(<Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Signature),
     Sol(<Solana as Chain>::Signature),
@@ -274,7 +274,7 @@ impl ChainSignature {
 /// Type for a list of chain signatures.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainSignatureList {
-    Comp(Vec<(<Compound as Chain>::Address, <Compound as Chain>::Signature)>),
+    Gate(Vec<(<Gateway as Chain>::Address, <Gateway as Chain>::Signature)>),
     Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
     Sol(Vec<(<Solana as Chain>::Address, <Solana as Chain>::Signature)>),
@@ -322,7 +322,7 @@ pub trait Chain {
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct Compound {}
+pub struct Gateway {}
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Ethereum {}
@@ -336,8 +336,8 @@ pub struct Solana {}
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Tezos {}
 
-impl Chain for Compound {
-    const ID: ChainId = ChainId::Comp;
+impl Chain for Gateway {
+    const ID: ChainId = ChainId::Gate;
 
     type EventId = comp::EventId;
     type Event = comp::Event;
@@ -401,11 +401,11 @@ impl Chain for Ethereum {
         data: &[u8],
         signature: Self::Signature,
     ) -> Result<Self::Address, Reason> {
-        Ok(compound_crypto::eth_recover(data, &signature, true)?)
+        Ok(gateway_crypto::eth_recover(data, &signature, true)?)
     }
 
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
-        Ok(compound_crypto::eth_recover(data, &signature, false)?)
+        Ok(gateway_crypto::eth_recover(data, &signature, false)?)
     }
 
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason> {

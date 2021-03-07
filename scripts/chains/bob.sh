@@ -13,15 +13,15 @@ do
 done
 
 if [ "$purge" = true ] ; then
-./target/release/compound-chain purge-chain --base-path /tmp/chainz/bob --chain ./compoundChainSpec.json --database paritydb -y
+./target/release/gateway purge-chain --base-path /tmp/chainz/bob --chain ./gatewayChainSpec.json --database paritydb -y
 fi
 
 export ETH_KEY_ID=my_eth_key_id
 export ETH_RPC_URL=https://ropsten-eth.compound.finance
 export MINER="ETH:0x66613A2d4908D130C908ccF2f298b235bACD427a"
-./target/release/compound-chain \
+./target/release/gateway \
   --base-path /tmp/chainz/bob \
-  --chain ./compoundChainSpec.json \
+  --chain ./gatewayChainSpec.json \
   --port 30334 \
   --ws-port 9946 \
   --rpc-port 9934 \

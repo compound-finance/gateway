@@ -35,17 +35,17 @@
     - name: node key directory
       file:
         path: '{{ node_key_dir }}'
-        owner: compound
-        group: compound
+        owner: gateway
+        group: gateway
         mode: '0755'
         state: directory
       become: true
 
-    - name: chown priv node file # compound user needs to read it to boot node
+    - name: chown priv node file # gateway user needs to read it to boot node
       file:
         path: '{{ node_key_priv_file }}'
-        owner: compound
-        group: compound
+        owner: gateway
+        group: gateway
         mode: '0400'
         state: touch
       become: true
@@ -53,8 +53,8 @@
     - name: chown pub node file # less secure perms for pub file
       file:
         path: '{{ node_key_pub_file }}'
-        owner: compound
-        group: compound
+        owner: gateway
+        group: gateway
         mode: '0644'
         state: touch
       become: true
@@ -76,7 +76,7 @@
 
     # TODO: is this the right way to store a public key as a fact?
     - name: store public key fact
-      copy: content="[compound_chain]\npublic_key={{ public_key.stderr_lines[0] }}" dest={{ fact_file }}
+      copy: content="[gateway]\npublic_key={{ public_key.stderr_lines[0] }}" dest={{ fact_file }}
       become: true
 
     - name: re-read facts after adding public key fact

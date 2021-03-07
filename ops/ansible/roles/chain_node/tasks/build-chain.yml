@@ -15,10 +15,10 @@
     - build-chain
 
 # TODO: how to handle missing deploy key?
-- name: checkout compound chain
+- name: checkout gateway
   git:
     repo: '{{ git_repo }}'
-    dest: '{{ compound_chain_home }}'
+    dest: '{{ gateway_home }}'
     version: '{{ git_branch }}'
     key_file: '{{ git_deploy_key }}'
     accept_hostkey: yes
@@ -26,19 +26,19 @@
     - build-chain
     - rebuild-chain
 
-- name: compile compound chain
+- name: compile gateway
   command:
     cmd: '{{ cargo_bin }} +nightly build --release'
-    chdir: '{{ compound_chain_home }}'
+    chdir: '{{ gateway_home }}'
   async: 3600
   poll: 0
-  register: compound_chain
+  register: gateway
   tags:
     - build-chain
     - rebuild-chain
 
-- name: compile compound chain - check async status
-  async_status: jid={{ compound_chain.ansible_job_id }}
+- name: compile gateway - check async status
+  async_status: jid={{ gateway.ansible_job_id }}
   register: job_result
   until: job_result.finished
   retries: 1000
@@ -47,11 +47,11 @@
     - build-chain
     - rebuild-chain
 
-- name: change compound-chain bin owner to compound
+- name: change gateway bin owner to gateway
   file:
-    path: '{{ compound_chain_bin }}'
-    owner: compound
-    group: compound
+    path: '{{ gateway_bin }}'
+    owner: gateway
+    group: gateway
     mode: '0744'
     state: file
   become: true

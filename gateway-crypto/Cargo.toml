@@ -1,10 +1,10 @@
 [package]
 authors = ['Compound <https://compound.finance>']
-description = 'Cryptographic operations for compound chain'
+description = 'Cryptographic operations for gateway'
 edition = '2018'
 homepage = 'https://compound.cash'
-name = 'compound-crypto'
-repository = 'https://github.com/compound-finance/compound-chain/'
+name = 'gateway-crypto'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
 
 [dependencies]

@@ -4,7 +4,7 @@
 extern crate rocket;
 
 use chrono::prelude::*;
-use compound_crypto::{
+use gateway_crypto::{
     bytes_to_eth_hex_string, public_key_bytes_to_eth_address, Keyring,
     ETH_KEY_ID_ENV_VAR_DEV_DEFAULT,
 };
@@ -32,8 +32,8 @@ pub struct PostPriceBody {
 
 /// This holds our state
 struct App {
-    pub keyring: Mutex<compound_crypto::InMemoryKeyring>,
-    pub key_id: compound_crypto::KeyId,
+    pub keyring: Mutex<gateway_crypto::InMemoryKeyring>,
+    pub key_id: gateway_crypto::KeyId,
     pub prices: Mutex<HashMap<String, u64>>,
 }
 
@@ -41,8 +41,8 @@ impl App {
     /// Creates a new mock open oracle reporter with an Eth price of 1000.000001 using the alice key
     /// The reporter address is 0xb4521c6e39dfbad1c654990757c530b9c292ed61
     fn new() -> App {
-        let keyring = Mutex::new(compound_crypto::dev_keyring());
-        let key_id: compound_crypto::KeyId = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
+        let keyring = Mutex::new(gateway_crypto::dev_keyring());
+        let key_id: gateway_crypto::KeyId = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
         let mut prices: HashMap<String, u64> = HashMap::new();
         prices.insert("ETH".into(), 1000000001);
         let prices = Mutex::new(prices);
@@ -78,10 +78,10 @@ impl App {
         let timestamp_eth_abi = ethabi::Token::Uint(timestamp.into());
 
         let mut message_strings = Vec::new();
-        let mut digested_message_bytes_to_sign: Vec<compound_crypto::HashedMessageBytes> =
+        let mut digested_message_bytes_to_sign: Vec<gateway_crypto::HashedMessageBytes> =
             Vec::new();
         let mut price_strings = HashMap::new();
-        let mut digested: compound_crypto::HashedMessageBytes;
+        let mut digested: gateway_crypto::HashedMessageBytes;
 
         for (key, value) in prices.iter() {
             let value: u64 = *value;
@@ -93,9 +93,8 @@ impl App {
                 ethabi_key,
                 ethabi_value,
             ]);
-            digested = compound_crypto::keccak(&ethabi_encoded_bytes);
-            let hex_encoded_string =
-                compound_crypto::bytes_to_eth_hex_string(&ethabi_encoded_bytes);
+            digested = gateway_crypto::keccak(&ethabi_encoded_bytes);
+            let hex_encoded_string = gateway_crypto::bytes_to_eth_hex_string(&ethabi_encoded_bytes);
             message_strings.push(hex_encoded_string);
             digested_message_bytes_to_sign.push(digested);
             // todo: this may cause issues later with prices not matching during sanity check
@@ -112,7 +111,7 @@ impl App {
             .iter()
             .map(|e| {
                 let bytes = e.as_ref().unwrap();
-                compound_crypto::bytes_to_eth_hex_string(&bytes.as_slice())
+                gateway_crypto::bytes_to_eth_hex_string(&bytes.as_slice())
             })
             .collect();
 

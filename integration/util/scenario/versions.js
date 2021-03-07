@@ -19,8 +19,8 @@ function releasePath(version, file) {
 
 function releaseWasmInfo(repoUrl, version) {
   return {
-    url: releaseUrl(repoUrl, version, 'compound_chain_runtime.compact.wasm'),
-    path: releasePath(version, 'compound_chain_runtime.compact.wasm'),
+    url: releaseUrl(repoUrl, version, 'gateway_runtime.compact.wasm'),
+    path: releasePath(version, 'gateway_runtime.compact.wasm'),
   };
 }
 

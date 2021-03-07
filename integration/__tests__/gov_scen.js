@@ -122,7 +122,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       const newValidatorKeys = await chain.rotateKeys(newValidator);
 
       const charlie = keyring.createFromUri("//Charlie");
-      const charlieCompoundId = charlie.address;
+      const charlieGatewayId = charlie.address;
       await chain.setKeys(charlie, newValidatorKeys);
 
       const { alice, bob } = validators.validatorInfoMap;
@@ -130,7 +130,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       const allAuthsRaw = [
         toValKeys(alice.aura_key, alice.eth_account),
         toValKeys(bob.aura_key, bob.eth_account),
-        toValKeys(charlieCompoundId, eth_account),
+        toValKeys(charlieGatewayId, eth_account),
       ];
 
       const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);
@@ -139,7 +139,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       await chain.waitUntilSession(3);
 
       const newSessionAuths = await chain.sessionValidators();
-      expect(newSessionAuths.sort()).toEqual([alice.aura_key, bob.aura_key, charlieCompoundId].sort());
+      expect(newSessionAuths.sort()).toEqual([alice.aura_key, bob.aura_key, charlieGatewayId].sort());
 
       const auraAuths = await chain.getAuraAuthorites();
       expect(auraAuths.sort()).toEqual([alice.aura_key, bob.aura_key, keyring.encodeAddress(newValidatorKeys.aura)].sort());
@@ -169,14 +169,14 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       await validators.addValidator("Charlie", { peer_id, node_key, eth_private_key, eth_account });
 
       const charlie = keyring.createFromUri("//Charlie");
-      const charlieCompoundId = charlie.address;
+      const charlieGatewayId = charlie.address;
 
       const { alice, bob } = validators.validatorInfoMap;
       const toValKeys = (substrateId, ethAccount) => {return  {substrate_id: keyring.decodeAddress(substrateId), eth_address: ethAccount} };
       const allAuthsRaw = [
         toValKeys(alice.aura_key, alice.eth_account),
         toValKeys(bob.aura_key, bob.eth_account),
-        toValKeys(charlieCompoundId, eth_account),
+        toValKeys(charlieGatewayId, eth_account),
       ];
 
       const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);

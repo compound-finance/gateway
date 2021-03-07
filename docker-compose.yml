@@ -2,17 +2,17 @@ version: "3.2"
 
 services:
   dev:
-    container_name: compound-chain
+    container_name: gateway
     image: paritytech/ci-linux:production
-    working_dir: /var/www/compound-chain
+    working_dir: /var/www/gateway
     ports:
       - "9944:9944"
     environment:
-      - CARGO_HOME=/var/www/compound-chain/.cargo
+      - CARGO_HOME=/var/www/gateway/.cargo
       - WASM_BUILD_TOOLCHAIN=nightly-2020-09-27
     volumes:
-      - .:/var/www/compound-chain
+      - .:/var/www/gateway
       - type: bind
         source: ./.local
         target: /root/.local
-    command: bash -c "cargo build --release && ./target/release/compound-chain --dev --ws-external"
+    command: bash -c "cargo build --release && ./target/release/gateway --dev --ws-external"

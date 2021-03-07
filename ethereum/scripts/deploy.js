@@ -8,7 +8,7 @@ const {
 } = require('./utils/deploy_utils');
 
 const main = async (admin) => {
-  console.log(chalk.yellow(`\n\nDeploying Compound Chain to ${network} with Admin ${admin}\n`));
+  console.log(chalk.yellow(`\n\nDeploying Gateway to ${network} with Admin ${admin}\n`));
 
   const root = saddle.account;
 

@@ -1,9 +1,9 @@
 """
-Patch substrate with a local verison of substrate. Useful for fixing bugs in substrate while working on compound-chain.
+Patch substrate with a local verison of substrate. Useful for fixing bugs in substrate while working on gateway.
 
 PRECONDITIONS
 * git folders are checked out in the same directory as in
-* run this script from the compound-chain directory
+* run this script from the gateway directory
 
 USAGE
 1. run

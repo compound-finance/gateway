@@ -1,16 +1,16 @@
 [package]
 authors = ['Compound <https://compound.finance>']
 build = 'build.rs'
-description = 'A Compound Chain node.'
+description = 'A Gateway node.'
 edition = '2018'
 homepage = 'https://compound.cash'
-name = 'compound-chain'
-repository = 'https://github.com/compound-finance/compound-chain/'
+name = 'gateway'
+repository = 'https://github.com/compound-finance/gateway/'
 version = '1.0.0'
-default-run = "compound-chain"
+default-run = "gateway"
 
 [[bin]]
-name = 'compound-chain'
+name = 'gateway'
 
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']
@@ -73,8 +73,8 @@ frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', br
 frame-benchmarking-cli = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
 
 # Local dependencies
-compound-chain-runtime = { path = '../runtime' }
-compound-crypto = { path = '../compound-crypto' }
+gateway-runtime = { path = '../runtime' }
+gateway-crypto = { path = '../gateway-crypto' }
 our-std = { path = '../our-std' }
 pallet-cash = { path = '../pallets/cash' }
 pallet-cash-runtime-api = { path = '../pallets/cash/runtime-api' }
@@ -95,7 +95,7 @@ default = ['with-parity-db']
 with-parity-db=['sc-client-db/with-parity-db']
 with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
 runtime-benchmarks = [
-	'compound-chain-runtime/runtime-benchmarks',
+	'gateway-runtime/runtime-benchmarks',
 	'frame-benchmarking-cli',
 ]
 runtime-debug = ['our-std/runtime-debug']

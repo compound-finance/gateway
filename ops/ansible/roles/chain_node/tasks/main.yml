@@ -11,5 +11,5 @@
 - name: Generate keys
   import_tasks: generate-keys.yml
 
-- name: Install Compound Service
-  import_tasks: compound-service.yml
+- name: Install Gateway Service
+  import_tasks: gateway-service.yml

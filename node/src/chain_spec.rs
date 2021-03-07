@@ -1,4 +1,4 @@
-use compound_chain_runtime::{
+use gateway_runtime::{
     opaque, wasm_binary_unwrap, AccountId, AuraConfig, CashConfig, GenesisConfig, GrandpaConfig,
     SessionConfig, Signature, SudoConfig, SystemConfig,
 };
@@ -157,7 +157,7 @@ pub fn staging_testnet_config() -> ChainSpec {
         // Telemetry
         None,
         // Protocol ID
-        Some("compound-chain-staging"),
+        Some("gateway-staging"),
         // Properties
         Some(get_properties()),
         // Extensions
@@ -268,7 +268,7 @@ pub fn extract_configuration_from_properties(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use compound_chain_runtime::BuildStorage;
+    use gateway_runtime::BuildStorage;
 
     /// Best case scenario - we have the key we need in the properties map and we _can_ return
     /// the OCW configuration

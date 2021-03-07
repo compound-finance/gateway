@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use codec::{Decode, Encode};
-use compound_crypto::CryptoError;
+use gateway_crypto::CryptoError;
 use sp_runtime_interface::pass_by::PassByCodec;
 use std::sync::Mutex;
 
@@ -33,7 +33,7 @@ lazy_static! {
 }
 
 /// The configuration interface for offchain workers. This is designed to manage configuration
-/// that is specific to compound chain AND distributed in the chain spec file. Ultimately
+/// that is specific to gateway AND distributed in the chain spec file. Ultimately
 /// the things that are being configured here should not be changed by any honest validators.
 /// Each chain spec file will have different values for these configurations by design, for example
 /// testnet may point to an Ethereum testnet starport address and lock event topic.
@@ -55,7 +55,7 @@ pub trait ConfigInterface {
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
-const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = compound_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
+const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const MINER_ENV_VAR: &str = "MINER";
 const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str = "https://goerli-eth.compound.finance";
@@ -107,22 +107,22 @@ pub trait KeyringInterface {
     fn sign(
         messages: Vec<Vec<u8>>,
         key_id: Vec<u8>,
-    ) -> Result<Vec<Result<compound_crypto::SignatureBytes, CryptoError>>, CryptoError> {
-        let keyring = compound_crypto::keyring();
-        let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
+    ) -> Result<Vec<Result<gateway_crypto::SignatureBytes, CryptoError>>, CryptoError> {
+        let keyring = gateway_crypto::keyring();
+        let key_id = gateway_crypto::KeyId::from_utf8(key_id)?;
         let messages: Vec<&[u8]> = messages.iter().map(|e| e.as_slice()).collect();
         keyring.sign(messages, &key_id)
     }
 
     fn sign_one(message: Vec<u8>, key_id: Vec<u8>) -> Result<[u8; 65], CryptoError> {
-        let keyring = compound_crypto::keyring();
-        let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
+        let keyring = gateway_crypto::keyring();
+        let key_id = gateway_crypto::KeyId::from_utf8(key_id)?;
         keyring.sign_one(&message, &key_id)
     }
 
     fn get_public_key(key_id: Vec<u8>) -> Result<[u8; 64], CryptoError> {
-        let keyring = compound_crypto::keyring();
-        let key_id = compound_crypto::KeyId::from_utf8(key_id)?;
+        let keyring = gateway_crypto::keyring();
+        let key_id = gateway_crypto::KeyId::from_utf8(key_id)?;
         keyring.get_public_key(&key_id)
     }
 }

@@ -4,7 +4,7 @@
   "chainType": "Live",
   "bootNodes": [],
   "telemetryEndpoints": null,
-  "protocolId": "compound-chain-staging",
+  "protocolId": "gateway-staging",
   "properties": {
     "eth_starport_address": "0x5dCE7D554f5237F67bb2C6708e45291B3c6e0389"
   },

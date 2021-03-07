@@ -65,11 +65,11 @@ class Ctx {
   }
 
   __target() {
-    return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'compound-chain');
+    return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'gateway');
   }
 
   __wasmFile() {
-    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'compound-chain-runtime', 'compound_chain_runtime.compact.wasm');
+    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'gateway-runtime', 'gateway_runtime.compact.wasm');
   }
 
   __genesisVersion() {
