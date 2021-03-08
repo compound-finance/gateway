@@ -25,7 +25,7 @@ use crate::types::{
     CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, LiquidityFactor, Nonce,
     ReporterSet, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig,
 };
-use chains::{Chain, Ethereum};
+use chains::Chain;
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
@@ -35,10 +35,10 @@ use frame_support::{
     Parameter,
 };
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{cmp::min, collections::btree_set::BTreeSet, str, vec::Vec, Debuggable};
+use our_std::{collections::btree_set::BTreeSet, str, vec::Vec, Debuggable};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
-    InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+    InvalidTransaction, TransactionSource, TransactionValidity,
 };
 
 use pallet_session;
@@ -432,7 +432,7 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
             // no era changes pending, periodic
             let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
             let is_new_period = (now % period) == <T>::BlockNumber::from(0 as u32);
-            
+
             if is_new_period {
                 println!(
                     "should_end_session={}[periodic {:?}%{:?}]",
@@ -672,85 +672,8 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// By default unsigned transactions are disallowed, but implementing the validator
     /// here we make sure that some particular calls (the ones produced by offchain worker)
     /// are being whitelisted and marked as valid.
-    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-        match call {
-            Call::set_miner(_miner) => ValidTransaction::with_tag_prefix("CashPallet::set_miner")
-                .priority(1)
-                .longevity(10)
-                .propagate(true)
-                .build(),
-            Call::set_next_code_via_hash(next_code) => {
-                // Allow this call only if we're waiting on new code
-                // TODO: Is this check too expensive?
-                let hash = <Ethereum as Chain>::hash_bytes(&next_code);
-                if AllowedNextCodeHash::exists() {
-                    ValidTransaction::with_tag_prefix("CashPallet::set_next_code_via_hash")
-                        .priority(1)
-                        .longevity(10)
-                        .and_provides(hash)
-                        .propagate(true)
-                        .build()
-                } else {
-                    InvalidTransaction::Call.into()
-                }
-            }
-            Call::receive_event(event_id, event, signature) => {
-                log!(
-                    "validating receive_event({:?},{:?},{}))",
-                    event_id,
-                    event,
-                    hex::encode(&signature)
-                );
-
-                ValidTransaction::with_tag_prefix("CashPallet::receive_event")
-                    .priority(2)
-                    .longevity(10)
-                    .and_provides((event_id, signature))
-                    .propagate(true)
-                    .build()
-            }
-            Call::exec_trx_request(request, signature, nonce) => {
-                let signer_res = signature.recover_account(
-                    &internal::exec_trx_request::prepend_nonce(request, *nonce)[..],
-                );
-
-                log!("validating signer_res={:?}", signer_res);
-
-                match (signer_res, nonce) {
-                    (Err(_e), _) => InvalidTransaction::Call.into(),
-                    (Ok(sender), 0) => {
-                        ValidTransaction::with_tag_prefix("CashPallet::exec_trx_request")
-                            .priority(4)
-                            .longevity(10)
-                            .and_provides((sender, 0))
-                            .propagate(true)
-                            .build()
-                    }
-                    (Ok(sender), _) => {
-                        ValidTransaction::with_tag_prefix("CashPallet::exec_trx_request")
-                            .priority(3)
-                            .longevity(10)
-                            .and_provides((sender, nonce))
-                            .propagate(true)
-                            .build()
-                    }
-                }
-            }
-            Call::post_price(_, sig) => ValidTransaction::with_tag_prefix("CashPallet::post_price")
-                .priority(5)
-                .longevity(10)
-                .and_provides(sig)
-                .propagate(true)
-                .build(),
-            Call::publish_signature(_, _, sig) => {
-                ValidTransaction::with_tag_prefix("CashPallet::publish_signature")
-                    .priority(5)
-                    .longevity(10)
-                    .and_provides(sig)
-                    .propagate(true)
-                    .build()
-            }
-            _ => InvalidTransaction::Call.into(),
-        }
+    fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        internal::validate_trx::validate_unsigned::<T>(source, call)
+            .unwrap_or(InvalidTransaction::Call.into())
     }
 }
