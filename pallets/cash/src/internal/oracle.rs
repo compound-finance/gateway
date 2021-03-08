@@ -179,7 +179,7 @@ const OCW_LATEST_TIMESTAMP: &[u8; 33] = b"cash::latest_price_feed_timestamp";
 const OCW_LATEST_BLOCK_NUMBER: &[u8; 41] = b"cash::latest_price_feed_poll_block_number";
 const OCW_STORAGE_LOCK: &[u8; 34] = b"cash::storage_lock_open_price_feed";
 
-pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Reason> {
+pub fn check_signature<T: Config>(payload: &Vec<u8>, signature: &Vec<u8>) -> Result<bool, Reason> {
     // check signature
     let parsed_sig: <Ethereum as Chain>::Signature =
         gateway_crypto::eth_signature_from_bytes(&signature)?;
@@ -188,7 +188,12 @@ pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(),
     // the hashed message is hashed again in the eth convention inside eth_recover
     let hashed = gateway_crypto::keccak(&payload);
     let recovered = gateway_crypto::eth_recover(&hashed, &parsed_sig, true)?;
-    if !PriceReporters::get().contains(recovered) {
+
+    Ok(PriceReporters::get().contains(recovered))
+}
+
+pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Reason> {
+    if !check_signature::<T>(&payload, &signature)? {
         return Err(OracleError::NotAReporter.into());
     }
 

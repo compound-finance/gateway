@@ -1,4 +1,4 @@
-use crate::chains::eth;
+use crate::chains::{eth, ChainId, ChainSignature};
 use crate::log;
 use crate::reason::Reason;
 use crate::types::ValidatorIdentity;
@@ -19,11 +19,6 @@ pub enum ChainLogId {
     Eth(eth::BlockNumber, eth::LogIndex),
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainLogEvent {
-    Eth(ethereum_client::EthereumLogEvent),
-}
-
 impl ChainLogId {
     pub fn show(&self) -> String {
         match self {
@@ -31,6 +26,23 @@ impl ChainLogId {
                 format!("Eth({},{})", block_number, log_index)
             }
         }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainLogEvent {
+    Eth(ethereum_client::EthereumLogEvent),
+}
+
+impl ChainLogEvent {
+    pub fn chain_id(&self) -> ChainId {
+        match self {
+            ChainLogEvent::Eth(_) => ChainId::Eth,
+        }
+    }
+
+    pub fn sign_event(&self) -> Result<ChainSignature, Reason> {
+        self.chain_id().sign(&self.encode())
     }
 }
 
