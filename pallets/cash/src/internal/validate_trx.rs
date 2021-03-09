@@ -2,6 +2,7 @@ use crate::{
     chains::{Chain, ChainAccount, Ethereum},
     internal,
     notices::EncodeNotice,
+    reason::Reason,
     AllowedNextCodeHash, Call, Config, Notices, Validators,
 };
 use codec::Encode;
@@ -11,32 +12,35 @@ use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, V
 
 #[derive(Eq, PartialEq, RuntimeDebug)]
 pub enum ValidationError {
+    InvalidInternalOnly,
     InvalidNextCode,
     InvalidValidator,
     InvalidSignature,
     InvalidCall,
     InvalidPriceSignature,
+    InvalidPrice(Reason),
     UnknownNotice,
 }
 
 pub fn validate_unsigned<T: Config>(
-    _source: TransactionSource,
+    source: TransactionSource,
     call: &Call<T>,
 ) -> Result<TransactionValidity, ValidationError> {
     match call {
-        Call::set_miner(_miner) => Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
-            .priority(1)
-            .longevity(10)
-            .propagate(true)
-            .build()),
+        Call::set_miner(_miner) => match source {
+            TransactionSource::Local => Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
+                .longevity(1)
+                .build()),
+            _ => Err(ValidationError::InvalidInternalOnly),
+        },
         Call::set_next_code_via_hash(next_code) => {
             let hash = <Ethereum as Chain>::hash_bytes(&next_code);
 
             if AllowedNextCodeHash::get() == Some(hash) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::set_next_code_via_hash")
-                        .priority(1)
-                        .longevity(10)
+                        .priority(100)
+                        .longevity(32)
                         .and_provides(hash)
                         .propagate(true)
                         .build(),
@@ -51,8 +55,8 @@ pub fn validate_unsigned<T: Config>(
                 let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
                 if validators.contains(&signer) {
                     Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
-                        .priority(2)
-                        .longevity(10)
+                        .priority(100)
+                        .longevity(32)
                         .and_provides((event_id, signature))
                         .propagate(true)
                         .build())
@@ -67,21 +71,23 @@ pub fn validate_unsigned<T: Config>(
             let signer_res = signature
                 .recover_account(&internal::exec_trx_request::prepend_nonce(request, *nonce)[..]);
 
+            // TODO: We might want to check existential value of signer
+
             match (signer_res, nonce) {
                 (Err(_e), _) => Err(ValidationError::InvalidSignature),
                 (Ok(sender), 0) => Ok(ValidTransaction::with_tag_prefix(
                     "Gateway::exec_trx_request",
                 )
-                .priority(4)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_provides((sender, 0))
                 .propagate(true)
                 .build()),
                 (Ok(sender), _) => Ok(ValidTransaction::with_tag_prefix(
                     "Gateway::exec_trx_request",
                 )
-                .priority(3)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_provides((sender, nonce))
                 .and_requires((sender, nonce - 1))
                 .propagate(true)
@@ -90,12 +96,22 @@ pub fn validate_unsigned<T: Config>(
         }
         Call::post_price(payload, signature) => {
             if internal::oracle::check_signature::<T>(&payload, &signature) == Ok(true) {
-                Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(5)
-                    .longevity(10)
-                    .and_provides(signature)
-                    .propagate(true)
-                    .build())
+                match source {
+                    TransactionSource::Local => {
+                        Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
+                            .priority(100)
+                            .and_provides(signature)
+                            .build())
+                    }
+                    _ => match internal::oracle::get_and_check_parsed_price::<T>(payload) {
+                        Ok(_) => Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
+                            .priority(100)
+                            .and_provides(signature)
+                            .propagate(true)
+                            .build()),
+                        Err(reason) => Err(ValidationError::InvalidPrice(reason)),
+                    },
+                }
             } else {
                 Err(ValidationError::InvalidPriceSignature)
             }
@@ -109,8 +125,8 @@ pub fn validate_unsigned<T: Config>(
             if Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::publish_signature")
-                        .priority(5)
-                        .longevity(10)
+                        .priority(100)
+                        .longevity(32)
                         .and_provides(signature)
                         .propagate(true)
                         .build(),
@@ -134,8 +150,10 @@ mod tests {
         events::{ChainLogEvent, ChainLogId},
         mock::*,
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
-        types::{ValidatorKeys, ValidatorSig},
-        Call, NoticeStates, Validators,
+        reason,
+        symbol::Ticker,
+        types::{ReporterSet, ValidatorKeys, ValidatorSig},
+        Call, NoticeStates, PriceReporters, PriceTimes, Validators,
     };
     use ethereum_client::{events::EthereumEvent::Lock, EthereumLogEvent};
     use frame_support::storage::StorageMap;
@@ -143,20 +161,29 @@ mod tests {
     use sp_core::crypto::AccountId32;
 
     #[test]
-    fn test_set_miner() {
+    fn test_set_miner_external() {
+        new_test_ext().execute_with(|| {
+            let miner = ChainAccount::Eth([0u8; 20]);
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::External {},
+                    &Call::set_miner::<Test>(miner),
+                ),
+                Err(ValidationError::InvalidInternalOnly)
+            );
+        });
+    }
+
+    #[test]
+    fn test_set_miner_local() {
         new_test_ext().execute_with(|| {
             let miner = ChainAccount::Eth([0u8; 20]);
             let exp = ValidTransaction::with_tag_prefix("Gateway::set_miner")
-                .priority(1)
-                .longevity(10)
-                .propagate(true)
+                .longevity(1)
                 .build();
 
             assert_eq!(
-                validate_unsigned(
-                    TransactionSource::InBlock {},
-                    &Call::set_miner::<Test>(miner),
-                ),
+                validate_unsigned(TransactionSource::Local {}, &Call::set_miner::<Test>(miner),),
                 Ok(exp)
             );
         });
@@ -200,8 +227,8 @@ mod tests {
             let hash = <Ethereum as Chain>::hash_bytes(&next_code);
             AllowedNextCodeHash::put(hash);
             let exp = ValidTransaction::with_tag_prefix("Gateway::set_next_code_via_hash")
-                .priority(1)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_provides(hash)
                 .propagate(true)
                 .build();
@@ -312,8 +339,8 @@ mod tests {
                 _ => panic!("absurd"),
             };
             let exp = ValidTransaction::with_tag_prefix("Gateway::receive_event")
-                .priority(2)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_provides((event_id, eth_signature))
                 .propagate(true)
                 .build();
@@ -346,8 +373,8 @@ mod tests {
             let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
-                .priority(4)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_provides((ChainAccount::Eth(eth_address), 0))
                 .propagate(true)
                 .build();
@@ -380,8 +407,8 @@ mod tests {
             let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
-                .priority(3)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_requires((ChainAccount::Eth(eth_address), 4))
                 .and_provides((ChainAccount::Eth(eth_address), 5))
                 .propagate(true)
@@ -411,17 +438,63 @@ mod tests {
     }
 
     #[test]
-    fn test_post_price_valid_signature() {
+    fn test_post_price_stale() {
         new_test_ext().execute_with(|| {
+            PriceReporters::put(ReporterSet(vec![[133, 97, 91, 7, 102, 21, 49, 124, 128, 241, 76, 186, 214, 80, 30, 236, 3, 28, 213, 28]]));
+            let ticker = Ticker::new("BTC");
+            PriceTimes::insert(ticker, 999999999999999);
             let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
             let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
 
             assert_eq!(
                 validate_unsigned(
-                    TransactionSource::InBlock {},
+                    TransactionSource::External {},
                     &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
                 ),
-                Err(ValidationError::InvalidPriceSignature)
+                Err(ValidationError::InvalidPrice(Reason::OracleError(reason::OracleError::StalePrice)))
+            );
+        });
+    }
+
+    #[test]
+    fn test_post_price_valid_remote() {
+        new_test_ext().execute_with(|| {
+            PriceReporters::put(ReporterSet(vec![[133, 97, 91, 7, 102, 21, 49, 124, 128, 241, 76, 186, 214, 80, 30, 236, 3, 28, 213, 28]]));
+
+            let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
+            let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::External {},
+                    &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
+                ),
+                Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
+                    .priority(100)
+                    .and_provides(sig.to_vec())
+                    .propagate(true)
+                    .build())
+            );
+        });
+    }
+
+    #[test]
+    fn test_post_price_valid_local() {
+        new_test_ext().execute_with(|| {
+            PriceReporters::put(ReporterSet(vec![[133, 97, 91, 7, 102, 21, 49, 124, 128, 241, 76, 186, 214, 80, 30, 236, 3, 28, 213, 28]]));
+
+            let msg = hex_literal::hex!("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000688e4cda00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034254430000000000000000000000000000000000000000000000000000000000");
+            let sig = hex_literal::hex!("69538bfa1a2097ea206780654d7baac3a17ee57547ee3eeb5d8bcb58a2fcdf401ff8834f4a003193f24224437881276fe76c8e1c0a361081de854457d41d0690000000000000000000000000000000000000000000000000000000000000001c");
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::Local {},
+                    &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
+                ),
+                Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
+                    .priority(100)
+                    .and_provides(sig.to_vec())
+                    .build())
             );
         });
     }
@@ -453,12 +526,6 @@ mod tests {
             };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
-
-            let exp = ValidTransaction::with_tag_prefix("Gateway::set_miner")
-                .priority(1)
-                .longevity(10)
-                .propagate(true)
-                .build();
 
             assert_eq!(
                 validate_unsigned(
@@ -539,8 +606,8 @@ mod tests {
             );
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::publish_signature")
-                .priority(5)
-                .longevity(10)
+                .priority(100)
+                .longevity(32)
                 .and_provides(signature)
                 .propagate(true)
                 .build();
