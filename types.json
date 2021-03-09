@@ -266,7 +266,6 @@
       "BadUnits": "",
       "ChainMismatch": "",
       "CryptoError": "(CryptoError)",
-      "EventAlreadySigned": "",
       "FailedToSubmitExtrinsic": "",
       "FetchError": "",
       "IncorrectNonce": "(Nonce, Nonce)",

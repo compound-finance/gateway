@@ -4,6 +4,8 @@ use crate::{
     chains::*, core::*, factor::*, mock::*, notices::*, rates::*, reason::*, symbol::*, types::*, *,
 };
 
+use our_std::collections::btree_set::BTreeSet;
+
 use codec::{Decode, Encode};
 use hex_literal::hex;
 use sp_core::crypto::AccountId32;
@@ -11,6 +13,8 @@ use sp_core::offchain::testing;
 
 pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 pub use our_std::str::FromStr;
+
+pub use our_std::iter::FromIterator;
 
 pub mod extract;
 pub mod protocol;
@@ -132,6 +136,13 @@ fn it_fails_exec_trx_request_signed() {
 fn process_eth_event_happy_path() {
     new_test_ext().execute_with(|| {
         initialize_storage();
+
+        // Set validator signing key
+        std::env::set_var(
+            "ETH_KEY",
+            "6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d",
+        );
+
         // Dispatch a signed extrinsic.
         let event_id = ChainLogId::Eth(3858223, 0);
         let event = ChainLogEvent::Eth(ethereum_client::EthereumLogEvent {
@@ -157,12 +168,16 @@ fn process_eth_event_happy_path() {
             signature
         ));
 
+        // Event is in `Pending` queue now, waiting fro more validators' votes
         match CashModule::event_state(event_id) {
             EventState::Pending { signers } => {
                 assert_eq!(signers.len(), 1);
                 assert_eq!(
-                    hex::encode(signers[0]),
-                    "6a72a2f14577d9cd0167801efdd54a07b40d2b61"
+                    signers,
+                    BTreeSet::from_iter(vec![[
+                        138, 209, 178, 145, 140, 52, 238, 93, 62, 136, 26, 87, 198, 133, 116, 234,
+                        157, 190, 203, 129
+                    ]])
                 );
             }
             _ => {
