@@ -21,6 +21,7 @@
     "substrate_id": "SubstrateId",
     "eth_address": "[u8; 20]"
   },
+  "SignersSet": "BTreeSet<ValidatorIdentity>",
   "AssetInfo": {
     "asset": "ChainAsset",
     "decimals": "Decimals",
@@ -266,7 +267,6 @@
       "BadUnits": "",
       "ChainMismatch": "",
       "CryptoError": "(CryptoError)",
-      "EventAlreadySigned": "",
       "FailedToSubmitExtrinsic": "",
       "FetchError": "",
       "IncorrectNonce": "(Nonce, Nonce)",
@@ -356,7 +356,7 @@
   "EventState": {
     "_enum": {
       "Pending": {
-        "signers": "Vec<ValidatorKey>"
+        "signers": "SignersSet"
       },
       "Failed": {
         "reason": "Reason"

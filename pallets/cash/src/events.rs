@@ -1,9 +1,10 @@
 use crate::chains::eth;
 use crate::log;
 use crate::reason::Reason;
-use crate::types::ValidatorIdentity;
+use crate::types::{SignersSet, ValidatorIdentity};
 use codec::alloc::string::String;
 use codec::{Decode, Encode};
+use our_std::collections::btree_set::BTreeSet;
 use our_std::{vec::Vec, RuntimeDebug};
 
 extern crate ethereum_client;
@@ -37,14 +38,16 @@ impl ChainLogId {
 /// Type for the status of an event on the queue.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventState {
-    Pending { signers: Vec<ValidatorIdentity> },
+    Pending { signers: SignersSet },
     Failed { reason: Reason },
     Done,
 }
 
 impl Default for EventState {
     fn default() -> Self {
-        EventState::Pending { signers: vec![] }
+        EventState::Pending {
+            signers: SignersSet::new(),
+        }
     }
 }
 

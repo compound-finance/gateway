@@ -140,22 +140,14 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
 
 // Internal helpers
 
-// XXX we should receive the sets as args
 pub fn passes_validation_threshold(
-    signers: &Vec<ValidatorIdentity>,
-    validators: &Vec<ValidatorIdentity>,
+    signers: &BTreeSet<ValidatorIdentity>,
+    validators: &BTreeSet<ValidatorIdentity>,
 ) -> bool {
-    let mut signer_set = BTreeSet::<ValidatorIdentity>::new();
-    for v in signers {
-        signer_set.insert(*v);
-    }
-
-    let mut validator_set = BTreeSet::<ValidatorIdentity>::new();
-    for v in validators {
-        validator_set.insert(*v);
-    }
-    // TODO: Fix this math
-    signer_set.len() > validator_set.len() * 2 / 3
+    // Intersection is taken for the situation when some of the signers are not currently active validators
+    let valid_signers: Vec<_> = validators.intersection(&signers).collect();
+    // Using ceil(2 * validators.len() / 3)
+    valid_signers.len() >= (2 * validators.len() + 3 - 1) / 3
 }
 
 // XXX use Balances instead of raw balances everywhere and put all fns on types?
