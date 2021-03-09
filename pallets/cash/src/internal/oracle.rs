@@ -192,28 +192,27 @@ pub fn check_signature<T: Config>(payload: &Vec<u8>, signature: &Vec<u8>) -> Res
     Ok(PriceReporters::get().contains(recovered))
 }
 
-pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Reason> {
-    if !check_signature::<T>(&payload, &signature)? {
-        return Err(OracleError::NotAReporter.into());
-    }
-
+pub fn get_and_check_parsed_price<T: Config>(
+    payload: &Vec<u8>,
+) -> Result<(Message, Ticker), Reason> {
     // parse message and check it
-    let parsed = parse_message(&payload)?;
+    let parsed = parse_message(payload)?;
     let ticker = Ticker::from_str(&parsed.key)?;
 
-    // XXX
-    log!(
-        "Parsed price from open price feed: {:?} is worth {:?}",
-        parsed.key,
-        (parsed.value as f64) / 1000000.0
-    );
-
-    // todo: more sanity checking on the value // XXX like what?
     if let Some(last_updated) = PriceTimes::get(&ticker) {
         if parsed.timestamp <= last_updated {
-            return Err(OracleError::StalePrice.into());
+            Err(OracleError::StalePrice)?;
         }
     }
+
+    Ok((parsed, ticker))
+}
+pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), Reason> {
+    if !check_signature::<T>(&payload, &signature)? {
+        Err(OracleError::NotAReporter)?;
+    }
+
+    let (parsed, ticker) = get_and_check_parsed_price::<T>(&payload)?;
 
     // * WARNING begin storage - all checks must happen above * //
 
