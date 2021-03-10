@@ -125,45 +125,6 @@ pub fn public_key_to_eth_address(public: secp256k1::PublicKey) -> AddressBytes {
     address
 }
 
-/// Get the recovery id and chain from the last byte of the signature
-fn eth_get_chain(recovery_id: u8) -> Result<(u8, Option<u8>), CryptoError> {
-    match recovery_id {
-        0..=1 => Ok((recovery_id, None)),
-        27..=28 => Ok((recovery_id - 27, None)),
-        35..=255 => Ok((1 - recovery_id % 2, Some((recovery_id - 35) / 2))),
-        2..=26 | 29..=34 => Err(CryptoError::RecoverError),
-    }
-}
-
-/// Recovers the signer's address from the given signature and message. The message is _not_
-/// expected to be a digest and is hashed inside.
-pub fn eth_recover(
-    message: &[u8],
-    sig: &SignatureBytes,
-    prepend_preamble: bool,
-) -> Result<AddressBytes, CryptoError> {
-    if sig.len() == 0 {
-        return Err(CryptoError::RecoverError);
-    }
-
-    let last_byte_of_signature = sig[sig.len() - 1];
-    let (recovery_id, _) = eth_get_chain(last_byte_of_signature)?;
-
-    let recovery_id =
-        secp256k1::RecoveryId::parse(recovery_id).map_err(|_| CryptoError::ParseError)?;
-
-    let sig = secp256k1::Signature::parse_slice(&sig[..64]).map_err(|_| CryptoError::ParseError)?;
-    let digested = eth_keccak_for_signature(&message, prepend_preamble);
-    let message =
-        secp256k1::Message::parse_slice(&digested).map_err(|_| CryptoError::ParseError)?;
-
-    let recovered =
-        secp256k1::recover(&message, &sig, &recovery_id).map_err(|_| CryptoError::RecoverError)?;
-    let address = public_key_to_eth_address(recovered);
-
-    Ok(address)
-}
-
 const ETH_SIGNATURE_PADDED_RECOVERY_LENGTH: usize = 96;
 const ETH_SIGNATURE_UNPADDED_RECOVERY_LENGTH: usize = 65;
 

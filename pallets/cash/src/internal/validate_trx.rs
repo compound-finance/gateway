@@ -28,9 +28,11 @@ pub fn validate_unsigned<T: Config>(
 ) -> Result<TransactionValidity, ValidationError> {
     match call {
         Call::set_miner(_miner) => match source {
-            TransactionSource::InBlock => Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
-                .longevity(1)
-                .build()),
+            TransactionSource::InBlock => {
+                Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
+                    .longevity(1)
+                    .build())
+            }
             _ => Err(ValidationError::InvalidInternalOnly),
         },
         Call::set_next_code_via_hash(next_code) => {
@@ -50,8 +52,11 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::receive_event(event_id, event, signature) => {
-            if let Ok(signer) = gateway_crypto::eth_recover(&event.encode()[..], &signature, false)
-            {
+            if let Ok(signer) = runtime_interfaces::keyring_interface::eth_recover(
+                event.encode(),
+                signature.clone(),
+                false,
+            ) {
                 let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
                 if validators.contains(&signer) {
                     Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
@@ -159,7 +164,10 @@ mod tests {
                 .build();
 
             assert_eq!(
-                validate_unsigned(TransactionSource::InBlock {}, &Call::set_miner::<Test>(miner),),
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::set_miner::<Test>(miner),
+                ),
                 Ok(exp)
             );
         });

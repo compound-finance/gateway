@@ -401,11 +401,19 @@ impl Chain for Ethereum {
         data: &[u8],
         signature: Self::Signature,
     ) -> Result<Self::Address, Reason> {
-        Ok(gateway_crypto::eth_recover(data, &signature, true)?)
+        Ok(runtime_interfaces::keyring_interface::eth_recover(
+            data.into(),
+            signature,
+            true,
+        )?)
     }
 
     fn recover_address(data: &[u8], signature: Self::Signature) -> Result<Self::Address, Reason> {
-        Ok(gateway_crypto::eth_recover(data, &signature, false)?)
+        Ok(runtime_interfaces::keyring_interface::eth_recover(
+            data.into(),
+            signature,
+            false,
+        )?)
     }
 
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason> {

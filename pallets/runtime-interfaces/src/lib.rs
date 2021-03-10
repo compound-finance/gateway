@@ -128,6 +128,17 @@ pub trait KeyringInterface {
         let key_id = gateway_crypto::KeyId::from_utf8(key_id)?;
         keyring.get_public_key(&key_id)
     }
+
+    /// Note - it is possible to run gateway_crypto in no-std / wasm environment but it is simply
+    /// too slow to be feasible. We moved it out of gateway_crypto::no_std and now access eth_recover
+    /// via this runtime interface.
+    fn eth_recover(
+        message: Vec<u8>,
+        sig: gateway_crypto::SignatureBytes,
+        prepend_preamble: bool,
+    ) -> Result<gateway_crypto::AddressBytes, CryptoError> {
+        gateway_crypto::eth_recover(&message, &sig, prepend_preamble)
+    }
 }
 
 /// Set an environment variable to a value if it is not already set to an existing value.
