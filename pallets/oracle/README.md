@@ -1,3 +1,3 @@
-# Pallet for CASH
+# Pallet for Oracle
 
-TODO
+The Oracle provides prices for Gateway. The prices currently come from the Open Price Feed.

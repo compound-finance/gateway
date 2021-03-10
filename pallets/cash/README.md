@@ -1,3 +1,3 @@
 # Pallet for CASH
 
-TODO
+The core pallet for the Gateway system.
