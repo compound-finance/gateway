@@ -186,7 +186,8 @@ pub fn check_signature<T: Config>(
     // note that this is actually a double-hash situation but that is expected behavior
     // the hashed message is hashed again in the eth convention inside eth_recover
     let hashed = gateway_crypto::keccak(&payload);
-    let recovered = gateway_crypto::eth_recover(&hashed, &parsed_sig, true)?;
+    let recovered =
+        runtime_interfaces::keyring_interface::eth_recover(hashed.into(), parsed_sig, true)?;
 
     Ok(PriceReporters::get().contains(recovered))
 }
