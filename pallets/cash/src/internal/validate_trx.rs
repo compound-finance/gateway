@@ -28,7 +28,7 @@ pub fn validate_unsigned<T: Config>(
 ) -> Result<TransactionValidity, ValidationError> {
     match call {
         Call::set_miner(_miner) => match source {
-            TransactionSource::Local => Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
+            TransactionSource::InBlock => Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
                 .longevity(1)
                 .build()),
             _ => Err(ValidationError::InvalidInternalOnly),
@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn test_set_miner_local() {
+    fn test_set_miner_in_block() {
         new_test_ext().execute_with(|| {
             let miner = ChainAccount::Eth([0u8; 20]);
             let exp = ValidTransaction::with_tag_prefix("Gateway::set_miner")
@@ -159,7 +159,7 @@ mod tests {
                 .build();
 
             assert_eq!(
-                validate_unsigned(TransactionSource::Local {}, &Call::set_miner::<Test>(miner),),
+                validate_unsigned(TransactionSource::InBlock {}, &Call::set_miner::<Test>(miner),),
                 Ok(exp)
             );
         });
