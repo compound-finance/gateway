@@ -5,7 +5,7 @@ use frame_support::storage::StorageValue;
 use our_std::RuntimeDebug;
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
-const MAX_EXTERNAL_PAIRS: usize = 10;
+const MAX_EXTERNAL_PAIRS: usize = 30;
 
 #[derive(Encode, Eq, PartialEq, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Decode))]
