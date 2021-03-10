@@ -27,9 +27,10 @@ class Price {
 }
 
 class Prices {
-  constructor(prices, timestamp, serverPort, serverHost, reporter, ctx) {
+  constructor(prices, timestamp, runServer, serverPort, serverHost, reporter, ctx) {
     this.prices = prices;
     this.timestamp = timestamp;
+    this.runServer = runServer;
     this.serverPort = serverPort;
     this.serverHost = serverHost;
     this.reporter = reporter;
@@ -63,26 +64,32 @@ class Prices {
   }
 
   serverUrl() {
-    return `http://${this.serverHost}:${this.serverPort}/`;
+    if (this.runServer) {
+      return `http://${this.serverHost}:${this.serverPort}/`;
+    } else {
+      return null;
+    }
   }
 
   async start() {
-    let that = this;
-    await new Promise((resolve, reject) => {
-      const requestListener = function (req, res) {
-        let data = that.pricesResponse();
-        res.setHeader("Content-Type", "application/json");
-        res.writeHead(200);
-        res.end(JSON.stringify(data, null, 4));
-      }
+    if (this.runServer) {
+      let that = this;
+      await new Promise((resolve, reject) => {
+        const requestListener = function (req, res) {
+          let data = that.pricesResponse();
+          res.setHeader("Content-Type", "application/json");
+          res.writeHead(200);
+          res.end(JSON.stringify(data, null, 4));
+        }
 
-      let server = http.createServer(requestListener);
-      server.listen(that.serverPort, that.serverHost, () => {
-        that.ctx.log(`Price Server listening at ${that.serverUrl()}`)
-        that.server = server;
-        resolve();
+        let server = http.createServer(requestListener);
+        server.listen(that.serverPort, that.serverHost, () => {
+          that.ctx.log(`Price Server listening at ${that.serverUrl()}`)
+          that.server = server;
+          resolve();
+        });
       });
-    });
+    }
   }
 
   async teardown() {
@@ -95,6 +102,7 @@ class Prices {
 }
 
 let basePricesInfo = {
+  server: true,
   server_port: null,
   server_host: '127.0.0.1',
   reporter: '0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC',
@@ -169,14 +177,19 @@ async function buildPrice(key, priceInfo, ctx) {
   return price;
 }
 
-async function buildPrices(tokensInfoHash, ctx) {
+async function buildPrices(pricesInfoHash, tokensInfoHash, ctx) {
+  let pricesInfo = {
+    ...basePricesInfo,
+    ...pricesInfoHash
+  };
   let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
   let symbols = tokensInfo.map(([symbol, _]) => symbol.toUpperCase());
-  let entries = Object.entries(basePricesInfo.prices).filter(([k, v]) => k == 'ETH' || symbols.includes(k));
-  let serverPort = basePricesInfo.server_port || genPort();
-  let serverHost = basePricesInfo.server_host;
-  let reporter = basePricesInfo.reporter;
-  let timestamp = basePricesInfo.timestamp;
+  let entries = Object.entries(pricesInfo.prices).filter(([k, v]) => k == 'ETH' || symbols.includes(k));
+  let runServer = pricesInfo.server;
+  let serverPort = pricesInfo.server_port || genPort();
+  let serverHost = pricesInfo.server_host;
+  let reporter = pricesInfo.reporter;
+  let timestamp = pricesInfo.timestamp;
 
   let priceObjects = await entries.reduce(async (acc, [key, priceInfo]) => {
     return [
@@ -185,7 +198,7 @@ async function buildPrices(tokensInfoHash, ctx) {
     ];
   }, Promise.resolve([]));
 
-  let prices = new Prices(priceObjects, timestamp, serverPort, serverHost, reporter, ctx);
+  let prices = new Prices(priceObjects, timestamp, runServer, serverPort, serverHost, reporter, ctx);
   if (ctx.__usePriceServer()) {
     await prices.start();
   }
