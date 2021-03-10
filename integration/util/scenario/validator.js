@@ -39,6 +39,7 @@ let validatorInfoMap = {
     node_key: '0x0000000000000000000000000000000000000000000000000000000000000001',
     peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp', // I have _no idea_ how this is generated
     spawn_args: ['--alice'],
+    color: chalk.blue,
   },
   'bob': {
     aura_key: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
@@ -48,6 +49,7 @@ let validatorInfoMap = {
     node_key: '0x0000000000000000000000000000000000000000000000000000000000000002',
     peer_id: '12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD', // I have _no idea_ how this is generated
     spawn_args: ['--bob'],
+    color: chalk.green,
   }
 };
 
@@ -80,6 +82,14 @@ class Validator {
     return `/ip4/127.0.0.1/tcp/${this.p2pPort}/p2p/${this.peerId}`;
   }
 
+  colorize(text) {
+    if (typeof(this.info['color']) === 'function') {
+      return this.info['color'](text);
+    } else {
+      return text;
+    }
+  }
+
   async start(peers=[]) {
     this.bootnodes = peers.map((peer) => {
       return ['--reserved-nodes', peer];
@@ -106,7 +116,7 @@ class Validator {
 
     console.log(`Validator Env: ${JSON.stringify(env)}`);
 
-    let ps = spawnValidator(this.ctx, [
+    let ps = spawnValidator(this.ctx, this.colorize(this.name), [
       '--chain',
       this.chainSpecFile,
       '--rpc-methods',
@@ -235,21 +245,21 @@ class Validators {
   }
 }
 
-function spawnValidator(ctx, args = [], opts = {}) {
+function spawnValidator(ctx, name, args = [], opts = {}) {
   ctx.log(`Starting validator node ${ctx.__target()} with args ${JSON.stringify(args)}`)
 
   let proc = child_process.spawn(ctx.__target(), args, opts);
 
   proc.stdout.on('data', (data) => {
-    ctx.log(`stdout: ${data}`);
+    ctx.log(`${name} [stdout]: ${data}`);
   });
 
   proc.stderr.on('data', (data) => {
-    ctx.error(`stderr: ${data}`);
+    ctx.error(`${name} [stdout]: ${data}`);
   });
 
   proc.on('close', (code) => {
-    ctx.log(`child process exited with code ${code}`);
+    ctx.log(`${name} child process exited with code ${code}`);
   });
 
   return proc;
