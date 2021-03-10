@@ -89,7 +89,7 @@ class Ctx {
   }
 
   __opfUrl() {
-    return process.env['OPF_URL'] ? process.env['OPF_URL'] : this.prices.serverUrl();
+    return process.env['OPF_URL'] ? process.env['OPF_URL'] : ( this.prices.serverUrl() || this.scenInfo['opf_url'] );
   }
 
   debug(...msg) {
@@ -187,7 +187,7 @@ async function buildCtx(scenInfo={}) {
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
-  ctx.prices = await buildPrices(scenInfo.tokens, ctx);
+  ctx.prices = await buildPrices(scenInfo.prices, scenInfo.tokens, ctx);
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
   ctx.trxReq = await buildTrxReq(ctx);
   ctx.chain = await buildChain(ctx);
