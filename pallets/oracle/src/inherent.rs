@@ -10,8 +10,6 @@ use sp_runtime::{transaction_validity::TransactionSource, RuntimeString};
 /// The identifier for the miner inherent.
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"oracle00";
 
-/// TODO!!
-
 /// The type of the inherent.
 type Message = Vec<u8>;
 type Signature = Vec<u8>;
