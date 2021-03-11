@@ -4,7 +4,7 @@
         "decimals": 18, 
         "asset": "ETH:0xc0e2d7d9279846b80eacdea57220ab2333bc049d",
         "ticker": "ETH",
-        "liquidity_factor": 5000,
+        "liquidity_factor": 5000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -21,7 +21,7 @@
         "decimals": 8,
         "asset": "ETH:0x442Be68395613bDCD19778e761f03261ec46C06D",
         "ticker": "BTC",
-        "liquidity_factor": 6000,
+        "liquidity_factor": 6000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -38,7 +38,7 @@
         "decimals": 6,
         "asset": "ETH:0x110a13FC3efE6A245B50102D2d79B3E76125Ae83",
         "ticker": "USDT",
-        "liquidity_factor": 7000,
+        "liquidity_factor": 7000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -55,7 +55,7 @@
         "decimals": 6,
         "asset": "ETH:0x07865c6e87b9f70255377e024ace6630c1eaa37f",
         "ticker": "USDC",
-        "liquidity_factor": 8000,
+        "liquidity_factor": 8000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -72,7 +72,7 @@
         "decimals": 18,
         "asset": "ETH:0x31F42841c2db5173425b5223809CF3A38FEde360",
         "ticker": "DAI",
-        "liquidity_factor": 7000,
+        "liquidity_factor": 7000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -89,7 +89,7 @@
         "decimals": 18,
         "asset": "ETH:0x50390975d942e83d661d4bde43bf73b0ef27b426",
         "ticker": "BAT",
-        "liquidity_factor": 6000,
+        "liquidity_factor": 6000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -106,7 +106,7 @@
         "decimals": 18,
         "asset": "ETH:0xf76D4a441E4ba86A923ce32B89AFF89dBccAA075",
         "ticker": "COMP",
-        "liquidity_factor": 8000,
+        "liquidity_factor": 8000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -123,7 +123,7 @@
         "decimals": 18,
         "asset": "ETH:0xc8f88977e21630cf93c02d02d9e8812ff0dfc37a",
         "ticker": "UNI",
-        "liquidity_factor": 8000,
+        "liquidity_factor": 8000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,
@@ -140,7 +140,7 @@
         "decimals": 18,
         "asset": "ETH:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         "ticker": "ETH",
-        "liquidity_factor": 8000,
+        "liquidity_factor": 8000000000000000000,
         "rate_model": {
             "Kink": {
                 "zero_rate": 0,

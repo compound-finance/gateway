@@ -1,0 +1,11 @@
+
+- hosts:
+    - full_node
+    - authority_node
+  tasks:
+    - include_role:
+        name: chain_node
+        tasks_from: build-chain
+    - include_role:
+        name: chain_node
+        tasks_from: purge-and-restart
