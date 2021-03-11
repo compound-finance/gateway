@@ -133,6 +133,7 @@ class Chain {
 
   async setCode(code, onFinalize = true) {
     let api = this.api();
+    // TODO: Sudo is removed
     const sudoKey = await api.query.sudo.key();
     const sudoPair = this.ctx.actors.first().chainKey;
     return await sendAndWaitForEvents(api.tx.sudo.sudoUncheckedWeight(api.tx.system.setCode(code), 0), api, { onFinalize, signer: sudoPair });

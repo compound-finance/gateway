@@ -1,0 +1,12 @@
+{
+  "name": "chains",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@polkadot/types": "^4.1.1",
+    "chalk": "^4.1.0",
+    "compound-config": "https://github.com/compound-finance/compound-config.git",
+    "getopts": "^2.3.0"
+  }
+}

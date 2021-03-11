@@ -357,18 +357,6 @@
     "log_index": "u64",
     "event": "EthereumEvent"
   },
-  "LockOldEvent": {
-    "asset": "[u8; 20]",
-    "sender": "[u8; 20]",
-    "recipient": "[u8; 20]",
-    "amount": "u128"
-  },
-  "LockCashOldEvent": {
-    "sender": "[u8; 20]",
-    "recipient": "[u8; 20]",
-    "amount": "u128",
-    "principal": "u128"
-  },
   "LockEvent": {
     "asset": "[u8; 20]",
     "sender": "[u8; 20]",
@@ -397,8 +385,6 @@
   },
   "EthereumEvent": {
     "_enum": {
-      "LockOld": "LockOldEvent",
-      "LockCashOld": "LockCashOldEvent",
       "Lock": "LockEvent",
       "LockCash": "LockCashEvent",
       "ExecTrxRequest": "ExecTrxRequestEvent",
@@ -458,6 +444,7 @@
   "Source12": "Oracle_TickerRS",
   "Ticker": "[u8; 12]",
 
+  "Source13": "Node_ApiRS",
   "ApiRates": "(u64, u64)",
   "ApiAssetData": {
     "asset": "String",

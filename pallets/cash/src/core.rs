@@ -293,18 +293,6 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
             ),
 
-            ethereum_client::events::EthereumEvent::LockOld {
-                asset,
-                sender,
-                recipient,
-                amount,
-            } => lock_internal::<T>(
-                get_asset::<T>(ChainAsset::Eth(asset))?,
-                ChainAccount::Eth(sender),
-                ChainAccount::Eth(recipient),
-                get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
-            ),
-
             ethereum_client::events::EthereumEvent::LockCash {
                 sender,
                 chain,
@@ -314,17 +302,6 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
             } => internal::lock::lock_cash_principal_internal::<T>(
                 ChainAccount::Eth(sender),
                 get_chain_account(chain, recipient)?,
-                CashPrincipalAmount(principal),
-            ),
-
-            ethereum_client::events::EthereumEvent::LockCashOld {
-                sender,
-                recipient,
-                principal,
-                ..
-            } => internal::lock::lock_cash_principal_internal::<T>(
-                ChainAccount::Eth(sender),
-                ChainAccount::Eth(recipient),
                 CashPrincipalAmount(principal),
             ),
 
