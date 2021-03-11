@@ -168,7 +168,7 @@ where
 
         Ok(
             ApiAssetData {
-                asset: asset_info.asset,
+                asset: asset,
                 balance: (account_balance as ApiAssetBalance).into(),
                 total_supply: total_supply as ApiAssetAmount,
                 total_borrow: total_borrow as ApiAssetAmount,
