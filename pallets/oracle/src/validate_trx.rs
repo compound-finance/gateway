@@ -95,7 +95,7 @@ pub fn validate_unsigned<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{mock::*, ticker::Ticker, types::ReporterSet, Call, PriceReporters, PriceTimes};
+    use crate::{tests::*, ticker::Ticker, types::ReporterSet, Call, PriceReporters, PriceTimes};
     use frame_support::storage::{StorageMap, StorageValue};
 
     #[test]

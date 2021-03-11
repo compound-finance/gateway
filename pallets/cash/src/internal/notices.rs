@@ -286,8 +286,8 @@ mod tests {
     use super::*;
     use crate::{
         chains::{Chain, ChainSignatureList, Ethereum},
-        mock::*,
         notices::{ExtractionNotice, Notice},
+        tests::*,
         types::ValidatorKeys,
     };
     use gateway_crypto::CryptoError;

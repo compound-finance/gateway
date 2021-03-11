@@ -65,13 +65,7 @@ pub mod trx_req;
 pub mod types;
 
 #[cfg(test)]
-mod mock;
-
-#[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod testdata;
 
 /// Type for linking sessions to validators.
 pub type SubstrateId = AccountId32;

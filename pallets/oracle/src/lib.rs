@@ -26,14 +26,11 @@ pub mod ticker;
 pub mod types;
 pub mod validate_trx;
 
-/// Number of blocks between HTTP requests from offchain workers to open oracle price feed.
-pub const ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
-
-#[cfg(test)]
-mod mock;
-
 #[cfg(test)]
 mod tests;
+
+/// Number of blocks between HTTP requests from offchain workers to open oracle price feed.
+pub const ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {

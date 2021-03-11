@@ -31,9 +31,7 @@ pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        chains::*, mock, mock::*, notices::*, types::*, LatestNotice, NoticeStates, Notices,
-    };
+    use crate::{chains::*, notices::*, tests::*, types::*, LatestNotice, NoticeStates, Notices};
     use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
 
     #[test]

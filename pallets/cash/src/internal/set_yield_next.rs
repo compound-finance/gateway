@@ -73,7 +73,7 @@ pub fn set_yield_next<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{chains::*, mock::*, notices::*, LatestNotice, NoticeStates, Notices};
+    use crate::{chains::*, notices::*, tests::*, LatestNotice, NoticeStates, Notices};
     use frame_support::storage::{
         IterableStorageDoubleMap, StorageDoubleMap, StorageMap, StorageValue,
     };

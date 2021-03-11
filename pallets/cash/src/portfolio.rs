@@ -80,7 +80,7 @@ impl Portfolio {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{chains::*, core::*, mock::*, rates::*, reason::*, symbol::*, types::*, *};
+    use crate::{chains::*, core::*, rates::*, reason::*, symbol::*, tests::*, types::*, *};
     use pallet_oracle;
     use pallet_oracle::types::Price;
 
