@@ -1303,9 +1303,7 @@ pub fn on_initialize_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        chains::*, core::*, mock::*, params::*, rates::*, symbol::*, tests::*, types::*, *,
-    };
+    use crate::{chains::*, core::*, params::*, rates::*, symbol::*, tests::*, types::*, *};
 
     #[test]
     fn test_helpers() {

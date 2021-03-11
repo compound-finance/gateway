@@ -46,7 +46,7 @@ pub fn lock_cash_principal_internal<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{chains::ChainId, mock, mock::*, types::CashPrincipal};
+    use crate::{chains::ChainId, tests::*, types::CashPrincipal};
     use frame_support::{
         assert_err, assert_ok,
         storage::{StorageMap, StorageValue},

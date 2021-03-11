@@ -48,7 +48,7 @@ fn dispatch_call<T: Config>(_code: Vec<u8>) -> DispatchResultWithPostInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{mock, mock::*};
+    use crate::tests::*;
     use frame_support::storage::StorageValue;
 
     #[test]

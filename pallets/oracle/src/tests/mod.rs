@@ -1,10 +1,12 @@
-use crate::{error::OracleError, ticker::Ticker};
-use crate::{mock::*, *};
+use crate::{error::OracleError, ticker::Ticker, *};
 
 use sp_core::offchain::testing;
 
 pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 pub use our_std::{convert::TryInto, str::FromStr};
+
+pub mod mock;
+pub use mock::*;
 
 pub const ETH_TICKER: Ticker = Ticker::new("ETH");
 

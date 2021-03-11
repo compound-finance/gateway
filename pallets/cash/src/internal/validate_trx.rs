@@ -131,8 +131,8 @@ mod tests {
             ChainSignatureList, Ethereum,
         },
         events::{ChainLogEvent, ChainLogId},
-        mock::*,
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
+        tests::*,
         types::{ValidatorKeys, ValidatorSig},
         Call, NoticeStates, Validators,
     };

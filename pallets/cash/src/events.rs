@@ -128,9 +128,7 @@ pub fn encode_block_hex(block_number: u64) -> String {
 
 #[cfg(test)]
 pub mod tests {
-
-    use crate::mock::*;
-    use crate::*;
+    use crate::{tests::*, *};
     use our_std::convert::*;
     use sp_core::offchain::testing;
 
@@ -149,7 +147,7 @@ pub mod tests {
                 method: "POST".into(),
                 uri: String::from_utf8(given_eth_rpc_url.clone()).unwrap(),
                 body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#.to_vec(),
-                response: Some(testdata::json_responses::BLOCK_NUMBER_RESPONSE.to_vec()),
+                response: Some(tests::testdata::json_responses::BLOCK_NUMBER_RESPONSE.to_vec()),
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                 sent: true,
                 ..Default::default()
@@ -169,7 +167,7 @@ pub mod tests {
     #[test]
     fn test_fetch_events_with_3_events() {
         let calls: Vec<testing::PendingRequest> =
-            get_mockup_http_calls(testdata::json_responses::EVENTS_RESPONSE.to_vec());
+            get_mockup_http_calls(tests::testdata::json_responses::EVENTS_RESPONSE.to_vec());
 
         let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
         t.execute_with(|| {
@@ -220,7 +218,7 @@ pub mod tests {
     #[test]
     fn test_fetch_events_with_no_events() {
         let calls: Vec<testing::PendingRequest> =
-            get_mockup_http_calls(testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
+            get_mockup_http_calls(tests::testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
 
         let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
         t.execute_with(|| {
