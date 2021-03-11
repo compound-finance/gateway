@@ -2,4 +2,4 @@
 ssh_home: "{{ ansible_env.HOME }}/.ssh"
 git_deploy_key: "{{ ssh_home }}/id_rsa_gateway_deploy"
 git_repo: "ssh://git@github.com/compound-finance/gateway.git"
-git_branch: "master"
+git_branch: "m6"

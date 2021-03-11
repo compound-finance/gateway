@@ -286,8 +286,8 @@
       "RatesError": "(RatesError)",
       "RepayTooMuch": "",
       "SelfTransfer": "",
-      "SetYieldNextError": "(SetYieldNextError)",
       "SerdeError": "",
+      "SetYieldNextError": "(SetYieldNextError)",
       "SignatureAccountMismatch": "",
       "SignatureMismatch": "",
       "TimeTravelNotAllowed": "",
@@ -357,13 +357,13 @@
     "log_index": "u64",
     "event": "EthereumEvent"
   },
-  "LockOld": {
+  "LockOldEvent": {
     "asset": "[u8; 20]",
     "sender": "[u8; 20]",
     "recipient": "[u8; 20]",
     "amount": "u128"
   },
-  "LockCashOld": {
+  "LockCashOldEvent": {
     "sender": "[u8; 20]",
     "recipient": "[u8; 20]",
     "amount": "u128",
@@ -397,6 +397,8 @@
   },
   "EthereumEvent": {
     "_enum": {
+      "LockOld": "LockOldEvent",
+      "LockCashOld": "LockCashOldEvent",
       "Lock": "LockEvent",
       "LockCash": "LockCashEvent",
       "ExecTrxRequest": "ExecTrxRequestEvent",

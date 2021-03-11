@@ -21,6 +21,7 @@
     dest: '{{ gateway_home }}'
     version: '{{ git_branch }}'
     key_file: '{{ git_deploy_key }}'
+    force: true
     accept_hostkey: yes
   tags:
     - build-chain
