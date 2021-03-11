@@ -34,9 +34,9 @@ use crate::{
         Timestamp, USDQuantity, Units, ValidatorIdentity, CASH,
     },
     AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
-    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastIndices,
-    LastMinerSharePrincipal, LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets,
-    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp,
+    LastIndices, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp, Miner, Module,
+    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 
 #[macro_export]
@@ -109,7 +109,9 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
 }
 
 /// Return the current total borrow and total supply balances for the asset.
-pub fn get_market_totals<T: Config>(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
+pub fn get_market_totals<T: Config>(
+    asset: ChainAsset,
+) -> Result<(AssetAmount, AssetAmount), Reason> {
     let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let total_borrow = TotalBorrowAssets::get(asset);
     let total_supply = TotalSupplyAssets::get(asset);
@@ -117,7 +119,10 @@ pub fn get_market_totals<T: Config>(asset: ChainAsset) -> Result<(AssetAmount, A
 }
 
 /// Return the account's balance for the asset.
-pub fn get_account_balance<T: Config>(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+pub fn get_account_balance<T: Config>(
+    account: ChainAccount,
+    asset: ChainAsset,
+) -> Result<AssetBalance, Reason> {
     let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     Ok(AssetBalances::get(asset, account))
 }
@@ -126,7 +131,6 @@ pub fn get_account_balance<T: Config>(account: ChainAccount, asset: ChainAsset) 
 pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
 }
-
 
 // Internal helpers
 
@@ -1202,7 +1206,11 @@ pub fn effect_of_asset_interest_internal(
 /// Block initialization wrapper.
 // XXX we need to be able to mock Now (then get rid of this?)
 pub fn on_initialize<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
-    on_initialize_internal::<T>(get_now::<T>(), LastYieldTimestamp::get())
+    on_initialize_internal::<T>(
+        get_now::<T>(),
+        LastYieldTimestamp::get(),
+        LastBlockTimestamp::get(),
+    )
 }
 
 /// Take a ratio of prices.
@@ -1218,6 +1226,7 @@ pub fn ratio(num: Price, denom: Price) -> Result<Factor, MathError> {
 pub fn on_initialize_internal<T: Config>(
     now: Timestamp,
     last_yield_timestamp: Timestamp,
+    last_block_timestamp: Timestamp,
 ) -> Result<frame_support::weights::Weight, Reason> {
     // XXX re-evaluate how we do time, we don't really want this to be zero but there may
     // not actually be any good way to do "current" time per-se so what we have here is more like
@@ -1226,20 +1235,31 @@ pub fn on_initialize_internal<T: Config>(
     if now == 0 {
         return Err(Reason::TimeTravelNotAllowed);
     }
-    if last_yield_timestamp == 0 {
-        // this is the first time we have seen a valid time, set it
-        LastYieldTimestamp::put(now);
+    if last_yield_timestamp == 0 || last_block_timestamp == 0 {
+        // this is the first time we have seen a valid time, set it for LastYield and LastBlock
+        if last_yield_timestamp == 0 {
+            LastYieldTimestamp::put(now);
+        }
+        if last_block_timestamp == 0 {
+            LastBlockTimestamp::put(now);
+        }
+
+        // All dt will be 0 so bail out here, no interest accrued in this block.
         return Ok(0);
     }
 
     // Iterate through listed assets, summing the CASH principal they generated/paid last block
-    let dt = now
+    let dt_since_last_block = now
+        .checked_sub(last_block_timestamp)
+        .ok_or(Reason::TimeTravelNotAllowed)?;
+    let dt_since_last_yield = now
         .checked_sub(last_yield_timestamp)
         .ok_or(Reason::TimeTravelNotAllowed)?;
     let mut cash_principal_supply_increase = CashPrincipalAmount::ZERO;
     let mut cash_principal_borrow_increase = CashPrincipalAmount::ZERO;
 
-    let cash_index = GlobalCashIndex::get();
+    let last_block_cash_index = GlobalCashIndex::get();
+    let last_yield_cash_index = LastYieldCashIndex::get();
     let cash_yield = CashYield::get();
     let price_cash = get_price::<T>(CASH)?;
 
@@ -1249,10 +1269,10 @@ pub fn on_initialize_internal<T: Config>(
         let asset_units = asset_info.units();
         let price_asset = get_price::<T>(asset_units)?;
         let price_ratio = ratio(price_asset, price_cash)?;
-        let cash_borrow_principal_per_asset =
-            cash_index.cash_principal_per_asset(asset_cost.simple(dt)?, price_ratio)?;
-        let cash_hold_principal_per_asset =
-            cash_index.cash_principal_per_asset(asset_yield.simple(dt)?, price_ratio)?;
+        let cash_borrow_principal_per_asset = last_block_cash_index
+            .cash_principal_per_asset(asset_cost.simple(dt_since_last_block)?, price_ratio)?;
+        let cash_hold_principal_per_asset = last_block_cash_index
+            .cash_principal_per_asset(asset_yield.simple(dt_since_last_block)?, price_ratio)?;
 
         let supply_index = SupplyIndices::get(&asset);
         let borrow_index = BorrowIndices::get(&asset);
@@ -1276,11 +1296,11 @@ pub fn on_initialize_internal<T: Config>(
 
     let total_cash_principal = TotalCashPrincipal::get();
 
-    let increment = cash_yield.compound(dt)?;
+    let increment = cash_yield.compound(dt_since_last_yield)?;
     if increment == CashIndex::ONE {
         log!("Index increment = 1. No interest on cash earned in this block!")
     }
-    let cash_index_new = cash_index.increment(increment)?; // XXX
+    let cash_index_new = last_yield_cash_index.increment(increment)?; // XXX
     let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
     let miner_share_principal =
         cash_principal_borrow_increase.sub(cash_principal_supply_increase)?;
@@ -1308,11 +1328,13 @@ pub fn on_initialize_internal<T: Config>(
     GlobalCashIndex::put(cash_index_new);
     TotalCashPrincipal::put(total_cash_principal_new);
     LastMinerSharePrincipal::put(miner_share_principal);
-    LastYieldTimestamp::put(now);
+    LastBlockTimestamp::put(now);
 
     // Possibly rotate in any scheduled next CASH rate
     if let Some((next_apr, next_start)) = CashYieldNext::get() {
         if next_start <= now {
+            LastYieldTimestamp::put(next_start);
+            LastYieldCashIndex::put(cash_index_new);
             CashYield::put(next_apr);
             CashYieldNext::kill();
         }
@@ -1323,7 +1345,11 @@ pub fn on_initialize_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{chains::*, core::*, params::*, rates::*, symbol::*, tests::*, types::*, *};
+    use crate::{
+        chains::*, core::*, factor::*, params::*, rates::*, symbol::*, tests::mock::*, tests::*,
+        types::*, *,
+    };
+    use pallet_oracle::types::Price;
 
     #[test]
     fn test_helpers() {
@@ -1535,6 +1561,7 @@ mod tests {
 
             SupportedAssets::insert(&asset, asset_info);
             GlobalCashIndex::put(CashIndex::from_nominal("1.123"));
+            LastYieldCashIndex::put(CashIndex::from_nominal("1.123"));
             SupplyIndices::insert(&asset, AssetIndex::from_nominal("1234"));
             BorrowIndices::insert(&asset, AssetIndex::from_nominal("1345"));
             TotalSupplyAssets::insert(asset.clone(), asset_info.as_quantity_nominal("300").value);
@@ -1547,7 +1574,8 @@ mod tests {
                 1450_000000 as pallet_oracle::types::AssetPrice,
             ); // $1450 eth
 
-            let result = on_initialize_internal::<Test>(now, last_yield_timestamp);
+            let result =
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp);
             assert_eq!(result, Ok(0u64));
 
             assert_eq!(
@@ -1575,12 +1603,141 @@ mod tests {
             );
             // Run again to set miner true principal
             assert_eq!(
-                on_initialize_internal::<Test>(now, last_yield_timestamp),
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp),
                 Ok(0)
             );
             assert_eq!(
                 CashPrincipals::get(&miner),
                 CashPrincipal::from_nominal("243.097062")
+            );
+        });
+    }
+
+    #[test]
+    fn test_on_initialize_next_yield_progression() {
+        new_test_ext().execute_with(|| {
+            let now = MILLISECONDS_PER_YEAR; // we are at year 1 (from epoc)
+            let last_yield_timestamp = 3 * MILLISECONDS_PER_YEAR / 4; // last time we set the yield was 3 months ago
+            let last_block_timestamp = now - 6 * 1000; // last block was 6 seconds ago
+            let next_yield_timestamp = now + 6 * 1000; // we are going to set the next yield in the next block 6 seconds from "now"
+            let global_cash_index_initial = CashIndex::from_nominal("1.123");
+            let last_yield_cash_index_initial = CashIndex::from_nominal("1.111");
+            let cash_yield_initial = APR::from_nominal("0.24");
+            let cash_yield_next = APR::from_nominal("0.32");
+
+            CashYield::put(cash_yield_initial);
+            CashYieldNext::put((cash_yield_next, next_yield_timestamp));
+            GlobalCashIndex::put(global_cash_index_initial);
+            LastYieldCashIndex::put(last_yield_cash_index_initial);
+            LastYieldTimestamp::put(last_yield_timestamp);
+
+            let result =
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp);
+            assert_eq!(result, Ok(0u64));
+
+            let increment_expected = cash_yield_initial
+                .compound(now - last_yield_timestamp)
+                .expect("could not compound interest during expected calc");
+            let new_index_expected = last_yield_cash_index_initial
+                .increment(increment_expected)
+                .expect("could not increment index value during expected calc");
+            let new_index_actual = GlobalCashIndex::get();
+            assert_eq!(
+                new_index_expected, new_index_actual,
+                "current yield was not used to calculate the cash index increment"
+            );
+            let (next_yield_actual, next_yield_timestamp_actual) =
+                CashYieldNext::get().expect("cash yield next was cleared unexpectedly");
+            assert_eq!(
+                next_yield_actual, cash_yield_next,
+                "cash yield next yield was modified unexpectedly"
+            );
+            assert_eq!(
+                next_yield_timestamp_actual, next_yield_timestamp,
+                "cash yield next timestamp was modified unexpectedly"
+            );
+            assert_eq!(
+                LastYieldTimestamp::get(),
+                last_yield_timestamp,
+                "last yield timestamp changed unexpectedly"
+            );
+            assert_eq!(
+                LastYieldCashIndex::get(),
+                last_yield_cash_index_initial,
+                "last yield cash index was updated unexpectedly"
+            );
+
+            // simulate "a block goes by" in time
+            let last_block_timestamp = now;
+            let now = next_yield_timestamp;
+
+            let result =
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp);
+            assert_eq!(result, Ok(0u64));
+
+            let increment_expected = cash_yield_initial
+                .compound(now - last_yield_timestamp)
+                .expect("could not compound interest during expected calc");
+            let new_index_expected = last_yield_cash_index_initial
+                .increment(increment_expected)
+                .expect("could not increment index value during expected calc");
+            let new_index_actual = GlobalCashIndex::get();
+            assert_eq!(
+                new_index_expected, new_index_actual,
+                "current yield was not used to calculate the cash index increment"
+            );
+            assert!(CashYieldNext::get().is_none(), "next yield was not cleared");
+            let actual_cash_yield = CashYield::get();
+            assert_eq!(
+                actual_cash_yield, cash_yield_next,
+                "the current yield was not updated to next yield"
+            );
+            assert_eq!(
+                LastYieldTimestamp::get(),
+                next_yield_timestamp,
+                "last yield timestamp was not updated"
+            );
+            assert_eq!(
+                LastYieldCashIndex::get(),
+                new_index_actual,
+                "last yield cash index was not updated correctly"
+            );
+
+            // simulate "a block goes by" in time
+            let last_block_timestamp = now;
+            let now = now + 6 * 1000;
+            let new_cash_index_baseline = new_index_actual;
+
+            let result =
+                on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp);
+            assert_eq!(result, Ok(0u64));
+
+            let increment_expected = cash_yield_next
+                .compound(now - next_yield_timestamp)
+                .expect("could not compound interest during expected calc");
+            let new_index_expected = new_cash_index_baseline
+                .increment(increment_expected)
+                .expect("could not increment index value during expected calc");
+            let new_index_actual = GlobalCashIndex::get();
+            assert_eq!(
+                new_index_expected, new_index_actual,
+                "current yield was not used to calculate the cash index increment"
+            );
+            assert!(CashYieldNext::get().is_none(), "next yield was not cleared");
+            let actual_cash_yield = CashYield::get();
+            assert_eq!(
+                actual_cash_yield, cash_yield_next,
+                "the current yield was not updated to next yield"
+            );
+            assert_eq!(
+                LastYieldTimestamp::get(),
+                next_yield_timestamp,
+                "last yield timestamp was modified unexpectedly"
+            );
+            assert_eq!(
+                LastYieldCashIndex::get(),
+                new_cash_index_baseline,
+                "last yield cash index was updated unexpectedly"
             );
         });
     }

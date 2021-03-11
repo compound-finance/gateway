@@ -112,6 +112,8 @@ decl_storage! {
         Validators get(fn validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// An index to track interest earned by CASH holders and owed by CASH borrowers.
+        /// Note - the implementation of Default for CashIndex returns ONE. This also provides
+        /// the initial value as it is currently implemented.
         GlobalCashIndex get(fn cash_index): CashIndex;
 
         /// The upcoming base rate change for CASH and when, if any.
@@ -191,6 +193,12 @@ decl_storage! {
 
         /// Validator spread due to miner of last block.
         LastMinerSharePrincipal get(fn last_miner_share_principal): CashPrincipalAmount;
+
+        /// The timestamp of the previous block or defaults to timestamp at genesis.
+        LastBlockTimestamp get(fn last_block_timestamp): Timestamp;
+
+        /// The cash index of the previous yield accrual point or defaults to initial cash index.
+        LastYieldCashIndex get(fn last_yield_cash_index): CashIndex;
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
