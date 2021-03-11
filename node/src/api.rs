@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 use jsonrpc_core::{Error as RpcError, ErrorCode as RpcErrorCode, Result as RpcResult};
 use jsonrpc_derive::rpc;
@@ -12,7 +13,7 @@ use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
     rates::APR,
     reason::Reason,
-    types::AssetBalance,
+    types::{AssetAmount, AssetBalance, AssetInfo},
 };
 use pallet_cash_runtime_api::CashApi as CashRuntimeApi;
 use pallet_oracle::types::AssetPrice;
@@ -22,10 +23,24 @@ const CHAIN_ERROR: i64 = 2;
 
 // Note: no 128 bit integers for the moment
 //  due to issues with serde/serde_json
+pub type ApiAssetAmount = u64;
 pub type ApiAssetBalance = i64;
 pub type ApiAssetPrice = u64;
 pub type ApiAPR = u64;
+pub type ApiFactor = u64;
 pub type ApiRates = (ApiAPR, ApiAPR);
+
+#[derive(Deserialize, Serialize)]
+pub struct ApiAssetData {
+    asset: ChainAsset,
+    balance: ApiAssetBalance,
+    total_supply: ApiAssetAmount,
+    total_borrow: ApiAssetAmount,
+    supply_rate: ApiAPR,
+    borrow_rate: ApiAPR,
+    liquidity_factor: ApiFactor,
+    price: ApiAssetPrice
+}
 
 /// Converts a runtime trap into an RPC error.
 fn runtime_err(err: impl std::fmt::Debug) -> RpcError {
@@ -59,6 +74,9 @@ pub trait GatewayRpcApi<BlockHash> {
 
     #[rpc(name = "get_rates")]
     fn get_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
+
+    #[rpc(name = "gateway_asset_data")]
+    fn gateway_asset_data(&self, account: ChainAccount, assets: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiAssetData>;
 }
 
 pub struct GatewayRpcHandler<C, B> {
@@ -117,5 +135,48 @@ where
             .map_err(runtime_err)?
             .map_err(chain_err)?;
         Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
+    }
+
+    fn gateway_asset_data(&self, account: ChainAccount, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetData> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let asset_info: AssetInfo = api
+            .get_asset(&at, asset)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let account_balance: AssetBalance = api
+            .get_account_balance(&at, account, asset)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let (total_borrow, total_supply): (AssetAmount, AssetAmount) = api
+            .get_market_totals(&at, asset)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let (borrow_rate, supply_rate): (APR, APR) = api
+            .get_rates(&at, asset)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let price: AssetPrice = api
+            .get_price_with_ticker(&at, asset_info.ticker)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+
+        Ok(
+            ApiAssetData {
+                asset: asset_info.asset,
+                balance: (account_balance as ApiAssetBalance).into(),
+                total_supply: total_supply as ApiAssetAmount,
+                total_borrow: total_borrow as ApiAssetAmount,
+                supply_rate: supply_rate.0 as ApiAPR,
+                borrow_rate: borrow_rate.0 as ApiAPR,
+                liquidity_factor: (asset_info.liquidity_factor.0 as ApiFactor),
+                price: (price as ApiAssetPrice).into()
+            }
+        )
     }
 }

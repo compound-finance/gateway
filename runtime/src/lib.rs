@@ -47,7 +47,7 @@ use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
     rates::APR,
     reason::Reason,
-    types::AssetBalance,
+    types::{AssetAmount, AssetBalance, AssetInfo},
 };
 use pallet_oracle::{ticker::Ticker, types::AssetPrice};
 
@@ -550,8 +550,24 @@ impl_runtime_apis! {
             Oracle::get_price(Ticker::from_str(&ticker_str).map_err(Reason::OracleError)?).map_err(Reason::OracleError)
         }
 
+        fn get_price_with_ticker(ticker: Ticker) -> Result<AssetPrice, Reason> {
+            Oracle::get_price(ticker).map_err(Reason::OracleError)
+        }
+
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
             Cash::get_rates(asset)
+        }
+
+        fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason> {
+            Cash::get_asset(asset)
+        }
+
+        fn get_market_totals(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
+            Cash::get_market_totals(asset)
+        }
+
+        fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+            Cash::get_account_balance(account, asset)
         }
     }
 

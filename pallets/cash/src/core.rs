@@ -126,6 +126,20 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
         .get_rates(utilization, APR::ZERO, info.miner_shares)?)
 }
 
+/// Return the current total borrow and total supply balances for the asset.
+pub fn get_market_totals<T: Config>(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
+    let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
+    let total_borrow = TotalBorrowAssets::get(asset);
+    let total_supply = TotalSupplyAssets::get(asset);
+    Ok((total_borrow, total_supply))
+}
+
+/// Return the account's balance for the asset.
+pub fn get_account_balance<T: Config>(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+    let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
+    Ok(AssetBalances::get(asset, account))
+}
+
 // Internal helpers
 
 pub fn passes_validation_threshold(

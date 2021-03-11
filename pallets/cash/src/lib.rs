@@ -623,6 +623,21 @@ impl<T: Config> Module<T> {
     pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
         Ok(core::get_rates::<T>(asset)?)
     }
+
+    /// Get the asset info for the given asset.
+    pub fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason> {
+        Ok(core::get_asset::<T>(asset)?)
+    }
+
+    /// Get the total supply for the given asset.
+    pub fn get_market_totals(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
+        Ok(core::get_market_totals::<T>(asset)?)
+    }
+
+    /// Get the asset balance for the given account.
+    pub fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+        Ok(core::get_account_balance::<T>(account, asset)?)
+    }
 }
 
 impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
