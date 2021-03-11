@@ -1,11 +1,11 @@
 use gateway_runtime::{
     opaque, wasm_binary_unwrap, AccountId, AuraConfig, CashConfig, GenesisConfig, GrandpaConfig,
-    OracleConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
+    OracleConfig, SessionConfig, Signature, SystemConfig,
 };
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
     chains::{Chain, Ethereum},
-    types::{AssetInfo, Timestamp, ValidatorKeys},
+    types::{AssetInfo, Timestamp, ValidatorKeys, APR},
 };
 
 use sc_service::ChainType;
@@ -55,7 +55,7 @@ pub fn authority_keys_from_seed(
 /// Get the properties key of the chain spec file - a basic valid configuration
 fn get_properties() -> sc_service::Properties {
     let value = serde_json::json! ({
-        "eth_starport_address" : "0x5dCE7D554f5237F67bb2C6708e45291B3c6e0389"
+        "eth_starport_address" : ""
     });
     let as_object = value.as_object();
     let unwrapped = as_object.unwrap();
@@ -69,9 +69,36 @@ fn development_genesis() -> GenesisConfig {
             "Alice",
             "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7",
         )],
-        // Sudo account
-        get_account_id_from_seed::<sr25519::Public>("Alice"),
-        true,
+        // Initial reporters
+        vec![
+            "0x85615b076615317c80f14cbad6501eec031cd51c",
+            "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
+        ],
+        // Initial assets
+        vec![
+            AssetInfo {
+                liquidity_factor: FromStr::from_str("6789").unwrap(),
+                ..AssetInfo::minimal(
+                    FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE").unwrap(),
+                    FromStr::from_str("ETH/18").unwrap(),
+                )
+            },
+            AssetInfo {
+                ticker: FromStr::from_str("USD").unwrap(),
+                liquidity_factor: FromStr::from_str("6789").unwrap(),
+                ..AssetInfo::minimal(
+                    FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
+                    FromStr::from_str("USDC/6").unwrap(),
+                )
+            },
+        ],
+        // Initial cash yield
+        FromStr::from_str("0").unwrap(),
+        // Initial timestamp
+        wasm_timer::SystemTime::now()
+            .duration_since(wasm_timer::UNIX_EPOCH)
+            .expect("cannot get system time for genesis")
+            .as_millis() as Timestamp,
     )
 }
 
@@ -99,13 +126,15 @@ pub fn development_config() -> ChainSpec {
 fn local_testnet_genesis() -> GenesisConfig {
     testnet_genesis(
         // Initial PoA authorities
-        vec![
-            authority_keys_from_seed("Alice", "0xc77494d805d2b455686ba6a6bdf1c68ecf6e1cd7"),
-            authority_keys_from_seed("Bob", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
-        ],
-        // Sudo account
-        get_account_id_from_seed::<sr25519::Public>("Alice"),
-        true,
+        vec![],
+        // Initial reporters
+        vec![],
+        // Initial assets
+        vec![],
+        // Initial cash yield
+        FromStr::from_str("0").unwrap(),
+        // Initial timestamp
+        0 as Timestamp,
     )
 }
 
@@ -130,46 +159,13 @@ pub fn local_testnet_config() -> ChainSpec {
     )
 }
 
-fn staging_testnet_genesis() -> GenesisConfig {
-    testnet_genesis(
-        // Initial PoA authorities
-        vec![
-            authority_keys_from_seed("Alice", "0x55413A2d4908D130C908ccF2f298b235bACD427a"),
-            // authority_keys_from_seed("Bob", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
-            // authority_keys_from_seed("Charlie", "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd"),
-        ],
-        // Sudo account
-        get_account_id_from_seed::<sr25519::Public>("Alice"),
-        true,
-    )
-}
-
-pub fn staging_testnet_config() -> ChainSpec {
-    ChainSpec::from_genesis(
-        // Name
-        "Staging Testnet",
-        // ID
-        "staging_testnet",
-        ChainType::Live,
-        staging_testnet_genesis,
-        // Bootnodes
-        vec![],
-        // Telemetry
-        None,
-        // Protocol ID
-        Some("gateway-staging"),
-        // Properties
-        Some(get_properties()),
-        // Extensions
-        None,
-    )
-}
-
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
     initial_authorities: Vec<(AccountId, <Ethereum as Chain>::Address, AuraId, GrandpaId)>,
-    root_key: AccountId,
-    _enable_println: bool,
+    reporters: Vec<&str>,
+    assets: Vec<AssetInfo>,
+    cash_yield: APR,
+    last_yield_timestamp: Timestamp,
 ) -> GenesisConfig {
     GenesisConfig {
         frame_system: Some(SystemConfig {
@@ -182,10 +178,6 @@ fn testnet_genesis(
         }),
         pallet_grandpa: Some(GrandpaConfig {
             authorities: vec![],
-        }),
-        pallet_sudo: Some(SudoConfig {
-            // Assign network admin rights.
-            key: root_key,
         }),
 
         pallet_session: Some(SessionConfig {
@@ -205,32 +197,9 @@ fn testnet_genesis(
         }),
 
         pallet_cash: Some(CashConfig {
-            cash_yield: FromStr::from_str("0").unwrap(),
-            last_yield_timestamp: wasm_timer::SystemTime::now()
-                .duration_since(wasm_timer::UNIX_EPOCH)
-                .expect("cannot get system time for genesis")
-                .as_millis() as Timestamp,
-
-            assets: vec![
-                AssetInfo {
-                    liquidity_factor: FromStr::from_str("6789").unwrap(),
-                    ..AssetInfo::minimal(
-                        FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
-                            .unwrap(),
-                        FromStr::from_str("ETH/18").unwrap(),
-                    )
-                },
-                AssetInfo {
-                    ticker: FromStr::from_str("USD").unwrap(),
-                    liquidity_factor: FromStr::from_str("6789").unwrap(),
-                    ..AssetInfo::minimal(
-                        FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
-                            .unwrap(),
-                        FromStr::from_str("USDC/6").unwrap(),
-                    )
-                },
-            ],
-
+            cash_yield,
+            last_yield_timestamp,
+            assets,
             // XXX initial authorities should just be Vec<ValidatorKeys>?
             validators: initial_authorities
                 .iter()
@@ -242,12 +211,7 @@ fn testnet_genesis(
         }),
 
         pallet_oracle: Some(OracleConfig {
-            reporters: vec![
-                "0x85615b076615317c80f14cbad6501eec031cd51c",
-                "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
-            ]
-            .try_into()
-            .unwrap(),
+            reporters: reporters.try_into().unwrap(),
         }),
     }
 }

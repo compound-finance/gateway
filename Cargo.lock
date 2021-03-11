@@ -2253,7 +2253,6 @@ dependencies = [
  "pallet-oracle",
  "pallet-randomness-collective-flip",
  "pallet-session",
- "pallet-sudo",
  "pallet-timestamp",
  "parity-scale-codec",
  "serde",
@@ -4528,20 +4527,6 @@ dependencies = [
  "sp-staking",
  "sp-std",
  "sp-trie",
-]
-
-[[package]]
-name = "pallet-sudo"
-version = "2.0.0"
-source = "git+https://github.com/compound-finance/substrate?branch=master#3bb13fdc5be7b04a179b1b1c7c2032534263241d"
-dependencies = [
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "serde",
- "sp-io",
- "sp-runtime",
- "sp-std",
 ]
 
 [[package]]

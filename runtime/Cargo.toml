@@ -43,7 +43,6 @@ frame-system-benchmarking = { default-features = false, git = 'https://github.co
 pallet-aura = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-grandpa = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-randomness-collective-flip = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-pallet-sudo = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
@@ -78,7 +77,6 @@ std = [
     'pallet-grandpa/std',
     'pallet-randomness-collective-flip/std',
     'pallet-session/std',
-    'pallet-sudo/std',
     'pallet-timestamp/std',
     'serde',
     'sp-api/std',

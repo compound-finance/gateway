@@ -38,3 +38,6 @@ lcov.info
 
 # Releases
 releases
+
+# Dev Chain
+chains/dev/*

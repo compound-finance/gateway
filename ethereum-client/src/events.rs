@@ -3,24 +3,8 @@ use codec::{Decode, Encode};
 use our_std::convert::TryInto;
 use our_std::RuntimeDebug;
 
-/**
- * Deprecation Notice: `LockOld` and `LockCashOld` may be purged after
- *                     version 1.3.1 is deployed to all networks.
- */
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EthereumEvent {
-    LockOld {
-        asset: [u8; 20],
-        sender: [u8; 20],
-        recipient: [u8; 20],
-        amount: u128,
-    },
-    LockCashOld {
-        sender: [u8; 20],
-        recipient: [u8; 20],
-        amount: u128,
-        principal: u128,
-    },
     Lock {
         asset: [u8; 20],
         sender: [u8; 20],
@@ -235,30 +219,6 @@ lazy_static! {
     static ref NOTICE_INVOKED_EVENT_TOPIC: ethabi::Hash = NOTICE_INVOKED_EVENT.signature();
 }
 
-fn parse_lock_old_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
-    match &log.params[..] {
-        &[ethabi::LogParam {
-            value: ethabi::token::Token::Address(asset),
-            ..
-        }, ethabi::LogParam {
-            value: ethabi::token::Token::Address(sender),
-            ..
-        }, ethabi::LogParam {
-            value: ethabi::token::Token::Address(recipient),
-            ..
-        }, ethabi::LogParam {
-            value: ethabi::token::Token::Uint(amount),
-            ..
-        }] => Ok(EthereumEvent::LockOld {
-            asset: asset.into(),
-            sender: sender.into(),
-            recipient: recipient.into(),
-            amount: amount.try_into().map_err(|_| EventError::Overflow)?,
-        }),
-        _ => Err(EventError::InvalidLogParams),
-    }
-}
-
 fn parse_lock_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
     match &log.params[..] {
         [ethabi::LogParam {
@@ -284,30 +244,6 @@ fn parse_lock_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
                 .try_into()
                 .map_err(|_| EventError::InvalidRecipient)?,
             amount: (*amount).try_into().map_err(|_| EventError::Overflow)?,
-        }),
-        _ => Err(EventError::InvalidLogParams),
-    }
-}
-
-fn parse_lock_cash_old_log(log: ethabi::Log) -> Result<EthereumEvent, EventError> {
-    match &log.params[..] {
-        &[ethabi::LogParam {
-            value: ethabi::token::Token::Address(sender),
-            ..
-        }, ethabi::LogParam {
-            value: ethabi::token::Token::Address(recipient),
-            ..
-        }, ethabi::LogParam {
-            value: ethabi::token::Token::Uint(amount),
-            ..
-        }, ethabi::LogParam {
-            value: ethabi::token::Token::Uint(principal),
-            ..
-        }] => Ok(EthereumEvent::LockCashOld {
-            sender: sender.into(),
-            recipient: recipient.into(),
-            amount: amount.try_into().map_err(|_| EventError::Overflow)?,
-            principal: principal.try_into().map_err(|_| EventError::Overflow)?,
         }),
         _ => Err(EventError::InvalidLogParams),
     }
@@ -429,16 +365,7 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
         .map(|topic| decode_topic(topic).ok_or(EventError::InvalidTopic))
         .collect::<Result<Vec<ethabi::Hash>, _>>()?;
     let topic_hash = topic_hashes.first().ok_or(EventError::InvalidTopic)?;
-    if *topic_hash == *LOCK_OLD_EVENT_TOPIC {
-        let log: ethabi::Log = LOCK_OLD_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
-
-        parse_lock_old_log(log)
-    } else if *topic_hash == *LOCK_EVENT_TOPIC {
+    if *topic_hash == *LOCK_EVENT_TOPIC {
         let log: ethabi::Log = LOCK_EVENT
             .parse_log(ethabi::RawLog {
                 topics: topic_hashes,
@@ -447,15 +374,6 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
             .map_err(|_| EventError::ErrorParsingLog)?;
 
         parse_lock_log(log)
-    } else if *topic_hash == *LOCK_CASH_OLD_EVENT_TOPIC {
-        let log: ethabi::Log = LOCK_CASH_OLD_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
-
-        parse_lock_cash_old_log(log)
     } else if *topic_hash == *LOCK_CASH_EVENT_TOPIC {
         let log: ethabi::Log = LOCK_CASH_EVENT
             .parse_log(ethabi::RawLog {
@@ -503,37 +421,6 @@ mod tests {
 
     // Note: these tests just come from copying and pasting `starport.js` unit test data.
     #[test]
-    fn test_decode_lock_old_event() {
-        let topics = vec![
-            String::from("0xd6aba49fa5adb7dbc18ab12d057e77c75e5d4b345cf473c7514afbbd6f5fc626"),
-            String::from("0x0000000000000000000000002ab42ffcb000a543a63c428fa4fab8772d4575f3"),
-            String::from("0x00000000000000000000000045df7f9be475748910ca950a7941227f4daf112d"),
-            String::from("0x000000000000000000000000077653e86ea17b0d967c4f39bb5c507794e1a624"),
-        ];
-
-        let data =
-            String::from("0x0000000000000000000000000000000000000000000000000de0b6b3a7640000");
-        assert_eq!(
-            decode_event(topics, data),
-            Ok(EthereumEvent::LockOld {
-                asset: [
-                    42, 180, 47, 252, 176, 0, 165, 67, 166, 60, 66, 143, 164, 250, 184, 119, 45,
-                    69, 117, 243
-                ],
-                sender: [
-                    69, 223, 127, 155, 228, 117, 116, 137, 16, 202, 149, 10, 121, 65, 34, 127, 77,
-                    175, 17, 45
-                ],
-                recipient: [
-                    7, 118, 83, 232, 110, 161, 123, 13, 150, 124, 79, 57, 187, 92, 80, 119, 148,
-                    225, 166, 36
-                ],
-                amount: 1000000000000000000
-            })
-        )
-    }
-
-    #[test]
     fn test_decode_lock_event() {
         let topics = vec![
             String::from("0xc459acef3ffe957663bb49d644b20d0c790bcb41573893752a72ba6f023b9386"),
@@ -561,33 +448,6 @@ mod tests {
                     238, 225, 201, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                 ],
                 amount: 1000000000000000000
-            })
-        )
-    }
-
-    #[test]
-    fn test_decode_lock_cash_old_event() {
-        let topics = vec![
-            String::from("0xe100221382bf5c3c3c6813f37ba19b1dd54b38d08a8755d30093f30fbc703a91"),
-            String::from("0x000000000000000000000000a191b9569cde0f2b9679b7068d672578c7da7b5b"),
-            String::from("0x000000000000000000000000c8e1b166ffa58855272e7f88cc4dcc49665922fb"),
-        ];
-
-        let data =
-            String::from("0x00000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000f4240");
-        assert_eq!(
-            decode_event(topics, data),
-            Ok(EthereumEvent::LockCashOld {
-                sender: [
-                    161, 145, 185, 86, 156, 222, 15, 43, 150, 121, 183, 6, 141, 103, 37, 120, 199,
-                    218, 123, 91
-                ],
-                recipient: [
-                    200, 225, 177, 102, 255, 165, 136, 85, 39, 46, 127, 136, 204, 77, 204, 73, 102,
-                    89, 34, 251
-                ],
-                amount: 1000000,
-                principal: 1000000,
             })
         )
     }

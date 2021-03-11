@@ -121,7 +121,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("gateway"),
     impl_name: create_runtime_str!("gateway"),
     authoring_version: 1,
-    spec_version: 6,
+    spec_version: 7,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -258,11 +258,6 @@ parameter_types! {
     pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
 }
 
-impl pallet_sudo::Config for Runtime {
-    type Event = Event;
-    type Call = Call;
-}
-
 parameter_types! {
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
 }
@@ -382,7 +377,6 @@ construct_runtime!(
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
         Aura: pallet_aura::{Module, Config<T>},
         Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
-        Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
         // Include the custom logic from the Cash and Oracle pallets in the runtime.
         Cash: pallet_cash::{Module, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
