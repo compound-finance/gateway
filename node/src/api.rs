@@ -75,8 +75,8 @@ pub trait GatewayRpcApi<BlockHash> {
     #[rpc(name = "get_rates")]
     fn get_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
 
-    #[rpc(name = "gateway_asset_data")]
-    fn gateway_asset_data(&self, account: ChainAccount, assets: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiAssetData>;
+    #[rpc(name = "get_assetdata")]
+    fn get_assetdata(&self, account: ChainAccount, assets: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiAssetData>;
 }
 
 pub struct GatewayRpcHandler<C, B> {
@@ -137,7 +137,7 @@ where
         Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
     }
 
-    fn gateway_asset_data(&self, account: ChainAccount, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetData> {
+    fn get_assetdata(&self, account: ChainAccount, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetData> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let asset_info: AssetInfo = api
