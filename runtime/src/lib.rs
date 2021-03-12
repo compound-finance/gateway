@@ -542,8 +542,28 @@ impl_runtime_apis! {
     }
 
     impl pallet_cash_runtime_api::CashApi<Block> for Runtime {
+        fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason> {
+            Cash::get_asset(asset)
+        }
+
+        fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+            Cash::get_account_balance(account, asset)
+        }
+
+        fn get_cash_yield() -> Result<APR, Reason> {
+            Cash::get_cash_yield()
+        }
+
+        fn get_full_cash_balance(account: ChainAccount) -> Result<AssetBalance, Reason> {
+            Cash::get_full_cash_balance(account)
+        }
+
         fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
             Cash::get_liquidity(account)
+        }
+
+        fn get_market_totals(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
+            Cash::get_market_totals(asset)
         }
 
         fn get_price(ticker_str: String) -> Result<AssetPrice, Reason> {
@@ -556,18 +576,6 @@ impl_runtime_apis! {
 
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
             Cash::get_rates(asset)
-        }
-
-        fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason> {
-            Cash::get_asset(asset)
-        }
-
-        fn get_market_totals(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
-            Cash::get_market_totals(asset)
-        }
-
-        fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
-            Cash::get_account_balance(account, asset)
         }
     }
 
