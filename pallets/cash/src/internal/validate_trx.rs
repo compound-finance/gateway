@@ -384,7 +384,6 @@ mod tests {
             let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
                 .priority(100)
                 .longevity(32)
-                .and_requires((ChainAccount::Eth(eth_address), 4))
                 .and_provides((ChainAccount::Eth(eth_address), 5))
                 .propagate(true)
                 .build();
