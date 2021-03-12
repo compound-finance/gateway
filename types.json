@@ -221,7 +221,13 @@
 
   "Source5": "RatesRS",
   "RatesError": {
-    "_enum": ["ModelRateOutOfBounds", "ZeroAboveKink", "KinkAboveFull", "KinkUtilizationTooHigh", "Overflowed"]
+    "_enum": [
+      "ModelRateOutOfBounds",
+      "ZeroAboveKink",
+      "KinkAboveFull",
+      "KinkUtilizationTooHigh",
+      "Overflowed"
+    ]
   },
   "Factor": "(Uint)",
   "MinerShares": "Factor",
@@ -293,7 +299,14 @@
     }
   },
   "MathError": {
-    "_enum": ["Overflow", "Underflow", "SignMismatch", "SymbolMismatch", "PriceNotUSD", "DivisionByZero"]
+    "_enum": [
+      "Overflow",
+      "Underflow",
+      "SignMismatch",
+      "SymbolMismatch",
+      "PriceNotUSD",
+      "DivisionByZero"
+    ]
   },
   "TrxReqParseError": {
     "_enum": [
@@ -441,5 +454,22 @@
   "ReporterSet": "Vec<Reporter>",
 
   "Source12": "Oracle_TickerRS",
-  "Ticker": "[u8; 12]"
+  "Ticker": "[u8; 12]",
+
+  "ApiRates": "(u64, u64)",
+  "ApiAssetData": {
+    "asset": "String",
+    "balance": "i64",
+    "total_borrow": "u64",
+    "total_supply": "u64",
+    "borrow_rate": "u64",
+    "supply_rate": "u64",
+    "liquidity_factor": "String",
+    "price": "u64"
+  },
+  "ApiCashData": {
+    "balance": "i64",
+    "cash_yield": "u64",
+    "price": "u64"
+  }
 }
