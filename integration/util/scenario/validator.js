@@ -40,6 +40,7 @@ let validatorInfoMap = {
     peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp', // I have _no idea_ how this is generated
     spawn_args: ['--alice'],
     color: chalk.blue,
+    validator: true,
   },
   'bob': {
     aura_key: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
@@ -50,6 +51,7 @@ let validatorInfoMap = {
     peer_id: '12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD', // I have _no idea_ how this is generated
     spawn_args: ['--bob'],
     color: chalk.green,
+    validator: true,
   }
 };
 
