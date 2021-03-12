@@ -80,21 +80,12 @@ pub fn validate_unsigned<T: Config>(
 
             match (signer_res, nonce) {
                 (Err(_e), _) => Err(ValidationError::InvalidSignature),
-                (Ok(sender), 0) => Ok(ValidTransaction::with_tag_prefix(
-                    "Gateway::exec_trx_request",
-                )
-                .priority(100)
-                .longevity(32)
-                .and_provides((sender, 0))
-                .propagate(true)
-                .build()),
-                (Ok(sender), _) => Ok(ValidTransaction::with_tag_prefix(
+                (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
                     "Gateway::exec_trx_request",
                 )
                 .priority(100)
                 .longevity(32)
                 .and_provides((sender, nonce))
-                .and_requires((sender, nonce - 1))
                 .propagate(true)
                 .build()),
             }
