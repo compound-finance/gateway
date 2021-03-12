@@ -393,9 +393,6 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
 impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
     fn should_end_session(now: T::BlockNumber) -> bool {
         if NextValidators::iter().count() > 0 {
-            println!("should_end_session=true[next_validators]");
-            true
-        } else if NoticeHolds::iter().count() > 0 {
             // Check if we should end the hold
             let validators: Vec<_> = Validators::iter().map(|v| v.1).collect();
             let every_notice_hold_executed = NoticeHolds::iter().all(|(chain_id, notice_id)| {
@@ -406,10 +403,10 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
                 for (chain_id, _) in NoticeHolds::iter() {
                     NoticeHolds::take(chain_id);
                 }
-                println!("should_end_session=true[notices_executed]");
+                println!("should_end_session=true[next_validators]");
                 true
             } else {
-                println!("should_end_session=false[notices_held]");
+                println!("should_end_session=false[pending_notice_held]");
                 false
             }
         } else {
@@ -608,7 +605,10 @@ impl<T: Config> Module<T> {
     // ** API / View Functions ** //
 
     /// Get the asset balance for the given account.
-    pub fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+    pub fn get_account_balance(
+        account: ChainAccount,
+        asset: ChainAsset,
+    ) -> Result<AssetBalance, Reason> {
         Ok(core::get_account_balance::<T>(account, asset)?)
     }
 
