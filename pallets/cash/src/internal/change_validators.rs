@@ -11,19 +11,19 @@ use crate::{
 };
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
-    for (id, _) in NextValidators::iter() {
+    for validator in validators.iter() {
         require!(
-            <T>::SessionInterface::is_valid_keys(id) == true,
+            <T>::SessionInterface::is_valid_keys(validator.substrate_id.clone()),
             Reason::ChangeValidatorsError
         );
     }
 
-    for (id, _keys) in <NextValidators>::iter() {
-        <NextValidators>::take(&id);
+    for (id, _keys) in NextValidators::iter() {
+        NextValidators::take(&id);
     }
     for keys in &validators {
-        <NextValidators>::take(&keys.substrate_id);
-        <NextValidators>::insert(&keys.substrate_id, keys);
+        NextValidators::take(&keys.substrate_id);
+        NextValidators::insert(&keys.substrate_id, keys);
     }
 
     <Module<T>>::deposit_event(Event::ChangeValidators(validators.clone()));
