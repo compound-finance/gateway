@@ -29,7 +29,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
 
   // aurakey == validator id, account id
   let session_args = validatorsInfo.map(([_, v]) => [v.aura_key, v.aura_key, {aura: v.aura_key, grandpa: v.grandpa_key}]);
-  let validators = validatorsInfo.map(([_, v]) => ({
+  let validators = validatorsInfo.filter(([_, v]) => v.validator).map(([_, v]) => ({
       substrate_id: Array.from(ctx.actors.keyring.decodeAddress(v.aura_key)), // from ss58 str => byte array
       eth_address: v.eth_account
   }));
