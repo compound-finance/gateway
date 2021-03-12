@@ -140,6 +140,12 @@ pub fn get_account_balance<T: Config>(account: ChainAccount, asset: ChainAsset) 
     Ok(AssetBalances::get(asset, account))
 }
 
+/// Return the current cash yield.
+pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
+    Ok(CashYield::get())
+}
+
+
 // Internal helpers
 
 pub fn passes_validation_threshold(

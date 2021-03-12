@@ -614,14 +614,9 @@ impl<T: Config> Module<T> {
 
     // ** API / View Functions ** //
 
-    /// Get the liquidity for the given account.
-    pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
-        Ok(core::get_liquidity::<T>(account)?.value)
-    }
-
-    /// Get the rates for the given asset.
-    pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
-        Ok(core::get_rates::<T>(asset)?)
+    /// Get the asset balance for the given account.
+    pub fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
+        Ok(core::get_account_balance::<T>(account, asset)?)
     }
 
     /// Get the asset info for the given asset.
@@ -629,14 +624,29 @@ impl<T: Config> Module<T> {
         Ok(core::get_asset::<T>(asset)?)
     }
 
+    /// Get the cash yield.
+    pub fn get_cash_yield() -> Result<APR, Reason> {
+        Ok(core::get_cash_yield::<T>()?)
+    }
+
+    /// Get the full cash balance for the given account.
+    pub fn get_full_cash_balance(account: ChainAccount) -> Result<AssetBalance, Reason> {
+        Ok(core::get_cash_balance_with_asset_interest::<T>(account)?.value)
+    }
+
+    /// Get the liquidity for the given account.
+    pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
+        Ok(core::get_liquidity::<T>(account)?.value)
+    }
+
     /// Get the total supply for the given asset.
     pub fn get_market_totals(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason> {
         Ok(core::get_market_totals::<T>(asset)?)
     }
 
-    /// Get the asset balance for the given account.
-    pub fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason> {
-        Ok(core::get_account_balance::<T>(account, asset)?)
+    /// Get the rates for the given asset.
+    pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
+        Ok(core::get_rates::<T>(asset)?)
     }
 }
 

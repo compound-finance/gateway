@@ -27,6 +27,7 @@ pub type ApiAssetAmount = u64;
 pub type ApiAssetBalance = i64;
 pub type ApiAssetPrice = u64;
 pub type ApiAPR = u64;
+pub type ApiCashYield = u64;
 pub type ApiFactor = u64;
 pub type ApiRates = (ApiAPR, ApiAPR);
 
@@ -41,6 +42,14 @@ pub struct ApiAssetData {
     liquidity_factor: ApiFactor,
     price: ApiAssetPrice
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct ApiCashData {
+    balance: ApiAssetBalance,
+    cash_yield: ApiCashYield,
+    price: ApiAssetPrice
+}
+
 
 /// Converts a runtime trap into an RPC error.
 fn runtime_err(err: impl std::fmt::Debug) -> RpcError {
@@ -62,21 +71,24 @@ fn chain_err(reason: Reason) -> RpcError {
 
 #[rpc]
 pub trait GatewayRpcApi<BlockHash> {
-    #[rpc(name = "get_liquidity")]
-    fn get_liquidity(
+    #[rpc(name = "gateway_assetdata")]
+    fn gateway_assetdata(&self, account: ChainAccount, assets: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiAssetData>;
+
+    #[rpc(name = "gateway_cashdata")]
+    fn gateway_cashdata(&self, account: ChainAccount, at: Option<BlockHash>) -> RpcResult<ApiCashData>;
+
+    #[rpc(name = "gateway_liquidity")]
+    fn gateway_liquidity(
         &self,
         account: ChainAccount,
         at: Option<BlockHash>,
     ) -> RpcResult<ApiAssetBalance>;
 
-    #[rpc(name = "get_price")]
-    fn get_price(&self, ticker: String, at: Option<BlockHash>) -> RpcResult<ApiAssetPrice>;
+    #[rpc(name = "gateway_price")]
+    fn gateway_price(&self, ticker: String, at: Option<BlockHash>) -> RpcResult<ApiAssetPrice>;
 
-    #[rpc(name = "get_rates")]
-    fn get_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
-
-    #[rpc(name = "get_assetdata")]
-    fn get_assetdata(&self, account: ChainAccount, assets: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiAssetData>;
+    #[rpc(name = "gateway_rates")]
+    fn gateway_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
 }
 
 pub struct GatewayRpcHandler<C, B> {
@@ -99,45 +111,7 @@ where
     C: 'static + Send + Sync + ProvideRuntimeApi<B> + HeaderBackend<B>,
     C::Api: CashRuntimeApi<B>,
 {
-    fn get_liquidity(
-        &self,
-        account: ChainAccount,
-        at: Option<<B as BlockT>::Hash>,
-    ) -> RpcResult<ApiAssetBalance> {
-        let api = self.client.runtime_api();
-        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
-        let result: AssetBalance = api
-            .get_liquidity(&at, account)
-            .map_err(runtime_err)?
-            .map_err(chain_err)?;
-        Ok((result as ApiAssetBalance).into())
-    }
-
-    fn get_price(
-        &self,
-        ticker: String,
-        at: Option<<B as BlockT>::Hash>,
-    ) -> RpcResult<ApiAssetPrice> {
-        let api = self.client.runtime_api();
-        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
-        let result: AssetPrice = api
-            .get_price(&at, ticker)
-            .map_err(runtime_err)?
-            .map_err(chain_err)?;
-        Ok((result as ApiAssetPrice).into()) // XXX try_into, or patch for 128?
-    }
-
-    fn get_rates(&self, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiRates> {
-        let api = self.client.runtime_api();
-        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
-        let (borrow_rate, supply_rate): (APR, APR) = api
-            .get_rates(&at, asset)
-            .map_err(runtime_err)?
-            .map_err(chain_err)?;
-        Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
-    }
-
-    fn get_assetdata(&self, account: ChainAccount, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetData> {
+    fn gateway_assetdata(&self, account: ChainAccount, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetData> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let asset_info: AssetInfo = api
@@ -178,5 +152,70 @@ where
                 price: (price as ApiAssetPrice).into()
             }
         )
+    }
+
+    fn gateway_cashdata(&self, account: ChainAccount, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiCashData> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let balance: AssetBalance = api
+            .get_full_cash_balance(&at, account)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let cash_yield: APR = api
+            .get_cash_yield(&at)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let price: AssetPrice = api
+            .get_price(&at, "CASH".to_string())
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        Ok(
+            ApiCashData {
+                balance: (balance as ApiAssetBalance).into(),
+                cash_yield: cash_yield.0 as ApiAPR,
+                price: (price as ApiAssetPrice).into()
+            }
+        )
+    }
+
+    fn gateway_liquidity(
+        &self,
+        account: ChainAccount,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<ApiAssetBalance> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let result: AssetBalance = api
+            .get_liquidity(&at, account)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+        Ok((result as ApiAssetBalance).into())
+    }
+
+    fn gateway_price(
+        &self,
+        ticker: String,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<ApiAssetPrice> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let result: AssetPrice = api
+            .get_price(&at, ticker)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+        Ok((result as ApiAssetPrice).into()) // XXX try_into, or patch for 128?
+    }
+
+    fn gateway_rates(&self, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiRates> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let (borrow_rate, supply_rate): (APR, APR) = api
+            .get_rates(&at, asset)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+        Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
     }
 }
