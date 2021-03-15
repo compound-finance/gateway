@@ -91,7 +91,6 @@ fn submit_events<T: Config>(events: Vec<(ChainLogId, ChainLogEvent)>) -> Result<
         // XXX why are we signing with eth?
         //  bc eth is identity key...
         let signature = <Ethereum as Chain>::sign_message(&event.encode()[..])?;
-
         let call = Call::receive_event(event_id, event, signature);
 
         // TODO: Do we want to short-circuit on an error here?

@@ -229,7 +229,6 @@ mod tests {
                     amount: 500,
                 },
             });
-
             let signature: ValidatorSig = [0u8; 65];
 
             assert_eq!(
