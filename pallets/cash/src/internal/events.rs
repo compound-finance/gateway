@@ -91,6 +91,7 @@ fn submit_events<T: Config>(events: Vec<(ChainLogId, ChainLogEvent)>) -> Result<
         // XXX why are we signing with eth?
         //  bc eth is identity key...
         let signature = <Ethereum as Chain>::sign_message(&event.encode()[..])?;
+
         let call = Call::receive_event(event_id, event, signature);
 
         // TODO: Do we want to short-circuit on an error here?
@@ -120,8 +121,7 @@ pub fn receive_event<T: Config>(
     // XXX do we want to store/check hash to allow replaying?
     // TODO: use more generic function?
     // XXX why is this using eth for validator sig though?
-    let signer: crate::types::ValidatorIdentity =
-        runtime_interfaces::keyring_interface::eth_recover(event.encode(), signature, false)?;
+    let signer = <Ethereum as Chain>::recover_address(&event.encode(), signature)?;
     let validators: BTreeSet<_> = Validators::iter().map(|v| v.1.eth_address).collect();
     if !validators.contains(&signer) {
         log!(
