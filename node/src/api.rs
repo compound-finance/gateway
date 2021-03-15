@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 
 use jsonrpc_core::{Error as RpcError, ErrorCode as RpcErrorCode, Result as RpcResult};
 use jsonrpc_derive::rpc;
@@ -40,16 +40,15 @@ pub struct ApiAssetData {
     supply_rate: ApiAPR,
     borrow_rate: ApiAPR,
     liquidity_factor: ApiFactor,
-    price: ApiAssetPrice
+    price: ApiAssetPrice,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct ApiCashData {
     balance: ApiAssetBalance,
     cash_yield: ApiCashYield,
-    price: ApiAssetPrice
+    price: ApiAssetPrice,
 }
-
 
 /// Converts a runtime trap into an RPC error.
 fn runtime_err(err: impl std::fmt::Debug) -> RpcError {
@@ -72,10 +71,19 @@ fn chain_err(reason: Reason) -> RpcError {
 #[rpc]
 pub trait GatewayRpcApi<BlockHash> {
     #[rpc(name = "gateway_assetdata")]
-    fn gateway_assetdata(&self, account: ChainAccount, assets: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiAssetData>;
+    fn gateway_assetdata(
+        &self,
+        account: ChainAccount,
+        assets: ChainAsset,
+        at: Option<BlockHash>,
+    ) -> RpcResult<ApiAssetData>;
 
     #[rpc(name = "gateway_cashdata")]
-    fn gateway_cashdata(&self, account: ChainAccount, at: Option<BlockHash>) -> RpcResult<ApiCashData>;
+    fn gateway_cashdata(
+        &self,
+        account: ChainAccount,
+        at: Option<BlockHash>,
+    ) -> RpcResult<ApiCashData>;
 
     #[rpc(name = "gateway_liquidity")]
     fn gateway_liquidity(
@@ -111,7 +119,12 @@ where
     C: 'static + Send + Sync + ProvideRuntimeApi<B> + HeaderBackend<B>,
     C::Api: CashRuntimeApi<B>,
 {
-    fn gateway_assetdata(&self, account: ChainAccount, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetData> {
+    fn gateway_assetdata(
+        &self,
+        account: ChainAccount,
+        asset: ChainAsset,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<ApiAssetData> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let asset_info: AssetInfo = api
@@ -139,22 +152,23 @@ where
             .map_err(runtime_err)?
             .map_err(chain_err)?;
 
-
-        Ok(
-            ApiAssetData {
-                asset: asset,
-                balance: (account_balance as ApiAssetBalance).into(),
-                total_supply: total_supply as ApiAssetAmount,
-                total_borrow: total_borrow as ApiAssetAmount,
-                supply_rate: supply_rate.0 as ApiAPR,
-                borrow_rate: borrow_rate.0 as ApiAPR,
-                liquidity_factor: (asset_info.liquidity_factor.0 as ApiFactor),
-                price: (price as ApiAssetPrice).into()
-            }
-        )
+        Ok(ApiAssetData {
+            asset: asset,
+            balance: (account_balance as ApiAssetBalance).into(),
+            total_supply: total_supply as ApiAssetAmount,
+            total_borrow: total_borrow as ApiAssetAmount,
+            supply_rate: supply_rate.0 as ApiAPR,
+            borrow_rate: borrow_rate.0 as ApiAPR,
+            liquidity_factor: (asset_info.liquidity_factor.0 as ApiFactor),
+            price: (price as ApiAssetPrice).into(),
+        })
     }
 
-    fn gateway_cashdata(&self, account: ChainAccount, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiCashData> {
+    fn gateway_cashdata(
+        &self,
+        account: ChainAccount,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<ApiCashData> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let balance: AssetBalance = api
@@ -172,13 +186,11 @@ where
             .map_err(runtime_err)?
             .map_err(chain_err)?;
 
-        Ok(
-            ApiCashData {
-                balance: (balance as ApiAssetBalance).into(),
-                cash_yield: cash_yield.0 as ApiAPR,
-                price: (price as ApiAssetPrice).into()
-            }
-        )
+        Ok(ApiCashData {
+            balance: (balance as ApiAssetBalance).into(),
+            cash_yield: cash_yield.0 as ApiAPR,
+            price: (price as ApiAssetPrice).into(),
+        })
     }
 
     fn gateway_liquidity(
@@ -209,7 +221,11 @@ where
         Ok((result as ApiAssetPrice).into()) // XXX try_into, or patch for 128?
     }
 
-    fn gateway_rates(&self, asset: ChainAsset, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiRates> {
+    fn gateway_rates(
+        &self,
+        asset: ChainAsset,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<ApiRates> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let (borrow_rate, supply_rate): (APR, APR) = api
