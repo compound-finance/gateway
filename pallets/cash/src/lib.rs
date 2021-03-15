@@ -173,7 +173,7 @@ decl_storage! {
         /// The most recent notice emitted for a given chain.
         LatestNotice get(fn latest_notice_id): map hasher(blake2_128_concat) ChainId => Option<(NoticeId, ChainHash)>;
 
-        /// Notices which we are waiting to be fully signed before we allow the next session to end.
+        /// The change authority notices which must be fully signed before we allow notice signing to continue
         NoticeHolds get(fn notice_hold): map hasher(blake2_128_concat) ChainId => Option<NoticeId>;
 
         /// Index of notices by chain account

@@ -2,10 +2,12 @@ use frame_support::storage::{IterableStorageMap, StorageMap};
 
 use crate::{
     internal, reason::Reason, require, types::ValidatorKeys, Config, Event, Module, NextValidators,
-    SessionInterface,
+    NoticeHolds, SessionInterface,
 };
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
+    require!(NoticeHolds::iter().count() == 0, Reason::PendingAuthNotice);
+
     for validator in validators.iter() {
         require!(
             <T>::SessionInterface::is_valid_keys(validator.substrate_id.clone()),
@@ -17,7 +19,6 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
         NextValidators::take(&id);
     }
     for keys in &validators {
-        NextValidators::take(&keys.substrate_id);
         NextValidators::insert(&keys.substrate_id, keys);
     }
 
