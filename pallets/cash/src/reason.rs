@@ -58,7 +58,7 @@ pub enum Reason {
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
     InvalidChain,
-    PendingEraNotice,
+    PendingAuthNotice,
     ChangeValidatorsError,
 }
 
@@ -115,7 +115,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::TrxRequestParseError(_) => (27, 0, "trx request parse error"),
             Reason::UnknownValidator => (28, 0, "unknown validator"),
             Reason::InvalidChain => (29, 0, "invalid chain"),
-            Reason::PendingEraNotice => (30, 0, "era-changing notice already pending"),
+            Reason::PendingAuthNotice => (30, 0, "change auth notice is already pending"),
             Reason::ChangeValidatorsError => (31, 0, "change validators error"),
         };
         frame_support::dispatch::DispatchError::Module {

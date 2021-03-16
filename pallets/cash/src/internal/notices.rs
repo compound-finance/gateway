@@ -145,16 +145,10 @@ fn dispatch_notice<T: Config>(
         LatestNotice::get(chain_id).unwrap_or((NoticeId(0, 0), chain_id.zero_hash()));
 
     let notice_id = if should_increment_era {
-        // XXXXXX where does this belong?
-        //  require!(NoticeHolds::iter().count() == 0, Reason::PendingEraNotice);
         latest_notice_id.seq_era()
     } else {
         latest_notice_id.seq()
     };
-
-    if should_increment_era {
-        NoticeHolds::insert(chain_id, notice_id);
-    }
 
     // Add to notices, notice states, track the latest notice and index by account
     let notice = notice_fn(notice_id, parent_hash);
@@ -165,6 +159,10 @@ fn dispatch_notice<T: Config>(
     NoticeHashes::insert(notice_hash, notice_id);
     if let Some(recipient) = maybe_recipient {
         AccountNotices::append(recipient, notice_id);
+    }
+
+    if let Notice::ChangeAuthorityNotice(_) = &notice {
+        NoticeHolds::insert(chain_id, notice_id);
     }
 
     // Deposit Notice Event
