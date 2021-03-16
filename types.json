@@ -3,7 +3,6 @@
   "Decimals": "u8",
   "Bips": "u128",
   "Nonce": "u32",
-  "Timestamp": "u64",
   "Int": "i128",
   "Uint": "u128",
   "AssetAmount": "Uint",
@@ -31,7 +30,10 @@
     "ticker": "Ticker"
   },
   "ConfigSetString": "Vec<String>",
-  "Quantity": ["Symbol", "AssetAmount"],
+  "Quantity": [
+    "Symbol",
+    "AssetAmount"
+  ],
   "CashPrincipal": "(Int)",
   "CashPrincipalAmount": "(Uint)",
   "CashIndex": "(Uint)",
@@ -46,31 +48,35 @@
       "DispatchFailure": "(DispatchError)"
     }
   },
-
   "Source1": "SymbolRS",
   "Symbol": "[u8; 12]",
   "Units": "(Ticker, u8)",
-
   "Source2": "ChainsRS",
   "ChainId": {
-    "_enum": ["Comp", "Eth", "Dot", "Sol", "Tez"]
+    "_enum": [
+      "Comp",
+      "Eth",
+      "Dot",
+      "Sol",
+      "Tez"
+    ]
   },
   "ChainAccount": {
     "_enum": {
-      "Comp": ["[u8; 20]"],
-      "Eth": ["[u8; 20]"],
-      "Dot": ["[u8; 20]"],
-      "Sol": ["[u8; 20]"],
-      "Tez": ["[u8; 20]"]
+      "Comp": "[u8; 20]",
+      "Eth": "[u8; 20]",
+      "Dot": "[u8; 20]",
+      "Sol": "[u8; 20]",
+      "Tez": "[u8; 20]"
     }
   },
   "ChainHash": {
     "_enum": {
-      "Comp": ["[u8; 32]"],
-      "Eth": ["[u8; 32]"],
-      "Dot": ["[u8; 32]"],
-      "Sol": ["[u8; 32]"],
-      "Tez": ["[u8; 32]"]
+      "Comp": "[u8; 32]",
+      "Eth": "[u8; 32]",
+      "Dot": "[u8; 32]",
+      "Sol": "[u8; 32]",
+      "Tez": "[u8; 32]"
     }
   },
   "CashAsset": {
@@ -81,11 +87,11 @@
   },
   "ChainAsset": {
     "_enum": {
-      "Comp": ["[u8; 20]"],
-      "Eth": ["[u8; 20]"],
-      "Dot": ["[u8; 20]"],
-      "Sol": ["[u8; 20]"],
-      "Tez": ["[u8; 20]"]
+      "Comp": "[u8; 20]",
+      "Eth": "[u8; 20]",
+      "Dot": "[u8; 20]",
+      "Sol": "[u8; 20]",
+      "Tez": "[u8; 20]"
     }
   },
   "ChainAccountSignature": {
@@ -99,20 +105,20 @@
   },
   "ChainSignature": {
     "_enum": {
-      "Comp": ["[u8; 65]"],
-      "Eth": ["[u8; 65]"],
-      "Dot": ["[u8; 65]"],
-      "Sol": ["[u8; 65]"],
-      "Tez": ["[u8; 65]"]
+      "Comp": "[u8; 65]",
+      "Eth": "[u8; 65]",
+      "Dot": "[u8; 65]",
+      "Sol": "[u8; 65]",
+      "Tez": "[u8; 65]"
     }
   },
   "ChainSignatureList": {
     "_enum": {
-      "Comp": ["Vec<([u8; 20], [u8; 65])>"],
-      "Eth": ["Vec<([u8; 20], [u8; 65])>"],
-      "Dot": ["Vec<([u8; 20], [u8; 65])>"],
-      "Sol": ["Vec<([u8; 20], [u8; 65])>"],
-      "Tez": ["Vec<([u8; 20], [u8; 65])>"]
+      "Comp": "Vec<([u8; 20], [u8; 65])>",
+      "Eth": "Vec<([u8; 20], [u8; 65])>",
+      "Dot": "Vec<([u8; 20], [u8; 65])>",
+      "Sol": "Vec<([u8; 20], [u8; 65])>",
+      "Tez": "Vec<([u8; 20], [u8; 65])>"
     }
   },
   "Compound": {},
@@ -120,7 +126,6 @@
   "Polkadot": {},
   "Solana": {},
   "Tezos": {},
-
   "Source3": "NoticesRS",
   "EncodedNotice": "Vec<u8>",
   "EraId": "u32",
@@ -201,7 +206,6 @@
   "NoticeStatePending": {
     "signature_pairs": "ChainSignatureList"
   },
-
   "Source4": "CompoundCrypto",
   "CryptoError": {
     "_enum": [
@@ -218,7 +222,6 @@
       "EnvironmentVariableInvalidSeed"
     ]
   },
-
   "Source5": "RatesRS",
   "RatesError": {
     "_enum": [
@@ -244,7 +247,6 @@
       "Kink": "KinkModel"
     }
   },
-
   "Source6": "ReasonRS",
   "Reason": {
     "_enum": {
@@ -321,7 +323,6 @@
       "InvalidChainAccount"
     ]
   },
-
   "Source7": "EventsRS",
   "EventInfo": {
     "latest_eth_block": "u64",
@@ -348,7 +349,6 @@
       "Done": {}
     }
   },
-
   "Source8": "EthereumClientRS",
   "EthereumLogEvent": {
     "block_hash": "[u8; 32]",
@@ -406,7 +406,6 @@
       "NoticeInvoked": "NoticeInvokedEvent"
     }
   },
-
   "Source9": "SetYieldNextRS",
   "SetYieldNextError": {
     "_enum": {
@@ -427,7 +426,6 @@
     "grandpa": "[u8;32]"
   },
   "Keys": "SessionKeys",
-
   "Source11": "Oracle_ErrorRS",
   "OracleError": {
     "_enum": [
@@ -447,17 +445,15 @@
       "SubmitError"
     ]
   },
-
-  "Source12": "Oracle_TypesRS",
   "Reporter": "[u8; 20]",
   "Timestamp": "u64",
   "AssetPrice": "u128",
-  "Price": ["Ticker", "AssetPrice"],
+  "Price": [
+    "Ticker",
+    "AssetPrice"
+  ],
   "ReporterSet": "Vec<Reporter>",
-
-  "Source12": "Oracle_TickerRS",
   "Ticker": "[u8; 12]",
-
   "ApiRates": "(u64, u64)",
   "ApiAssetData": {
     "asset": "String",
