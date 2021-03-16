@@ -186,9 +186,9 @@ contract CashToken is ICash {
     }
 
     /**
-     * @notice Moves `amount` tokens from the caller's account to `recipient`.
+     * @notice Moves Cash `principal` from the caller's account to `recipient`.
      * @return a boolean value indicating whether the operation succeeded.
-     * Emits a {Transfer} event.
+     * Emits a {TransferPrincipal} event.
      */
     function transferPrincipal(address recipient, uint128 principal) external override returns (bool) {
         require(msg.sender != recipient, "Invalid recipient");
