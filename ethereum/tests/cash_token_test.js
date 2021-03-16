@@ -414,6 +414,44 @@ describe('CashToken', () => {
     });
   });
 
+  describe('#transferPrincipal', () => {
+    it('should transfer Cash principal between users', async() => {
+      // Mint tokes first to have something to transfer
+      const cashIndex = await call(cash, 'getCashIndex');
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
+      const amount = principal * cashIndex / 1e18;
+
+      const transferPrincipal = 5e6;
+      const tx = await send(cash, 'transferPrincipal', [account2, 5e6], { from: account1 });
+      expect(tx.events.TransferPrincipal.returnValues).toMatchObject({
+        from: account1,
+        to: account2,
+        value: transferPrincipal.toString()
+      });
+
+      expect(await call(cash, 'totalSupply')).toEqualNumber(amount);
+      expect(await call(cash, 'cashPrincipal', [account1])).toEqualNumber(5e6);
+      expect(await call(cash, 'cashPrincipal', [account2])).toEqualNumber(5e6);
+      expect(await call(cash, 'balanceOf', [account1])).toEqualNumber(amount / 2);
+      expect(await call(cash, 'balanceOf', [account2])).toEqualNumber(amount / 2);
+    });
+
+    it('should fail if recipient is invalid', async() => {
+      await expect(send(cash, 'transferPrincipal', [account1, 1e6], { from: account1 })).rejects.toRevert("revert Invalid recipient");
+    });
+
+    it('should fail if not enough Cash principal to transfer', async() => {
+      const cashIndex = await call(cash, 'getCashIndex');
+      const principal = 10e6;
+      await send(cash, 'mint', [account1, principal], { from: admin });
+
+      const amount = principal * cashIndex / 1e18;
+      // An attempt to transfer double amount
+      await expect(send(cash, 'transferPrincipal', [account2, 2 * principal], { from: account1 })).rejects.toRevert("revert");
+    });
+  });
+
   describe("#getCashIndex tests", () => {
     it('getCashIndex is growing over time', async() => {
       const blockNumber = await web3.eth.getBlockNumber();
