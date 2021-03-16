@@ -440,7 +440,7 @@ describe('CashToken', () => {
       expect(tx.events.TransferPrincipal.returnValues).toMatchObject({
         from: account1,
         to: account2,
-        value: transferPrincipal.toString()
+        principal: transferPrincipal.toString()
       });
 
       expect(await call(cash, 'totalSupply')).toEqualNumber(amount);

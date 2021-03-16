@@ -28,7 +28,7 @@ interface ICash is IERC20 {
     function getCashIndex() external view returns (uint128);
 
     event SetFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart);
-    event TransferPrincipal(address indexed from, address indexed to, uint128 value);
+    event TransferPrincipal(address indexed from, address indexed to, uint128 principal);
 }
 
 /**
