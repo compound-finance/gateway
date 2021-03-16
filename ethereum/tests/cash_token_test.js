@@ -41,9 +41,11 @@ describe('CashToken', () => {
       expect(await call(cash, 'admin')).toMatchAddress(admin);
       let cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
       let cashYieldStart = await call(cash, 'cashYieldStart');
+      let initialized = await call(cash, 'initialized');
       expect(cashYieldAndIndex.index).toEqualNumber(1e18);
       expect(cashYieldAndIndex.yield).toEqualNumber(0);
       expect(cashYieldStart).toEqualNumber(start);
+      expect(initialized).toEqual(true);
     });
 
     it('should have correct admin and yield references when non-zero', async () => {

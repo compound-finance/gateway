@@ -31,6 +31,7 @@ contract Starport {
     event Unlock(address indexed account, uint amount, address asset);
     event UnlockCash(address indexed account, uint amount, uint128 principal);
     event ChangeAuthorities(address[] newAuthorities);
+    event SetFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart);
     event ExecuteProposal(string title, bytes[] extrinsics);
     event NewSupplyCap(address indexed asset, uint supplyCap);
 
@@ -338,6 +339,7 @@ contract Starport {
     function setFutureYield(uint128 nextCashYield, uint128 nextCashYieldIndex, uint nextCashYieldStart) external {
         require(msg.sender == address(this) || msg.sender == admin, "Call must be by notice or admin");
 
+        emit SetFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
         cash.setFutureYield(nextCashYield, nextCashYieldIndex, nextCashYieldStart);
     }
 

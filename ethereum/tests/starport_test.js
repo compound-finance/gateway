@@ -1485,11 +1485,13 @@ describe('Starport', () => {
 
       const tx = await send(starport, 'setFutureYield', [nextCashYield, nextCashYieldIndex, nextCashYieldStart], { from: root });
 
-      expect(tx.events.SetFutureYield.returnValues).toMatchObject({
+      const expectedYieldEvent = {
         nextCashYield: nextCashYield.toString(),
         nextCashYieldIndex: nextCashYieldIndex.toString(),
         nextCashYieldStart: nextCashYieldStart.toString(),
-      });
+      };
+      expect(tx.events.SetFutureYield[0].returnValues).toMatchObject(expectedYieldEvent);
+      expect(tx.events.SetFutureYield[1].returnValues).toMatchObject(expectedYieldEvent);
 
       expect(await call(cash, 'cashYieldAndIndex')).toMatchObject({
         yield: "0",
@@ -1522,11 +1524,13 @@ describe('Starport', () => {
         index: "1234",
       });
 
-      expect(tx.events.SetFutureYield.returnValues).toMatchObject({
+      const expectedYieldEvent = {
         nextCashYield: nextCashYield.toString(),
         nextCashYieldIndex: nextCashYieldIndex.toString(),
         nextCashYieldStart: nextCashYieldStart.toString(),
-      });
+      };
+      expect(tx.events.SetFutureYield[0].returnValues).toMatchObject(expectedYieldEvent);
+      expect(tx.events.SetFutureYield[1].returnValues).toMatchObject(expectedYieldEvent);
     });
 
     it('should set future yield via hand-coded notice', async () => {
@@ -1543,11 +1547,13 @@ describe('Starport', () => {
       const signatures = signAll(setFutureYieldNotice, authorityWallets);
       const tx = await send(starport, 'invoke', [setFutureYieldNotice, signatures], { from: account1 });
 
-      expect(tx.events.SetFutureYield.returnValues).toMatchObject({
+      const expectedYieldEvent = {
         nextCashYield: "1200",
         nextCashYieldIndex: "1234",
         nextCashYieldStart: "1644703495",
-      });
+      }
+      expect(tx.events.SetFutureYield[0].returnValues).toMatchObject(expectedYieldEvent);
+      expect(tx.events.SetFutureYield[1].returnValues).toMatchObject(expectedYieldEvent);
     });
 
     it('should fail when not called by self or admin', async () => {
