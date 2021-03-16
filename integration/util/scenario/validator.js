@@ -190,7 +190,7 @@ class Validator {
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
     const api = await ApiPromise.create({
       provider: wsProvider,
-      types: await loadTypes(this.ctx);
+      types: await loadTypes(this.ctx),
       rpc: await loadRpc(this.ctx)
     });
 
