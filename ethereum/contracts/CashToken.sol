@@ -125,6 +125,8 @@ contract CashToken is ICash {
      */
     function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStart) external override {
         require(msg.sender == admin, "Must be admin");
+        require(nextYield <= 1e4, "Invalid yield range");
+        require(nextYieldStart > cashYieldStart, "Invalid yield start");
         uint nextStart = nextCashYieldStart;
 
         // Updating cash yield and index to the 'old' next values
