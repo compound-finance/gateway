@@ -461,9 +461,9 @@
   "ApiRates": "(u64, u64)",
   "ApiAssetData": {
     "asset": "String",
-    "balance": "i64",
-    "total_borrow": "u64",
-    "total_supply": "u64",
+    "balance": "String",
+    "total_borrow": "String",
+    "total_supply": "String",
     "borrow_rate": "u64",
     "supply_rate": "u64",
     "liquidity_factor": "String",

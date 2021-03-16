@@ -80,6 +80,10 @@ class Ctx {
     return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json');
   }
 
+  __rpcFile() {
+    return process.env['RPC_FILE'] || this.scenInfo['rpc_file'] || path.join(__dirname, '..', '..', '..', 'rpc.json');
+  }
+
   __provider() {
     return process.env['PROVIDER'] || this.scenInfo['eth_opts']['provider'];
   }

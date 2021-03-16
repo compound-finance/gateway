@@ -108,6 +108,17 @@ class Actor {
     }
   }
 
+  async chainBalanceFromRPC(tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+    if (token instanceof CashToken) {
+      return await this.cash();
+    } else {
+      let assetdata = await this.ctx.api().rpc.gateway.assetdata(this.toTrxArg(), token.toTrxArg());
+      let weiAmount = assetdata.balance
+      return token.toTokenAmount(weiAmount);
+    }
+  }
+
   async cashForToken(token) {
     let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
     let lastIndex = await this.ctx.api().query.cash.lastIndices(token.toChainAsset(), this.toChainAccount());
