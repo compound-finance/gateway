@@ -188,22 +188,9 @@ class Validator {
     });
 
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
-    const types = await loadTypes(this.ctx);
     const api = await ApiPromise.create({
       provider: wsProvider,
-      types: {
-        ...types,
-        ApiAssetData: {
-          asset: 'String',
-          balance: 'String',
-          total_borrow: 'String',
-          total_supply: 'String',
-          borrow_rate: 'String',
-          supply_rate: 'String',
-          liquidity_factor: 'String',
-          price: 'String',
-        },
-      },
+      types: await loadTypes(this.ctx);
       rpc: await loadRpc(this.ctx)
     });
 

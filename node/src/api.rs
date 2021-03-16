@@ -23,31 +23,26 @@ const CHAIN_ERROR: i64 = 2;
 
 // Note: no 128 bit integers for the moment
 //  due to issues with serde/serde_json
-pub type ApiAssetAmount = String;
-pub type ApiAssetBalance = String;
-pub type ApiAssetPrice = u64;
 pub type ApiAPR = u64;
-pub type ApiCashYield = u64;
-pub type ApiFactor = String;
 pub type ApiRates = (ApiAPR, ApiAPR);
 
 #[derive(Deserialize, Serialize)]
 pub struct ApiAssetData {
     asset: ChainAsset,
-    balance: ApiAssetBalance,
-    total_supply: ApiAssetAmount,
-    total_borrow: ApiAssetAmount,
-    supply_rate: ApiAPR,
-    borrow_rate: ApiAPR,
-    liquidity_factor: ApiFactor,
-    price: ApiAssetPrice,
+    balance: String,
+    total_supply: String,
+    total_borrow: String,
+    supply_rate: String,
+    borrow_rate: String,
+    liquidity_factor: String,
+    price: String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct ApiCashData {
-    balance: ApiAssetBalance,
-    cash_yield: ApiCashYield,
-    price: ApiAssetPrice,
+    balance: String,
+    cash_yield: String,
+    price: String,
 }
 
 /// Converts a runtime trap into an RPC error.
@@ -90,10 +85,10 @@ pub trait GatewayRpcApi<BlockHash> {
         &self,
         account: ChainAccount,
         at: Option<BlockHash>,
-    ) -> RpcResult<ApiAssetBalance>;
+    ) -> RpcResult<String>;
 
     #[rpc(name = "gateway_price")]
-    fn gateway_price(&self, ticker: String, at: Option<BlockHash>) -> RpcResult<ApiAssetPrice>;
+    fn gateway_price(&self, ticker: String, at: Option<BlockHash>) -> RpcResult<String>;
 
     #[rpc(name = "gateway_rates")]
     fn gateway_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
@@ -157,10 +152,10 @@ where
             balance: format!("{}", account_balance),
             total_supply: format!("{}", total_supply),
             total_borrow: format!("{}", total_borrow),
-            supply_rate: supply_rate.0 as ApiAPR,
-            borrow_rate: borrow_rate.0 as ApiAPR,
+            supply_rate: format!("{}", supply_rate.0), 
+            borrow_rate: format!("{}", borrow_rate.0 ),
             liquidity_factor: format!("{}", asset_info.liquidity_factor.0),
-            price: (price as ApiAssetPrice).into(),
+            price: format!("{}", price),
         })
     }
 
@@ -188,8 +183,8 @@ where
 
         Ok(ApiCashData {
             balance: format!("{}", balance),
-            cash_yield: cash_yield.0 as ApiAPR,
-            price: (price as ApiAssetPrice).into(),
+            cash_yield: format!("{}", cash_yield.0),
+            price: format!("{}", price),
         })
     }
 
@@ -197,7 +192,7 @@ where
         &self,
         account: ChainAccount,
         at: Option<<B as BlockT>::Hash>,
-    ) -> RpcResult<ApiAssetBalance> {
+    ) -> RpcResult<String> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let result: AssetBalance = api
@@ -211,14 +206,14 @@ where
         &self,
         ticker: String,
         at: Option<<B as BlockT>::Hash>,
-    ) -> RpcResult<ApiAssetPrice> {
+    ) -> RpcResult<String> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let result: AssetPrice = api
             .get_price(&at, ticker)
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-        Ok((result as ApiAssetPrice).into()) // XXX try_into, or patch for 128?
+        Ok(format!("{}", result)) 
     }
 
     fn gateway_rates(
