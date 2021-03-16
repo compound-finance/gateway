@@ -23,12 +23,12 @@ const CHAIN_ERROR: i64 = 2;
 
 // Note: no 128 bit integers for the moment
 //  due to issues with serde/serde_json
-pub type ApiAssetAmount = u64;
-pub type ApiAssetBalance = i64;
+pub type ApiAssetAmount = String;
+pub type ApiAssetBalance = String;
 pub type ApiAssetPrice = u64;
 pub type ApiAPR = u64;
 pub type ApiCashYield = u64;
-pub type ApiFactor = u64;
+pub type ApiFactor = String;
 pub type ApiRates = (ApiAPR, ApiAPR);
 
 #[derive(Deserialize, Serialize)]
@@ -154,12 +154,12 @@ where
 
         Ok(ApiAssetData {
             asset: asset,
-            balance: (account_balance as ApiAssetBalance).into(),
-            total_supply: total_supply as ApiAssetAmount,
-            total_borrow: total_borrow as ApiAssetAmount,
+            balance: format!("{}", account_balance),
+            total_supply: format!("{}", total_supply),
+            total_borrow: format!("{}", total_borrow),
             supply_rate: supply_rate.0 as ApiAPR,
             borrow_rate: borrow_rate.0 as ApiAPR,
-            liquidity_factor: (asset_info.liquidity_factor.0 as ApiFactor),
+            liquidity_factor: format!("{}", asset_info.liquidity_factor.0),
             price: (price as ApiAssetPrice).into(),
         })
     }
@@ -187,7 +187,7 @@ where
             .map_err(chain_err)?;
 
         Ok(ApiCashData {
-            balance: (balance as ApiAssetBalance).into(),
+            balance: format!("{}", balance),
             cash_yield: cash_yield.0 as ApiAPR,
             price: (price as ApiAssetPrice).into(),
         })
@@ -204,7 +204,7 @@ where
             .get_liquidity(&at, account)
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-        Ok((result as ApiAssetBalance).into())
+        Ok(format!("{}", result))
     }
 
     fn gateway_price(
