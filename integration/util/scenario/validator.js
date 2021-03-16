@@ -18,14 +18,36 @@ async function loadTypes(ctx) {
       let pos = Number(match[1]);
       let show = (start, end) => contents.slice(start, end).toString().replaceAll("\n", "\\n");
       let colored =
-        chalk.green(show(pos - 20, pos)) +
-        chalk.red(show(pos, pos + 1)) +
-        chalk.green(show(pos + 1, pos + 20));
+          chalk.green(show(pos - 20, pos)) +
+          chalk.red(show(pos, pos + 1)) +
+          chalk.green(show(pos + 1, pos + 20));
 
       ctx.error("JSON Error Around: \n" + chalk.bgWhiteBright(colored));
       throw new Error(`Error Parsing \`types.json\`: ${e.toString()} [around \`${colored}\`]`);
     } else {
       throw new Error(`Error Parsing \`types.json\`: ${e.toString()}`);
+    }
+  }
+}
+
+async function loadRpc(ctx) {
+  let contents = await fs.readFile(ctx.__rpcFile());
+  try {
+    return JSON.parse(contents);
+  } catch (e) {
+    let match = /in JSON at position (\d+)/.exec(e.message);
+    if (match) {
+      let pos = Number(match[1]);
+      let show = (start, end) => contents.slice(start, end).toString().replaceAll("\n", "\\n");
+      let colored =
+          chalk.green(show(pos - 20, pos)) +
+          chalk.red(show(pos, pos + 1)) +
+          chalk.green(show(pos + 1, pos + 20));
+
+      ctx.error("JSON Error Around: \n" + chalk.bgWhiteBright(colored));
+      throw new Error(`Error Parsing \`rpc.json\`: ${e.toString()} [around \`${colored}\`]`);
+    } else {
+      throw new Error(`Error Parsing \`rpc.json\`: ${e.toString()}`);
     }
   }
 }
@@ -168,7 +190,8 @@ class Validator {
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
     const api = await ApiPromise.create({
       provider: wsProvider,
-      types: await loadTypes(this.ctx)
+      types: await loadTypes(this.ctx),
+      rpc: await loadRpc(this.ctx)
     });
 
     this.ps = ps;

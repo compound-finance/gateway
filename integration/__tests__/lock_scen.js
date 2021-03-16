@@ -32,10 +32,12 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   },
   {
     name: 'Lock Eth',
+    only: true,
     scenario: async ({ ashley, chain, ether }) => {
       await ashley.lock(0.01, ether);
       expect(await ashley.tokenBalance(ether)).toEqual(99.99);
       expect(await ashley.chainBalance(ether)).toEqual(0.01);
+      expect(await ashley.chainBalanceFromRPC(ether)).toEqual(0.01);
     }
   },
   {
