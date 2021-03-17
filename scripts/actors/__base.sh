@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname ${BASH_SOURCE[0]})/../..
 
-while getopts "a:pbc:" flag
+while getopts "a:pbc:v" flag
 do
     case "${flag}" in
         a) actor=$OPTARG;;
