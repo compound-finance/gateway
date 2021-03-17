@@ -284,17 +284,27 @@ pub(crate) mod tests {
 
     #[test]
     fn test_create_local_testnet_chain_spec() {
-        local_testnet_config().build_storage().unwrap();
+        integration_test_config_with_single_authority().build_storage().unwrap();
     }
 
     fn local_testnet_genesis_instant_single() -> GenesisConfig {
         testnet_genesis(
+            // Initial PoA authorities
             vec![authority_keys_from_seed(
                 "Alice",
                 "0x435228f5ad6fc8ce7b4398456a72a2f14577d9cd",
             )],
-            get_account_id_from_seed::<sr25519::Public>("Alice"),
-            false,
+            // Initial reporters
+            vec![
+                "0x85615b076615317c80f14cbad6501eec031cd51c",
+                "0xfCEAdAFab14d46e20144F48824d0C09B1a03F2BC",
+            ],
+            // Initial assets
+            vec![],
+            // Initial cash yield
+            FromStr::from_str("0").unwrap(),
+            // Initial timestamp
+            0 as Timestamp,
         )
     }
 
