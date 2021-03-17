@@ -26,5 +26,8 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
 
     internal::notices::dispatch_change_authority_notice::<T>(validators);
 
+    // rotate to the queued session, and rotate from this one when notices are fully signed
+    <T>::SessionInterface::rotate_session();
+
     Ok(())
 }
