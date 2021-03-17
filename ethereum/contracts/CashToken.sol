@@ -51,14 +51,16 @@ contract CashToken is ICash {
     /// @notice The amount of cash principal per account
     mapping (address => uint128) public cashPrincipal;
 
+    bool public initialized = false;
+
     /**
      * @notice Construct a Cash Token
      * @dev You must call `initialize()` after construction
      * @param admin_ The address of admin
      */
-	constructor(address admin_) {
+    constructor(address admin_) {
         admin = admin_;
-	}
+    }
 
     /**
      * @notice Initialize Cash token contract
@@ -66,11 +68,13 @@ contract CashToken is ICash {
      * @param initialYieldStart The timestamp when Cash index and yield were activated on Gateway
      */
     function initialize(uint128 initialYield, uint initialYieldStart) external {
-        require(cashYieldAndIndex.index == 0, "Cash Token already initialized");
+        require(initialized == false, "Cash Token already initialized");
 
         // Note: we don't check that this is in the past, but calls will revert until it is.
         cashYieldStart = initialYieldStart;
         cashYieldAndIndex = CashYieldAndIndex({yield: initialYield, index: 1e18});
+
+        initialized = true;
     }
 
     /**
@@ -121,6 +125,8 @@ contract CashToken is ICash {
      */
     function setFutureYield(uint128 nextYield, uint128 nextIndex, uint nextYieldStart) external override {
         require(msg.sender == admin, "Must be admin");
+        require(nextYield <= 1e4, "Invalid yield range");
+        require(nextYieldStart > cashYieldStart, "Invalid yield start");
         uint nextStart = nextCashYieldStart;
 
         // Updating cash yield and index to the 'old' next values
@@ -130,6 +136,8 @@ contract CashToken is ICash {
         }
         nextCashYieldStart = nextYieldStart;
         nextCashYieldAndIndex = CashYieldAndIndex({yield: nextYield, index: nextIndex});
+
+        emit SetFutureYield(nextYield, nextIndex, nextYieldStart);
     }
 
     /**

@@ -41,9 +41,11 @@ describe('CashToken', () => {
       expect(await call(cash, 'admin')).toMatchAddress(admin);
       let cashYieldAndIndex = await call(cash, 'cashYieldAndIndex');
       let cashYieldStart = await call(cash, 'cashYieldStart');
+      let initialized = await call(cash, 'initialized');
       expect(cashYieldAndIndex.index).toEqualNumber(1e18);
       expect(cashYieldAndIndex.yield).toEqualNumber(0);
       expect(cashYieldStart).toEqualNumber(start);
+      expect(initialized).toEqual(true);
     });
 
     it('should have correct admin and yield references when non-zero', async () => {
@@ -172,7 +174,7 @@ describe('CashToken', () => {
       const start_before = await call(cash, 'cashYieldStart');
 
       // Update future yield, first change
-      await send(cash, 'setFutureYield', [43628, 1e6, nextYieldTimestamp], { from: admin });
+      await send(cash, 'setFutureYield', [362, 1e6, nextYieldTimestamp], { from: admin });
       const yieldAndIndex_change = await call(cash, 'cashYieldAndIndex');
       const start_change = await call(cash, 'cashYieldStart');
       const nextYieldAndIndex_change = await call(cash, 'nextCashYieldAndIndex');
@@ -181,14 +183,14 @@ describe('CashToken', () => {
       expect(yieldAndIndex_change.yield).toEqualNumber(yieldAndIndex_before.yield);
       expect(yieldAndIndex_change.index).toEqualNumber(yieldAndIndex_before.index);
       expect(start_change).toEqualNumber(start_before);
-      expect(nextYieldAndIndex_change.yield).toEqualNumber(43628);
+      expect(nextYieldAndIndex_change.yield).toEqualNumber(362);
       expect(nextYieldAndIndex_change.index).toEqualNumber(1e6);
       expect(nextStart_change).toEqualNumber(nextYieldTimestamp);
 
       await sendRPC(web3, "evm_increaseTime", [31 * 60]);
 
       // Update future yield, second change, current yield, index and time are set to previous next values
-      await send(cash, 'setFutureYield', [43629, 11e5, nextYieldTimestamp + 60 * 60], { from: admin });
+      await send(cash, 'setFutureYield', [369, 11e5, nextYieldTimestamp + 60 * 60], { from: admin });
       const yieldAndIndex_change2 = await call(cash, 'cashYieldAndIndex');
       const start_change2 = await call(cash, 'cashYieldStart');
       const nextYieldAndIndex_change2 = await call(cash, 'nextCashYieldAndIndex');
@@ -197,7 +199,7 @@ describe('CashToken', () => {
       expect(yieldAndIndex_change2.yield).toEqualNumber(nextYieldAndIndex_change.yield);
       expect(yieldAndIndex_change2.index).toEqualNumber(nextYieldAndIndex_change.index);
       expect(start_change2).toEqualNumber(nextStart_change);
-      expect(nextYieldAndIndex_change2.yield).toEqualNumber(43629);
+      expect(nextYieldAndIndex_change2.yield).toEqualNumber(369);
       expect(nextYieldAndIndex_change2.index).toEqualNumber(11e5);
       expect(nextStart_change2).toEqualNumber(nextYieldTimestamp + 60 * 60);
     });
@@ -206,8 +208,21 @@ describe('CashToken', () => {
       const blockNumber = await web3.eth.getBlockNumber();
       const block = await web3.eth.getBlock(blockNumber);
       const nextYieldTimestamp = block.timestamp + 30 * 60;
-      await expect(send(cash, 'setFutureYield', [43628, 1e6, nextYieldTimestamp], { from: account1 })).rejects.toRevert("revert Must be admin");
-    })
+      await expect(send(cash, 'setFutureYield', [300, 1e6, nextYieldTimestamp], { from: account1 })).rejects.toRevert("revert Must be admin");
+    });
+
+    it('should fail if next yield start is before current yield start', async() => {
+      const start_yield = await call(cash, 'cashYieldStart');
+      await expect(send(cash, 'setFutureYield', [300, 1e6, start_yield], { from: admin })).rejects.toRevert("revert Invalid yield start");
+      await expect(send(cash, 'setFutureYield', [300, 1e6, start_yield - 1000], { from: admin })).rejects.toRevert("revert Invalid yield start");
+    });
+
+    it('should fail if yield range is invalid', async() => {
+      const blockNumber = await web3.eth.getBlockNumber();
+      const block = await web3.eth.getBlock(blockNumber);
+      const nextYieldTimestamp = block.timestamp + 30 * 60;
+      await expect(send(cash, 'setFutureYield', [30000, 1e6, nextYieldTimestamp], { from: admin })).rejects.toRevert("revert Invalid yield range");
+    });
   });
 
   describe('#mint', () => {

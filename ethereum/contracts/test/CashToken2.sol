@@ -4,16 +4,16 @@ pragma solidity ^0.8.1;
 import "../CashToken.sol";
 
 contract CashToken2 is CashToken {
-	bool public intiailized_ = false;
+	bool public initialized_ = false;
 	uint public counter = 0;
 
 	constructor(address admin_) CashToken(admin_) {
 	}
 
 	function initialize_(uint counter_) public {
-		require(intiailized_ == false, "cannot reinitialize");
+		require(initialized_ == false, "cannot reinitialize");
 		counter = counter_;
-		intiailized_ = true;
+		initialized_ = true;
 	}
 
 	/// Simple function to test notices

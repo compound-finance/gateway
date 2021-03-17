@@ -96,7 +96,7 @@ contract Starport {
      * @dev Externally-owned accounts may call `execTrxRequest` with a signed message to avoid Ethereum fees.
      * @param trxRequest An ASCII-encoded transaction request
      */
-    function execTrxRequest(string calldata trxRequest) public payable {
+    function execTrxRequest(string calldata trxRequest) public {
         emit ExecTrxRequest(msg.sender, trxRequest);
     }
 
