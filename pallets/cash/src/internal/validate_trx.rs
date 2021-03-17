@@ -52,24 +52,18 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::receive_event(event_id, event, signature) => {
-            if let Ok(signer) = runtime_interfaces::keyring_interface::eth_recover(
-                event.encode(),
-                signature.clone(),
-                false,
-            ) {
-                let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
-                if validators.contains(&signer) {
-                    Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
-                        .priority(100)
-                        .longevity(32)
-                        .and_provides((event_id, signature))
-                        .propagate(true)
-                        .build())
-                } else {
-                    Err(ValidationError::InvalidValidator)
-                }
+            let signer = <Ethereum as Chain>::recover_address(&event.encode(), *signature)
+                .map_err(|_| ValidationError::InvalidSignature)?;
+            let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
+            if validators.contains(&signer) {
+                Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
+                    .priority(100)
+                    .longevity(32)
+                    .and_provides((event_id, signature))
+                    .propagate(true)
+                    .build())
             } else {
-                Err(ValidationError::InvalidSignature)
+                Err(ValidationError::InvalidValidator)
             }
         }
         Call::exec_trx_request(request, signature, nonce) => {
