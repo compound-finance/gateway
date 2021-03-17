@@ -5,6 +5,15 @@ const path = require('path');
 const getopts = require('getopts');
 const chalk = require('chalk');
 const types = require('@polkadot/types');
+const Contract = require('web3-eth-contract');
+
+function getEthProvider(network) {
+  if (['ropsten'].includes(network)) {
+    return `https://${network}-eth.compound.finance`;
+  } else {
+    throw new Error(`Unknown or unsupported eth network: "${network}"`);
+  }
+}
 
 async function readFile(chain, file) {
   return await fs.readFile(path.join(__dirname, chain, file), 'utf8');
@@ -22,6 +31,10 @@ async function fetchCompoundConfig(network) {
 
 async function fetchChainDeployment(network) {
   return JSON.parse(await fs.readFile(path.join(__dirname, '..', 'ethereum','networks', `${network}.json`), 'utf8'));
+}
+
+async function fetchChainDeploymentABI(network) {
+  return JSON.parse(await fs.readFile(path.join(__dirname, '..', 'ethereum','networks', `${network}-abi.json`), 'utf8'));
 }
 
 function exec(target, args, opts = {}) {
@@ -82,9 +95,29 @@ async function setAuthorities(chainSpec, chainConfig, opts) {
 }
 
 async function setStarport(chainSpec, chainConfig, opts) {
-  let chainDeployment = await fetchChainDeployment(chainConfig.network);
+  let chainDeployment = await fetchChainDeployment(chainConfig.eth_network);
   let starportAddress = must(chainDeployment.Contracts, 'Starport');
   chainSpec.properties.eth_starport_address = starportAddress;
+}
+
+async function setInitialYield(chainSpec, chainConfig, opts) {
+  let chainDeployment = await fetchChainDeployment(chainConfig.eth_network);
+  let chainDeploymentABI = await fetchChainDeploymentABI(chainConfig.eth_network);
+  let cashTokenAddress = chainDeployment.Contracts.Cash;
+  if (!cashTokenAddress) {
+    throw new Error(`Missing cash token address for network ${chainConfig.eth_network}`);
+  }
+  let cashTokenABI = chainDeploymentABI.Cash;
+  if (!cashTokenABI) {
+    throw new Error(`Missing cash token ABI for network ${chainConfig.eth_network}`);
+  }
+  let cashToken = new Contract(cashTokenABI, cashTokenAddress);
+  cashToken.setProvider(getEthProvider(chainConfig.eth_network));
+  let yieldStart = await cashToken.methods.cashYieldStart().call();
+  let cashYield = (await cashToken.methods.cashYieldAndIndex().call()).yield;
+
+  chainSpec.genesis.runtime.palletCash.lastYieldTimestamp = Number(yieldStart) * 1000;
+  chainSpec.genesis.runtime.palletCash.cashYield = Number(cashYield);
 }
 
 function must(hash, key, validator = (x) => x !== undefined) {
@@ -104,7 +137,7 @@ function upper(obj) {
 }
 
 async function setAssetInfo(chainSpec, chainConfig, opts) {
-  let compoundConfig = await fetchCompoundConfig(chainConfig.network);
+  let compoundConfig = await fetchCompoundConfig(chainConfig.eth_network);
   let contracts = upper(compoundConfig['Contracts']);
   let tokenInfos = upper(compoundConfig['Tokens']);
 
@@ -112,12 +145,12 @@ async function setAssetInfo(chainSpec, chainConfig, opts) {
   let assets = Object.entries(chainConfig.tokens).map(([symbol, info]) => {
     let tokenAddress = contracts[symbol];
     if (!tokenAddress) {
-      throw new Error(`Missing contract address on ${chainConfig.network} for ${symbol} from compound-config`);
+      throw new Error(`Missing contract address on ${chainConfig.eth_network} for ${symbol} from compound-config`);
     }
 
     let tokenInfo = tokenInfos[symbol];
     if (!tokenInfo) {
-      throw new Error(`Missing token info on ${chainConfig.network} for ${symbol} from compound-config`);
+      throw new Error(`Missing token info on ${chainConfig.eth_network} for ${symbol} from compound-config`);
     }
     let asset = `ETH:${tokenAddress}`;
     let decimals = must(tokenInfo, 'decimals', (d) => typeof(d) === 'number');
@@ -167,6 +200,7 @@ async function buildSpec(opts) {
   await setAssetInfo(chainSpec, chainConfig, opts);
   await setReporters(chainSpec, chainConfig, opts);
   await setStarport(chainSpec, chainConfig, opts);
+  await setInitialYield(chainSpec, chainConfig, opts);
 
   await writeFile(chain, 'chain-spec.json', JSON.stringify(chainSpec, null, 2));
 

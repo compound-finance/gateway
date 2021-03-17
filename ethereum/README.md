@@ -32,10 +32,10 @@ yarn test
 You can deploy the Starport with the following command:
 
 ```
-yarn script deploy -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae
+yarn script deploy -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae 300
 ```
 
-where `0x2079A734292094702f4D7D64A59e980c20652Cae` is the admin, e.g. the Compound Timelock.
+where `0x2079A734292094702f4D7D64A59e980c20652Cae` is the admin, e.g. the Compound Timelock, and `300` is the initial cash yield.
 
 And to upgrade to m3:
 

@@ -87,7 +87,7 @@ function checkAddress(address) {
 }
 
 const fromNow = (seconds) => {
-  return Math.floor(seconds + (new Date() / 1000));
+  return Math.floor(seconds + (Date.now() / 1000));
 }
 
 const mapValues = (obj, fn) => {

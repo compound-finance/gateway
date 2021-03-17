@@ -1,9 +1,9 @@
 {
     "Contracts": {
-        "Starport": "0xe7A19d74645b6eC10cCD3333e394CE5071Fa5C98",
-        "Cash": "0xC13F4C270E6f1664EC8a204a9326fC7252230656",
-        "StarportImpl": "0xc2539F22E6f81037AbEEB13537eA419654f89043",
-        "CashImpl": "0xbfefBE13b56f33951268fF34f90104210b11bFE7",
-        "ProxyAdmin": "0xa70f0BA8BB1F6bd848F91c5337B8a1BD724c13db"
+        "Starport": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613",
+        "Cash": "0xc65a4A1855d314033530A29Ab993A1717879E5BF",
+        "StarportImpl": "0xed5DdA5976ec5F29910426d7876eBD6f307e0934",
+        "CashImpl": "0x1ffe465b3c82499e1C637c02EFECD128B7B454CF",
+        "ProxyAdmin": "0xd418B3A7c4a2b9d60fF8dDf9E94a8b75Aa3f60A5"
     }
 }

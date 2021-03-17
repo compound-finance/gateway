@@ -1,5 +1,5 @@
 {
-    "network": "ropsten",
+    "eth_network": "ropsten",
     "base_chain": "testnet",
     "validators": [
         {
