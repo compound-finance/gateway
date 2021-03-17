@@ -11,6 +11,7 @@ do
         p) purge=true;;
         b) build=true;;
         c) chain=$OPTARG;;
+        v) validator=true;;
     esac
 done
 
@@ -22,7 +23,9 @@ case "$actor" in
     export port=30333
     export wsPort=9944
     export rpcPort=9933
-    export gatewayArgs=--alice
+    if [ "$validator" == true ]; then
+      gatewayArgs="--alice"
+    fi
     ;;
 
   "bob")
@@ -32,7 +35,9 @@ case "$actor" in
     export port=30334
     export wsPort=9945
     export rpcPort=9934
-    export gatewayArgs=--bob
+    if [ "$validator" == true ]; then
+      gatewayArgs="--bob"
+    fi
     ;;
 
   "charlie")
@@ -42,7 +47,9 @@ case "$actor" in
     export port=30335
     export wsPort=9946
     export rpcPort=9934
-    export gatewayArgs=--charlie
+    if [ "$validator" == true ]; then
+      gatewayArgs="--charlie"
+    fi
     ;;
 
   "")
@@ -65,14 +72,15 @@ if [ -z "$chain" ]; then
 fi
 
 chainFile=./chains/$chain/chain-spec-raw.json
-basePath="$(dirname $(mktemp -u))"
+basePath="$(mktemp -d)"
 
 if [ ! -f "$chainFile" ]; then
   echo "Cannot find chain $chain at $chainFile. Try running \"chains/build_spec.js $chain\""
 fi
 
 if [ "$purge" = true ] ; then
-   purge-chain --base-path "$basePath" --chain "$chainFile" --database paritydb -y
+   ./target/release/gateway purge-chain --base-path "$basePath" --chain "$chainFile" --database paritydb -y
+   ./target/release/gateway purge-chain --base-path "$basePath" --chain local --database paritydb -y
 fi
 
 set -x
@@ -86,4 +94,5 @@ set -x
   --no-mdns \
   --rpc-methods Unsafe \
   --validator \
+  -lbasic_authorship=trace,txpool=trace,afg=trace,aura=trace \
   $gatewayArgs
