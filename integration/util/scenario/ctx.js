@@ -96,6 +96,10 @@ class Ctx {
     return process.env['OPF_URL'] ? process.env['OPF_URL'] : ( this.prices.serverUrl() || this.scenInfo['opf_url'] );
   }
 
+  __reporters() {
+    return process.env['REPORTERS'] ? process.env['REPORTERS'].split(',') : this.scenInfo['reporters'];
+  }
+
   debug(...msg) {
     debug(...msg);
   }
