@@ -70,14 +70,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     };
   }
 
-  let palletSudo = {}
-  if (ctx.actors.first()) {
-    palletSudo = {
-      palletSudo: {
-        key: ctx.actors.first().chainKey.address
-      }
-    };
-  }
+  let reporters = ctx.__reporters();
 
   return {
     name: 'Integration Test Network',
@@ -88,7 +81,6 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     genesis: {
       runtime: {
         ...frameSystem,
-        ...palletSudo,
         palletCash: {
           assets,
           ...initialYieldConfig,
@@ -96,6 +88,9 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         },
         palletSession: {
           keys: session_args
+        },
+        palletOracle: {
+          reporters
         }
       }
     }

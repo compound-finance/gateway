@@ -18,6 +18,7 @@ const baseScenInfo = {
     "wbtc",
     "usdc",
   ],
+  reporters: ["0xfceadafab14d46e20144f48824d0c09b1a03f2bc"], // [env=REPORTERS]
   eth_supply_cap: 1000000,
   eth_liquidity_factor: 0.7,
   chain_spec: { // TODO: Allow override of chain spec?
