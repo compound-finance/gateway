@@ -40,8 +40,22 @@ class CashToken extends Token {
     return Number(await this.cashToken.methods.totalCashPrincipal().call());
   }
 
+  async cashYieldStart() {
+    return await this.cashToken.methods.cashYieldStart().call();
+  }
+
   async getCashYieldAndIndex() {
-    return await this.cashToken.methods.cashYieldAndIndex().call();
+    let { yield: theYield, index } = await this.cashToken.methods.cashYieldAndIndex().call();
+    return { yield: theYield, index };
+  }
+
+  async nextCashYieldStart() {
+    return await this.cashToken.methods.nextCashYieldStart().call();
+  }
+
+  async getNextCashYieldAndIndex() {
+    let { yield: theYield, index } = await this.cashToken.methods.nextCashYieldAndIndex().call();
+    return { yield: theYield, index };
   }
 
   async upgradeTo(version) {

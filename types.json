@@ -153,8 +153,8 @@
     "id": "NoticeId",
     "parent": "[u8; 32]",
     "next_cash_yield": "u128",
-    "next_cash_yield_start_at": "u128",
-    "next_cash_index": "u128"
+    "next_cash_index": "u128",
+    "next_cash_yield_start_at": "u64"
   },
   "FutureYieldNotice": {
     "_enum": {
