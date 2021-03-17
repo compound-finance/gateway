@@ -6,7 +6,7 @@
   "telemetryEndpoints": null,
   "protocolId": "local",
   "properties": {
-    "eth_starport_address": "0xe7A19d74645b6eC10cCD3333e394CE5071Fa5C98"
+    "eth_starport_address": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613"
   },
   "consensusEngine": null,
   "lightSyncState": null,
@@ -23,8 +23,8 @@
         "authorities": []
       },
       "palletCash": {
-        "lastYieldTimestamp": 0,
-        "cashYield": 0,
+        "lastYieldTimestamp": 1615967424000,
+        "cashYield": 300,
         "assets": [
           {
             "asset": "ETH:0xc0e2d7d9279846b80eacdea57220ab2333bc049d",

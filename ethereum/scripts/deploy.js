@@ -7,8 +7,8 @@ const {
   saveNetwork,
 } = require('./utils/deploy_utils');
 
-const main = async (admin) => {
-  console.log(chalk.yellow(`\n\nDeploying Gateway to ${network} with Admin ${admin}\n`));
+const main = async (admin, initialYield) => {
+  console.log(chalk.yellow(`\n\nDeploying Gateway to ${network} with Admin ${admin} and Cash Yield ${initialYield}\n`));
 
   const root = saddle.account;
 
@@ -29,7 +29,7 @@ const main = async (admin) => {
   let cashProxy = await deployAndVerify('TransparentUpgradeableProxy', [
     cashImpl._address,
     proxyAdmin._address,
-    cashImpl.methods.initialize(0, fromNow(0)).encodeABI()
+    cashImpl.methods.initialize(initialYield, fromNow(0)).encodeABI()
   ], { from: root }, saddle, env, network);
   cash = await saddle.getContractAt('CashToken', cashProxy._address);
 
@@ -47,9 +47,13 @@ const main = async (admin) => {
 };
 
 (async () => {
-  let [admin] = args;
+  let [admin, initialYield_] = args;
+  let initialYield = Number(initialYield_);
 
   checkAddress(admin);
+  if (Number.isNaN(initialYield) || initialYield > 1000) {
+    throw new Error(`Invalid initial yield: ${initialYield_}`);
+  }
 
-  await main(admin);
+  await main(admin, initialYield);
 })();

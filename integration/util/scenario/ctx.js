@@ -19,7 +19,7 @@ const { buildVersions } = require('./versions');
 class Ctx {
   constructor(scenInfo) {
     this.scenInfo = scenInfo;
-    this.startTime = Math.floor(new Date() / 1000);
+    this.startTime = Math.floor(Date.now() / 1000);
   }
 
   __startTime() {
