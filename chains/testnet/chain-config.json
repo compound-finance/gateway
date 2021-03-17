@@ -1,6 +1,8 @@
 {
     "eth_network": "ropsten",
     "base_chain": "testnet",
+    "websocket": "wss://alice.compound.cash",
+    "rpc": "https://brr-rpc.compound.cash",
     "validators": [
         {
             "substrate_id": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
