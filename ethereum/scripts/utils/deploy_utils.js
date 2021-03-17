@@ -8,7 +8,7 @@ async function deployAndVerify(contract, args, opts, saddle, env, network) {
   let etherscan = env['etherscan'];
 
   // Delay for Etherscan to pick up contract
-  let etherscanDelay = env['etherscan_delay'] ? Number(env['etherscan_delay']) : 25_000;
+  let etherscanDelay = env['etherscan_delay'] ? Number(env['etherscan_delay']) : 35_000;
 
   console.log(`Deploying ${chalk.blue(chalk.bold(contract))} with args ${chalk.green(JSON.stringify(args))}`);
   let res = await saddle.deploy(contract, args, opts);
