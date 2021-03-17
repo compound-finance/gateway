@@ -300,6 +300,7 @@ fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
 
 pub trait SessionInterface<AccountId>: frame_system::Config {
     fn is_valid_keys(x: AccountId) -> bool;
+    fn rotate_session();
 }
 
 impl<T: Config> SessionInterface<SubstrateId> for T
@@ -311,6 +312,10 @@ where
             Some(_keys) => true,
             None => false,
         }
+    }
+
+    fn rotate_session() {
+        <pallet_session::Module<T>>::rotate_session();
     }
 }
 
@@ -349,18 +354,12 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
 
 /*
 -- Block N --
-changeAuth extrinsic, nextValidators set,  set true
-
--- Block N + 1 --
-Must end session to get through the already-planned session
-* "ShouldEndSession" should be true bc nextValidators not empty
-* "new_session" returns nextValidators to queue them and deletes the storage
+changeAuth extrinsic, nextValidators set, hold is set, rotate_session is called
+* new_session returns the nextValidators
 
 -- Afterwards --
-"ShouldEndSession" when
-* era notices were signed
-
-The next session will finally have the NextValidators, and notice signing can continue
+"ShouldEndSession" returns true when notice era notices were signed
+* when it does, start_session sets Validators = NextValidators
 
 */
 

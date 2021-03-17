@@ -81,11 +81,7 @@ pub trait GatewayRpcApi<BlockHash> {
     ) -> RpcResult<ApiCashData>;
 
     #[rpc(name = "gateway_liquidity")]
-    fn gateway_liquidity(
-        &self,
-        account: ChainAccount,
-        at: Option<BlockHash>,
-    ) -> RpcResult<String>;
+    fn gateway_liquidity(&self, account: ChainAccount, at: Option<BlockHash>) -> RpcResult<String>;
 
     #[rpc(name = "gateway_price")]
     fn gateway_price(&self, ticker: String, at: Option<BlockHash>) -> RpcResult<String>;
@@ -152,8 +148,8 @@ where
             balance: format!("{}", account_balance),
             total_supply: format!("{}", total_supply),
             total_borrow: format!("{}", total_borrow),
-            supply_rate: format!("{}", supply_rate.0), 
-            borrow_rate: format!("{}", borrow_rate.0 ),
+            supply_rate: format!("{}", supply_rate.0),
+            borrow_rate: format!("{}", borrow_rate.0),
             liquidity_factor: format!("{}", asset_info.liquidity_factor.0),
             price: format!("{}", price),
         })
@@ -202,18 +198,14 @@ where
         Ok(format!("{}", result))
     }
 
-    fn gateway_price(
-        &self,
-        ticker: String,
-        at: Option<<B as BlockT>::Hash>,
-    ) -> RpcResult<String> {
+    fn gateway_price(&self, ticker: String, at: Option<<B as BlockT>::Hash>) -> RpcResult<String> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
         let result: AssetPrice = api
             .get_price(&at, ticker)
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-        Ok(format!("{}", result)) 
+        Ok(format!("{}", result))
     }
 
     fn gateway_rates(

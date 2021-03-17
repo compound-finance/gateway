@@ -92,7 +92,8 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       const newAuths = [[alice.aura_key, { eth_address: alice.eth_account }]];
       expect(pending).toEqual(newAuths);
 
-      await chain.waitUntilSession(3);
+      // start at 0, rotate through 1, actually perform change over on 2
+      await chain.waitUntilSession(2);
       const newVals = await chain.cashValidators();
       expect(newVals).toEqual(newAuths);
 
@@ -136,7 +137,8 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);
       const {notice} = await starport.executeProposal("Update authorities", [extrinsic], {awaitNotice: true});
 
-      await chain.waitUntilSession(3);
+      // start at 0, rotate through 1, actually perform change over on 2
+      await chain.waitUntilSession(2);
 
       const newSessionAuths = await chain.sessionValidators();
       expect(newSessionAuths.sort()).toEqual([alice.aura_key, bob.aura_key, charlieGatewayId].sort());
@@ -156,7 +158,6 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    only: true,
     name: "Does not add auth w/o session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
       // spins up new validator charlie, doesnt add session keys, change validators should fail
