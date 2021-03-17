@@ -7,7 +7,7 @@ let supply_cap_scen_info = {
   tokens: [
     { token: 'zrx', balances: { ashley: 1000 } }
   ],
-  validators: ['alice']
+  validators: ['alice', 'bob']
 };
 
 buildScenarios('Supply Cap Scenarios', supply_cap_scen_info, [
@@ -16,7 +16,7 @@ buildScenarios('Supply Cap Scenarios', supply_cap_scen_info, [
     scenario: async ({ ashley, zrx, starport, chain, ctx }) => {
       expect(await starport.supplyCap(zrx)).toEqual("1000000000000000000000000");
       let extrinsic = ctx.api().tx.cash.setSupplyCap(zrx.toChainAsset(), 1000);
-      let { notice } = await starport.executeProposal("Set ZRX Supply Cap", [extrinsic], true, true);
+      let { notice } = await starport.executeProposal("Set ZRX Supply Cap", [extrinsic], { awaitNotice: true });
       let signatures = await chain.getNoticeSignatures(notice, { signatures: 1 });
       await starport.invoke(notice, signatures);
       expect(await starport.supplyCap(zrx)).toEqual("1000");

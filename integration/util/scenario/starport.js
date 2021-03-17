@@ -57,7 +57,7 @@ class Starport {
     return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.ctx.eth.root() });
   }
 
-  async executeProposal(title, extrinsics, opts) {
+  async executeProposal(title, extrinsics, opts = {}) {
     opts = {
       awaitEvent: true,
       awaitNotice: false,
@@ -75,13 +75,15 @@ class Starport {
     }
     if (opts.awaitEvent) {
       event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
-    }
-    if (opts.checkSuccess) {
-      let [payload, govResult] = event.data[0][0];
-      if (!govResult.isDispatchSuccess) {
-        expect(govResult.toJSON()).toBe(null);
+
+      if (opts.checkSuccess) {
+        let [payload, govResult] = event.data[0][0];
+        if (!govResult.isDispatchSuccess) {
+          expect(govResult.toJSON()).toBe(null);
+        }
       }
     }
+
     return {
       event,
       notice,
