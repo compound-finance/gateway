@@ -10,7 +10,7 @@ pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<()
 
     for validator in validators.iter() {
         require!(
-            <T>::SessionInterface::is_valid_keys(validator.substrate_id.clone()),
+            <T>::SessionInterface::has_next_keys(validator.substrate_id.clone()),
             Reason::ChangeValidatorsError
         );
     }
