@@ -284,7 +284,9 @@ pub(crate) mod tests {
 
     #[test]
     fn test_create_local_testnet_chain_spec() {
-        integration_test_config_with_single_authority().build_storage().unwrap();
+        integration_test_config_with_single_authority()
+            .build_storage()
+            .unwrap();
     }
 
     fn local_testnet_genesis_instant_single() -> GenesisConfig {
