@@ -94,14 +94,10 @@ mod tests {
                 Some((expected_notice_id, expected_notice.hash()))
             );
 
-            // assert_eq!(
-            //     1,
-            //     NextSessionIndex
-            // );
-            // assert_eq!(
-            //     vec![&(substrate_id, session_keys)],
-            //     Session::queued_keys().iter().collect::<Vec<_>>()
-            // );
+            assert_eq!(
+                vec![&(substrate_id, session_keys)],
+                Session::queued_keys().iter().collect::<Vec<_>>()
+            );
         });
     }
 
