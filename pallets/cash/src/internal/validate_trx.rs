@@ -31,6 +31,7 @@ pub fn validate_unsigned<T: Config>(
             TransactionSource::InBlock => {
                 Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
                     .longevity(1)
+                    .propagate(false)
                     .build())
             }
             _ => Err(ValidationError::InvalidInternalOnly),
