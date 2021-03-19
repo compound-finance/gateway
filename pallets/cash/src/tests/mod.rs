@@ -72,7 +72,6 @@ macro_rules! qty {
 }
 
 pub fn initialize_storage() {
-    runtime_interfaces::set_validator_config_dev_defaults();
     CashModule::initialize_assets(vec![
         AssetInfo {
             liquidity_factor: FromStr::from_str("7890").unwrap(),

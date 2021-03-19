@@ -11,6 +11,14 @@ pub struct Config {
     eth_starport_address: Vec<u8>,
 }
 
+#[derive(Clone)]
+pub struct ValidatorConfig {
+    eth_key_id: String,
+    eth_rpc_url: String,
+    miner: String,
+    opf_url: String,
+}
+
 /// XXX Possible sanity checks for config fields here
 impl Config {
     pub fn update(&mut self, new: Config) {
@@ -32,7 +40,27 @@ type PriceFeedData = (Vec<(Vec<u8>, Vec<u8>)>, u64);
 
 lazy_static! {
     static ref CONFIG: Mutex<Config> = Mutex::new(new_config("".into()));
+    static ref VALIDATOR_CONFIG: Mutex<Option<ValidatorConfig>> = Mutex::new(None);
     static ref PRICE_FEED_DATA: Mutex<Option<PriceFeedData>> = Mutex::new(None);
+}
+
+pub fn initialize_validator_config(
+    eth_key_id: Option<String>,
+    eth_rpc_url: Option<String>,
+    miner: Option<String>,
+    opf_url: Option<String>,
+) {
+    match VALIDATOR_CONFIG.lock() {
+        Ok(mut data_ref) => {
+            *data_ref = Some(ValidatorConfig {
+                eth_key_id: eth_key_id.unwrap_or(ETH_KEY_ID_DEFAULT.to_owned()),
+                eth_rpc_url: eth_rpc_url.unwrap_or(ETH_RPC_URL_DEFAULT.to_owned()),
+                miner: miner.unwrap_or(MINER_DEFAULT.to_owned()),
+                opf_url: opf_url.unwrap_or(OPF_URL_DEFAULT.to_owned()),
+            });
+        }
+        _ => (), // XXX todo: log?
+    };
 }
 
 /// The configuration interface for offchain workers. This is designed to manage configuration
@@ -58,12 +86,14 @@ pub trait ConfigInterface {
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
-const ETH_KEY_ID_ENV_VAR_DEV_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const MINER_ENV_VAR: &str = "MINER";
-const ETH_RPC_URL_ENV_VAR_DEV_DEFAULT: &str = "https://goerli-eth.compound.finance";
 const OPF_URL_ENV_VAR: &str = "OPF_URL";
-const OPF_URL_ENV_VAR_DEFAULT: &str = "https://prices.compound.finance/coinbase";
+
+const ETH_KEY_ID_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
+const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
+const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
+const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set
@@ -82,22 +112,74 @@ pub trait ValidatorConfigInterface {
     /// Downstream this is used to feed the keyring for signing and obtaining the corresponding
     /// public key.
     fn get_eth_key_id() -> Option<Vec<u8>> {
-        std::env::var(ETH_KEY_ID_ENV_VAR).ok().map(Into::into)
+        // check env override
+        if let Ok(eth_key_id_from_env) = std::env::var(ETH_KEY_ID_ENV_VAR) {
+            if eth_key_id_from_env.len() > 0 {
+                return Some(eth_key_id_from_env.into());
+            }
+        }
+        // check config
+        if let Ok(config) = VALIDATOR_CONFIG.lock() {
+            if let Some(inner) = config.as_ref() {
+                return Some(inner.eth_key_id.clone().into());
+            }
+        }
+        // not set
+        return Some(ETH_KEY_ID_DEFAULT.into());
     }
 
     /// Get the Ethereum node RPC URL
     fn get_eth_rpc_url() -> Option<Vec<u8>> {
-        std::env::var(ETH_RPC_URL_ENV_VAR).ok().map(Into::into)
+        // check env override
+        if let Ok(eth_rpc_url) = std::env::var(ETH_RPC_URL_ENV_VAR) {
+            if eth_rpc_url.len() > 0 {
+                return Some(eth_rpc_url.into());
+            }
+        }
+        // check config
+        if let Ok(config) = VALIDATOR_CONFIG.lock() {
+            if let Some(inner) = config.as_ref() {
+                return Some(inner.eth_rpc_url.clone().into());
+            }
+        }
+        // not set
+        return Some(ETH_RPC_URL_DEFAULT.into());
     }
 
     /// Get the open price feed URLs
     fn get_opf_url() -> Option<Vec<u8>> {
-        std::env::var(OPF_URL_ENV_VAR).ok().map(Into::into)
+        // check env override
+        if let Ok(opf_url) = std::env::var(OPF_URL_ENV_VAR) {
+            if opf_url.len() > 0 {
+                return Some(opf_url.into());
+            }
+        }
+        // check config
+        if let Ok(config) = VALIDATOR_CONFIG.lock() {
+            if let Some(inner) = config.as_ref() {
+                return Some(inner.opf_url.clone().into());
+            }
+        }
+        // not set
+        return Some(OPF_URL_DEFAULT.into());
     }
 
     /// Get the Miner address
     fn get_miner_address() -> Option<Vec<u8>> {
-        std::env::var(MINER_ENV_VAR).ok().map(Into::into)
+        // check env override
+        if let Ok(miner) = std::env::var(MINER_ENV_VAR) {
+            if miner.len() > 0 {
+                return Some(miner.into());
+            }
+        }
+        // check config
+        if let Ok(config) = VALIDATOR_CONFIG.lock() {
+            if let Some(inner) = config.as_ref() {
+                return Some(inner.miner.clone().into());
+            }
+        }
+        // not set
+        return Some(MINER_DEFAULT.into());
     }
 }
 
@@ -139,28 +221,6 @@ pub trait KeyringInterface {
     ) -> Result<gateway_crypto::AddressBytes, CryptoError> {
         gateway_crypto::eth_recover(&message, &sig, prepend_preamble)
     }
-}
-
-/// Set an environment variable to a value if it is not already set to an existing value.
-fn set_validator_config_dev_default(key: &str, value: &str) {
-    let existing = std::env::var(key);
-    if existing.is_ok() {
-        return;
-    }
-
-    std::env::set_var(key, value);
-}
-
-/// For the local dev environment we want some sane defaults for these configuration values
-/// without always having to set up the developer's machine, with, say, a `.env` file
-/// or a run shell script. We would like to just stick with `cargo run -- ...`. To that end
-/// when the `--dev` flag is passed, these defaults are used but only when an existing environment
-/// variable is not already set.
-pub fn set_validator_config_dev_defaults() {
-    set_validator_config_dev_default(ETH_KEY_ID_ENV_VAR, ETH_KEY_ID_ENV_VAR_DEV_DEFAULT);
-    set_validator_config_dev_default(ETH_RPC_URL_ENV_VAR, ETH_RPC_URL_ENV_VAR_DEV_DEFAULT);
-    set_validator_config_dev_default(OPF_URL_ENV_VAR, OPF_URL_ENV_VAR_DEFAULT);
-    set_validator_config_dev_default(MINER_ENV_VAR, "");
 }
 
 #[sp_runtime_interface::runtime_interface]
