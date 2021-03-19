@@ -150,6 +150,11 @@ class Starport {
 
     return this.starport.methods.supplyCaps(token.ethAddress()).call();
   }
+
+  async tokenBalance(tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+    return await token.getBalance(this.starport._address);
+  }
 }
 
 async function buildStarport(starportInfo, validatorsInfoHash, ctx) {

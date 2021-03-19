@@ -80,6 +80,11 @@ class Actor {
     return await token.getBalance(this);
   }
 
+  async tokenTransfer(recipientLookup, amount, tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+    await token.transfer(this, recipientLookup, amount);
+  }
+
   async chainCashPrincipal_() {
     return await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
   }
