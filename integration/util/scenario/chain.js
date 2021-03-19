@@ -186,6 +186,20 @@ class Chain {
     return asset.unwrap().rate_model.toJSON();
   }
 
+  async noticeHold(chainId) {
+    return (await this.api().query.cash.noticeHolds(chainId)).toJSON();
+  }
+
+  async noticeState(notice) {
+    let chainId = getNoticeChainId(notice);
+    let noticeState = await this.api().query.cash.noticeStates(chainId, notice.NoticeId);
+    return noticeState.toJSON();
+  }
+
+  async cullNotices() {
+    return await sendAndWaitForEvents(this.api().tx.cash.cullNotices(), this.api());
+  }
+
   async nextCodeHash() {
     return mapToJson(await this.ctx.api().query.cash.allowedNextCodeHash());
   }

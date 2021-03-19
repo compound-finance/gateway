@@ -181,6 +181,12 @@ pub fn handle_notice_invoked<T: Config>(
         Reason::NoticeHashMismatch
     );
     Notices::take(chain_id, notice_id);
+    if let Some(notice_hold_id) = NoticeHolds::get(chain_id) {
+        if notice_hold_id == notice_id {
+            log!("Removing notice hold as executed");
+            NoticeHolds::take(chain_id);
+        }
+    }
     NoticeStates::insert(chain_id, notice_id, NoticeState::Executed);
     Ok(())
 }
@@ -298,6 +304,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
+            let notice_hold_id = NoticeId(4, 6);
             let notice_hash = ChainHash::Eth([1; 32]);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
                 id: NoticeId(80, 1),
@@ -307,6 +314,7 @@ mod tests {
                 account: [2; 20],
             });
 
+            NoticeHolds::insert(chain_id, notice_hold_id);
             NoticeHashes::insert(notice_hash, notice_id);
             Notices::insert(chain_id, notice_id, notice);
             NoticeStates::insert(
@@ -327,6 +335,46 @@ mod tests {
                 NoticeStates::get(chain_id, notice_id),
                 NoticeState::Executed
             );
+            assert_eq!(NoticeHolds::get(chain_id), Some(notice_hold_id));
+        });
+    }
+
+    #[test]
+    fn test_handle_notice_invoked_proper_notice_removes_notice_hold() {
+        new_test_ext().execute_with(|| {
+            let chain_id = ChainId::Eth;
+            let notice_id = NoticeId(5, 6);
+            let notice_hash = ChainHash::Eth([1; 32]);
+            let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: NoticeId(80, 1),
+                parent: [3u8; 32],
+                asset: [1; 20],
+                amount: 100,
+                account: [2; 20],
+            });
+
+            NoticeHolds::insert(chain_id, notice_id);
+            NoticeHashes::insert(notice_hash, notice_id);
+            Notices::insert(chain_id, notice_id, notice);
+            NoticeStates::insert(
+                chain_id,
+                notice_id,
+                NoticeState::Pending {
+                    signature_pairs: ChainSignatureList::Eth(vec![]),
+                },
+            );
+
+            let result = handle_notice_invoked::<Test>(chain_id, notice_id, notice_hash, vec![]);
+
+            assert_eq!(result, Ok(()));
+
+            assert_eq!(NoticeHashes::get(notice_hash), Some(notice_id));
+            assert_eq!(Notices::get(chain_id, notice_id), None);
+            assert_eq!(
+                NoticeStates::get(chain_id, notice_id),
+                NoticeState::Executed
+            );
+            assert_eq!(NoticeHolds::get(chain_id), None);
         });
     }
 
