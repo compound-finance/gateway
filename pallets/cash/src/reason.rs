@@ -60,6 +60,7 @@ pub enum Reason {
     InvalidChain,
     PendingAuthNotice,
     ChangeValidatorsError,
+    InvalidTrxRequest,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -117,6 +118,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::InvalidChain => (29, 0, "invalid chain"),
             Reason::PendingAuthNotice => (30, 0, "change auth notice is already pending"),
             Reason::ChangeValidatorsError => (31, 0, "change validators error"),
+            Reason::InvalidTrxRequest => (32, 0, "invalid trx request"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

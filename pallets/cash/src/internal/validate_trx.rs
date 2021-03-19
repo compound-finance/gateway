@@ -3,10 +3,10 @@ use crate::{
     internal,
     notices::EncodeNotice,
     reason::Reason,
-    AllowedNextCodeHash, Call, Config, Notices, Validators,
+    AllowedNextCodeHash, Call, Config, Nonces, Notices, Validators,
 };
 use codec::Encode;
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageValue};
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
 use our_std::RuntimeDebug;
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
@@ -20,7 +20,11 @@ pub enum ValidationError {
     InvalidPriceSignature,
     InvalidPrice(Reason),
     UnknownNotice,
+    InvalidNonce,
 }
+
+pub const UNSIGNED_TXS_PRIORITY: u64 = 100;
+pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
 pub fn validate_unsigned<T: Config>(
     source: TransactionSource,
@@ -30,7 +34,7 @@ pub fn validate_unsigned<T: Config>(
         Call::set_miner(_miner) => match source {
             TransactionSource::InBlock => {
                 Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
-                    .longevity(1)
+                    // .longevity(1)
                     .propagate(false)
                     .build())
             }
@@ -42,8 +46,8 @@ pub fn validate_unsigned<T: Config>(
             if AllowedNextCodeHash::get() == Some(hash) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::set_next_code_via_hash")
-                        .priority(100)
-                        .longevity(32)
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
                         .and_provides(hash)
                         .propagate(true)
                         .build(),
@@ -58,8 +62,8 @@ pub fn validate_unsigned<T: Config>(
             let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
             if validators.contains(&signer) {
                 Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
-                    .priority(100)
-                    .longevity(32)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides((event_id, signature))
                     .propagate(true)
                     .build())
@@ -68,21 +72,23 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::exec_trx_request(request, signature, nonce) => {
-            let signer_res = signature
-                .recover_account(&internal::exec_trx_request::prepend_nonce(request, *nonce)[..]);
-
             // TODO: We might want to check existential value of signer
+            let sender = signature
+                .recover_account(&internal::exec_trx_request::prepend_nonce(request, *nonce)[..])
+                .map_err(|_| ValidationError::InvalidSignature)?;
 
-            match (signer_res, nonce) {
-                (Err(_e), _) => Err(ValidationError::InvalidSignature),
-                (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
-                    "Gateway::exec_trx_request",
+            let current_nonce = Nonces::get(sender);
+            if *nonce == current_nonce {
+                Ok(
+                    ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
+                        .and_provides((sender, nonce))
+                        .propagate(true)
+                        .build(),
                 )
-                .priority(100)
-                .longevity(32)
-                .and_provides((sender, nonce))
-                .propagate(true)
-                .build()),
+            } else {
+                Err(ValidationError::InvalidNonce)
             }
         }
         Call::publish_signature(chain_id, notice_id, signature) => {
@@ -94,8 +100,8 @@ pub fn validate_unsigned<T: Config>(
             if Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::publish_signature")
-                        .priority(100)
-                        .longevity(32)
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
                         .and_provides(signature)
                         .propagate(true)
                         .build(),

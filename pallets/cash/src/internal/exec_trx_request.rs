@@ -195,6 +195,7 @@ pub fn exec_trx_request<T: Config>(
             }
             _ => Err(Reason::InvalidLiquidation), // Probably isn't possible
         }?,
+        _ => Err(Reason::InvalidTrxRequest)?,
     }
 
     if let Some(nonce) = nonce_opt {
