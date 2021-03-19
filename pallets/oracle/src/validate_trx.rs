@@ -29,7 +29,7 @@ pub fn validate_unsigned<T: Config>(
                     TransactionSource::Local | TransactionSource::InBlock => {
                         Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
                             .priority(UNSIGNED_TXS_PRIORITY)
-                            .longevity(UNSINED_TXS_LONGEVITY)
+                            .longevity(UNSIGNED_TXS_LONGEVITY)
                             .and_provides(signature)
                             .propagate(false)
                             .build())
