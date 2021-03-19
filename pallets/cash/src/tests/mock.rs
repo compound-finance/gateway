@@ -61,15 +61,6 @@ impl pallet_session::SessionHandler<SubstrateId> for TestSessionHandler {
     fn on_before_session_ending() {}
 }
 
-pub struct TestSessionManager;
-impl pallet_session::SessionManager<SubstrateId> for TestSessionManager {
-    fn end_session(_: SessionIndex) {}
-    fn start_session(_: SessionIndex) {}
-    fn new_session(_: SessionIndex) -> Option<Vec<SubstrateId>> {
-        None
-    }
-}
-
 pub mod opaque {
     use super::*;
 
@@ -138,7 +129,7 @@ impl pallet_session::Config for Test {
     type ValidatorIdOf = ConvertInto;
     type ShouldEndSession = TestShouldEndSession;
     type NextSessionRotation = ();
-    type SessionManager = TestSessionManager;
+    type SessionManager = Cash;
     type SessionHandler = TestSessionHandler;
     type Keys = opaque::MockSessionKeys;
     type DisabledValidatorsThreshold = (); //sp_runtime::Perbill::from_percent(33);

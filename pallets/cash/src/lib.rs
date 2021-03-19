@@ -28,10 +28,11 @@ use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
-    traits::{StoredMap, UnfilteredDispatchable},
+    traits::{OnRuntimeUpgrade, StoredMap, UnfilteredDispatchable},
     weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
+use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{collections::btree_set::BTreeSet, error, log, str, vec::Vec, Debuggable};
 use sp_core::crypto::AccountId32;
@@ -573,6 +574,22 @@ decl_module! {
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)
+        }
+
+        // Remove any notice holds if they have been executed
+        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
+        pub fn cull_notices(origin) -> dispatch::DispatchResult {
+            log!("Culling executed notices");
+            NoticeHolds::iter().for_each(|(chain_id, notice_id)| {
+                match NoticeStates::get(chain_id, notice_id) {
+                    NoticeState::Executed => {
+                        NoticeHolds::take(chain_id);
+                        log!("Removed notice hold {:?}:{:?} as it was already executed", chain_id, notice_id);
+                    },
+                    _ => ()
+                }
+            });
+            Ok(())
         }
     }
 }

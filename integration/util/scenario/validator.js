@@ -59,7 +59,7 @@ let validatorInfoMap = {
     eth_private_key: "50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374",
     eth_account: "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61",
     node_key: '0x0000000000000000000000000000000000000000000000000000000000000001',
-    peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp', // I have _no idea_ how this is generated
+    peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp', // I have _no idea_ how this is generated (I just run a node with the node key and grab it)
     spawn_args: ['--alice'],
     color: chalk.blue,
     validator: true,
@@ -73,6 +73,17 @@ let validatorInfoMap = {
     peer_id: '12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD', // I have _no idea_ how this is generated
     spawn_args: ['--bob'],
     color: chalk.green,
+    validator: true,
+  },
+  'charlie': {
+    aura_key: "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y",
+    grandpa_key: "5DbKjhNLpqX3zqZdNBc9BGb4fHU1cRBaDhJUskrvkwfraDi6",
+    eth_private_key: "46848fdbde39184417f511187ebc87e12e3087ac67c630e18836a6813110310d",
+    eth_account: "0x714fea791A402f28BFB43B07f6C9A70482A8cF90",
+    node_key: '0x0000000000000000000000000000000000000000000000000000000000000003',
+    peer_id: '12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x', // I have _no idea_ how this is generated
+    spawn_args: ['--charlie'],
+    color: chalk.orange,
     validator: true,
   }
 };

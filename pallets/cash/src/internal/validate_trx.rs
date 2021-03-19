@@ -31,10 +31,7 @@ pub fn validate_unsigned<T: Config>(
     match call {
         Call::set_miner(_miner) => match source {
             TransactionSource::InBlock => {
-                Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
-                    // .longevity(1)
-                    .propagate(false)
-                    .build())
+                Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner").build())
             }
             _ => Err(ValidationError::InvalidInternalOnly),
         },
@@ -108,6 +105,11 @@ pub fn validate_unsigned<T: Config>(
                 Err(ValidationError::InvalidValidator)
             }
         }
+        Call::cull_notices() => Ok(ValidTransaction::with_tag_prefix("Gateway::cull_notices")
+            .priority(100)
+            .and_provides("cull_notices")
+            .propagate(false)
+            .build()),
         _ => Err(ValidationError::InvalidCall),
     }
 }
