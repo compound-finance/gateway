@@ -20,5 +20,5 @@ pub const TRANSFER_FEE: Quantity = Quantity::from_nominal("0.01", CASH);
 /// Number of blocks between HTTP requests from offchain workers to open oracle price feed.
 pub const ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
 
-// #[cfg(not(debug_assertions))]
-pub const SESSION_PERIOD: u32 = 14400; // @ 6s blocks, 1 period per day
+// The number of blocks in between periodic sessions
+pub const SESSION_PERIOD: u32 = 14400; // Assuming 6s blocks, ~1 period per day
