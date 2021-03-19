@@ -45,10 +45,10 @@ mod tests {
     #[test]
     fn test_change_val() {
         new_test_ext().execute_with(|| {
-            let prev_substrate_id: AccountId32 = [8;32].into();
+            let prev_substrate_id: AccountId32 = [8; 32].into();
             let prev_keys = ValidatorKeys {
                 substrate_id: prev_substrate_id.clone(),
-                eth_address: [9;20]
+                eth_address: [9; 20],
             };
 
             NextValidators::insert(prev_substrate_id, prev_keys);
