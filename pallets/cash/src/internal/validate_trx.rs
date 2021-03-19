@@ -2,6 +2,7 @@ use crate::{
     chains::{Chain, ChainAccount, Ethereum},
     internal,
     notices::EncodeNotice,
+    params::{UNSIGNED_TXS_LONGEVITY, UNSIGNED_TXS_PRIORITY},
     reason::Reason,
     AllowedNextCodeHash, Call, Config, Nonces, Notices, Validators,
 };
@@ -22,9 +23,6 @@ pub enum ValidationError {
     UnknownNotice,
     InvalidNonce,
 }
-
-pub const UNSIGNED_TXS_PRIORITY: u64 = 100;
-pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
 pub fn validate_unsigned<T: Config>(
     source: TransactionSource,
