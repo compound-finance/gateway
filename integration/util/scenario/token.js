@@ -58,8 +58,13 @@ class Token {
   }
 
   async getBalance(actorLookup) {
-    let actor = this.ctx.actors.get(actorLookup);
-    let balanceWei = await this.token.methods.balanceOf(actor.ethAddress()).call();
+    let balanceWei;
+    if (typeof(actorLookup) === 'string' && actorLookup.slice(0, 2) === '0x') {
+      balanceWei = await this.token.methods.balanceOf(actorLookup).call();
+    } else {
+      let actor = this.ctx.actors.get(actorLookup);
+      balanceWei = await this.token.methods.balanceOf(actor.ethAddress()).call();
+    }
 
     return this.toTokenAmount(balanceWei);
   }
@@ -69,6 +74,14 @@ class Token {
       throw new Error(`Ctx: starport must be set before using set supply cap`);
     }
     this.ctx.starport.setSupplyCap(this, tokenAmount);
+  }
+
+  async transfer(fromLookup, toLookup, tokenAmount) {
+    let fromActor = this.ctx.actors.get(fromLookup);
+    let toActor = this.ctx.actors.get(toLookup);
+    let weiAmount = this.toWeiAmount(tokenAmount);
+
+    await this.token.methods.transfer(toActor.ethAddress(), weiAmount).send({from: fromActor.ethAddress()});
   }
 
   async setBalance(actorLookup, tokenAmount) {
