@@ -295,8 +295,7 @@
       "UnknownValidator": "",
       "InvalidChain": "",
       "PendingEraNotice": "",
-      "ChangeValidatorsError": "",
-      "InvalidTrxRequest": ""
+      "ChangeValidatorsError": ""
     }
   },
   "MathError": {
