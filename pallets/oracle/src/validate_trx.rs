@@ -150,7 +150,8 @@ mod tests {
                     &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(sig.to_vec())
                     .propagate(true)
                     .build())
@@ -172,7 +173,8 @@ mod tests {
                     &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(sig.to_vec())
                     .propagate(false)
                     .build())
@@ -226,7 +228,8 @@ mod tests {
                     &Call::post_prices::<Test>(vec![(msg.to_vec(), sig.to_vec())]),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_prices")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(vec![sig.to_vec()])
                     .propagate(true)
                     .build())
@@ -248,7 +251,8 @@ mod tests {
                     &Call::post_prices::<Test>(vec![(msg.to_vec(), sig.to_vec())]),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_prices")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(vec![sig.to_vec()])
                     .propagate(false)
                     .build())
