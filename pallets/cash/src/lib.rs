@@ -92,6 +92,8 @@ pub trait Config:
 
     /// Placate substrate's `HandleLifetime` trait.
     type AccountStore: StoredMap<SubstrateId, ()>;
+
+    /// Associated type which allows us to interact with substrate Sessions.
     type SessionInterface: self::SessionInterface<SubstrateId>;
 }
 
@@ -306,7 +308,7 @@ fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
 }
 
 pub trait SessionInterface<AccountId>: frame_system::Config {
-    fn is_valid_keys(x: AccountId) -> bool;
+    fn has_next_keys(x: AccountId) -> bool;
     fn rotate_session();
 }
 
@@ -314,7 +316,7 @@ impl<T: Config> SessionInterface<SubstrateId> for T
 where
     T: pallet_session::Config<ValidatorId = SubstrateId>,
 {
-    fn is_valid_keys(x: SubstrateId) -> bool {
+    fn has_next_keys(x: SubstrateId) -> bool {
         match <pallet_session::Module<T>>::next_keys(x as T::ValidatorId) {
             Some(_keys) => true,
             None => false,
