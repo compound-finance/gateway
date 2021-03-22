@@ -45,9 +45,10 @@ class Eth {
     });
   }
 
-  async mine(count = 1) {
+  async mine(count = 1, ts = undefined) {
     for (const i in [...new Array(count)]) {
-      await this.sendAsync('evm_mine');
+      let params = [ts].filter((x) => x !== undefined);
+      await this.sendAsync('evm_mine', params);
     }
   }
 
@@ -123,9 +124,15 @@ class Eth {
   }
 
   async ethBalance(actorLookup) {
-    let actor = this.ctx.actors.get(actorLookup);
+    let ethAddress;
+    if (typeof(actorLookup) === 'string' && actorLookup.slice(0, 2) === '0x') {
+      ethAddress = actorLookup;
+    } else {
+      let actor = this.ctx.actors.get(actorLookup);
+      ethAddress = actor.ethAddress();
+    }
 
-    return Number(await this.web3.eth.getBalance(actor.ethAddress()));
+    return Number(await this.web3.eth.getBalance(ethAddress));
   }
 
   async getNextContractAddress(skip = 0) {
