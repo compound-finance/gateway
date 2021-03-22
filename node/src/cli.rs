@@ -2,12 +2,34 @@ use sc_cli::RunCmd;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
+pub struct GatewayCmd {
+    /// Set the ETH Key ID for AWS KMS integration
+    #[structopt(long = "eth-key-id")]
+    pub eth_key_id: Option<String>,
+
+    /// Set the ETH RPC Url for interfacing with ethereum
+    #[structopt(long = "eth-rpc-url")]
+    pub eth_rpc_url: Option<String>,
+
+    /// Set the miner address (only useful for validator)
+    #[structopt(long = "miner")]
+    pub miner: Option<String>,
+
+    /// Open price feed URL
+    #[structopt(long = "opf-url")]
+    pub opf_url: Option<String>,
+}
+
+#[derive(Debug, StructOpt)]
 pub struct Cli {
     #[structopt(subcommand)]
     pub subcommand: Option<Subcommand>,
 
     #[structopt(flatten)]
     pub run: RunCmd,
+
+    #[structopt(flatten)]
+    pub gateway: GatewayCmd,
 }
 
 #[derive(Debug, StructOpt)]

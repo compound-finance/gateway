@@ -470,7 +470,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_missing_notice() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -492,7 +491,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_non_pending() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice_state = NoticeState::Executed {};
@@ -507,7 +505,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_already_signed() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let signer = <Ethereum as Chain>::signer_address().unwrap();
@@ -525,7 +522,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_valid() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -550,7 +546,6 @@ mod tests {
     #[test]
     fn test_process_notices() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id_1 = NoticeId(5, 6);
             let notice_1 = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -616,7 +611,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_valid() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -685,7 +679,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_already_signed() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -714,7 +707,6 @@ mod tests {
     #[test]
     fn test_publish_signature_signature_mismatch() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -746,7 +738,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_unknown_validator() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -773,7 +764,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_invalid_signature() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
