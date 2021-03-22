@@ -31,7 +31,9 @@ pub fn validate_unsigned<T: Config>(
     match call {
         Call::set_miner(_miner) => match source {
             TransactionSource::InBlock => {
-                Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner").build())
+                Ok(ValidTransaction::with_tag_prefix("Gateway::set_miner")
+                    .longevity(1)
+                    .build())
             }
             _ => Err(ValidationError::InvalidInternalOnly),
         },
@@ -381,6 +383,8 @@ mod tests {
                 runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
 
             let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            Nonces::insert(ChainAccount::Eth(eth_address), nonce);
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
                 .priority(100)
