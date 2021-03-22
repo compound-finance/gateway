@@ -11,7 +11,6 @@ pub use mock::*;
 pub const ETH_TICKER: Ticker = Ticker::new("ETH");
 
 pub fn initialize_storage() {
-    runtime_interfaces::set_validator_config_dev_defaults();
     OracleModule::initialize_reporters(
         vec![
             "0x85615b076615317c80f14cbad6501eec031cd51c",
