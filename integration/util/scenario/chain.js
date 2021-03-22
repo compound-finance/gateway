@@ -181,6 +181,12 @@ class Chain {
     });
   }
 
+  async tokenBalance(token, chainAccount) {
+    console.log(["gghy88", token.toChainAsset(), chainAccount]);
+    let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), chainAccount);
+    return token.toTokenAmount(weiAmount);
+  }
+
   async interestRateModel(token) {
     let asset = await this.ctx.api().query.cash.supportedAssets(token.toChainAsset());
     return asset.unwrap().rate_model.toJSON();

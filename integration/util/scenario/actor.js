@@ -108,8 +108,7 @@ class Actor {
     if (token instanceof CashToken) {
       return await this.cash();
     } else {
-      let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
-      return token.toTokenAmount(weiAmount);
+      return this.ctx.chain.tokenBalance(token, this.toChainAccount());
     }
   }
 
