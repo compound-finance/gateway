@@ -2,12 +2,22 @@ const fs = require('fs').promises;
 const repl = require('repl');
 const path = require('path');
 const { Readable } = require('stream');
-const { createReadStream } = require('fs');
+const { createReadStream, constants } = require('fs');
 const getopts = require('getopts');
 const { ApiPromise, WsProvider, Keyring } = require('@polkadot/api');
 const Types = require('@polkadot/types');
 const fetch = require('node-fetch');
 const { getSaddle, describeProvider } = require('eth-saddle');
+const chalk = require('chalk');
+
+async function fileExists(path) {
+  try {
+    await fs.access(path, constants.R_OK);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function matchesLine(completion, line) {
   if (completion.initial && line.startsWith(completion.initial)) {
@@ -208,7 +218,14 @@ async function loadChainConfig(chain) {
 }
 
 async function loadTypes(version) {
-  return JSON.parse(await fs.readFile(path.join(__dirname, '..', 'releases', `m${Number(version)}`, 'types.json'), 'utf8'));
+  let releaseTypesFile = path.join(__dirname, '..', 'releases', `m${Number(version)}`, 'types.json');
+  let baseTypesFile = path.join(__dirname, '..', 'types.json');
+  if (await fileExists(releaseTypesFile)) {
+    return JSON.parse(await fs.readFile(releaseTypesFile, 'utf8'));
+  } else {
+    console.warn(chalk.yellow(`Cannot find release m${version} types file at ${releaseTypesFile}, using base types.json. Please pull release m${version} with \`scripts/pull_release.sh m${version}\``));
+    return JSON.parse(await fs.readFile(baseTypesFile, 'utf8'));
+  }
 }
 
 async function rpc(chain, chainConfig, section, method, params=[]) {
