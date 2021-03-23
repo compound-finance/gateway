@@ -9,6 +9,7 @@ cargo build --release --features runtime-benchmarks
     --wasm-execution compiled \
     --pallet pallet_cash \
     --extrinsic '*' \
+    --steps 10 \
     --repeat 10 \
     --raw \
     --template=./.maintain/frame-weight-template.hbs \

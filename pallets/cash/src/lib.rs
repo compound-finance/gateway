@@ -485,7 +485,7 @@ decl_module! {
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
             match core::on_initialize::<T>() {
-                Ok(weight) => weight,
+                Ok(()) => <T as Config>::WeightInfo::set_yield_next(),
                 Err(err) => {
                     // This should never happen...
                     error!("Could not initialize block!!! {:#?} {:#?}", block, err);
@@ -574,10 +574,10 @@ decl_module! {
         }
 
         /// Adds the asset to the runtime by defining it as a supported asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn support_asset(origin, asset: ChainAsset, asset_info: AssetInfo) -> dispatch::DispatchResult {
+        #[weight = (1, DispatchClass::Operational, Pays::No)]
+        pub fn support_asset(origin, asset_info: AssetInfo) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset, asset_info))?)
+            Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset_info))?)
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]

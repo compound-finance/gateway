@@ -1,4 +1,26 @@
+use codec::{Decode, Encode};
 use our_std::convert::TryInto;
+use our_std::RuntimeDebug;
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum HexError {
+    DecodeAddress,
+    DecodeSignature,
+}
+
+pub fn decode_address(data: &String) -> Result<[u8; 20], HexError> {
+    decode_hex(data)
+        .unwrap()
+        .try_into()
+        .map_err(|_| HexError::DecodeAddress)
+}
+
+pub fn decode_signature(data: &String) -> Result<[u8; 65], HexError> {
+    decode_hex(data)
+        .unwrap()
+        .try_into()
+        .map_err(|_| HexError::DecodeSignature)
+}
 
 pub fn decode_hex(data: &String) -> Option<Vec<u8>> {
     if data.len() < 2 || &data[0..2] != "0x" {

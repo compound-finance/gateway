@@ -94,7 +94,7 @@ sp-timestamp = { default-features = false, git = 'https://github.com/compound-fi
 frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
 [features]
-default = ['with-parity-db']
+default = ['with-rocks-db', 'runtime-benchmarks']
 with-parity-db=['sc-client-db/with-parity-db']
 with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
 runtime-benchmarks = [
