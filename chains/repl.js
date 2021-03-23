@@ -5,6 +5,7 @@ const { Readable } = require('stream');
 const { createReadStream } = require('fs');
 const getopts = require('getopts');
 const { ApiPromise, WsProvider, Keyring } = require('@polkadot/api');
+const Types = require('@polkadot/types');
 const fetch = require('node-fetch');
 const { getSaddle, describeProvider } = require('eth-saddle');
 
@@ -131,11 +132,11 @@ async function getContracts(saddle) {
 function defineAction(r, fn) {
   return async (name) => {
     r.clearBufferedCommand();
-    await wrapError(fn(), r);
+    await wrapError(fn(name), r);
   };
 }
 
-function defineCommands(r, { api, keyring }, saddle, network, contracts) {
+function defineCommands(r, { api, keyring, types }, saddle, network, contracts) {
   r.defineCommand('validators', {
     help: 'Show current validators',
     action: defineAction(r, async () => {
@@ -146,6 +147,15 @@ function defineCommands(r, { api, keyring }, saddle, network, contracts) {
           `\t\t${k}=${v}`).join("\n");
         console.log(`\t${key}:\n${value}\n`);
       });
+    })
+  });
+
+  r.defineCommand('decode_call', {
+    help: 'Decode a call',
+    action: defineAction(r, async (name) => {
+      let call = new types.GenericCall(api.registry, name);
+      let { method, section, args } = call.toHuman();
+      console.log(`Extrinsic Call:\n\t${section}.${method}(${args.map((a) => JSON.stringify(a)).join(",")})`);
     })
   });
 
@@ -230,8 +240,9 @@ function toSS58(keyring, arr) {
   return keyring.encodeAddress(arr);
 }
 
-async function connect(chain, chainConfig) {
-  if (!chainConfig.websocket) {
+async function connect(chain, chainConfig, websocket = undefined) {
+  let ws = websocket || chainConfig.websocket;
+  if (!ws) {
     throw new Error(`No websocket config for chain ${chain}`);
   }
 
@@ -239,14 +250,14 @@ async function connect(chain, chainConfig) {
   let { specVersion } = runtimeVersion;
   let typesJson = await loadTypes(specVersion);
 
-  const wsProvider = new WsProvider(chainConfig.websocket);
+  const wsProvider = new WsProvider(ws);
   let api = await ApiPromise.create({
     provider: wsProvider,
     types: typesJson
   });
 
   let keyring = new Keyring();
-  let types = api.types;
+  let types = Types;
 
   return {
     wsProvider,
@@ -266,9 +277,14 @@ function defineKeys(r, obj) {
   });
 }
 
-async function startConsole(input, chain, trace) {
+async function startConsole(input, chain, options) {
+  let {
+    verbose,
+    websocket
+  } = options;
+
   let chainConfig = await loadChainConfig(chain);
-  let connection = await connect(chain, chainConfig);
+  let connection = await connect(chain, chainConfig, websocket);
   let network = chainConfig.eth_network;
   let saddle = await getSaddle(network);
   let {contracts, contractInsts} = await getContracts(saddle);
@@ -311,7 +327,9 @@ const options = getopts(process.argv.slice(2), {
   alias: {
     script: "s",
     eval: "e",
-    chain: "c"
+    chain: "c",
+    websocket: "w",
+    verbose: "v"
   },
 });
 
@@ -324,4 +342,4 @@ if (options.script) {
   input = Readable.from(codes);
 }
 
-startConsole(input, chain, process.env['TRACE']);
+startConsole(input, chain, options);
