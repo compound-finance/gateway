@@ -188,6 +188,7 @@ pub fn exec_trx_request<T: Config>(
             }
 
             (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::ChainAsset(collateral)) => {
+                println!("HEEEERE, in-kind liquidation");
                 let borrowed_asset = get_asset::<T>(borrowed)?;
                 let collateral_asset = get_asset::<T>(collateral)?;
                 let borrowed_asset_amount = match max_amount {
@@ -217,6 +218,7 @@ pub fn exec_trx_request<T: Config>(
     Ok(())
 }
 
+#[allow(dead_code)]
 mod mocked_core {
     pub use our_std::result::Result;
 
@@ -379,6 +381,7 @@ mod tests {
     use super::*;
     use crate::{chains::*, factor::*, rates::*, tests::mock::*, tests::*, types::*, *};
     use mocked_core::get_latest_call_result;
+    use serial_test::serial;
 
     fn init_eth_asset() {
         // Init ETH asset
@@ -394,6 +397,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn exec_trx_request_extract_cash_principal_internal() {
         new_test_ext().execute_with(|| {
             let req_str = "(Extract 3 CASH Eth:0x0101010101010101010101010101010101010101)";
@@ -408,6 +412,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn exec_trx_request_extract_internal() {
         new_test_ext().execute_with(|| {
             init_eth_asset();
@@ -424,6 +429,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn exec_trx_transfer_internal() {
         new_test_ext().execute_with(|| {
             init_eth_asset();
@@ -440,6 +446,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn exec_trx_transfer_principal_cash_internal() {
         new_test_ext().execute_with(|| {
             init_eth_asset();
@@ -456,6 +463,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn exec_trx_liquidate_internal() {
         new_test_ext().execute_with(|| {
             init_eth_asset();
@@ -471,18 +479,34 @@ mod tests {
         });
     }
 
-    fn exec_trx_liquidate_cash_principal_internal() {
+    // #[test]
+    // #[serial]
+    // fn exec_trx_liquidate_cash_principal_internal() {
+    //     new_test_ext().execute_with(|| {
+    //         init_eth_asset();
+
+    //         let req_str ="(Liquidate Max Cash Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
+    //         let account = ChainAccount::Eth([20; 20]);
+    //         let nonce = Some(0);
+
+    //         assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+    //         let actual = get_latest_call_result();
+    //         let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
+    //         assert_eq!(actual, expected);
+    //     });
+    // }
+
+    #[test]
+    #[serial]
+    fn exec_trx_in_kind_liquidation() {
         new_test_ext().execute_with(|| {
             init_eth_asset();
 
-            let req_str =  "(Liquidate Max Cash Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
+            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
             let account = ChainAccount::Eth([20; 20]);
             let nonce = Some(0);
 
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
-            assert_eq!(actual, expected);
+            assert_eq!(exec_trx_request::<Test>(req_str, account, nonce), Err(Reason::InKindLiquidation));
         });
     }
 }
