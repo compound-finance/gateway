@@ -108,7 +108,7 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::cull_notices() => Ok(ValidTransaction::with_tag_prefix("Gateway::cull_notices")
-            .priority(100)
+            .priority(UNSIGNED_TXS_PRIORITY)
             .and_provides("cull_notices")
             .propagate(false)
             .build()),
@@ -387,8 +387,8 @@ mod tests {
             Nonces::insert(ChainAccount::Eth(eth_address), nonce);
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
-                .priority(100)
-                .longevity(32)
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_provides((ChainAccount::Eth(eth_address), 5))
                 .propagate(true)
                 .build();
@@ -510,8 +510,8 @@ mod tests {
             );
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::publish_signature")
-                .priority(100)
-                .longevity(32)
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_provides(signature)
                 .propagate(true)
                 .build();
