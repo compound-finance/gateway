@@ -1,14 +1,27 @@
 use frame_support::storage::{StorageMap, StorageValue};
 
+#[cfg(test)]
+use crate::core::get_asset;
+#[cfg(not(test))]
+use crate::core::{
+    extract_cash_principal_internal, extract_internal, get_asset,
+    liquidate_cash_collateral_internal, liquidate_cash_principal_internal, liquidate_internal,
+    transfer_cash_principal_internal, transfer_internal,
+};
 use crate::{
     chains::{ChainAccount, ChainAccountSignature},
-    core::{self, get_asset},
     log,
     reason::Reason,
     require,
     symbol::CASH,
     types::{CashOrChainAsset, Nonce, Quantity},
     CashPrincipals, Config, GlobalCashIndex, Nonces,
+};
+#[cfg(test)]
+use mocked_core::{
+    extract_cash_principal_internal, extract_internal, liquidate_cash_collateral_internal,
+    liquidate_cash_principal_internal, liquidate_internal, transfer_cash_principal_internal,
+    transfer_internal,
 };
 use our_std::str;
 
@@ -32,7 +45,6 @@ pub fn exec<T: Config>(
     exec_trx_request::<T>(request_str, sender, Some(nonce))
 }
 
-// TODO: Unit tests!!
 pub fn exec_trx_request<T: Config>(
     request_str: &str,
     sender: ChainAccount,
@@ -61,7 +73,7 @@ pub fn exec_trx_request<T: Config>(
                 CashOrChainAsset::Cash => match max_amount {
                     trx_request::MaxAmount::Max => {
                         let principal_amount = CashPrincipals::get(sender).amount_withdrawable()?;
-                        core::extract_cash_principal_internal::<T>(
+                        extract_cash_principal_internal::<T>(
                             sender,
                             account.into(),
                             principal_amount,
@@ -72,7 +84,7 @@ pub fn exec_trx_request<T: Config>(
                         let index = GlobalCashIndex::get();
                         let principal_amount =
                             index.cash_principal_amount(Quantity::new(amount, CASH))?;
-                        core::extract_cash_principal_internal::<T>(
+                        extract_cash_principal_internal::<T>(
                             sender,
                             account.into(),
                             principal_amount,
@@ -87,7 +99,7 @@ pub fn exec_trx_request<T: Config>(
                     trx_request::MaxAmount::Amount(amount) => {
                         let asset = get_asset::<T>(chain_asset)?;
                         let asset_amount = asset.as_quantity(amount.into());
-                        core::extract_internal::<T>(asset, sender, account.into(), asset_amount)?;
+                        extract_internal::<T>(asset, sender, account.into(), asset_amount)?;
                     }
                 },
             }
@@ -98,7 +110,7 @@ pub fn exec_trx_request<T: Config>(
                 CashOrChainAsset::Cash => match max_amount {
                     trx_request::MaxAmount::Max => {
                         let principal_amount = CashPrincipals::get(sender).amount_withdrawable()?;
-                        core::transfer_cash_principal_internal::<T>(
+                        transfer_cash_principal_internal::<T>(
                             sender,
                             account.into(),
                             principal_amount,
@@ -109,7 +121,7 @@ pub fn exec_trx_request<T: Config>(
                         let index = GlobalCashIndex::get();
                         let principal_amount =
                             index.cash_principal_amount(Quantity::new(amount, CASH))?;
-                        core::transfer_cash_principal_internal::<T>(
+                        transfer_cash_principal_internal::<T>(
                             sender,
                             account.into(),
                             principal_amount,
@@ -125,7 +137,7 @@ pub fn exec_trx_request<T: Config>(
                     trx_request::MaxAmount::Amount(amount) => {
                         let asset = get_asset::<T>(chain_asset)?;
                         let asset_amount = asset.as_quantity(amount.into());
-                        core::transfer_internal::<T>(asset, sender, account.into(), asset_amount)?;
+                        transfer_internal::<T>(asset, sender, account.into(), asset_amount)?;
                     }
                 },
             }
@@ -151,7 +163,7 @@ pub fn exec_trx_request<T: Config>(
                     }
                 };
 
-                core::liquidate_cash_principal_internal::<T>(
+                liquidate_cash_principal_internal::<T>(
                     collateral_asset,
                     sender,
                     borrower.into(),
@@ -167,7 +179,7 @@ pub fn exec_trx_request<T: Config>(
                     }
                 };
 
-                core::liquidate_cash_collateral_internal::<T>(
+                liquidate_cash_collateral_internal::<T>(
                     borrowed_asset,
                     sender,
                     borrower.into(),
@@ -185,7 +197,7 @@ pub fn exec_trx_request<T: Config>(
                     }
                 };
 
-                core::liquidate_internal::<T>(
+                liquidate_internal::<T>(
                     borrowed_asset,
                     collateral_asset,
                     sender,
@@ -203,4 +215,274 @@ pub fn exec_trx_request<T: Config>(
     }
 
     Ok(())
+}
+
+mod mocked_core {
+    pub use our_std::result::Result;
+
+    use crate::{
+        chains::{ChainAccount, ChainAsset},
+        reason::Reason,
+        types::{AssetInfo, AssetQuantity, CashPrincipalAmount},
+        Config,
+    };
+
+    static mut LATEST_CALL: &str = "";
+
+    pub fn extract_internal<T: Config>(
+        asset: AssetInfo,
+        holder: ChainAccount,
+        recipient: ChainAccount,
+        amount: AssetQuantity,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "extract_internal: {:?}, {:?}, {:?}, {:?}",
+            ChainAsset::from(asset.asset),
+            String::from(holder),
+            String::from(recipient),
+            amount.value
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn extract_cash_principal_internal<T: Config>(
+        holder: ChainAccount,
+        recipient: ChainAccount,
+        principal: CashPrincipalAmount,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "extract_cash_principal_internal: {:?}, {:?}, {:?}",
+            String::from(holder),
+            String::from(recipient),
+            principal.0
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn transfer_internal<T: Config>(
+        asset: AssetInfo,
+        sender: ChainAccount,
+        recipient: ChainAccount,
+        amount: AssetQuantity,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "transfer_internal: {:?}, {:?}, {:?}, {:?}",
+            ChainAsset::from(asset.asset),
+            String::from(sender),
+            String::from(recipient),
+            amount.value
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn transfer_cash_principal_internal<T: Config>(
+        sender: ChainAccount,
+        recipient: ChainAccount,
+        principal: CashPrincipalAmount,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "transfer_cash_principal_internal: {:?}, {:?}, {:?}",
+            String::from(sender),
+            String::from(recipient),
+            principal.0
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn liquidate_internal<T: Config>(
+        asset: AssetInfo,
+        collateral_asset: AssetInfo,
+        liquidator: ChainAccount,
+        borrower: ChainAccount,
+        amount: AssetQuantity,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "liquidate_internal: {:?}, {:?}, {:?}, {:?}, {:?}",
+            ChainAsset::from(asset.asset),
+            ChainAsset::from(collateral_asset.asset),
+            String::from(liquidator),
+            String::from(borrower),
+            amount.value
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn liquidate_cash_principal_internal<T: Config>(
+        collateral_asset: AssetInfo,
+        liquidator: ChainAccount,
+        borrower: ChainAccount,
+        principal: CashPrincipalAmount,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "liquidate_cash_principal_internal: {:?}, {:?}, {:?}, {:?}",
+            ChainAsset::from(collateral_asset.asset),
+            String::from(liquidator),
+            String::from(borrower),
+            principal.0
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn liquidate_cash_collateral_internal<T: Config>(
+        asset: AssetInfo,
+        liquidator: ChainAccount,
+        borrower: ChainAccount,
+        amount: AssetQuantity,
+    ) -> Result<(), Reason> {
+        let latest_call_str = format!(
+            "liquidate_cash_collateral_internal: {:?}, {:?}, {:?}, {:?}",
+            ChainAsset::from(asset.asset),
+            String::from(liquidator),
+            String::from(borrower),
+            amount.value
+        );
+        unsafe {
+            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
+        }
+
+        Ok(())
+    }
+
+    pub fn get_latest_call_result() -> String {
+        unsafe {
+            return LATEST_CALL.to_string();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{chains::*, factor::*, rates::*, tests::mock::*, tests::*, types::*, *};
+    use mocked_core::get_latest_call_result;
+
+    fn init_eth_asset() {
+        // Init ETH asset
+        let kink_rate = 105;
+        let asset = Eth;
+        let asset_info = AssetInfo {
+            rate_model: InterestRateModel::new_kink(0, kink_rate, Factor::from_nominal("0.5"), 202),
+            miner_shares: MinerShares::from_nominal("0.5"),
+            ..AssetInfo::minimal(asset, ETH)
+        };
+
+        SupportedAssets::insert(&asset, asset_info);
+    }
+
+    #[test]
+    fn exec_trx_request_extract_cash_principal_internal() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Extract 3 CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let nonce = Some(0);
+
+            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+            let actual = get_latest_call_result();
+            let expected = "extract_cash_principal_internal: \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 3";
+            assert_eq!(actual, expected);
+        });
+    }
+
+    #[test]
+    fn exec_trx_request_extract_internal() {
+        new_test_ext().execute_with(|| {
+            init_eth_asset();
+
+            let req_str = "(Extract 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let nonce = Some(0);
+
+            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+            let actual = get_latest_call_result();
+            let expected = "extract_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 3";
+            assert_eq!(actual, expected);
+        });
+    }
+
+    #[test]
+    fn exec_trx_transfer_internal() {
+        new_test_ext().execute_with(|| {
+            init_eth_asset();
+
+            let req_str = "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let nonce = Some(0);
+
+            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+            let actual = get_latest_call_result();
+            let expected = "transfer_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 3";
+            assert_eq!(actual, expected);
+        });
+    }
+
+    #[test]
+    fn exec_trx_transfer_principal_cash_internal() {
+        new_test_ext().execute_with(|| {
+            init_eth_asset();
+
+            let req_str = "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let nonce = Some(0);
+
+            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+            let actual = get_latest_call_result();
+            let expected = "transfer_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 3";
+            assert_eq!(actual, expected);
+        });
+    }
+
+    #[test]
+    fn exec_trx_liquidate_internal() {
+        new_test_ext().execute_with(|| {
+            init_eth_asset();
+
+            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Cash Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let nonce = Some(0);
+
+            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+            let actual = get_latest_call_result();
+            let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
+            assert_eq!(actual, expected);
+        });
+    }
+
+    fn exec_trx_liquidate_cash_principal_internal() {
+        new_test_ext().execute_with(|| {
+            init_eth_asset();
+
+            let req_str =  "(Liquidate Max Cash Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let nonce = Some(0);
+
+            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+            let actual = get_latest_call_result();
+            let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
+            assert_eq!(actual, expected);
+        });
+    }
 }
