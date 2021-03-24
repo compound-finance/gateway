@@ -2,7 +2,7 @@
     "Contracts": {
         "Starport": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613",
         "Cash": "0xc65a4A1855d314033530A29Ab993A1717879E5BF",
-        "StarportImpl": "0xed5DdA5976ec5F29910426d7876eBD6f307e0934",
+        "StarportImpl": "0xaa39fd81E66Eb9DbEEf3253319516A7317829Eb0",
         "CashImpl": "0x1ffe465b3c82499e1C637c02EFECD128B7B454CF",
         "ProxyAdmin": "0xd418B3A7c4a2b9d60fF8dDf9E94a8b75Aa3f60A5"
     }
