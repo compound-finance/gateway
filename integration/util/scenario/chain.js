@@ -182,7 +182,6 @@ class Chain {
   }
 
   async tokenBalance(token, chainAccount) {
-    console.log(["gghy88", token.toChainAsset(), chainAccount]);
     let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), chainAccount);
     return token.toTokenAmount(weiAmount);
   }
