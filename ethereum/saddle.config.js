@@ -92,6 +92,7 @@ module.exports = {
   scripts: {
     "deploy": "scripts/deploy.js",
     "deploy:m3": "scripts/migrations/m3.js",
-    "deploy:m4": "scripts/migrations/m4.js"
+    "deploy:m4": "scripts/migrations/m4.js",
+    "deploy:starport": "scripts/migrations/deploy_starport.js"
   }                                                     // Aliases for scripts
 }
