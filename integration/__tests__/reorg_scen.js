@@ -11,6 +11,7 @@ let lock_scen_info = {
 
 buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
   {
+    skip: true,
     name: 'Re-org Lock Collateral via Snapshot',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth }) => {
       let snapshotId = await eth.snapshot();
@@ -28,7 +29,7 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
       await ashley.tokenTransfer(bert, 100, usdc);
       await eth.mine(20);
 
-      // Uh-oh
+      // Uh-oh [TODO: Match real expectations]
       expect(await ashley.tokenBalance(usdc)).toEqual(0);
       expect(await ashley.chainBalance(usdc)).toEqual(100);
       expect(await starport.tokenBalance(usdc)).toEqual(0);
@@ -36,7 +37,7 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
     }
   },
   {
-    only: true,
+    skip: true,
     name: 'Re-org with Identical Tx',
     scenario: async ({ ashley, bert, ether, chain, snapshot, starport, eth, sleep }) => {
       let crazyLock = await eth.__deploy('CrazyLock', [starport.ethAddress()]);
@@ -66,7 +67,7 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
       expect(tx0.blockNumber).toEqual(tx1.blockNumber);
       expect(tx0.transactionIndex).toEqual(tx1.transactionIndex);
 
-      // Uh-oh
+      // Uh-oh [TODO: Match real expectations]
       expect(await ashley.chainBalance(ether)).toEqual(0.1);
       expect(await starport.tokenBalance(ether)).toEqual(0);
     }
