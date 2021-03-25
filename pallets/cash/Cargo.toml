@@ -32,6 +32,7 @@ sp-core = { default-features = false, git = 'https://github.com/compound-finance
 sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'master' }
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
 frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -43,7 +44,6 @@ ethereum-client = { path = '../../ethereum-client', default-features = false }
 gateway-crypto = { path = '../../gateway-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
 our-std = { path = '../../our-std', default-features = false }
-frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional=true }
 
 [dev-dependencies]
 frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'master'}
@@ -65,4 +65,4 @@ std = [
     'pallet-oracle/std',
 ]
 runtime-debug = ['our-std/runtime-debug']
-runtime-benchmarks = ["frame-benchmarking"]
+runtime-benchmarks = ['frame-benchmarking']

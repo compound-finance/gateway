@@ -65,6 +65,9 @@ pub mod symbol;
 pub mod trx_req;
 pub mod types;
 
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking;
+
 #[cfg(test)]
 mod tests;
 
