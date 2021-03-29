@@ -4430,6 +4430,7 @@ dependencies = [
  "sp-inherents",
  "sp-io",
  "sp-runtime",
+ "sp-std",
  "tiny-keccak 2.0.2",
  "trx-request",
 ]

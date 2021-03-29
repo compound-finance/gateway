@@ -65,6 +65,9 @@ pub mod symbol;
 pub mod trx_req;
 pub mod types;
 
+pub mod weights;
+pub use weights::WeightInfo;
+
 #[cfg(feature = "runtime-benchmarks")]
 pub mod benchmarking;
 
@@ -98,6 +101,9 @@ pub trait Config:
 
     /// Associated type which allows us to interact with substrate Sessions.
     type SessionInterface: self::SessionInterface<SubstrateId>;
+
+    /// Weight information for extrinsics in this pallet.
+	type WeightInfo: WeightInfo;
 }
 
 decl_storage! {
@@ -528,7 +534,7 @@ decl_module! {
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
         }
 
-        /// Set the cash yield rate at some point in the future. [Root]
+        /// Set the cash yield rrate at some point in the future. [Root]
         #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
@@ -550,7 +556,8 @@ decl_module! {
             Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
         }
 
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        // #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = <T as Config>::WeightInfo::publish_signature()]
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::notices::publish_signature(chain_id, notice_id, signature))?)

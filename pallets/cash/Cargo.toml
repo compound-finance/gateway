@@ -29,6 +29,7 @@ libsecp256k1 = { version = '0.3.2', default-features = false, features = ['hmac'
 tiny-keccak = { version = '2.0.0', features = ['keccak'], default-features = false }
 
 sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master'  }
 sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'master' }
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -58,6 +59,7 @@ std = [
     'sp-io/std',
     'sp-core/std',
     'sp-runtime/std',
+    'sp-std/std',
     'runtime-interfaces/std',
     'gateway-crypto/std',
     'our-std/std',

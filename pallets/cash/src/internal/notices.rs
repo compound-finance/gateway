@@ -594,7 +594,7 @@ mod tests {
             assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
         });
     }
-
+ 
     #[test]
     fn test_publish_signature_executed() {
         new_test_ext().execute_with(|| {

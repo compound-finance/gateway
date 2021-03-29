@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+cargo build --release --features runtime-benchmarks
+
+./target/release/gateway benchmark \
+    --execution wasm \
+    --wasm-execution compiled \
+    --pallet pallet_cash \
+    --extrinsic '*' \
+    --repeat 10 \
+    --raw \
+    --template=./.maintain/frame-weight-template.hbs \
+    --output=./pallets/cash/src/weights.rs

@@ -300,6 +300,7 @@ impl pallet_cash::Config for Runtime {
     type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
     type AccountStore = System;
     type SessionInterface = Self;
+    type WeightInfo = pallet_cash::weights::SubstrateWeight<Runtime>;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------
