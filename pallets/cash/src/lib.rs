@@ -18,7 +18,7 @@ use crate::{
     events::{ChainLogEvent, ChainLogId, EventState},
     notices::{Notice, NoticeId, NoticeState},
     types::{
-        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Balance, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
         LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig, APR,
     },
@@ -676,6 +676,20 @@ impl<T: Config> Module<T> {
     /// Get the rates for the given asset.
     pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
         Ok(core::get_rates::<T>(asset)?)
+    }
+
+    /// Get the rates for the given asset.
+    pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
+        Ok(core::get_accounts::<T>()?)
+    }
+
+    /// Get the all liquidity
+    pub fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
+        let accounts : Vec<(ChainAccount, String)> = core::get_accounts_liquidity::<T>()?
+        .iter()
+        .map(|(chain_account, bal)| (chain_account.clone(), format!("{}", bal)))
+        .collect();
+        Ok(accounts)
     }
 }
 

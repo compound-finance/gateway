@@ -132,6 +132,21 @@ pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
 }
 
+/// Return the current borrow and supply rates for the asset.
+pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
+    let info: Vec<(ChainAccount)> = CashPrincipals::iter().map(|p| p.0).collect::<Vec<ChainAccount>>();
+    Ok(info)
+}
+
+/// Return the current borrow and supply rates for the asset.
+pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
+    let mut info:  Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
+        .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
+        .collect::<Vec<(ChainAccount, AssetBalance)>>();
+    info.sort_by(|(a_account,a_balance), (b_account,b_balance)| a_balance.cmp(b_balance));
+    Ok(info)
+}
+
 // Internal helpers
 
 pub fn passes_validation_threshold(

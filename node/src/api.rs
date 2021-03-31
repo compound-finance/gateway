@@ -93,6 +93,12 @@ pub trait GatewayRpcApi<BlockHash> {
 
     #[rpc(name = "gateway_rates")]
     fn gateway_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
+
+    #[rpc(name = "chain_accounts")]
+    fn chain_accounts(&self, at: Option<BlockHash>) -> RpcResult<Vec<ChainAccount>>;
+
+    #[rpc(name = "chain_account_liquidities")]
+    fn chain_account_liquidities(&self, at: Option<BlockHash>) -> RpcResult<Vec<(ChainAccount, String)>>;
 }
 
 pub struct GatewayRpcHandler<C, B> {
@@ -225,5 +231,29 @@ where
             .map_err(runtime_err)?
             .map_err(chain_err)?;
         Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
+    }
+
+    fn chain_accounts(
+        &self,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<Vec<ChainAccount>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let accounts = api.get_accounts(&at)
+        .map_err(runtime_err)?
+        .map_err(chain_err)?;
+        Ok(accounts) // XXX try_into?
+    }
+
+    fn chain_account_liquidities(
+        &self,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<Vec<(ChainAccount, String)>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let accounts = api.get_accounts_liquidity(&at)
+        .map_err(runtime_err)?
+        .map_err(chain_err)?;
+        Ok(accounts) // XXX try_into?
     }
 }

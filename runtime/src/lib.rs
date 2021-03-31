@@ -572,6 +572,14 @@ impl_runtime_apis! {
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
             Cash::get_rates(asset)
         }
+
+        fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
+            Cash::get_accounts()
+        }
+
+        fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
+            Cash::get_accounts_liquidity()
+        }
     }
 
     #[cfg(feature = "runtime-benchmarks")]
