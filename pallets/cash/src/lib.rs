@@ -534,7 +534,7 @@ decl_module! {
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
         }
 
-        /// Set the cash yield rrate at some point in the future. [Root]
+        /// Set the cash yield rate at some point in the future. [Root]
         #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
@@ -556,8 +556,11 @@ decl_module! {
             Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
         }
 
-        // #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        #[weight = <T as Config>::WeightInfo::publish_signature()]
+        #[weight = (
+            <T as Config>::WeightInfo::publish_signature(),
+            DispatchClass::Operational,
+            Pays::No,
+        )]
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::notices::publish_signature(chain_id, notice_id, signature))?)

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -eo pipefail
+
 cargo build --release --features runtime-benchmarks
 
 ./target/release/gateway benchmark \
