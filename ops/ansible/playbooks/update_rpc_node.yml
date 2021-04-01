@@ -1,0 +1,19 @@
+- hosts:
+    - full_node
+  tasks:
+    - name: stop gateway service
+      become: true
+      systemd:
+        name: gateway.service
+        state: stopped
+
+    - include_role:
+        name: chain_node
+        tasks_from: build-chain.yml
+
+    - name: start gateway service
+      become: true
+      systemd:
+        name: gateway.service
+        state: started
+      
