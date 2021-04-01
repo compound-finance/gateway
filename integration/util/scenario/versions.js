@@ -206,8 +206,6 @@ async function buildVersions(versionsInfo, ctx) {
   let current = new CurrentVersion(ctx);
   versions.push(current);
 
-  console.log({versions});
-
   // Make sure we have all included versions
   await Promise.all(versions.map((version) => version.ensure()));
 

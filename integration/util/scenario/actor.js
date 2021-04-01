@@ -80,6 +80,11 @@ class Actor {
     return await token.getBalance(this);
   }
 
+  async tokenTransfer(recipientLookup, amount, tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+    await token.transfer(this, recipientLookup, amount);
+  }
+
   async chainCashPrincipal_() {
     return await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
   }
@@ -103,8 +108,7 @@ class Actor {
     if (token instanceof CashToken) {
       return await this.cash();
     } else {
-      let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
-      return token.toTokenAmount(weiAmount);
+      return this.ctx.chain.tokenBalance(token, this.toChainAccount());
     }
   }
 

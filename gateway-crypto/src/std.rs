@@ -31,6 +31,12 @@ impl From<&str> for KeyId {
     }
 }
 
+impl From<String> for KeyId {
+    fn from(source: String) -> Self {
+        KeyId { data: source }
+    }
+}
+
 impl Into<String> for KeyId {
     fn into(self) -> String {
         self.data

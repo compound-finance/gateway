@@ -132,11 +132,7 @@ class Validator {
 
     let env = {
       ...this.spawnOpts,
-      ETH_RPC_URL: this.ctx.eth.web3Url,
       ETH_KEY: this.ethPrivateKey,
-      ETH_KEY_ID: "my_eth_key_id",
-      MINER: `Eth:${this.ethAccount}`,
-      OPF_URL: this.ctx.__opfUrl()
     };
 
     let versioning = [];
@@ -166,6 +162,10 @@ class Validator {
       '--no-mdns',
       '--node-key',
       this.nodeKey,
+      '--eth-rpc-url', this.ctx.eth.web3Url,
+      '--eth-key-id', "my_eth_key_id",
+      '--miner', `Eth:${this.ethAccount}`,
+      '--opf-url', this.ctx.__opfUrl(),
       '-lruntime=debug',
       '--reserved-only',
       ...versioning,

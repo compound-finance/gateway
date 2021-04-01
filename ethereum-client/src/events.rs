@@ -36,33 +36,6 @@ pub enum EthereumEvent {
 }
 
 lazy_static! {
-    static ref LOCK_OLD_EVENT: ethabi::Event = ethabi::Event {
-        name: String::from("Lock"),
-        inputs: vec![
-            ethabi::EventParam {
-                name: String::from("asset"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("sender"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("recipient"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("amount"),
-                kind: ethabi::param_type::ParamType::Uint(256),
-                indexed: false
-            }
-        ],
-        anonymous: false
-    };
-    static ref LOCK_OLD_EVENT_TOPIC: ethabi::Hash = LOCK_OLD_EVENT.signature();
     static ref LOCK_EVENT: ethabi::Event = ethabi::Event {
         name: String::from("Lock"),
         inputs: vec![
@@ -95,33 +68,6 @@ lazy_static! {
         anonymous: false
     };
     static ref LOCK_EVENT_TOPIC: ethabi::Hash = LOCK_EVENT.signature();
-    static ref LOCK_CASH_OLD_EVENT: ethabi::Event = ethabi::Event {
-        name: String::from("LockCash"),
-        inputs: vec![
-            ethabi::EventParam {
-                name: String::from("sender"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("recipient"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("amount"),
-                kind: ethabi::param_type::ParamType::Uint(256),
-                indexed: false
-            },
-            ethabi::EventParam {
-                name: String::from("principal"),
-                kind: ethabi::param_type::ParamType::Uint(128),
-                indexed: false
-            },
-        ],
-        anonymous: false
-    };
-    static ref LOCK_CASH_OLD_EVENT_TOPIC: ethabi::Hash = LOCK_CASH_OLD_EVENT.signature();
     static ref LOCK_CASH_EVENT: ethabi::Event = ethabi::Event {
         name: String::from("LockCash"),
         inputs: vec![

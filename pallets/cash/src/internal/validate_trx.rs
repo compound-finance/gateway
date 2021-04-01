@@ -253,8 +253,6 @@ mod tests {
     #[test]
     fn test_receive_event_not_a_validator() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
-
             let event_id: ChainLogId = ChainLogId::Eth(1, 1);
             let event: ChainLogEvent = ChainLogEvent::Eth(EthereumLogEvent {
                 block_hash: [0u8; 32],
@@ -287,7 +285,6 @@ mod tests {
     #[test]
     fn test_receive_event_is_validator() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let substrate_id = AccountId32::new([0u8; 32]);
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
             Validators::insert(
@@ -336,7 +333,6 @@ mod tests {
     #[test]
     fn test_exec_trx_request_nonce_zero() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let request: Vec<u8> = String::from("Hello").as_bytes().into();
             let nonce = 0;
             let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n70:Hello")
@@ -370,7 +366,6 @@ mod tests {
     #[test]
     fn test_exec_trx_request_nonce_nonzero() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let request: Vec<u8> = String::from("Hello").as_bytes().into();
             let nonce = 5;
             let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n75:Hello")
@@ -406,7 +401,6 @@ mod tests {
     #[test]
     fn test_publish_signature_invalid_signature() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -444,7 +438,6 @@ mod tests {
     #[test]
     fn test_publish_signature_invalid_validator() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -479,7 +472,6 @@ mod tests {
     #[test]
     fn test_publish_signature_valid() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {

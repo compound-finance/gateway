@@ -138,7 +138,6 @@ pub mod tests {
             "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
         let config = runtime_interfaces::new_config(given_eth_starport_address.clone());
         runtime_interfaces::config_interface::set(config);
-        runtime_interfaces::set_validator_config_dev_defaults();
 
         let given_eth_rpc_url =
             runtime_interfaces::validator_config_interface::get_eth_rpc_url().unwrap();

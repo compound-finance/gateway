@@ -31,11 +31,6 @@ impl SubstrateCli for Cli {
     }
 
     fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
-        if id == "dev" {
-            // check for our required environment variables and set them to the defaults if necessary
-            runtime_interfaces::set_validator_config_dev_defaults();
-        }
-
         Ok(match id {
             "dev" => Box::new(chain_spec::development_config()),
             "" | "local" | "testnet" => Box::new(chain_spec::local_testnet_config()),
@@ -138,6 +133,12 @@ pub fn run() -> sc_cli::Result<()> {
         }
         None => {
             let runner = cli.create_runner(&cli.run)?;
+            runtime_interfaces::initialize_validator_config(
+                cli.gateway.eth_key_id.clone(),
+                cli.gateway.eth_rpc_url.clone(),
+                cli.gateway.miner.clone(),
+                cli.gateway.opf_url.clone(),
+            );
             Ok(runner.run_node_until_exit(|config| async move {
                 match config.role {
                     Role::Light => service::new_light(config),

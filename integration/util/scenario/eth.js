@@ -15,10 +15,49 @@ class Eth {
     this.version = version;
     this.ctx = ctx;
     this.contractsFiles = {};
+    this.asyncId = 1;
   }
 
   root() {
     return this.defaultFrom;
+  }
+
+  sendAsync(method, params = []) {
+    let id = this.asyncId++;
+
+    return new Promise((resolve, reject) => {
+      this.web3.currentProvider.sendAsync({
+        jsonrpc: "2.0",
+        method,
+        params,
+        id: id
+      }, function(err, result) {
+        if (err) {
+          reject(err);
+        } else {
+          if (result.id !== id) {
+            throw new Error(`Incorrect response id. Expected=${id}, Received=${result.id}`);
+          }
+
+          resolve(result.result);
+        }
+      });
+    });
+  }
+
+  async mine(count = 1, ts = undefined) {
+    for (const i in [...new Array(count)]) {
+      let params = [ts].filter((x) => x !== undefined);
+      await this.sendAsync('evm_mine', params);
+    }
+  }
+
+  async snapshot() {
+    return await this.sendAsync('evm_snapshot');
+  }
+
+  async restore(snapshotId) {
+    await this.sendAsync('evm_revert', [snapshotId]);
   }
 
   async getContractsFile(contractsFile) {
@@ -85,9 +124,15 @@ class Eth {
   }
 
   async ethBalance(actorLookup) {
-    let actor = this.ctx.actors.get(actorLookup);
+    let ethAddress;
+    if (typeof(actorLookup) === 'string' && actorLookup.slice(0, 2) === '0x') {
+      ethAddress = actorLookup;
+    } else {
+      let actor = this.ctx.actors.get(actorLookup);
+      ethAddress = actor.ethAddress();
+    }
 
-    return Number(await this.web3.eth.getBalance(actor.ethAddress()));
+    return Number(await this.web3.eth.getBalance(ethAddress));
   }
 
   async getNextContractAddress(skip = 0) {
