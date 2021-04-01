@@ -1,5 +1,6 @@
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
+    portfolio::Portfolio,
     rates::APR,
     reason::Reason,
     types::{AssetAmount, AssetBalance, AssetInfo},
@@ -19,5 +20,6 @@ sp_api::decl_runtime_apis! {
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason>;
         fn get_accounts() -> Result<Vec<ChainAccount>, Reason>;
         fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason>;
+        fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason>;
     }
 }

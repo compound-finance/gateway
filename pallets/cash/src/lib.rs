@@ -17,8 +17,9 @@ use crate::{
     },
     events::{ChainLogEvent, ChainLogId, EventState},
     notices::{Notice, NoticeId, NoticeState},
+    portfolio::Portfolio,
     types::{
-        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Balance, Bips, CashIndex, CashPrincipal,
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
         LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig, APR,
     },
@@ -28,7 +29,7 @@ use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
-    traits::{OnRuntimeUpgrade, StoredMap, UnfilteredDispatchable},
+    traits::{StoredMap, UnfilteredDispatchable},
     weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
@@ -685,11 +686,16 @@ impl<T: Config> Module<T> {
 
     /// Get the all liquidity
     pub fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
-        let accounts : Vec<(ChainAccount, String)> = core::get_accounts_liquidity::<T>()?
-        .iter()
-        .map(|(chain_account, bal)| (chain_account.clone(), format!("{}", bal)))
-        .collect();
+        let accounts: Vec<(ChainAccount, String)> = core::get_accounts_liquidity::<T>()?
+            .iter()
+            .map(|(chain_account, bal)| (chain_account.clone(), format!("{}", bal)))
+            .collect();
         Ok(accounts)
+    }
+
+    /// Get the portfolio for the given chain account.
+    pub fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
+        Ok(core::get_portfolio::<T>(account)?)
     }
 }
 

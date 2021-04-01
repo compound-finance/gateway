@@ -134,17 +134,24 @@ pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
 
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
-    let info: Vec<(ChainAccount)> = CashPrincipals::iter().map(|p| p.0).collect::<Vec<ChainAccount>>();
+    let info: Vec<ChainAccount> = CashPrincipals::iter()
+        .map(|p| p.0)
+        .collect::<Vec<ChainAccount>>();
     Ok(info)
 }
 
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
-    let mut info:  Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
+    let mut info: Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
         .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
         .collect::<Vec<(ChainAccount, AssetBalance)>>();
-    info.sort_by(|(a_account,a_balance), (b_account,b_balance)| a_balance.cmp(b_balance));
+    info.sort_by(|(_a_account, a_balance), (_b_account, b_balance)| a_balance.cmp(b_balance));
     Ok(info)
+}
+
+/// Return the portfolio of the chain account
+pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
+    Ok(Portfolio::from_storage::<T>(account)?)
 }
 
 // Internal helpers
