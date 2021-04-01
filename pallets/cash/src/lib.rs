@@ -103,7 +103,7 @@ pub trait Config:
     type SessionInterface: self::SessionInterface<SubstrateId>;
 
     /// Weight information for extrinsics in this pallet.
-	type WeightInfo: WeightInfo;
+    type WeightInfo: WeightInfo;
 }
 
 decl_storage! {
@@ -535,7 +535,7 @@ decl_module! {
         }
 
         /// Set the cash yield rate at some point in the future. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_yield_next(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start))?)
@@ -549,18 +549,14 @@ decl_module! {
         }
 
         // TODO: Do we need to sign the event id, too?
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::receive_event(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
             log!("receive_event(origin,event_id,event,signature): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
         }
 
-        #[weight = (
-            <T as Config>::WeightInfo::publish_signature(),
-            DispatchClass::Operational,
-            Pays::No,
-        )]
+        #[weight = (<T as Config>::WeightInfo::publish_signature(), DispatchClass::Operational, Pays::No)]
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::notices::publish_signature(chain_id, notice_id, signature))?)
