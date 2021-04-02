@@ -85,8 +85,6 @@ pub fn exec_trx_request<T: Config>(
         );
     }
 
-    // transfer_cash_principal_internal::<T>(sender, account.into(), principal_amount)?;
-
     // XXX still controversial as we read from storage sometimes redundantly,
     //  and calculate amount from principal provided
     //  I think its ok as we should be able to cache things extremely well,
