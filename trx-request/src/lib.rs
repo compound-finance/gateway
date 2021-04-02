@@ -1,4 +1,3 @@
-#![feature(str_split_once)]
 // TODO: Are we okay with this? XXX I think so?
 #![allow(incomplete_features)]
 #![feature(unsized_locals)]

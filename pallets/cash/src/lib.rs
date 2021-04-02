@@ -592,7 +592,7 @@ decl_module! {
 
         // Remove any notice holds if they have been executed
         #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
-        pub fn cull_notices(origin) -> dispatch::DispatchResult {
+        pub fn cull_notices(_origin) -> dispatch::DispatchResult {
             log!("Culling executed notices");
             NoticeHolds::iter().for_each(|(chain_id, notice_id)| {
                 match NoticeStates::get(chain_id, notice_id) {
@@ -679,6 +679,10 @@ impl<T: Config> Module<T> {
         Ok(core::get_rates::<T>(asset)?)
     }
 
+    /// Get the list of assets
+    pub fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
+        Ok(core::get_assets::<T>()?)
+    }
     /// Get the rates for the given asset.
     pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
         Ok(core::get_accounts::<T>()?)

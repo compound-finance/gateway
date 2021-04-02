@@ -179,6 +179,19 @@ function defineCommands(r, { api, keyring, types }, saddle, network, contracts) 
     })
   });
 
+  r.defineCommand('exec', {
+    help: 'Sign and send a trx request from saddle eth addr',
+    action: defineAction(r, async (request) => {
+      let user = saddle.account;// get saddle user and make chain account
+      const nonce = await api.query.cash.nonces({eth: user});
+      let req = `${nonce}:${request}`
+      let sig = await saddle.web3.eth.sign(req, user)
+      console.log("🎲", req)
+      let tx = api.tx.cash.execTrxRequest(request, {'Eth': [user, sig]}, nonce)
+      console.log("🏁", await tx.send())
+    })
+  });
+
   r.defineCommand('eth_network', {
     help: 'Show given Ethereum network',
     action: defineAction(r, async () => {

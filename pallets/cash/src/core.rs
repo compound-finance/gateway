@@ -108,6 +108,14 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
         .get_rates(utilization, APR::ZERO, info.miner_shares)?)
 }
 
+/// Return the current list of assets.
+pub fn get_assets<T: Config>() -> Result<Vec<AssetInfo>, Reason> {
+    let info = SupportedAssets::iter()
+        .map(|(_chain_asset, asset_info)| asset_info)
+        .collect::<Vec<AssetInfo>>();
+    Ok(info)
+}
+
 /// Return the current total borrow and total supply balances for the asset.
 pub fn get_market_totals<T: Config>(
     asset: ChainAsset,
@@ -1509,6 +1517,38 @@ mod tests {
             let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(asset)?;
             assert_eq!(borrow_rate, kink_rate.into());
             assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_get_assets() -> Result<(), Reason> {
+        new_test_ext().execute_with(|| {
+            initialize_storage();
+            let assets = vec![
+                AssetInfo {
+                    ticker: FromStr::from_str("USD").unwrap(),
+                    liquidity_factor: FromStr::from_str("7890").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                            .unwrap(),
+                        FromStr::from_str("USDC/6").unwrap(),
+                    )
+                },
+                AssetInfo {
+                    liquidity_factor: FromStr::from_str("7890").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+                            .unwrap(),
+                        FromStr::from_str("ETH/18").unwrap(),
+                    )
+                },
+            ];
+
+            let found_assets = crate::core::get_assets::<Test>()?;
+
+            assert_eq!(assets, found_assets);
 
             Ok(())
         })

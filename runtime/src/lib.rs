@@ -574,6 +574,10 @@ impl_runtime_apis! {
             Cash::get_rates(asset)
         }
 
+        fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
+            Cash::get_assets()
+        }
+
         fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
             Cash::get_accounts()
         }
