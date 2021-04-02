@@ -378,7 +378,10 @@ mod mocked_core {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{chains::*, factor::*, rates::*, tests::mock::*, tests::*, types::*, *};
+    use crate::{
+        chains::*, factor::*, rates::*, reason::TrxReqParseError, tests::mock::*, tests::*,
+        types::*, *,
+    };
     use mocked_core::get_latest_call_result;
     use serial_test::serial;
 

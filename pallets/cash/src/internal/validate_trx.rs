@@ -128,7 +128,7 @@ mod tests {
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
         tests::*,
         types::{ValidatorKeys, ValidatorSig},
-        Call, NoticeStates, Validators,
+        Call, Nonces, NoticeStates, Validators,
     };
     use ethereum_client::{events::EthereumEvent::Lock, EthereumLogEvent};
     use frame_support::storage::StorageMap;
@@ -333,9 +333,9 @@ mod tests {
     #[test]
     fn test_exec_trx_request_nonce_zero() {
         new_test_ext().execute_with(|| {
-            let request: Vec<u8> = String::from("Hello").as_bytes().into();
+            let request: Vec<u8> = String::from("(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)").as_bytes().into();
             let nonce = 0;
-            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n70:Hello")
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n720:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
                 .as_bytes()
                 .into();
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
@@ -366,9 +366,13 @@ mod tests {
     #[test]
     fn test_exec_trx_request_nonce_nonzero() {
         new_test_ext().execute_with(|| {
-            let request: Vec<u8> = String::from("Hello").as_bytes().into();
+            let request: Vec<u8> = String::from(
+                "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
+            )
+            .as_bytes()
+            .into();
             let nonce = 5;
-            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n75:Hello")
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n725:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
                 .as_bytes()
                 .into();
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
