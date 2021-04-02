@@ -6,6 +6,7 @@ use crate::{
     reason::Reason,
     AllowedNextCodeHash, Call, Config, Nonces, Notices, Validators,
 };
+
 use codec::Encode;
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
 use our_std::RuntimeDebug;
@@ -22,6 +23,8 @@ pub enum ValidationError {
     InvalidPrice(Reason),
     UnknownNotice,
     InvalidNonce,
+    InvalidTrxRequest,
+    NoCashToPayTrxRequestFee,
 }
 
 pub fn validate_unsigned<T: Config>(
@@ -69,23 +72,31 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::exec_trx_request(request, signature, nonce) => {
-            // TODO: We might want to check existential value of signer
-            let sender = signature
-                .recover_account(&internal::exec_trx_request::prepend_nonce(request, *nonce)[..])
-                .map_err(|_| ValidationError::InvalidSignature)?;
+            let signer_res = internal::exec_trx_request::is_minimally_valid_trx_request::<T>(
+                request.to_vec(),
+                *signature,
+                *nonce,
+            );
 
-            let current_nonce = Nonces::get(sender);
-            if *nonce == current_nonce {
-                Ok(
-                    ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
-                        .priority(UNSIGNED_TXS_PRIORITY)
-                        .longevity(UNSIGNED_TXS_LONGEVITY)
-                        .and_provides((sender, nonce))
-                        .propagate(true)
-                        .build(),
+            match (signer_res, nonce) {
+                // (Err(Reason::InvalidUTF8), _) => Err(ValidationError::InvalidTrxRequest),
+                // (Err(TrxReqParseError), _) => Err(ValidationError::InvalidTrxRequest),
+                // (Err(Reason::SignatureAccountMismatch), _) => {
+                //     Err(ValidationError::InvalidSignature)
+                // }
+                // (Err(Reason::IncorrectNonce(_, _)), _) => Err(ValidationError::InvalidNonce),
+                // (Err(Reason::InsufficientChainCash), _) => {
+                //     Err(ValidationError::NoCashToPayTrxRequestFee)
+                // }
+                (Err(_e), _) => Err(ValidationError::InvalidTrxRequest),
+                (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
+                    "Gateway::exec_trx_request",
                 )
-            } else {
-                Err(ValidationError::InvalidNonce)
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
+                .and_provides((sender, nonce))
+                .propagate(true)
+                .build()),
             }
         }
         Call::publish_signature(chain_id, notice_id, signature) => {

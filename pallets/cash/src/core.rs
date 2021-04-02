@@ -606,6 +606,42 @@ pub fn transfer_internal<T: Config>(
     Ok(())
 }
 
+pub fn transfer_cash_principal_fee_internal<T:Config>(sender: ChainAccount) -> Result<(), Reason> {
+    let miner = get_some_miner::<T>();
+    let index: CashIndex = GlobalCashIndex::get();
+    require!(
+        has_liquidity_to_reduce_cash::<T>(sender, TRANSFER_FEE)?,
+        Reason::InsufficientLiquidity
+    );
+
+    let sender_cash_principal = CashPrincipals::get(sender);
+    let miner_cash_principal = CashPrincipals::get(miner);
+
+    let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
+    let (_sender_withdraw_principal, sender_borrow_principal) =
+        withdraw_and_borrow_principal(sender_cash_principal, fee_principal);
+    let (miner_repay_principal, _miner_supply_principal) =
+        repay_and_supply_principal(miner_cash_principal, fee_principal);
+
+    let miner_cash_principal_new = miner_cash_principal.add_amount(fee_principal)?;
+    let sender_cash_principal_new = sender_cash_principal.sub_amount(fee_principal)?;
+
+    let total_cash_principal_new = sub_principal_amounts(
+        add_principal_amounts(TotalCashPrincipal::get(), sender_borrow_principal)?,
+        miner_repay_principal,
+        Reason::RepayTooMuch,
+    )?;
+
+    CashPrincipals::insert(miner, miner_cash_principal_new);
+    CashPrincipals::insert(sender, sender_cash_principal_new);
+    TotalCashPrincipal::put(total_cash_principal_new);
+
+    <Module<T>>::deposit_event(Event::TransferCash(sender, miner, fee_principal, index));
+
+    Ok(())
+
+}
+
 pub fn transfer_cash_principal_internal<T: Config>(
     sender: ChainAccount,
     recipient: ChainAccount,
