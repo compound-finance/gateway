@@ -22,7 +22,6 @@ pub enum ValidationError {
     InvalidPriceSignature,
     InvalidPrice(Reason),
     UnknownNotice,
-    InvalidNonce,
     InvalidTrxRequest,
 }
 
@@ -399,6 +398,87 @@ mod tests {
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
                 Ok(exp)
+            );
+        });
+    }
+
+    #[test]
+    fn test_exec_trx_request_invalid_request_wrong_nonce() {
+        new_test_ext().execute_with(|| {
+            let request: Vec<u8> = String::from(
+                "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
+            )
+            .as_bytes()
+            .into();
+            let nonce = 5;
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n725:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
+                .as_bytes()
+                .into();
+            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+            let eth_key_id =
+                runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+            let signature_raw =
+                runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+            let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            Nonces::insert(ChainAccount::Eth(eth_address), nonce - 1);
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::exec_trx_request::<Test>(request, signature, nonce),
+                ),
+                Err(ValidationError::InvalidTrxRequest)
+            );
+        });
+    }
+
+    #[test]
+    fn test_exec_trx_request_invalid_request_parse_error() {
+        new_test_ext().execute_with(|| {
+            let request: Vec<u8> = String::from("Parse Error").as_bytes().into();
+            let nonce = 5;
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n135:Parse Error")
+                .as_bytes()
+                .into();
+            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+            let eth_key_id =
+                runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+            let signature_raw =
+                runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+            let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::exec_trx_request::<Test>(request, signature, nonce),
+                ),
+                Err(ValidationError::InvalidTrxRequest)
+            );
+        });
+    }
+
+    #[test]
+    fn test_exec_trx_request_invalid_request_invalid_signature() {
+        new_test_ext().execute_with(|| {
+            let request: Vec<u8> = String::from("Hello").as_bytes().into();
+            let nonce = 5;
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n45:Hello")
+                .as_bytes()
+                .into();
+            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+            let eth_key_id =
+                runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+            let signature_raw =
+                runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+            let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::exec_trx_request::<Test>(request, signature, nonce),
+                ),
+                Err(ValidationError::InvalidTrxRequest)
             );
         });
     }
