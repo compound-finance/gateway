@@ -4,15 +4,14 @@ use frame_support::storage::{StorageMap, StorageValue};
 use crate::core::get_asset;
 #[cfg(not(test))]
 use crate::core::{
-    extract_cash_principal_internal, extract_internal, get_asset, has_liquidity_to_reduce_cash,
+    extract_cash_principal_internal, extract_internal, get_asset,
     liquidate_cash_collateral_internal, liquidate_cash_principal_internal, liquidate_internal,
-    transfer_cash_principal_fee_internal, transfer_cash_principal_internal, transfer_internal,
+    transfer_cash_principal_internal, transfer_internal,
 };
 use crate::{
     chains::{ChainAccount, ChainAccountSignature},
     log,
-    params::TRANSFER_FEE,
-    reason::{Reason, TrxReqParseError},
+    reason::Reason,
     require,
     symbol::CASH,
     types::{CashOrChainAsset, Nonce, Quantity},
@@ -51,13 +50,11 @@ pub fn is_minimally_valid_trx_request<T: Config>(
     signature: ChainAccountSignature,
     nonce: Nonce,
 ) -> Result<ChainAccount, Reason> {
-    // Checks if request string contains valid symbols
+    // Basic request validity checks - valid symbols and parsable request
     let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
-
-    // Checks if request is parsable
     trx_request::parse_request(request_str)?;
 
-    // Checks if signature is valid
+    // Signature check
     let sender = signature
         .recover_account(&prepend_nonce(&request, nonce)[..])
         .map_err(|_| Reason::SignatureAccountMismatch)?;
@@ -67,10 +64,6 @@ pub fn is_minimally_valid_trx_request<T: Config>(
     require!(
         nonce == current_nonce,
         Reason::IncorrectNonce(nonce, current_nonce)
-    );
-    require!(
-        has_liquidity_to_reduce_cash::<T>(sender, TRANSFER_FEE)?,
-        Reason::InsufficientChainCash
     );
     Ok(sender)
 }
@@ -91,10 +84,6 @@ pub fn exec_trx_request<T: Config>(
             Reason::IncorrectNonce(nonce, current_nonce)
         );
     }
-
-    // Charge trx request fee
-    // XXX TODO delete trx request fee from TRANSFERs
-    transfer_cash_principal_fee_internal::<T>(sender)?;
 
     // transfer_cash_principal_internal::<T>(sender, account.into(), principal_amount)?;
 

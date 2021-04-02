@@ -4,11 +4,11 @@ use crate::{
     notices::EncodeNotice,
     params::{UNSIGNED_TXS_LONGEVITY, UNSIGNED_TXS_PRIORITY},
     reason::Reason,
-    AllowedNextCodeHash, Call, Config, Nonces, Notices, Validators,
+    AllowedNextCodeHash, Call, Config, Notices, Validators,
 };
 
 use codec::Encode;
-use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue};
+use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageValue};
 use our_std::RuntimeDebug;
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
@@ -24,7 +24,6 @@ pub enum ValidationError {
     UnknownNotice,
     InvalidNonce,
     InvalidTrxRequest,
-    NoCashToPayTrxRequestFee,
 }
 
 pub fn validate_unsigned<T: Config>(
@@ -79,15 +78,6 @@ pub fn validate_unsigned<T: Config>(
             );
 
             match (signer_res, nonce) {
-                // (Err(Reason::InvalidUTF8), _) => Err(ValidationError::InvalidTrxRequest),
-                // (Err(TrxReqParseError), _) => Err(ValidationError::InvalidTrxRequest),
-                // (Err(Reason::SignatureAccountMismatch), _) => {
-                //     Err(ValidationError::InvalidSignature)
-                // }
-                // (Err(Reason::IncorrectNonce(_, _)), _) => Err(ValidationError::InvalidNonce),
-                // (Err(Reason::InsufficientChainCash), _) => {
-                //     Err(ValidationError::NoCashToPayTrxRequestFee)
-                // }
                 (Err(_e), _) => Err(ValidationError::InvalidTrxRequest),
                 (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
                     "Gateway::exec_trx_request",
