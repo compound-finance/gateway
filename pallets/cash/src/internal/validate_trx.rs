@@ -22,7 +22,7 @@ pub enum ValidationError {
     InvalidPriceSignature,
     InvalidPrice(Reason),
     UnknownNotice,
-    InvalidTrxRequest,
+    InvalidTrxRequest(Reason),
 }
 
 pub fn validate_unsigned<T: Config>(
@@ -77,7 +77,7 @@ pub fn validate_unsigned<T: Config>(
             );
 
             match (signer_res, nonce) {
-                (Err(_e), _) => Err(ValidationError::InvalidTrxRequest),
+                (Err(e), _) => Err(ValidationError::InvalidTrxRequest(e)),
                 (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
                     "Gateway::exec_trx_request",
                 )
@@ -126,6 +126,7 @@ mod tests {
         },
         events::{ChainLogEvent, ChainLogId},
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
+        reason::TrxReqParseError,
         tests::*,
         types::{ValidatorKeys, ValidatorSig},
         Call, Nonces, NoticeStates, Validators,
@@ -428,7 +429,7 @@ mod tests {
                     TransactionSource::InBlock {},
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
-                Err(ValidationError::InvalidTrxRequest)
+                Err(ValidationError::InvalidTrxRequest(Reason::IncorrectNonce(nonce, nonce - 1)))
             );
         });
     }
@@ -453,7 +454,9 @@ mod tests {
                     TransactionSource::InBlock {},
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
-                Err(ValidationError::InvalidTrxRequest)
+                Err(ValidationError::InvalidTrxRequest(
+                    Reason::TrxRequestParseError(TrxReqParseError::InvalidExpression)
+                ))
             );
         });
     }
@@ -461,9 +464,13 @@ mod tests {
     #[test]
     fn test_exec_trx_request_invalid_request_invalid_signature() {
         new_test_ext().execute_with(|| {
-            let request: Vec<u8> = String::from("Hello").as_bytes().into();
+            let request: Vec<u8> = String::from(
+                "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
+            )
+            .as_bytes()
+            .into();
             let nonce = 5;
-            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n45:Hello")
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n45:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
                 .as_bytes()
                 .into();
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
@@ -478,7 +485,9 @@ mod tests {
                     TransactionSource::InBlock {},
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
-                Err(ValidationError::InvalidTrxRequest)
+                Err(ValidationError::InvalidTrxRequest(
+                    Reason::SignatureAccountMismatch
+                ))
             );
         });
     }
