@@ -77,7 +77,7 @@ pub enum EventError {
 // XXX does this belong here? all very eth specific...
 //  whats the separate with internal?
 /// Fetch all latest Starport events for the offchain worker.
-pub fn fetch_eth_events(from_block: String) -> Result<EventInfo, EventError> {
+pub fn fetch_eth_blocks(from_block: String) -> Result<EventInfo, EventError> {
     // Get a validator config from runtime-interfaces pallet
     // Use config to get an address for interacting with Ethereum JSON RPC client
     let config = runtime_interfaces::config_interface::get();
@@ -106,8 +106,9 @@ pub fn fetch_eth_events(from_block: String) -> Result<EventInfo, EventError> {
     );
 
     // Fetch events using ethereum_client
-    let logs = ethereum_client::fetch_and_decode_logs(&eth_rpc_url, vec![&fetch_events_request])
-        .map_err(EventError::EthereumClientError)?;
+    let logs =
+        ethereum_client::fetch_and_decode_logs(&eth_rpc_url, vec![fetch_events_request.into()])
+            .map_err(EventError::EthereumClientError)?;
 
     let events = logs
         .into_iter()

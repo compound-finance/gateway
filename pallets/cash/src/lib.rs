@@ -12,7 +12,8 @@ extern crate trx_request;
 
 use crate::{
     chains::{
-        ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
+        ChainAccount, ChainAccountSignature, ChainAsset, ChainBlock, ChainBlockTally, ChainBlocks,
+        ChainEvents, ChainHash, ChainId, ChainReorg, ChainReorgTally, ChainSignature,
         ChainSignatureList,
     },
     events::{ChainLogEvent, ChainLogId, EventState},
@@ -212,6 +213,19 @@ decl_storage! {
 
         /// The cash index of the previous yield accrual point or defaults to initial cash index.
         LastYieldCashIndex get(fn last_yield_cash_index): CashIndex;
+
+        /// The mapping of ingression queue events, by chain.
+        IngressionQueue get(fn ingression_queue): map hasher(blake2_128_concat) ChainId => Option<ChainEvents>;
+
+        // XXX must be initialized for each chain...where to start fetching events from
+        /// The mapping of last block number for which validators added events to the ingression queue, by chain.
+        LastProcessedBlock get(fn last_processed_block): map hasher(blake2_128_concat) ChainId => Option<ChainBlock>;
+
+        /// The mapping of worker tallies for each descendant block, on current fork of underlying chain.
+        PendingChainBlocks get(fn pending_chain_blocks): map hasher(blake2_128_concat) ChainId => Vec<ChainBlockTally>;
+
+        /// The mapping of worker tallies for each alternate reorg, relative to current fork of underlying chain.
+        PendingChainReorgs get(fn pending_chain_reorgs): map hasher(blake2_128_concat) ChainId => Vec<ChainReorgTally>;
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
@@ -551,10 +565,18 @@ decl_module! {
 
         // TODO: Do we need to sign the event id, too?
         #[weight = (<T as Config>::WeightInfo::receive_event(), DispatchClass::Operational, Pays::No)] // XXX
-        pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_event(origin,event_id,event,signature): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
+        pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+            log!("receive_chain_blocks(origin, blocks, signature): {:?} {}", blocks, hex::encode(&signature)); // XXX ?
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
+            Ok(check_failure::<T>(internal::events::receive_chain_blocks::<T>(blocks, signature))?)
+        }
+
+        // TODO: Do we need to sign the event id, too?
+        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
+            log!("receive_chain_reorg(origin, reorg, signature): {:?} {}", reorg, hex::encode(&signature)); // XXX ?
+            ensure_none(origin)?;
+            Ok(check_failure::<T>(internal::events::receive_chain_reorg::<T>(reorg, signature))?)
         }
 
         #[weight = (<T as Config>::WeightInfo::publish_signature(), DispatchClass::Operational, Pays::No)]
@@ -565,8 +587,8 @@ decl_module! {
 
         /// Offchain Worker entry point.
         fn offchain_worker(block_number: T::BlockNumber) {
-            if let Err(e) = internal::events::fetch_events::<T>() {
-                log!("offchain_worker error during fetch events: {:?}", e);
+            if let Err(e) = internal::events::track_chain_events::<T>() {
+                log!("offchain_worker error during track_chain_events: {:?}", e);
             }
 
             let (succ, skip, failures) = internal::notices::process_notices::<T>(block_number);
@@ -587,22 +609,6 @@ decl_module! {
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)
-        }
-
-        // Remove any notice holds if they have been executed
-        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
-        pub fn cull_notices(origin) -> dispatch::DispatchResult {
-            log!("Culling executed notices");
-            NoticeHolds::iter().for_each(|(chain_id, notice_id)| {
-                match NoticeStates::get(chain_id, notice_id) {
-                    NoticeState::Executed => {
-                        NoticeHolds::take(chain_id);
-                        log!("Removed notice hold {:?}:{:?} as it was already executed", chain_id, notice_id);
-                    },
-                    _ => ()
-                }
-            });
-            Ok(())
         }
     }
 }

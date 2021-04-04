@@ -178,7 +178,7 @@ pub fn handle_notice_invoked<T: Config>(
 ) -> Result<(), Reason> {
     require!(
         NoticeHashes::get(notice_hash) == Some(notice_id),
-        Reason::NoticeHashMismatch
+        Reason::HashMismatch
     );
     Notices::take(chain_id, notice_id);
     if let Some(notice_hold_id) = NoticeHolds::get(chain_id) {
@@ -246,10 +246,15 @@ pub fn publish_signature(
             let notice = Notices::get(chain_id, notice_id)
                 .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
             let signer: ChainAccount = signature.recover(&notice.encode_notice())?;
-            let has_signer_v = has_signer(&signature_pairs, signer);
 
-            if has_signer_v {
-                return Ok(()); // Ignore for double-signs
+            // Skip signatures already in the list
+            if has_signer(&signature_pairs, signer) {
+                return Ok(());
+            }
+
+            // Note: we currently iterate all potentially all validators to check validity
+            if !Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
+                Err(Reason::UnknownValidator)?
             }
 
             // TODO: Can this be easier?
@@ -265,11 +270,6 @@ pub fn publish_signature(
                 }
                 _ => Err(Reason::SignatureMismatch),
             }?;
-
-            // Note: we currently iterate all potentially all validators to check validity
-            if !Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
-                Err(Reason::UnknownValidator)?
-            }
 
             NoticeStates::insert(
                 chain_id,
@@ -427,7 +427,7 @@ mod tests {
             let result =
                 handle_notice_invoked::<Test>(chain_id, NoticeId(66, 77), notice_hash, vec![]);
 
-            assert_eq!(result, Err(Reason::NoticeHashMismatch));
+            assert_eq!(result, Err(Reason::HashMismatch));
 
             assert_eq!(NoticeHashes::get(notice_hash), Some(notice_id));
             assert_eq!(Notices::get(chain_id, notice_id), Some(notice));

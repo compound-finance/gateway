@@ -38,6 +38,7 @@ pub fn validate_unsigned<T: Config>(
             }
             _ => Err(ValidationError::InvalidInternalOnly),
         },
+
         Call::set_next_code_via_hash(next_code) => {
             let hash = <Ethereum as Chain>::hash_bytes(&next_code);
 
@@ -54,21 +55,41 @@ pub fn validate_unsigned<T: Config>(
                 Err(ValidationError::InvalidNextCode)
             }
         }
-        Call::receive_event(event_id, event, signature) => {
-            let signer = <Ethereum as Chain>::recover_address(&event.encode(), *signature)
+
+        Call::receive_chain_blocks(blocks, signature) => {
+            let signer = <Ethereum as Chain>::recover_address(&blocks.encode(), *signature)
                 .map_err(|_| ValidationError::InvalidSignature)?;
             let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
             if validators.contains(&signer) {
-                Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
-                    .priority(UNSIGNED_TXS_PRIORITY)
-                    .longevity(UNSIGNED_TXS_LONGEVITY)
-                    .and_provides((event_id, signature))
-                    .propagate(true)
-                    .build())
+                Ok(
+                    ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
+                        .propagate(true)
+                        .build(),
+                )
             } else {
                 Err(ValidationError::InvalidValidator)
             }
         }
+
+        Call::receive_chain_reorg(reorg, signature) => {
+            let signer = <Ethereum as Chain>::recover_address(&reorg.encode(), *signature)
+                .map_err(|_| ValidationError::InvalidSignature)?;
+            let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
+            if validators.contains(&signer) {
+                Ok(
+                    ValidTransaction::with_tag_prefix("Gateway::receive_chain_reorg")
+                        .priority(100)
+                        .longevity(32)
+                        .propagate(true)
+                        .build(),
+                )
+            } else {
+                Err(ValidationError::InvalidValidator)
+            }
+        }
+
         Call::exec_trx_request(request, signature, nonce) => {
             let signer_res = internal::exec_trx_request::is_minimally_valid_trx_request::<T>(
                 request.to_vec(),
@@ -88,6 +109,7 @@ pub fn validate_unsigned<T: Config>(
                 .build()),
             }
         }
+
         Call::publish_signature(chain_id, notice_id, signature) => {
             let notice = Notices::get(chain_id, notice_id).ok_or(ValidationError::UnknownNotice)?;
             let signer = signature
@@ -107,12 +129,6 @@ pub fn validate_unsigned<T: Config>(
                 Err(ValidationError::InvalidValidator)
             }
         }
-        Call::cull_notices() => Ok(ValidTransaction::with_tag_prefix("Gateway::cull_notices")
-            .priority(UNSIGNED_TXS_PRIORITY)
-            .and_provides("cull_notices")
-            .propagate(false)
-            .build()),
-        _ => Err(ValidationError::InvalidCall),
     }
 }
 
@@ -223,28 +239,14 @@ mod tests {
     }
 
     #[test]
-    fn test_receive_event_recover_failure() {
+    fn test_receive_chain_blocks_recover_failure() {
         new_test_ext().execute_with(|| {
-            let event_id: ChainLogId = ChainLogId::Eth(1, 1);
-            let event: ChainLogEvent = ChainLogEvent::Eth(EthereumLogEvent {
-                block_hash: [0u8; 32],
-                block_number: 1,
-                transaction_index: 1,
-                log_index: 1,
-                event: Lock {
-                    asset: [0u8; 20],
-                    sender: [0u8; 20],
-                    chain: String::from("ETH"),
-                    recipient: [0u8; 32],
-                    amount: 500,
-                },
-            });
+            let blocks = ChainBlocks::Eth(vec![]);
             let signature: ValidatorSig = [0u8; 65];
-
             assert_eq!(
                 validate_unsigned(
                     TransactionSource::InBlock {},
-                    &Call::receive_event::<Test>(event_id, event, signature)
+                    &Call::receive_chain_blocks::<Test>(blocks, signature)
                 ),
                 Err(ValidationError::InvalidSignature)
             );
@@ -252,31 +254,15 @@ mod tests {
     }
 
     #[test]
-    fn test_receive_event_not_a_validator() {
+    fn test_receive_chain_blocks_not_a_validator() {
         new_test_ext().execute_with(|| {
-            let event_id: ChainLogId = ChainLogId::Eth(1, 1);
-            let event: ChainLogEvent = ChainLogEvent::Eth(EthereumLogEvent {
-                block_hash: [0u8; 32],
-                block_number: 1,
-                transaction_index: 1,
-                log_index: 1,
-                event: Lock {
-                    asset: [0u8; 20],
-                    sender: [0u8; 20],
-                    chain: String::from("ETH"),
-                    recipient: [0u8; 32],
-                    amount: 500,
-                },
-            });
-            let eth_signature = match event.sign_event().unwrap() {
-                ChainSignature::Eth(s) => s,
-                _ => panic!("absurd"),
-            };
+            let blocks = ChainBlocks::Eth(vec![]);
+            let signature = ChainId::Eth::sign(&blocks.encode);
 
             assert_eq!(
                 validate_unsigned(
                     TransactionSource::InBlock {},
-                    &Call::receive_event::<Test>(event_id, event, eth_signature)
+                    &Call::receive_chain_blocks::<Test>(blocks, signature)
                 ),
                 Err(ValidationError::InvalidValidator)
             );
@@ -284,9 +270,9 @@ mod tests {
     }
 
     #[test]
-    fn test_receive_event_is_validator() {
+    fn test_receive_chain_blocks_is_validator() {
         new_test_ext().execute_with(|| {
-            let substrate_id = AccountId32::new([0u8; 32]);
+            let substrate_id = AccountId32::new([1u8; 32]);
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
             Validators::insert(
                 substrate_id.clone(),
@@ -296,35 +282,18 @@ mod tests {
                 },
             );
 
-            let event_id: ChainLogId = ChainLogId::Eth(1, 1);
-            let event: ChainLogEvent = ChainLogEvent::Eth(EthereumLogEvent {
-                block_hash: [0u8; 32],
-                block_number: 1,
-                transaction_index: 1,
-                log_index: 1,
-                event: Lock {
-                    asset: [0u8; 20],
-                    sender: [0u8; 20],
-                    chain: String::from("ETH"),
-                    recipient: [0u8; 32],
-                    amount: 500,
-                },
-            });
-            let eth_signature = match event.sign_event().unwrap() {
-                ChainSignature::Eth(s) => s,
-                _ => panic!("absurd"),
-            };
+            let blocks = ChainBlocks::Eth(vec![]);
+            let signature = ChainId::Eth::sign(&blocks.encode());
             let exp = ValidTransaction::with_tag_prefix("Gateway::receive_event")
                 .priority(100)
                 .longevity(32)
-                .and_provides((event_id, eth_signature))
                 .propagate(true)
                 .build();
 
             assert_eq!(
                 validate_unsigned(
                     TransactionSource::InBlock {},
-                    &Call::receive_event::<Test>(event_id, event, eth_signature)
+                    &Call::receive_chain_blocks::<Test>(blocks, signature)
                 ),
                 Ok(exp)
             );

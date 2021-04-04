@@ -4,15 +4,18 @@ extern crate lazy_static;
 pub mod events;
 pub mod hex;
 
-use crate::events::decode_event;
 pub use crate::events::EthereumEvent;
-use crate::hex::{parse_u64, parse_word};
+use crate::{
+    events::decode_event,
+    hex::{parse_u64, parse_word},
+};
+
 use codec::{Decode, Encode};
 use frame_support::debug;
-use our_std::RuntimeDebug;
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
 
+use our_std::RuntimeDebug;
 use types_derive::Types;
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -37,8 +40,60 @@ pub struct EventsResponse<T> {
     pub error: Option<ResponseError>,
 }
 
+#[allow(non_snake_case)]
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
+pub struct TransactionObject {
+    pub blockHash: Option<String>,
+    pub blockNumber: Option<String>,
+    pub from: Option<String>,
+    pub gas: Option<String>,
+    pub gasPrice: Option<String>,
+    pub hash: Option<String>,
+    pub input: Option<String>,
+    pub nonce: Option<String>,
+    pub to: Option<String>,
+    pub transactionIndex: Option<String>,
+    pub r#type: Option<String>,
+    pub value: Option<String>,
+    pub r: Option<String>,
+    pub s: Option<String>,
+    pub v: Option<String>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
+pub struct BlockObject {
+    pub difficulty: Option<String>,
+    pub extraData: Option<String>,
+    pub gasLimit: Option<String>,
+    pub gasUsed: Option<String>,
+    pub hash: Option<String>,
+    pub logsBloom: Option<String>,
+    pub miner: Option<String>,
+    pub mixHash: Option<String>,
+    pub nonce: Option<String>,
+    pub number: Option<String>,
+    pub parentHash: Option<String>,
+    pub receiptRoot: Option<String>,
+    pub sha3Uncles: Option<String>,
+    pub size: Option<String>,
+    pub stateRoot: Option<String>,
+    pub timestamp: Option<String>,
+    pub totalDifficulty: Option<String>,
+    pub transactions: Option<Vec<TransactionObject>>,
+    pub transactionsRoot: Option<String>,
+    pub uncles: Option<Vec<String>>,
+}
+
 #[derive(Deserialize, RuntimeDebug, PartialEq)]
 pub struct BlockResponse {
+    pub id: Option<u64>,
+    pub result: Option<BlockObject>,
+    pub error: Option<ResponseError>,
+}
+
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
+pub struct BlockNumberResponse {
     pub id: Option<u64>,
     pub result: Option<String>,
     pub error: Option<ResponseError>,
@@ -73,9 +128,15 @@ fn deserialize_get_logs_response(
     serde_json::from_str(response)
 }
 
-fn deserialize_get_block_number_response(
+fn deserialize_get_block_by_number_response(
     response: &str,
 ) -> serde_json::error::Result<BlockResponse> {
+    serde_json::from_str(response)
+}
+
+fn deserialize_block_number_response(
+    response: &str,
+) -> serde_json::error::Result<BlockNumberResponse> {
     serde_json::from_str(response)
 }
 
@@ -90,17 +151,18 @@ pub struct EthereumLogEvent {
 
 fn send_rpc(
     server: &str,
-    method: &'static str,
-    params: Vec<&str>,
+    method: serde_json::Value,
+    params: Vec<serde_json::Value>,
 ) -> Result<String, EthereumClientError> {
     // TODO - move 2_000 to config???
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
-    let data = format!(
-        r#"{{"jsonrpc":"2.0","method":"{}","params":[{}],"id":1}}"#,
-        method,
-        params.join(",")
-    );
-    // debug::native::info!("Data for send_rpc: {}", data.clone());
+    let data = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": params,
+        "id":1
+    })
+    .to_string();
 
     let request = http::Request::post(server, vec![data]);
 
@@ -133,9 +195,9 @@ fn send_rpc(
 
 pub fn fetch_and_decode_logs(
     server: &str,
-    params: Vec<&str>,
+    params: Vec<serde_json::Value>,
 ) -> Result<Vec<EthereumLogEvent>, EthereumClientError> {
-    let body_str: String = send_rpc(server, "eth_getLogs", params)?;
+    let body_str: String = send_rpc(server, "eth_getLogs".into(), params)?;
     let deserialized_body = deserialize_get_logs_response(&body_str)
         .map_err(|_| EthereumClientError::JsonParseError)?;
     let eth_logs = deserialized_body
@@ -187,9 +249,26 @@ pub fn fetch_and_decode_logs(
         .collect())
 }
 
+pub fn fetch_block_with_number(
+    server: &str,
+    block_num: &str,
+) -> Result<BlockObject, EthereumClientError> {
+    let body_str: String = send_rpc(
+        server,
+        "eth_getBlockByNumber".into(),
+        vec![block_num.into(), true.into()],
+    )?;
+    let deserialized_body = deserialize_get_block_by_number_response(&body_str)
+        .map_err(|_| EthereumClientError::JsonParseError)?;
+
+    deserialized_body
+        .result
+        .ok_or(EthereumClientError::JsonParseError)
+}
+
 pub fn fetch_latest_block(server: &str) -> Result<u64, EthereumClientError> {
-    let body_str: String = send_rpc(server, "eth_blockNumber", vec![])?;
-    let deserialized_body = deserialize_get_block_number_response(&body_str)
+    let body_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
+    let deserialized_body = deserialize_block_number_response(&body_str)
         .map_err(|_| EthereumClientError::JsonParseError)?;
 
     parse_u64(Some(
@@ -203,6 +282,60 @@ pub fn fetch_latest_block(server: &str) -> Result<u64, EthereumClientError> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+
+    use sp_core::offchain::{testing, OffchainExt};
+
+    #[test]
+    fn test_fetch_latest_block() {
+        let (offchain, state) = testing::TestOffchainExt::new();
+        let mut t = sp_io::TestExternalities::default();
+        t.register_extension(OffchainExt::new(offchain));
+        {
+            let mut s = state.write();
+            s.expect_request(testing::PendingRequest {
+                method: "POST".into(),
+                uri: "https://mainnet-eth.compound.finance".into(),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                body: br#"{"id":1,"jsonrpc":"2.0","method":"eth_blockNumber","params":[]}"#
+                    .to_vec(),
+                response: Some(br#"{"jsonrpc":"2.0","id":1,"result": "0x123"}"#.to_vec()),
+                sent: true,
+                ..Default::default()
+            });
+        }
+        t.execute_with(|| {
+            let result = fetch_latest_block("https://mainnet-eth.compound.finance");
+            assert_eq!(result, Ok(291));
+        });
+    }
+
+    #[test]
+    fn test_fetch_block_with_number() {
+        let (offchain, state) = testing::TestOffchainExt::new();
+        let mut t = sp_io::TestExternalities::default();
+        t.register_extension(OffchainExt::new(offchain));
+        {
+            let mut s = state.write();
+            s.expect_request(
+                testing::PendingRequest {
+                    method: "POST".into(),
+                    uri: "https://mainnet-eth.compound.finance".into(),
+                    headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                    body: br#"{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x506",true]}"#.to_vec(),
+                    response: Some(br#"{"jsonrpc":"2.0","id":1,"result":{"difficulty":"0xb9e274f7969f5","extraData":"0x65746865726d696e652d657531","gasLimit":"0x7a121d","gasUsed":"0x781503","hash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a","logsBloom":"0x044410ea904e1020440110008000902200168801c81010301489212010002008080b0010004001b006040222c42004b001200408400500901889c908212040401020008d300010100198d10800100080027900254120000000530141030808140c299400162c0000d200204080008838240009002c020010400010101000481660200420a884b8020282204a00141ce10805004810800190180114180001b0001b1000020ac8040007000320b0480004018240891882a20080010281002c00000010102e0184210003010100438004202003080401000806204010000a42200104110100201200008081005001104002410140114a002010808c00200894c0c0","miner":"0xea674fdde714fd979de3edf0f56aa9716b898ec8","mixHash":"0xd733e12126a2155f0278c3987777eaca558a274b42d0396306dffb8fa6d21e76","nonce":"0x56a66f3802150748","number":"0x506","parentHash":"0x062e77dced431eb671a56839f96da912f68d841024665748d38cd3d6795961ea","receiptsRoot":"0x19ad317358916207491d4b64340153b924f4dda88fa8ef5dcb49090f234c00e7","sha3Uncles":"0xd21bed33f01dac18a3ee5538d1607ff2709d742eb4e13877cf66dcbed6c980f2","size":"0x5f50","stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6","timestamp":"0x5aae89b9","totalDifficulty":"0xa91291ae5c752d4885","transactions":[{"blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a","blockNumber":"0x508990","from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2","gas":"0x186a0","gasPrice":"0x153005ce00","hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c","input":"0x","nonce":"0x6740d","r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91","s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706","to":"0x1d53de4d66110689bf494a110e859f3a6d15661f","transactionIndex":"0x0","type":"0x0","v":"0x25","value":"0x453aa4214124000"}],"transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610","uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}}"#.to_vec()),
+                    sent: true,
+                    ..Default::default()
+                });
+        }
+        t.execute_with(|| {
+            let result = fetch_block_with_number("https://mainnet-eth.compound.finance", "0x506");
+            let block = result.unwrap();
+            assert_eq!(block.difficulty, Some("0xb9e274f7969f5".into()));
+            assert_eq!(block.number, Some("0x506".into()));
+            assert_eq!(block.transactions.unwrap().len(), 1);
+            assert_eq!(block.uncles.unwrap().len(), 1);
+        });
+    }
 
     #[test]
     fn test_deserialize_get_logs_request_happy_path() {

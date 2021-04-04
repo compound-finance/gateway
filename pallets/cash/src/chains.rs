@@ -3,7 +3,9 @@ pub use our_std::vec::Vec;
 
 use crate::rates::APR;
 use crate::reason::Reason;
-use crate::types::{AssetAmount, CashIndex, Timestamp};
+use crate::types::{
+    AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity, ValidatorSig,
+};
 
 use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
@@ -94,6 +96,7 @@ impl ChainId {
     }
 }
 
+// XXX why?
 impl Default for ChainId {
     fn default() -> Self {
         ChainId::Eth
@@ -224,6 +227,9 @@ impl ChainAccountSignature {
     }
 }
 
+/// Type for a block number tied on an underlying chain.
+pub type ChainBlockNumber = u64;
+
 /// Type for an hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
@@ -286,6 +292,148 @@ impl FromStr for ChainId {
     }
 }
 
+/// Type for describing a block coming from an underlying chain.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainBlock {
+    Eth(<Ethereum as Chain>::Block),
+}
+
+impl ChainBlock {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainBlock::Eth(_) => ChainId::Eth,
+        }
+    }
+
+    pub fn hash(&self) -> ChainHash {
+        match *self {
+            ChainBlock::Eth(block) => ChainHash::Eth(block.hash),
+        }
+    }
+
+    pub fn number(&self) -> ChainBlockNumber {
+        match *self {
+            ChainBlock::Eth(block) => block.number as ChainBlockNumber,
+        }
+    }
+}
+
+/// Type for describing a set of blocks coming from an underlying chain.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainBlocks {
+    Eth(Vec<<Ethereum as Chain>::Block>),
+}
+
+impl ChainBlocks {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainBlocks::Eth(_) => ChainId::Eth,
+        }
+    }
+}
+
+/// Type for describing a reorg of an underlying chain.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainReorg {
+    Eth {
+        from_hash: <Ethereum as Chain>::Hash,
+        to_hash: <Ethereum as Chain>::Hash,
+        reverse_blocks: Vec<<Ethereum as Chain>::Block>,
+        forward_blocks: Vec<<Ethereum as Chain>::Block>,
+    },
+}
+
+impl ChainReorg {
+    pub fn chain_id(&self) -> ChainId {
+        match *self {
+            ChainReorg::Eth { .. } => ChainId::Eth,
+        }
+    }
+
+    pub fn from_hash(&self) -> ChainHash {
+        match *self {
+            ChainReorg::Eth { from_hash, .. } => ChainHash::Eth(from_hash),
+        }
+    }
+}
+
+/// Type for tallying signatures for an underlying chain block.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct ChainBlockTally {
+    pub block: ChainBlock,
+    pub for_votes: SignersSet,
+    pub against_votes: SignersSet,
+}
+
+impl ChainBlockTally {
+    pub fn new(
+        chain_id: ChainId,
+        block: ChainBlock,
+        validator: ValidatorIdentity,
+    ) -> ChainBlockTally {
+        match chain_id {
+            ChainId::Eth => ChainBlockTally {
+                block,
+                for_votes: [validator].iter().cloned().collect(),
+                against_votes: SignersSet::new(),
+            },
+        }
+    }
+
+    pub fn passes_threshold(self) -> bool {
+        false // XXX also need to check internally? use this or different?
+    }
+}
+
+/// Type for tallying signatures for an underlying chain reorg.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct ChainReorgTally {
+    pub reorg: ChainReorg,
+    pub votes: SignersSet,
+}
+
+impl ChainReorgTally {
+    pub fn new(
+        chain_id: ChainId,
+        reorg: ChainReorg,
+        validator: ValidatorIdentity,
+    ) -> ChainReorgTally {
+        match chain_id {
+            ChainId::Eth => ChainReorgTally {
+                reorg,
+                votes: [validator].iter().cloned().collect(),
+            },
+        }
+    }
+
+    pub fn passes_threshold(self) -> bool {
+        false // XXX also need to check internally? use this or different?
+    }
+
+    // XXX takes identity...
+    pub fn with_signature(&mut self, signature: ValidatorIdentity) {
+        // XXX add to votes in place?
+    }
+}
+
+/// Type for describing a set of events coming from an underlying chain.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainEvents {
+    Eth(Vec<<Ethereum as Chain>::Event>),
+}
+
+impl ChainEvents {
+    pub fn push(&mut self, block: ChainBlock) {
+        // XXX add block to queue in place
+        match *self {
+            ChainEvents::Eth(eth_events) => match block {
+                ChainBlock::Eth(eth_block) =>
+                    eth_events.extend(eth_block.events)
+            }
+        }
+    }
+}
+
 pub trait Chain {
     const ID: ChainId;
 
@@ -299,6 +447,7 @@ pub trait Chain {
     type Signature: Debuggable + Clone + Eq;
     type EventId: Debuggable + Clone + Eq + Ord;
     type Event: Debuggable + Clone + Eq;
+    type Block: Debuggable + Clone + Eq;
 
     fn zero_hash() -> Self::Hash;
     fn hash_bytes(data: &[u8]) -> Self::Hash;
@@ -360,6 +509,9 @@ impl Chain for Gateway {
 
     #[type_alias("Gateway__Chain__")]
     type Event = comp::Event;
+
+    #[type_alias("Gateway__Chain__")]
+    type Block = gate::Block;
 
     fn zero_hash() -> Self::Hash {
         panic!("XXX not implemented");
@@ -429,6 +581,7 @@ impl Chain for Ethereum {
 
     #[type_alias("Ethereum__Chain__")]
     type Event = eth::Event;
+    type Block = eth::Block;
 
     fn zero_hash() -> Self::Hash {
         [0u8; 32]
@@ -522,6 +675,7 @@ impl Chain for Polkadot {
 
     #[type_alias("Polkadot__Chain__")]
     type Event = dot::Event;
+    type Block = dot::Block;
 
     fn zero_hash() -> Self::Hash {
         panic!("XXX not implemented");
@@ -591,6 +745,7 @@ impl Chain for Solana {
 
     #[type_alias("Solana__Chain__")]
     type Event = sol::Event;
+    type Block = sol::Block;
 
     fn zero_hash() -> Self::Hash {
         panic!("XXX not implemented");
@@ -660,6 +815,7 @@ impl Chain for Tezos {
 
     #[type_alias("Tezos__Chain__")]
     type Event = tez::Event;
+    type Block = tez::Block;
 
     fn zero_hash() -> Self::Hash {
         panic!("XXX not implemented");
@@ -701,7 +857,7 @@ impl Chain for Tezos {
 //  which would also be a union type that would allow us to store them together
 //  in general storing types which add variants for chains over time *must* be ok
 //   or this strategy breaks and we need to re-visit everywhere in storage that's happening
-pub mod comp {
+pub mod gate {
     use codec::{Decode, Encode};
     use our_std::RuntimeDebug;
 
@@ -712,6 +868,9 @@ pub mod comp {
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
+
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub struct Block {}
 }
 
 pub mod eth {
@@ -763,6 +922,14 @@ pub mod eth {
             extrinsics: Vec<Vec<u8>>,
         },
     }
+
+    #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub struct Block {
+        pub hash: <Ethereum as Chain>::Hash,
+        pub parent_hash: <Ethereum as Chain>::Hash,
+        pub number: BlockNumber,
+        pub events: Vec<Event>,
+    }
 }
 
 pub mod dot {
@@ -776,6 +943,9 @@ pub mod dot {
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
+
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub struct Block {}
 }
 
 pub mod sol {
@@ -789,6 +959,9 @@ pub mod sol {
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
+
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub struct Block {}
 }
 
 pub mod tez {
@@ -802,4 +975,7 @@ pub mod tez {
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Event {}
+
+    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+    pub struct Block {}
 }
