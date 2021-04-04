@@ -67,10 +67,11 @@ if ! which rustup >/dev/null 2>&1; then
 fi
 
 if ! rustup target list | grep 'wasm32-unknown-unknown (installed)' >/dev/null 2>&1; then
-    rustup toolchain install nightly
-    rustup update nightly
-    rustup target add wasm32-unknown-unknown --toolchain nightly
-    rustup default nightly
+    NIGHTLY=nightly-2021-03-24
+    rustup toolchain install $NIGHTLY
+    rustup update $NIGHTLY
+    rustup target add wasm32-unknown-unknown --toolchain $NIGHTLY
+    rustup default $NIGHTLY
 fi
 
 if [[ "$1" == "--fast" ]]; then

@@ -23,8 +23,10 @@ use frame_support::{
 use pallet_oracle::types::Price;
 
 use crate::{
-    chains::{ChainAccount, ChainAsset, ChainHash, ChainId},
-    events::ChainLogEvent,
+    chains::{
+        Chain, ChainAccount, ChainAsset, ChainBlockEvent, ChainBlockEvents, ChainHash, ChainId,
+        ChainSignature, Ethereum,
+    },
     factor::Factor,
     internal::{self, liquidity},
     log,
@@ -34,13 +36,14 @@ use crate::{
     reason::{MathError, Reason},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
-        CashPrincipal, CashPrincipalAmount, GovernanceResult, NoticeId, Quantity, Timestamp,
-        USDQuantity, Units, ValidatorIdentity, CASH,
+        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, NoticeId, Quantity,
+        SignersSet, Timestamp, USDQuantity, Units, ValidatorKeys, CASH,
     },
     AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
-    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp,
-    LastIndices, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp, Miner, Module,
-    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, IngressionQueue,
+    LastBlockTimestamp, LastIndices, LastMinerSharePrincipal, LastYieldCashIndex,
+    LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 #[macro_export]
@@ -115,6 +118,11 @@ pub fn get_quantity<T: Config>(asset: ChainAsset, amount: AssetAmount) -> Result
         .as_quantity(amount))
 }
 
+/// Return a quantity with units of CASH.
+pub fn get_cash_quantity<T: Config>(principal: CashPrincipalAmount) -> Result<Quantity, Reason> {
+    Ok(GlobalCashIndex::get().cash_quantity(principal)?)
+}
+
 /// Return the USD value of the asset amount.
 pub fn get_value<T: Config>(amount: AssetQuantity) -> Result<USDQuantity, Reason> {
     Ok(amount.mul_price(get_price::<T>(amount.units)?)?)
@@ -143,6 +151,11 @@ pub fn get_assets<T: Config>() -> Result<Vec<AssetInfo>, Reason> {
         .map(|(_chain_asset, asset_info)| asset_info)
         .collect::<Vec<AssetInfo>>();
     Ok(info)
+}
+
+/// Return the event ingression queue for the underlying chain.
+pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents, Reason> {
+    Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
 }
 
 /// Return the current total borrow and total supply balances for the asset.
@@ -196,25 +209,54 @@ pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reas
     Ok(Portfolio::from_storage::<T>(account)?)
 }
 
-// Internal helpers
-
-pub fn passes_validation_threshold(
-    signers: &BTreeSet<ValidatorIdentity>,
-    validators: &BTreeSet<ValidatorIdentity>,
-) -> bool {
-    // Intersection is taken for the situation when some of the signers are not currently active validators
-    let valid_signers: Vec<_> = validators.intersection(&signers).collect();
-    // Using ceil(2 * validators.len() / 3)
-    valid_signers.len() >= (2 * validators.len() + 3 - 1) / 3
+pub fn get_validator_set<T: Config>() -> Result<SignersSet, Reason> {
+    // Note: inefficient, probably manage reading validators from storage better
+    Ok(Validators::iter().map(|(_, v)| v.substrate_id).collect())
 }
 
-// XXX use Balances instead of raw balances everywhere and put all fns on types?
+/// Return the validator which signed the given data, given signature.
+pub fn recover_validator<T: Config>(
+    data: &[u8],
+    signature: ChainSignature,
+) -> Result<ValidatorKeys, Reason> {
+    // Note: inefficient, we should index by every key we want to query by
+    match signature {
+        ChainSignature::Eth(eth_sig) => {
+            let signer = <Ethereum as Chain>::recover_address(data, eth_sig)?;
+            for (_, validator) in Validators::iter() {
+                if validator.eth_address == signer {
+                    return Ok(validator);
+                }
+            }
+        }
 
-fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
+        _ => {
+            // XXX should we even be having other branches for signatures now?
+            //  we should probably delete all variants of ChainSignature except Eth
+            //   generally minimal since we dont want validators to have to add new keys
+            //    can be separate from ChainAccountSignature
+            return Err(Reason::NotImplemented); // XXX
+        }
+    }
+
+    Err(Reason::UnknownValidator)
+}
+
+/// Sign the given data as a validator, assuming we have the credentials.
+/// The validator can sign with any valid ChainSignature, which happens to only be Eth currently.
+pub fn validator_sign<T: Config>(data: &[u8]) -> Result<ChainSignature, Reason> {
+    Ok(ChainSignature::Eth(<Ethereum as Chain>::sign_message(
+        data,
+    )?))
+}
+
+// Internal helpers
+
+pub fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
     Ok(a.checked_add(b.value).ok_or(MathError::Overflow)?)
 }
 
-fn add_amount_to_balance(
+pub fn add_amount_to_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> Result<AssetBalance, MathError> {
@@ -222,14 +264,14 @@ fn add_amount_to_balance(
     Ok(balance.checked_add(signed).ok_or(MathError::Overflow)?)
 }
 
-fn add_principal_amounts(
+pub fn add_principal_amounts(
     a: CashPrincipalAmount,
     b: CashPrincipalAmount,
 ) -> Result<CashPrincipalAmount, MathError> {
     Ok(a.add(b)?)
 }
 
-fn sub_amount_from_raw(
+pub fn sub_amount_from_raw(
     a: AssetAmount,
     b: AssetQuantity,
     underflow: Reason,
@@ -237,7 +279,7 @@ fn sub_amount_from_raw(
     Ok(a.checked_sub(b.value).ok_or(underflow)?)
 }
 
-fn sub_amount_from_balance(
+pub fn sub_amount_from_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> Result<AssetBalance, MathError> {
@@ -253,7 +295,7 @@ pub fn sub_principal_amounts(
     Ok(a.sub(b).map_err(|_| underflow)?)
 }
 
-fn neg_balance(balance: AssetBalance) -> AssetAmount {
+pub fn neg_balance(balance: AssetBalance) -> AssetAmount {
     if balance < 0 {
         -balance as AssetAmount
     } else {
@@ -261,7 +303,7 @@ fn neg_balance(balance: AssetBalance) -> AssetAmount {
     }
 }
 
-fn pos_balance(balance: AssetBalance) -> AssetAmount {
+pub fn pos_balance(balance: AssetBalance) -> AssetAmount {
     if balance > 0 {
         balance as AssetAmount
     } else {
@@ -269,7 +311,7 @@ fn pos_balance(balance: AssetBalance) -> AssetAmount {
     }
 }
 
-fn repay_and_supply_amount(
+pub fn repay_and_supply_amount(
     balance: AssetBalance,
     amount: AssetQuantity,
 ) -> (AssetQuantity, AssetQuantity) {
@@ -313,7 +355,7 @@ pub fn repay_and_supply_principal(
     )
 }
 
-fn withdraw_and_borrow_principal(
+pub fn withdraw_and_borrow_principal(
     balance: CashPrincipal,
     principal: CashPrincipalAmount,
 ) -> (CashPrincipalAmount, CashPrincipalAmount) {
@@ -325,7 +367,7 @@ fn withdraw_and_borrow_principal(
     )
 }
 
-fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount, Reason> {
+pub fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount, Reason> {
     match &chain.to_ascii_uppercase()[..] {
         "ETH" => {
             let mut eth_recipient: [u8; 20] = [0; 20];
@@ -339,67 +381,104 @@ fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount,
 
 // Protocol interface //
 
-pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(), Reason> {
-    log!("apply_chain_event_internal(event): {:?}", &event);
+/// Apply the event to the current state, effectively taking the action.
+pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<(), Reason> {
+    log!("apply_chain_event_internal(event): {:?}", event);
 
     match event {
-        ChainLogEvent::Eth(eth_event) => match eth_event.event {
-            ethereum_client::events::EthereumEvent::Lock {
+        ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
+            ethereum_client::EthereumEvent::Lock {
                 asset,
                 sender,
                 chain,
                 recipient,
                 amount,
-            } => lock_internal::<T>(
-                get_asset::<T>(ChainAsset::Eth(asset))?,
-                ChainAccount::Eth(sender),
-                get_chain_account(chain, recipient)?,
-                get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
+            } => internal::lock::lock_internal::<T>(
+                get_asset::<T>(ChainAsset::Eth(*asset))?,
+                ChainAccount::Eth(*sender),
+                get_chain_account(chain.to_string(), *recipient)?,
+                get_quantity::<T>(ChainAsset::Eth(*asset), *amount)?,
             ),
 
-            ethereum_client::events::EthereumEvent::LockCash {
+            ethereum_client::EthereumEvent::LockCash {
                 sender,
                 chain,
                 recipient,
                 principal,
                 ..
             } => internal::lock::lock_cash_principal_internal::<T>(
-                ChainAccount::Eth(sender),
-                get_chain_account(chain, recipient)?,
-                CashPrincipalAmount(principal),
+                ChainAccount::Eth(*sender),
+                get_chain_account(chain.to_string(), *recipient)?,
+                CashPrincipalAmount(*principal),
             ),
 
-            ethereum_client::events::EthereumEvent::ExecuteProposal {
+            ethereum_client::EthereumEvent::ExecuteProposal {
                 title: _title,
                 extrinsics,
-            } => dispatch_extrinsics_internal::<T>(extrinsics),
+            } => dispatch_extrinsics_internal::<T>(extrinsics.to_vec()),
 
-            ethereum_client::events::EthereumEvent::ExecTrxRequest {
+            ethereum_client::EthereumEvent::ExecTrxRequest {
                 account,
                 trx_request,
             } => internal::exec_trx_request::exec_trx_request::<T>(
                 &trx_request[..],
-                ChainAccount::Eth(account),
+                ChainAccount::Eth(*account),
                 None,
             ),
 
-            ethereum_client::events::EthereumEvent::NoticeInvoked {
+            ethereum_client::EthereumEvent::NoticeInvoked {
                 era_id,
                 era_index,
                 notice_hash,
                 result,
             } => internal::notices::handle_notice_invoked::<T>(
                 ChainId::Eth,
-                NoticeId(era_id, era_index),
-                ChainHash::Eth(notice_hash),
-                result,
+                NoticeId(*era_id, *era_index),
+                ChainHash::Eth(*notice_hash),
+                result.to_vec(),
             ),
         },
     }
 }
 
+/// Un-apply the event on the current state, undoing the action to the extent possible/necessary.
+pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<(), Reason> {
+    log!("unapply_chain_event_internal(event): {:?}", event);
+
+    match event {
+        ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
+            ethereum_client::EthereumEvent::Lock {
+                asset,
+                sender,
+                chain,
+                recipient,
+                amount,
+            } => internal::lock::undo_lock_internal::<T>(
+                get_asset::<T>(ChainAsset::Eth(*asset))?,
+                ChainAccount::Eth(*sender),
+                get_chain_account(chain.to_string(), *recipient)?,
+                get_quantity::<T>(ChainAsset::Eth(*asset), *amount)?,
+            ),
+
+            ethereum_client::EthereumEvent::LockCash {
+                sender,
+                chain,
+                recipient,
+                principal,
+                ..
+            } => internal::lock::undo_lock_cash_principal_internal::<T>(
+                ChainAccount::Eth(*sender),
+                get_chain_account(chain.to_string(), *recipient)?,
+                CashPrincipalAmount(*principal),
+            ),
+
+            _ => Ok(()),
+        },
+    }
+}
+
 /// Update the index of which assets an account has non-zero balances in.
-fn set_asset_balance_internal<T: Config>(
+pub fn set_asset_balance_internal<T: Config>(
     asset: ChainAsset,
     account: ChainAccount,
     balance: AssetBalance,
@@ -451,44 +530,6 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
         .collect();
 
     <Module<T>>::deposit_event(Event::ExecutedGovernance(results));
-
-    Ok(())
-}
-
-pub fn lock_internal<T: Config>(
-    asset: AssetInfo,
-    sender: ChainAccount,
-    holder: ChainAccount,
-    amount: AssetQuantity,
-) -> Result<(), Reason> {
-    let holder_asset = AssetBalances::get(asset.asset, holder);
-    let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
-
-    let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
-    let total_supply_new =
-        add_amount_to_raw(TotalSupplyAssets::get(asset.asset), holder_supply_amount)?;
-    let total_borrow_new = sub_amount_from_raw(
-        TotalBorrowAssets::get(asset.asset),
-        holder_repay_amount,
-        Reason::RepayTooMuch,
-    )?;
-
-    let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
-        asset,
-        holder,
-        holder_asset,
-        holder_asset_new,
-        CashPrincipals::get(holder),
-    )?;
-
-    LastIndices::insert(asset.asset, holder, last_index_post);
-    CashPrincipals::insert(holder, cash_principal_post);
-    TotalSupplyAssets::insert(asset.asset, total_supply_new);
-    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
-
-    set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
-
-    <Module<T>>::deposit_event(Event::Locked(asset.asset, sender, holder, amount.value));
 
     Ok(())
 }
@@ -549,7 +590,7 @@ pub fn extract_cash_principal_internal<T: Config>(
     recipient: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<(), Reason> {
-    let index: CashIndex = GlobalCashIndex::get();
+    let index = GlobalCashIndex::get();
     let amount = index.cash_quantity(principal)?;
 
     require_min_tx_value!(get_value::<T>(amount)?);
@@ -681,7 +722,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
     principal: CashPrincipalAmount,
 ) -> Result<(), Reason> {
     let miner = get_some_miner::<T>();
-    let index: CashIndex = GlobalCashIndex::get();
+    let index = GlobalCashIndex::get();
     let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
     let principal_with_fee = principal.add(fee_principal)?;
     let amount = index.cash_quantity(principal)?;
@@ -1146,7 +1187,7 @@ pub fn get_cash_balance_with_asset_interest<T: Config>(
 
 // Asset Interest //
 
-/// Return CASH Principal post asset interest, and updated asset index, for a given account
+/// Return CASH Principal post asset interest, and updated asset index, for a given account.
 pub fn effect_of_asset_interest_internal(
     asset_info: AssetInfo,
     account: ChainAccount,
@@ -1316,11 +1357,7 @@ pub fn on_initialize_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        chains::*, core::*, factor::*, params::*, rates::*, symbol::*, tests::mock::*, tests::*,
-        types::*, *,
-    };
-    use pallet_oracle::types::Price;
+    use crate::tests::*;
 
     #[test]
     fn test_helpers() {
@@ -1492,6 +1529,14 @@ mod tests {
             initialize_storage();
             let assets = vec![
                 AssetInfo {
+                    liquidity_factor: FromStr::from_str("7890").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+                            .unwrap(),
+                        FromStr::from_str("ETH/18").unwrap(),
+                    )
+                },
+                AssetInfo {
                     ticker: FromStr::from_str("USD").unwrap(),
                     liquidity_factor: FromStr::from_str("7890").unwrap(),
                     ..AssetInfo::minimal(
@@ -1500,19 +1545,9 @@ mod tests {
                         FromStr::from_str("USDC/6").unwrap(),
                     )
                 },
-                AssetInfo {
-                    liquidity_factor: FromStr::from_str("7890").unwrap(),
-                    ..AssetInfo::minimal(
-                        FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
-                            .unwrap(),
-                        FromStr::from_str("ETH/18").unwrap(),
-                    )
-                },
             ];
 
-            let found_assets = crate::core::get_assets::<Test>()?;
-
-            assert_eq!(assets, found_assets);
+            assert_eq!(crate::core::get_assets::<Test>()?, assets);
 
             Ok(())
         })

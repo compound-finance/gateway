@@ -17,8 +17,8 @@ json_files=(./base_types.json)
 for project in ${projects[@]}; do
   json_file="$(mktemp)"
   echo "Building $project to $json_file"
-  cargo clean -p $project
-  TYPES_FILE="$json_file" cargo build -p $project
+  cargo +nightly clean -p $project
+  TYPES_FILE="$json_file" cargo +nightly build -p $project
   json_files[${#json_files[@]}]="$json_file"
 done
 

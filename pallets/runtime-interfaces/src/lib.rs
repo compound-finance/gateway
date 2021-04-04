@@ -4,19 +4,19 @@ extern crate lazy_static;
 use codec::{Decode, Encode};
 use gateway_crypto::CryptoError;
 use sp_runtime_interface::pass_by::PassByCodec;
-use std::sync::Mutex;
+use std::{str, sync::Mutex};
 
 #[derive(Clone, Decode, Encode, PassByCodec)]
 pub struct Config {
-    eth_starport_address: Vec<u8>,
+    pub eth_starport_address: String,
 }
 
 #[derive(Clone)]
 pub struct ValidatorConfig {
-    eth_key_id: String,
-    eth_rpc_url: String,
-    miner: String,
-    opf_url: String,
+    pub eth_key_id: String,
+    pub eth_rpc_url: String,
+    pub miner: String,
+    pub opf_url: String,
 }
 
 /// XXX Possible sanity checks for config fields here
@@ -24,13 +24,9 @@ impl Config {
     pub fn update(&mut self, new: Config) {
         self.eth_starport_address = new.eth_starport_address;
     }
-
-    pub fn get_eth_starport_address(&self) -> Vec<u8> {
-        self.eth_starport_address.clone()
-    }
 }
 
-pub fn new_config(eth_starport_address: Vec<u8>) -> Config {
+pub fn new_config(eth_starport_address: String) -> Config {
     return Config {
         eth_starport_address,
     };
@@ -83,6 +79,16 @@ pub trait ConfigInterface {
     fn get() -> Config {
         CONFIG.lock().unwrap().clone()
     }
+
+    /// Get the Ethereum Starport address.
+    fn get_eth_starport_address() -> Option<String> {
+        if let Ok(config) = CONFIG.lock() {
+            if config.eth_starport_address.len() == 42 {
+                return Some(config.eth_starport_address.clone());
+            }
+        }
+        return None;
+    }
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
@@ -129,17 +135,17 @@ pub trait ValidatorConfigInterface {
     }
 
     /// Get the Ethereum node RPC URL
-    fn get_eth_rpc_url() -> Option<Vec<u8>> {
+    fn get_eth_rpc_url() -> Option<String> {
         // check env override
         if let Ok(eth_rpc_url) = std::env::var(ETH_RPC_URL_ENV_VAR) {
             if eth_rpc_url.len() > 0 {
-                return Some(eth_rpc_url.into());
+                return Some(eth_rpc_url);
             }
         }
         // check config
         if let Ok(config) = VALIDATOR_CONFIG.lock() {
             if let Some(inner) = config.as_ref() {
-                return Some(inner.eth_rpc_url.clone().into());
+                return Some(inner.eth_rpc_url.clone());
             }
         }
         // not set
@@ -147,17 +153,17 @@ pub trait ValidatorConfigInterface {
     }
 
     /// Get the open price feed URLs
-    fn get_opf_url() -> Option<Vec<u8>> {
+    fn get_opf_url() -> Option<String> {
         // check env override
         if let Ok(opf_url) = std::env::var(OPF_URL_ENV_VAR) {
             if opf_url.len() > 0 {
-                return Some(opf_url.into());
+                return Some(opf_url);
             }
         }
         // check config
         if let Ok(config) = VALIDATOR_CONFIG.lock() {
             if let Some(inner) = config.as_ref() {
-                return Some(inner.opf_url.clone().into());
+                return Some(inner.opf_url.clone());
             }
         }
         // not set
@@ -256,10 +262,9 @@ mod tests {
     #[test]
     fn test_basic() {
         // this gets loaded from the json file "chain config file"
-        let given_eth_starport_address: Vec<u8> =
-            "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
-        let expected_eth_starport_address: Vec<u8> =
-            "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
+        let given_eth_starport_address = String::from("0xbbde1662bC3ED16aA8C618c9833c801F3543B587");
+        let expected_eth_starport_address =
+            String::from("0xbbde1662bC3ED16aA8C618c9833c801F3543B587");
 
         let config = new_config(given_eth_starport_address.clone());
         // set in node
