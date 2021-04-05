@@ -22,3 +22,11 @@ pub const ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
 
 // The number of blocks in between periodic sessions
 pub const SESSION_PERIOD: u32 = 14400; // Assuming 6s blocks, ~1 period per day
+
+/// Standard priority for all unsigned transactions
+/// More an be found here https://substrate.dev/docs/en/knowledgebase/learn-substrate/tx-pool
+pub const UNSIGNED_TXS_PRIORITY: u64 = 100;
+
+/// Standard longevity for all unsigned transactions
+/// More an be found here https://substrate.dev/docs/en/knowledgebase/learn-substrate/tx-pool
+pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;

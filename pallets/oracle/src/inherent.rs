@@ -118,7 +118,7 @@ impl<T: Config> ProvideInherent for Module<T> {
     }
 
     fn check_inherent(call: &Self::Call, _data: &InherentData) -> Result<(), Self::Error> {
-        match validate_trx::validate_unsigned(TransactionSource::Local, call) {
+        match validate_trx::validate_unsigned(TransactionSource::InBlock, call) {
             Ok(_) => Ok(()),
             Err(err) => {
                 log!("Invalid inherent: {:?}", err);

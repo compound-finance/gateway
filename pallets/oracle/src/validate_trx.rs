@@ -5,6 +5,8 @@ use our_std::RuntimeDebug;
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
 const MAX_EXTERNAL_PAIRS: usize = 30;
+const UNSIGNED_TXS_PRIORITY: u64 = 100;
+const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
 #[derive(Encode, Eq, PartialEq, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Decode))]
@@ -26,14 +28,16 @@ pub fn validate_unsigned<T: Config>(
                 match source {
                     TransactionSource::Local | TransactionSource::InBlock => {
                         Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                            .priority(100)
+                            .priority(UNSIGNED_TXS_PRIORITY)
+                            .longevity(UNSIGNED_TXS_LONGEVITY)
                             .and_provides(signature)
                             .propagate(false)
                             .build())
                     }
                     _ => match oracle::get_and_check_parsed_price::<T>(payload) {
                         Ok(_) => Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                            .priority(100)
+                            .priority(UNSIGNED_TXS_PRIORITY)
+                            .longevity(UNSIGNED_TXS_LONGEVITY)
                             .and_provides(signature)
                             .propagate(true)
                             .build()),
@@ -49,7 +53,8 @@ pub fn validate_unsigned<T: Config>(
             let if_valid = match source {
                 TransactionSource::Local | TransactionSource::InBlock => {
                     Ok(ValidTransaction::with_tag_prefix("Gateway::post_prices")
-                        .priority(100)
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
                         .and_provides(signatures)
                         .propagate(false)
                         .build())
@@ -57,7 +62,8 @@ pub fn validate_unsigned<T: Config>(
                 _ => {
                     if pairs.iter().count() < MAX_EXTERNAL_PAIRS {
                         Ok(ValidTransaction::with_tag_prefix("Gateway::post_prices")
-                            .priority(100)
+                            .priority(UNSIGNED_TXS_PRIORITY)
+                            .longevity(UNSIGNED_TXS_LONGEVITY)
                             .and_provides(signatures)
                             .propagate(true)
                             .build())
@@ -144,7 +150,8 @@ mod tests {
                     &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(sig.to_vec())
                     .propagate(true)
                     .build())
@@ -166,7 +173,8 @@ mod tests {
                     &Call::post_price::<Test>(msg.to_vec(), sig.to_vec()),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_price")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(sig.to_vec())
                     .propagate(false)
                     .build())
@@ -220,7 +228,8 @@ mod tests {
                     &Call::post_prices::<Test>(vec![(msg.to_vec(), sig.to_vec())]),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_prices")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(vec![sig.to_vec()])
                     .propagate(true)
                     .build())
@@ -242,7 +251,8 @@ mod tests {
                     &Call::post_prices::<Test>(vec![(msg.to_vec(), sig.to_vec())]),
                 ),
                 Ok(ValidTransaction::with_tag_prefix("Gateway::post_prices")
-                    .priority(100)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides(vec![sig.to_vec()])
                     .propagate(false)
                     .build())
