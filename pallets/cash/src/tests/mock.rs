@@ -160,6 +160,7 @@ impl Config for Test {
     type TimeConverter = crate::converters::TimeConverter<Self>;
     type AccountStore = System;
     type SessionInterface = Self;
+    type WeightInfo = ();
 }
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test

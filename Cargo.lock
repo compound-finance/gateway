@@ -4407,6 +4407,7 @@ dependencies = [
  "ethabi 12.0.0",
  "ethereum-client",
  "ethereum-types 0.11.0",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "gateway-crypto",
@@ -4430,6 +4431,7 @@ dependencies = [
  "sp-inherents",
  "sp-io",
  "sp-runtime",
+ "sp-std",
  "tiny-keccak 2.0.2",
  "trx-request",
 ]
