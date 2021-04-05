@@ -2,9 +2,11 @@ use crate::{
     chains::{Chain, ChainAccount, Ethereum},
     internal,
     notices::EncodeNotice,
+    params::{UNSIGNED_TXS_LONGEVITY, UNSIGNED_TXS_PRIORITY},
     reason::Reason,
     AllowedNextCodeHash, Call, Config, Notices, Validators,
 };
+
 use codec::Encode;
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageValue};
 use our_std::RuntimeDebug;
@@ -20,6 +22,7 @@ pub enum ValidationError {
     InvalidPriceSignature,
     InvalidPrice(Reason),
     UnknownNotice,
+    InvalidTrxRequest(Reason),
 }
 
 pub fn validate_unsigned<T: Config>(
@@ -41,8 +44,8 @@ pub fn validate_unsigned<T: Config>(
             if AllowedNextCodeHash::get() == Some(hash) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::set_next_code_via_hash")
-                        .priority(100)
-                        .longevity(32)
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
                         .and_provides(hash)
                         .propagate(true)
                         .build(),
@@ -57,8 +60,8 @@ pub fn validate_unsigned<T: Config>(
             let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
             if validators.contains(&signer) {
                 Ok(ValidTransaction::with_tag_prefix("Gateway::receive_event")
-                    .priority(100)
-                    .longevity(32)
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
                     .and_provides((event_id, signature))
                     .propagate(true)
                     .build())
@@ -67,18 +70,19 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::exec_trx_request(request, signature, nonce) => {
-            let signer_res = signature
-                .recover_account(&internal::exec_trx_request::prepend_nonce(request, *nonce)[..]);
-
-            // TODO: We might want to check existential value of signer
+            let signer_res = internal::exec_trx_request::is_minimally_valid_trx_request::<T>(
+                request.to_vec(),
+                *signature,
+                *nonce,
+            );
 
             match (signer_res, nonce) {
-                (Err(_e), _) => Err(ValidationError::InvalidSignature),
+                (Err(e), _) => Err(ValidationError::InvalidTrxRequest(e)),
                 (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
                     "Gateway::exec_trx_request",
                 )
-                .priority(100)
-                .longevity(32)
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_provides((sender, nonce))
                 .propagate(true)
                 .build()),
@@ -93,8 +97,8 @@ pub fn validate_unsigned<T: Config>(
             if Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::publish_signature")
-                        .priority(100)
-                        .longevity(32)
+                        .priority(UNSIGNED_TXS_PRIORITY)
+                        .longevity(UNSIGNED_TXS_LONGEVITY)
                         .and_provides(signature)
                         .propagate(true)
                         .build(),
@@ -104,7 +108,7 @@ pub fn validate_unsigned<T: Config>(
             }
         }
         Call::cull_notices() => Ok(ValidTransaction::with_tag_prefix("Gateway::cull_notices")
-            .priority(100)
+            .priority(UNSIGNED_TXS_PRIORITY)
             .and_provides("cull_notices")
             .propagate(false)
             .build()),
@@ -138,9 +142,10 @@ mod tests {
         },
         events::{ChainLogEvent, ChainLogId},
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
+        reason::TrxReqParseError,
         tests::*,
         types::{ValidatorKeys, ValidatorSig},
-        Call, NoticeStates, Validators,
+        Call, Nonces, NoticeStates, Validators,
     };
     use ethereum_client::{events::EthereumEvent::Lock, EthereumLogEvent};
     use frame_support::storage::StorageMap;
@@ -345,9 +350,9 @@ mod tests {
     #[test]
     fn test_exec_trx_request_nonce_zero() {
         new_test_ext().execute_with(|| {
-            let request: Vec<u8> = String::from("Hello").as_bytes().into();
+            let request: Vec<u8> = String::from("(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)").as_bytes().into();
             let nonce = 0;
-            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n70:Hello")
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n720:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
                 .as_bytes()
                 .into();
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
@@ -378,9 +383,13 @@ mod tests {
     #[test]
     fn test_exec_trx_request_nonce_nonzero() {
         new_test_ext().execute_with(|| {
-            let request: Vec<u8> = String::from("Hello").as_bytes().into();
+            let request: Vec<u8> = String::from(
+                "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
+            )
+            .as_bytes()
+            .into();
             let nonce = 5;
-            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n75:Hello")
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n725:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
                 .as_bytes()
                 .into();
             let eth_address = <Ethereum as Chain>::signer_address().unwrap();
@@ -391,9 +400,11 @@ mod tests {
 
             let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
 
+            Nonces::insert(ChainAccount::Eth(eth_address), nonce);
+
             let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
-                .priority(100)
-                .longevity(32)
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_provides((ChainAccount::Eth(eth_address), 5))
                 .propagate(true)
                 .build();
@@ -404,6 +415,95 @@ mod tests {
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
                 Ok(exp)
+            );
+        });
+    }
+
+    #[test]
+    fn test_exec_trx_request_invalid_request_wrong_nonce() {
+        new_test_ext().execute_with(|| {
+            let request: Vec<u8> = String::from(
+                "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
+            )
+            .as_bytes()
+            .into();
+            let nonce = 5;
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n725:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
+                .as_bytes()
+                .into();
+            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+            let eth_key_id =
+                runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+            let signature_raw =
+                runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+            let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            Nonces::insert(ChainAccount::Eth(eth_address), nonce - 1);
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::exec_trx_request::<Test>(request, signature, nonce),
+                ),
+                Err(ValidationError::InvalidTrxRequest(Reason::IncorrectNonce(nonce, nonce - 1)))
+            );
+        });
+    }
+
+    #[test]
+    fn test_exec_trx_request_invalid_request_parse_error() {
+        new_test_ext().execute_with(|| {
+            let request: Vec<u8> = String::from("Parse Error").as_bytes().into();
+            let nonce = 5;
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n135:Parse Error")
+                .as_bytes()
+                .into();
+            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+            let eth_key_id =
+                runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+            let signature_raw =
+                runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+            let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::exec_trx_request::<Test>(request, signature, nonce),
+                ),
+                Err(ValidationError::InvalidTrxRequest(
+                    Reason::TrxRequestParseError(TrxReqParseError::InvalidExpression)
+                ))
+            );
+        });
+    }
+
+    #[test]
+    fn test_exec_trx_request_invalid_request_invalid_signature() {
+        new_test_ext().execute_with(|| {
+            let request: Vec<u8> = String::from(
+                "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
+            )
+            .as_bytes()
+            .into();
+            let nonce = 5;
+            let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n45:(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)")
+                .as_bytes()
+                .into();
+            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+            let eth_key_id =
+                runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+            let signature_raw =
+                runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+            let signature = ChainAccountSignature::Eth(eth_address, signature_raw);
+
+            assert_eq!(
+                validate_unsigned(
+                    TransactionSource::InBlock {},
+                    &Call::exec_trx_request::<Test>(request, signature, nonce),
+                ),
+                Err(ValidationError::InvalidTrxRequest(
+                    Reason::SignatureAccountMismatch
+                ))
             );
         });
     }
@@ -512,8 +612,8 @@ mod tests {
             );
 
             let exp = ValidTransaction::with_tag_prefix("Gateway::publish_signature")
-                .priority(100)
-                .longevity(32)
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_provides(signature)
                 .propagate(true)
                 .build();

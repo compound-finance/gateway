@@ -48,6 +48,7 @@ our-std = { path = '../../our-std', default-features = false }
 
 [dev-dependencies]
 frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'master'}
+serial_test = "*"
 
 [features]
 default = ['std']

@@ -4,7 +4,6 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(const_panic)]
 #![feature(destructuring_assignment)]
-#![feature(str_split_once)]
 
 #[macro_use]
 extern crate alloc;
