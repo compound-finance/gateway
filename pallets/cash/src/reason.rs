@@ -9,8 +9,10 @@ use our_std::RuntimeDebug;
 use pallet_oracle::error::OracleError;
 use trx_request;
 
+use types_derive::Types;
+
 /// Type for reporting failures for reasons outside of our control.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum Reason {
     AssetExtractionNotSupported,
     AssetNotSupported,
@@ -177,7 +179,7 @@ impl serde::de::Error for Reason {
 impl serde::de::StdError for Reason {}
 
 /// Type for reporting failures from calculations.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum MathError {
     AbnormalFloatingPointResult,
     DivisionByZero,
@@ -189,7 +191,7 @@ pub enum MathError {
 }
 
 /// Error from parsing trx requests.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum TrxReqParseError {
     NotImplemented,
     LexError,

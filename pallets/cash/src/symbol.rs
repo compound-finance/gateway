@@ -11,9 +11,11 @@ use crate::{
 };
 use pallet_oracle::ticker::{Ticker, CASH_TICKER, USD_TICKER};
 
+use types_derive::Types;
+
 /// Type for the abstract symbol of an asset, not tied to a chain.
-#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
-pub struct Symbol(pub [u8; WIDTH]);
+#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug, Types)]
+pub struct Symbol(pub [u8; 12]);
 
 impl Symbol {
     pub const fn new(symbol_str: &str) -> Self {
@@ -41,7 +43,7 @@ impl From<Symbol> for String {
 }
 
 /// Type for determining whether quantities may be combined.
-#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug, Types)]
 pub struct Units {
     pub ticker: Ticker,
     pub decimals: Decimals,

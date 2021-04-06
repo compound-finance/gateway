@@ -10,6 +10,8 @@ use frame_support::sp_runtime::DispatchError;
 
 use pallet_oracle::{ticker::Ticker, types::Price};
 
+use types_derive::{type_alias, Types};
+
 pub use crate::{
     chains::{Chain, ChainAsset, ChainId, Ethereum},
     factor::{BigInt, BigUint, Factor},
@@ -23,55 +25,71 @@ pub use crate::{
 // Type aliases //
 
 /// Type for representing a percentage/fractional, often between [0, 100].
+#[type_alias]
 pub type Bips = u128;
 
 /// Type for representing a number of decimal places.
+#[type_alias]
 pub type Decimals = u8;
 
 /// Type for a nonce.
+#[type_alias]
 pub type Nonce = u32;
 
 /// Type for representing time since current Unix epoch in milliseconds.
+#[type_alias]
 pub type Timestamp = u64;
 
 /// Type of the largest possible signed integer.
+#[type_alias]
 pub type Int = i128;
 
 /// Type of the largest possible unsigned integer.
+#[type_alias]
 pub type Uint = u128;
 
 /// Type for a generic encoded message, potentially for any chain.
+#[type_alias]
 pub type EncodedNotice = Vec<u8>;
 
 /// Type for representing an amount, potentially of any symbol.
+#[type_alias]
 pub type AssetAmount = Uint;
 
 /// Type for representing an amount of CASH
+#[type_alias]
 pub type CashAmount = Uint;
 
 /// Type for representing a balance of a specific asset.
+#[type_alias]
 pub type AssetBalance = Int;
 
 /// Type for representing an amount of an asset, together with its units.
+#[type_alias]
 pub type AssetQuantity = Quantity;
 
 /// Type for representing a quantity of CASH.
+#[type_alias]
 pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 
 /// Type for representing a quantity of USD.
+#[type_alias]
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
 /// Type for a market's liquidity factor.
+#[type_alias]
 pub type LiquidityFactor = Factor;
 
 /// Type for the miner shares portion of interest going to miners.
+#[type_alias]
 pub type MinerShares = Factor;
 
 /// Type for a code hash.
+#[type_alias]
 pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
 
 /// Governance Result type
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum GovernanceResult {
     FailedToDecodeCall,
     DispatchSuccess,
@@ -79,26 +97,30 @@ pub enum GovernanceResult {
 }
 
 /// Type for enumerating sessions.
+#[type_alias]
 pub type SessionIndex = u32;
 
 /// Type for an address used to identify a validator.
+#[type_alias]
 pub type ValidatorIdentity = <Ethereum as Chain>::Address;
 
 /// Type for signature used to verify that a signed payload comes from a validator.
+#[type_alias]
 pub type ValidatorSig = <Ethereum as Chain>::Signature;
 
 /// Type for signers set used to identify validators that signed this event.
+#[type_alias]
 pub type SignersSet = BTreeSet<ValidatorIdentity>;
 
 /// Type for representing the keys to sign notices.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub struct ValidatorKeys {
     pub substrate_id: SubstrateId,
     pub eth_address: <Ethereum as Chain>::Address,
 }
 
 /// Type for referring to either an asset or CASH.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum CashOrChainAsset {
     Cash,
     ChainAsset(ChainAsset),
@@ -106,7 +128,7 @@ pub enum CashOrChainAsset {
 
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub struct AssetInfo {
     pub asset: ChainAsset,
     pub decimals: Decimals,
@@ -154,7 +176,7 @@ impl AssetInfo {
 }
 
 /// Type for representing a quantity of an asset, bound to its ticker and number of decimals.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Quantity {
     pub value: AssetAmount,
     pub units: Units,
@@ -256,7 +278,7 @@ impl Quantity {
 }
 
 /// Type for representing a signed balance of an asset, bound to its ticker and number of decimals.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Balance {
     pub value: AssetBalance,
     pub units: Units,
@@ -327,7 +349,9 @@ impl Balance {
 }
 
 /// Type for representing a balance of CASH Principal.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug, Types,
+)]
 pub struct CashPrincipal(pub AssetBalance);
 
 impl CashPrincipal {
@@ -385,7 +409,9 @@ impl CashPrincipal {
 }
 
 /// Type for representing an amount of CASH Principal.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug, Types,
+)]
 pub struct CashPrincipalAmount(pub AssetAmount);
 
 impl CashPrincipalAmount {
@@ -434,8 +460,10 @@ impl TryInto<CashPrincipalAmount> for CashPrincipal {
 }
 
 /// Type for representing a multiplicative index on Gateway.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct CashIndex(pub Uint);
+
+#[type_alias]
 pub type CashPerCashPrincipal = CashIndex;
 
 impl CashIndex {
@@ -530,8 +558,10 @@ where
 }
 
 /// Type for representing the additive asset indices.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct AssetIndex(pub Uint);
+
+#[type_alias]
 pub type CashPrincipalPerAsset = AssetIndex;
 
 impl AssetIndex {

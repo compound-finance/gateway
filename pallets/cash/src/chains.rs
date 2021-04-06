@@ -9,9 +9,11 @@ use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::{str::FromStr, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
+use types_derive::{type_alias, Types};
+
 /// Type for representing the selection of a supported chain.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainId {
     Gate,
     Eth,
@@ -99,7 +101,7 @@ impl Default for ChainId {
 }
 
 /// Type for an account tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccount {
     Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
@@ -143,7 +145,7 @@ impl From<ChainAccount> for String {
 }
 
 /// Type for an asset tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAsset {
     Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
@@ -187,7 +189,7 @@ impl From<ChainAsset> for String {
 }
 
 /// Type for a signature and account tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccountSignature {
     Gate(<Gateway as Chain>::Address, <Gateway as Chain>::Signature),
     Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
@@ -223,7 +225,7 @@ impl ChainAccountSignature {
 }
 
 /// Type for an hash tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
     Gate(<Gateway as Chain>::Hash),
     Eth(<Ethereum as Chain>::Hash),
@@ -233,7 +235,7 @@ pub enum ChainHash {
 }
 
 /// Type for a signature tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignature {
     Gate(<Gateway as Chain>::Signature),
     Eth(<Ethereum as Chain>::Signature),
@@ -262,7 +264,7 @@ impl ChainSignature {
 }
 
 /// Type for a list of chain signatures.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignatureList {
     Gate(Vec<(<Gateway as Chain>::Address, <Gateway as Chain>::Signature)>),
     Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
@@ -371,7 +373,34 @@ impl Chain for Gateway {
 impl Chain for Ethereum {
     const ID: ChainId = ChainId::Eth;
 
+    #[type_alias("Ethereum__Chain__")]
+    type Address = [u8; 20];
+
+    #[type_alias("Ethereum__Chain__")]
+    type Amount = u128;
+
+    #[type_alias("Ethereum__Chain__")]
+    type CashIndex = u128;
+
+    #[type_alias("Ethereum__Chain__")]
+    type Rate = u128;
+
+    #[type_alias("Ethereum__Chain__")]
+    type Timestamp = u64;
+
+    #[type_alias("Ethereum__Chain__")]
+    type Hash = [u8; 32];
+
+    #[type_alias("Ethereum__Chain__")]
+    type PublicKey = [u8; 64];
+
+    #[type_alias("Ethereum__Chain__")]
+    type Signature = [u8; 65];
+
+    #[type_alias("Ethereum__Chain__")]
     type EventId = eth::EventId;
+
+    #[type_alias("Ethereum__Chain__")]
     type Event = eth::Event;
 
     fn zero_hash() -> Self::Hash {
@@ -582,14 +611,20 @@ pub mod eth {
     use codec::{Decode, Encode};
     use our_std::RuntimeDebug;
 
+    use types_derive::type_alias;
+
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub enum RecoveryError {
         SignatureRecoveryError,
     }
 
+    #[type_alias("Eth__")]
     pub type BlockNumber = u64;
+
+    #[type_alias("Eth__")]
     pub type LogIndex = u64;
 
+    #[type_alias("Eth__")]
     pub type EventId = (BlockNumber, LogIndex);
 
     #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]

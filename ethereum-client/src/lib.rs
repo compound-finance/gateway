@@ -13,7 +13,9 @@ use our_std::RuntimeDebug;
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+use types_derive::Types;
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EthereumClientError {
     HttpIoError,
     HttpTimeout,
@@ -22,27 +24,27 @@ pub enum EthereumClientError {
     JsonParseError,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Deserialize, RuntimeDebug, PartialEq, Types)]
 pub struct ResponseError {
     pub message: Option<String>,
     pub code: Option<i64>,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Deserialize, RuntimeDebug, PartialEq, Types)]
 pub struct EventsResponse<T> {
     pub id: Option<u64>,
     pub result: Option<Vec<T>>,
     pub error: Option<ResponseError>,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Deserialize, RuntimeDebug, PartialEq, Types)]
 pub struct BlockResponse {
     pub id: Option<u64>,
     pub result: Option<String>,
     pub error: Option<ResponseError>,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Deserialize, RuntimeDebug, PartialEq, Types)]
 #[serde(rename_all = "camelCase")]
 pub struct LogObject {
     /// true when the log was removed, due to a chain reorganization. false if it's a valid log.

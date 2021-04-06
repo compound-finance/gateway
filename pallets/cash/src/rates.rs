@@ -11,8 +11,10 @@ use crate::{
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use types_derive::Types;
+
 /// Error enum for interest rates
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum RatesError {
     ModelRateOutOfBounds,
     ZeroAboveKink,
@@ -23,7 +25,7 @@ pub enum RatesError {
 
 /// Annualized interest rate
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct APR(pub Uint);
 
 impl From<Uint> for APR {
@@ -102,7 +104,7 @@ pub fn get_utilization(supplied: AssetAmount, borrowed: AssetAmount) -> Result<F
 
 /// This represents an interest rate model type and parameters.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum InterestRateModel {
     Kink {
         zero_rate: APR,

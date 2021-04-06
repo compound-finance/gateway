@@ -11,8 +11,10 @@ use crate::{
     AssetBalances, AssetsWithNonZeroBalance, Config,
 };
 
+use types_derive::Types;
+
 /// Type for representing a set of positions for an account.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub struct Portfolio {
     pub cash: Balance,
     pub positions: Vec<(AssetInfo, Balance)>,

@@ -3,7 +3,9 @@ use codec::{Decode, Encode};
 use our_std::convert::TryInto;
 use our_std::RuntimeDebug;
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+use types_derive::Types;
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EthereumEvent {
     Lock {
         asset: [u8; 20],

@@ -42,3 +42,6 @@ releases
 # Chains
 chains/dev/*
 *.gateway_history
+
+# Backups
+*.bak
