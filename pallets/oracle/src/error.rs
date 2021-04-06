@@ -3,8 +3,10 @@ use frame_support;
 use gateway_crypto::CryptoError;
 use our_std::Debuggable;
 
+use types_derive::Types;
+
 /// Errors coming from the price oracle.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable, Types)]
 pub enum OracleError {
     BadTicker,
     CryptoError,

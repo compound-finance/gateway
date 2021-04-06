@@ -4,17 +4,20 @@ use crate::reason::Reason;
 use crate::types::SignersSet;
 use codec::alloc::string::String;
 use codec::{Decode, Encode};
+use ethereum_client::EthereumClientError;
 use our_std::{vec::Vec, RuntimeDebug};
+
+use types_derive::Types;
 
 extern crate ethereum_client;
 
-#[derive(RuntimeDebug)]
+#[derive(RuntimeDebug, Types)]
 pub struct EventInfo {
     pub latest_eth_block: u64,
     pub events: Vec<(ChainLogId, ChainLogEvent)>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainLogId {
     Eth(eth::BlockNumber, eth::LogIndex),
 }
@@ -29,7 +32,7 @@ impl ChainLogId {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainLogEvent {
     Eth(ethereum_client::EthereumLogEvent),
 }
@@ -47,7 +50,7 @@ impl ChainLogEvent {
 }
 
 /// Type for the status of an event on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EventState {
     Pending { signers: SignersSet },
     Failed { reason: Reason },
@@ -62,12 +65,12 @@ impl Default for EventState {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EventError {
     EthRpcUrlMissing,
     EthRpcUrlInvalid,
     StarportAddressInvalid,
-    EthereumClientError(ethereum_client::EthereumClientError),
+    EthereumClientError(EthereumClientError),
     ErrorDecodingHex,
 }
 

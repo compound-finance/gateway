@@ -2,13 +2,19 @@ use crate::{error::OracleError, ticker::Ticker};
 use codec::{Decode, Encode};
 use our_std::{consts::uint_from_string_with_decimals, convert::TryFrom, RuntimeDebug};
 
+use types_derive::{type_alias, Types};
+
 /// Type for an open price feed reporter.
+
+#[type_alias]
 pub type Reporter = [u8; 20];
 
 /// Type for representing time since current Unix epoch in milliseconds.
+#[type_alias("Oracle__")]
 pub type Timestamp = u64;
 
 /// Type for representing a price, potentially for any symbol.
+#[type_alias]
 pub type AssetPrice = u128;
 
 // XXX ideally we should really impl Ord ourselves for these
@@ -16,7 +22,7 @@ pub type AssetPrice = u128;
 //   would have to panic, though not for partial ord
 
 /// Type for representing a price (in USD), bound to its ticker.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Price {
     pub ticker: Ticker,
     pub value: AssetPrice,
@@ -37,7 +43,7 @@ impl Price {
 }
 
 /// Type for a set of open price feed reporters.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Default, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Default, RuntimeDebug, Types)]
 pub struct ReporterSet(pub Vec<Reporter>);
 
 impl ReporterSet {

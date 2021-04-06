@@ -8,6 +8,8 @@ use crate::{
     types::{Decimals, Int, Uint},
 };
 
+use types_derive::Types;
+
 /// Type for wrapping intermediate signed calculations.
 pub struct BigInt(pub BigI);
 
@@ -92,7 +94,7 @@ impl BigUint {
 
 /// Type for an unsigned factor, with a large fixed number of decimals.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Factor(pub Uint);
 
 impl Factor {

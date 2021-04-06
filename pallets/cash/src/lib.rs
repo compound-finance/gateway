@@ -44,6 +44,7 @@ use pallet_oracle;
 use pallet_oracle::ticker::Ticker;
 use pallet_session;
 use pallet_timestamp;
+use types_derive::type_alias;
 
 #[macro_use]
 extern crate lazy_static;
@@ -74,6 +75,7 @@ pub mod benchmarking;
 mod tests;
 
 /// Type for linking sessions to validators.
+#[type_alias]
 pub type SubstrateId = AccountId32;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.

@@ -43,6 +43,8 @@ gateway-crypto = { path = '../../gateway-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
 our-std = { path = '../../our-std', default-features = false }
 
+types-derive = { path = '../../types-derive' }
+
 [features]
 default = ['std']
 std = [

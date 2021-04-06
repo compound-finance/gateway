@@ -12,5 +12,6 @@ members = [
     'gateway-crypto',
     'ethereum-client',
     'test-utils/open-oracle-mock-reporter',
-    'trx-request'
+    'trx-request',
+    'types-derive',
 ]
