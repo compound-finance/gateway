@@ -5,11 +5,13 @@ use our_std::{
     RuntimeDebug,
 };
 
+use types_derive::Types;
+
 use crate::error::OracleError;
 
 /// Type for an asset price ticker.
-#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug)]
-pub struct Ticker(pub [u8; WIDTH]);
+#[derive(Copy, Clone, Eq, Encode, Decode, PartialEq, Ord, PartialOrd, RuntimeDebug, Types)]
+pub struct Ticker(pub [u8; 12]);
 
 impl Ticker {
     pub const fn new(ticker_str: &str) -> Self {

@@ -6,6 +6,7 @@ use our_std::{
     RuntimeDebug,
 };
 
+// TODO: This conflicts with `Uint` defined in types.rs
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, RuntimeDebug)]
 pub struct Uint(pub BigUint);
 

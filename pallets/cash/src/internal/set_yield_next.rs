@@ -12,7 +12,9 @@ use codec::{Decode, Encode};
 use frame_support::storage::StorageValue;
 use our_std::Debuggable;
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
+use types_derive::Types;
+
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable, Types)]
 pub enum SetYieldNextError {
     TimestampTooSoonToNow,
     TimestampTooSoonToNext,

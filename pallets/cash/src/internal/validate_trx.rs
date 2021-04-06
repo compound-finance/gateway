@@ -12,7 +12,9 @@ use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageValue}
 use our_std::RuntimeDebug;
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
-#[derive(Eq, PartialEq, RuntimeDebug)]
+use types_derive::Types;
+
+#[derive(Eq, PartialEq, RuntimeDebug, Types)]
 pub enum ValidationError {
     InvalidInternalOnly,
     InvalidNextCode,
