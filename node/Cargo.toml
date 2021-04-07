@@ -81,6 +81,8 @@ pallet-cash-runtime-api = { path = '../pallets/cash/runtime-api' }
 pallet-oracle = { path = '../pallets/oracle' }
 runtime-interfaces = { path = '../pallets/runtime-interfaces' }
 
+types-derive = { path = '../types-derive' }
+
 [dev-dependencies]
 tempfile = "3.1.0"
 
@@ -92,7 +94,7 @@ sp-timestamp = { default-features = false, git = 'https://github.com/compound-fi
 frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
 [features]
-default = ['with-rocks-db', 'runtime-benchmarks']
+default = ['with-parity-db']
 with-parity-db=['sc-client-db/with-parity-db']
 with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
 runtime-benchmarks = [
