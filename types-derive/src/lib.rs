@@ -161,18 +161,22 @@ fn process_fields(
             if fields.unnamed.len() == 1 {
                 type_to_json(&fields.unnamed.iter().next().unwrap().ty)
             } else {
-                let ty = json!(fields
+                let ty_fields = fields
                     .unnamed
                     .iter()
-                    .map(|field| type_to_json(&field.ty))
-                    .collect::<Vec<_>>());
+                    .map(|field| type_to_str(&field.ty))
+                    .collect::<Vec<_>>()
+                    .join(",");
+
+                let ty = json!(format!("({})", ty_fields));
+
                 match prefix_opt {
                     Some(prefix) => {
                         let new_type_name = format!("{}", prefix);
                         new_types.push((new_type_name.clone(), ty));
                         json!(new_type_name)
                     }
-                    None => json!(ty),
+                    None => ty,
                 }
             }
         }
