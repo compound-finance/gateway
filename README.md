@@ -221,3 +221,45 @@ by appending your own. A few useful ones are as follow.
 # Check whether the code is compilable
 ./scripts/docker_run.sh cargo +nightly check
 ```
+
+## Release Process
+
+All upgrades to Gateway should happen via the release process.
+We need to track which features were included in the release, usually including a changelog that covers each PR that was merged.
+Proper release management is important here, especially since releases include many varieties of breaking changes.
+A scenario test should be written to show that things work as expected after the upgrade takes place.
+The goal is to not break things on release.
+
+Releases should be cut from the `develop` (default) branch on [Github](https://github.com/compound-finance/gateway).
+For now, here's the manual process we follow for cutting releases:
+
+### Build Release Artifacts
+
+First build the release artifacts using the included script:
+
+```
+$ scripts/build_release.sh <MILESTONE TAG>
+```
+
+Where `<MILESTONE TAG>` should be a sequentially increasing counter beginning with `m`, e.g. `m7`, `m8`, `m9`.
+
+### Upload Release Artifacts
+
+Draft a [new release on GitHub](https://github.com/compound-finance/gateway/releases/new).
+Tag it with the appropriate milestone tag.
+Title it in a style similar to other releases, describing its purpose.
+Put any other context or information describing what it does in the description.
+
+Attach the following files to the release, from the repository where you built the release artifacts:
+
+```
+contracts.json
+gateway_runtime.checksum
+gateway_runtime.compact.wasm
+rpc.json
+types.json
+```
+
+These files should all exist in the `releases/<MILESTONE TAG>` directory of the repository you built from,
+ you should be able to simply drag and drop them.
+This will likely be automated by the process of merging certain release branches into the main development branch.
