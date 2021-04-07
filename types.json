@@ -82,26 +82,11 @@
       "Tez": "ChainAccountSignatureTez"
     }
   },
-  "ChainAccountSignatureDot": [
-    "Polkadot__Chain__Address",
-    "Polkadot__Chain__Signature"
-  ],
-  "ChainAccountSignatureEth": [
-    "Ethereum__Chain__Address",
-    "Ethereum__Chain__Signature"
-  ],
-  "ChainAccountSignatureGate": [
-    "Gateway__Chain__Address",
-    "Gateway__Chain__Signature"
-  ],
-  "ChainAccountSignatureSol": [
-    "Solana__Chain__Address",
-    "Solana__Chain__Signature"
-  ],
-  "ChainAccountSignatureTez": [
-    "Tezos__Chain__Address",
-    "Tezos__Chain__Signature"
-  ],
+  "ChainAccountSignatureDot": "(Polkadot__Chain__Address,Polkadot__Chain__Signature)",
+  "ChainAccountSignatureEth": "(Ethereum__Chain__Address,Ethereum__Chain__Signature)",
+  "ChainAccountSignatureGate": "(Gateway__Chain__Address,Gateway__Chain__Signature)",
+  "ChainAccountSignatureSol": "(Solana__Chain__Address,Solana__Chain__Signature)",
+  "ChainAccountSignatureTez": "(Tezos__Chain__Address,Tezos__Chain__Signature)",
   "ChainAsset": {
     "_enum": {
       "Gate": "Gateway__Chain__Address",
@@ -139,10 +124,7 @@
       "Eth": "ChainLogIdEth"
     }
   },
-  "ChainLogIdEth": [
-    "eth__BlockNumber",
-    "eth__LogIndex"
-  ],
+  "ChainLogIdEth": "(eth__BlockNumber,eth__LogIndex)",
   "ChainSignature": {
     "_enum": {
       "Gate": "Gateway__Chain__Signature",
@@ -191,9 +173,6 @@
   "EncodedNotice": "Vec<u8>",
   "EraId": "u32",
   "EraIndex": "u32",
-  "Eth__BlockNumber": "u64",
-  "Eth__EventId": "(BlockNumber,LogIndex)",
-  "Eth__LogIndex": "u64",
   "EthereumEvent": {
     "_enum": {
       "Lock": "EthereumEventLock",
@@ -290,6 +269,16 @@
     "next_cash_index": "Ethereum__Chain__CashIndex",
     "next_cash_yield_start": "Ethereum__Chain__Timestamp"
   },
+  "Gateway__Chain__Address": "[u8; 20]",
+  "Gateway__Chain__Amount": "u128",
+  "Gateway__Chain__CashIndex": "u128",
+  "Gateway__Chain__Event": "comp__Event",
+  "Gateway__Chain__EventId": "comp__EventId",
+  "Gateway__Chain__Hash": "[u8; 32]",
+  "Gateway__Chain__PublicKey": "[u8; 64]",
+  "Gateway__Chain__Rate": "u128",
+  "Gateway__Chain__Signature": "[u8; 65]",
+  "Gateway__Chain__Timestamp": "u64",
   "GovernanceResult": {
     "_enum": {
       "FailedToDecodeCall": "",
@@ -334,10 +323,7 @@
       "ChangeAuthorityNotice": "ChangeAuthorityNotice"
     }
   },
-  "NoticeId": [
-    "EraId",
-    "EraIndex"
-  ],
+  "NoticeId": "(EraId,EraIndex)",
   "NoticeState": {
     "_enum": {
       "Missing": "",
@@ -368,6 +354,16 @@
     }
   },
   "Oracle__Timestamp": "u64",
+  "Polkadot__Chain__Address": "[u8; 20]",
+  "Polkadot__Chain__Amount": "u128",
+  "Polkadot__Chain__CashIndex": "u128",
+  "Polkadot__Chain__Event": "dot__Event",
+  "Polkadot__Chain__EventId": "dot__EventId",
+  "Polkadot__Chain__Hash": "[u8; 32]",
+  "Polkadot__Chain__PublicKey": "[u8; 64]",
+  "Polkadot__Chain__Rate": "u128",
+  "Polkadot__Chain__Signature": "[u8; 65]",
+  "Polkadot__Chain__Timestamp": "u64",
   "Portfolio": {
     "cash": "Balance",
     "positions": "Vec<(AssetInfo,Balance)>"
@@ -441,14 +437,8 @@
       "ChangeValidatorsError": ""
     }
   },
-  "ReasonIncorrectNonce": [
-    "Nonce",
-    "Nonce"
-  ],
-  "ReasonNoticeMissing": [
-    "ChainId",
-    "NoticeId"
-  ],
+  "ReasonIncorrectNonce": "(Nonce,Nonce)",
+  "ReasonNoticeMissing": "(ChainId,NoticeId)",
   "Reporter": "[u8; 20]",
   "ReporterSet": "Vec<Reporter>",
   "SessionIndex": "u32",
@@ -475,8 +465,28 @@
   },
   "SignedPayload": "Vec<u8>",
   "SignersSet": "BTreeSet<ValidatorIdentity>",
+  "Solana__Chain__Address": "[u8; 20]",
+  "Solana__Chain__Amount": "u128",
+  "Solana__Chain__CashIndex": "u128",
+  "Solana__Chain__Event": "sol__Event",
+  "Solana__Chain__EventId": "sol__EventId",
+  "Solana__Chain__Hash": "[u8; 32]",
+  "Solana__Chain__PublicKey": "[u8; 64]",
+  "Solana__Chain__Rate": "u128",
+  "Solana__Chain__Signature": "[u8; 65]",
+  "Solana__Chain__Timestamp": "u64",
   "SubstrateId": "AccountId32",
   "Symbol": "[u8; 12]",
+  "Tezos__Chain__Address": "[u8; 20]",
+  "Tezos__Chain__Amount": "u128",
+  "Tezos__Chain__CashIndex": "u128",
+  "Tezos__Chain__Event": "tez__Event",
+  "Tezos__Chain__EventId": "tez__EventId",
+  "Tezos__Chain__Hash": "[u8; 32]",
+  "Tezos__Chain__PublicKey": "[u8; 64]",
+  "Tezos__Chain__Rate": "u128",
+  "Tezos__Chain__Signature": "[u8; 65]",
+  "Tezos__Chain__Timestamp": "u64",
   "Ticker": "[u8; 12]",
   "Timestamp": "u64",
   "TrxReqParseError": {
@@ -507,5 +517,12 @@
   "VersionedAuthorityList": {
     "authorityList": "AuthorityList",
     "version": "u8"
-  }
+  },
+  "comp__EventId": "(u64,u64)",
+  "dot__EventId": "(u64,u64)",
+  "eth__BlockNumber": "u64",
+  "eth__EventId": "(BlockNumber,LogIndex)",
+  "eth__LogIndex": "u64",
+  "sol__EventId": "(u64,u64)",
+  "tez__EventId": "(u128,u128)"
 }
