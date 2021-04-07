@@ -23,6 +23,8 @@ sp-core = { default-features = false, git = 'https://github.com/compound-finance
 
 our-std = { path = "../our-std", default-features = false }
 
+types-derive = { path = "../types-derive" }
+
 [features]
 default = ['std']
 std = [

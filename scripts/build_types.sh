@@ -8,11 +8,11 @@ types_json="./types.json"
 
 cp "$types_json" "$types_json.bak"
 
-projects=("pallet-cash" "pallet-oracle" "ethereum-client")
+projects=("gateway" "pallet-cash" "pallet-oracle" "ethereum-client" "gateway-crypto")
 
 set -x
 
-json_files=()
+json_files=(./base_types.json)
 
 for project in ${projects[@]}; do
   json_file="$(mktemp)"
@@ -22,6 +22,6 @@ for project in ${projects[@]}; do
   json_files[${#json_files[@]}]="$json_file"
 done
 
-jq -sS 'add' ${json_files[@]} > $types_json
+jq -s 'add' ${json_files[@]} | jq -r 'to_entries|sort|from_entries' > $types_json
 
 echo "Built $types_json"

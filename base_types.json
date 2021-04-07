@@ -1,0 +1,16 @@
+{
+  "AccountId32": "[u8;32]",
+  "Authorities": "Vec<AccountId32>",
+  "Address": "MultiAddress",
+  "Keys": "SessionKeys",
+  "SignedPayload": "Vec<u8>",
+  "VersionedAuthorityList": {
+    "authorityList": "AuthorityList",
+    "version": "u8"
+  },
+  "LookupSource": "MultiAddress",
+  "SessionKeys": {
+    "aura": "[u8;32]",
+    "grandpa": "[u8;32]"
+  }
+}
