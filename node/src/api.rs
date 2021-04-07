@@ -18,15 +18,20 @@ use pallet_cash::{
 use pallet_cash_runtime_api::CashApi as CashRuntimeApi;
 use pallet_oracle::types::AssetPrice;
 
+use types_derive::{type_alias, Types};
+
 const RUNTIME_ERROR: i64 = 1;
 const CHAIN_ERROR: i64 = 2;
 
 // Note: no 128 bit integers for the moment
 //  due to issues with serde/serde_json
+#[type_alias]
 pub type ApiAPR = u64;
+
+#[type_alias]
 pub type ApiRates = (ApiAPR, ApiAPR);
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Types)]
 pub struct ApiAssetData {
     asset: ChainAsset,
     balance: String,
@@ -38,7 +43,7 @@ pub struct ApiAssetData {
     price: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Types)]
 pub struct ApiCashData {
     balance: String,
     cash_yield: String,

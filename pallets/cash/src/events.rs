@@ -4,7 +4,7 @@ use crate::reason::Reason;
 use crate::types::SignersSet;
 use codec::alloc::string::String;
 use codec::{Decode, Encode};
-use ethereum_client::EthereumClientError;
+use ethereum_client::{EthereumClientError, EthereumLogEvent};
 use our_std::{vec::Vec, RuntimeDebug};
 
 use types_derive::Types;
@@ -34,7 +34,7 @@ impl ChainLogId {
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainLogEvent {
-    Eth(ethereum_client::EthereumLogEvent),
+    Eth(EthereumLogEvent),
 }
 
 impl ChainLogEvent {
@@ -65,7 +65,7 @@ impl Default for EventState {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventError {
     EthRpcUrlMissing,
     EthRpcUrlInvalid,

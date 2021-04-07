@@ -52,7 +52,7 @@ pub fn derive_types(input: TokenStream) -> TokenStream {
 }
 
 fn write_types(new_types: Vec<(String, serde_json::Value)>) {
-    let data = serde_json::to_string_pretty(&json!(new_types
+    let data = serde_json::to_string(&json!(new_types
         .clone()
         .into_iter()
         .collect::<serde_json::Map<_, _>>()))
@@ -168,7 +168,7 @@ fn process_fields(
                     .collect::<Vec<_>>());
                 match prefix_opt {
                     Some(prefix) => {
-                        let new_type_name = format!("{}Type", prefix);
+                        let new_type_name = format!("{}", prefix);
                         new_types.push((new_type_name.clone(), ty));
                         json!(new_type_name)
                     }
@@ -187,7 +187,7 @@ fn process_fields(
                 .collect::<serde_json::Map<_, _>>());
             match prefix_opt {
                 Some(prefix) => {
-                    let new_type_name = format!("{}Type", prefix);
+                    let new_type_name = format!("{}", prefix);
                     new_types.push((new_type_name.clone(), ty));
                     json!(new_type_name)
                 }

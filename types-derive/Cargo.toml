@@ -10,7 +10,7 @@ edition = "2018"
 syn = { version = "1.0", features=["full"] }
 quote = "1.0"
 lazy_static = '1.4.0'
-serde_json = "1.0.64"
+serde_json = { version = "1.0.64", features=["preserve_order"] }
 
 [lib]
 proc-macro = true
