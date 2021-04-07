@@ -45,3 +45,6 @@ chains/dev/*
 
 # Backups
 *.bak
+
+ethereum/artifacts
+ethereum/cache

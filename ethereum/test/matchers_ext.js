@@ -1,7 +1,29 @@
+const chai = require("chai");
 const BigNumber = require("bignumber.js");
 
-expect.extend({
+function extend(object) {
+  Object.entries(object).forEach(([name, matcher]) => {
+    function wrap(fn) {
+      return function (right) {
+        var left = this._obj;
+        let res = fn(left, right);
+        if (res.pass) {
+          return new chai.Assertion(true).to.be.equal(true);
+        } else {
+          return new chai.Assertion("").to.be.equal(res.message);
+        }
+      }
+    }
+    console.log("Extending", name);
+    chai.Assertion.addMethod(name, wrap(matcher));
+  });
+}
+
+extend({
   toMatchAddress(actual, expected) {
+    actual = actual.hasOwnProperty('address') ? actual.address : actual;
+    expected = expected.hasOwnProperty('address') ? expected.address : expected;
+
     return {
       pass: actual.toLowerCase() == expected.toLowerCase(),
       message: () => `expected (${actual}) == (${expected})`
@@ -16,7 +38,7 @@ expect.extend({
   }
 });
 
-expect.extend({
+extend({
   greaterThan(actual, expected) {
     return {
       pass: (new BigNumber(actual)).gt(new BigNumber(expected)),
@@ -25,7 +47,7 @@ expect.extend({
   }
 });
 
-expect.extend({
+extend({
   toRevert(actual, msg='revert') {
     return {
       pass: !!actual['message'] && actual.message === `VM Exception while processing transaction: ${msg}`,
@@ -34,7 +56,7 @@ expect.extend({
   }
 });
 
-expect.extend({
+extend({
   toBeWithinRange(received, floor, ceiling) {
     const pass = received >= floor && received <= ceiling;
     if (pass) {
