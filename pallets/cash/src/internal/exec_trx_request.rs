@@ -49,7 +49,7 @@ pub fn is_minimally_valid_trx_request<T: Config>(
     request: Vec<u8>,
     signature: ChainAccountSignature,
     nonce: Nonce,
-) -> Result<ChainAccount, Reason> {
+) -> Result<(ChainAccount, Nonce), Reason> {
     // Basic request validity checks - valid symbols and parsable request
     let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
     trx_request::parse_request(request_str)?;
@@ -59,13 +59,8 @@ pub fn is_minimally_valid_trx_request<T: Config>(
         .recover_account(&prepend_nonce(&request, nonce)[..])
         .map_err(|_| Reason::SignatureAccountMismatch)?;
 
-    // Nonce check
     let current_nonce = Nonces::get(sender);
-    require!(
-        nonce == current_nonce,
-        Reason::IncorrectNonce(nonce, current_nonce)
-    );
-    Ok(sender)
+    Ok((sender, current_nonce))
 }
 
 pub fn exec_trx_request<T: Config>(

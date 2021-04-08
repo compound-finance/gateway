@@ -4,7 +4,7 @@ use crate::{
     notices::EncodeNotice,
     params::{UNSIGNED_TXS_LONGEVITY, UNSIGNED_TXS_PRIORITY},
     reason::Reason,
-    AllowedNextCodeHash, Call, Config, Notices, Validators,
+    AllowedNextCodeHash, Call, Config, Nonces, Notices, Validators,
 };
 
 use codec::Encode;
@@ -88,14 +88,29 @@ pub fn validate_unsigned<T: Config>(
 
             match (signer_res, nonce) {
                 (Err(e), _) => Err(ValidationError::InvalidTrxRequest(e)),
-                (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
-                    "Gateway::exec_trx_request",
-                )
-                .priority(UNSIGNED_TXS_PRIORITY)
-                .longevity(UNSIGNED_TXS_LONGEVITY)
-                .and_provides((sender, nonce))
-                .propagate(true)
-                .build()),
+                (Ok((sender, current_nonce)), nonce) => {
+                    // Nonce check
+                    if current_nonce == 0 || *nonce == current_nonce {
+                        Ok(
+                            ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
+                                .priority(UNSIGNED_TXS_PRIORITY)
+                                .longevity(UNSIGNED_TXS_LONGEVITY)
+                                .and_provides((sender, nonce))
+                                .propagate(true)
+                                .build(),
+                        )
+                    } else {
+                        Ok(
+                            ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
+                                .priority(UNSIGNED_TXS_PRIORITY)
+                                .longevity(UNSIGNED_TXS_LONGEVITY)
+                                .and_requires((sender, nonce - 1))
+                                .and_provides((sender, nonce))
+                                .propagate(true)
+                                .build(),
+                        )
+                    }
+                }
             }
         }
         Call::publish_signature(chain_id, notice_id, signature) => {
