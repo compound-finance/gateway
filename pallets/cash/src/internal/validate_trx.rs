@@ -9,10 +9,10 @@ use crate::{
 
 use codec::Encode;
 use frame_support::storage::{IterableStorageMap, StorageDoubleMap, StorageValue};
-use our_std::RuntimeDebug;
+use our_std::{log, RuntimeDebug};
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
-#[derive(Eq, PartialEq, RuntimeDebug)]
+#[derive(Eq, PartialEq, RuntimeDebug, Clone, Copy)]
 pub enum ValidationError {
     InvalidInternalOnly,
     InvalidNextCode,
@@ -23,6 +23,16 @@ pub enum ValidationError {
     InvalidPrice(Reason),
     UnknownNotice,
     InvalidTrxRequest(Reason),
+}
+
+pub fn check_validation_failure<T: Config>(
+    call: &Call<T>,
+    res: Result<TransactionValidity, ValidationError>,
+) -> Result<TransactionValidity, ValidationError> {
+    if let Err(err) = res {
+        log!("validate_unsigned call {:#?}, Error {:#?}", call, err);
+    }
+    res
 }
 
 pub fn validate_unsigned<T: Config>(
