@@ -38,6 +38,7 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
     }
   },
   {
+    skip: true,
     name: "Transfer Cash Max",
     scenario: async ({ ashley, bert, chuck, zrx, chain, starport, cash }) => {
       await ashley.transfer(10, cash, bert);

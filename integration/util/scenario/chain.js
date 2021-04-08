@@ -78,7 +78,7 @@ class Chain {
 
       let encodedNotice = encodeNotice(currNotice);
       let parentHash = getNoticeParentHash(currNotice);
-      let isAccepted = await this.ctx.starport.isNoticeUsed(currHash);
+      let isAccepted = await this.ctx.starport.isNoticeInvoked(currHash);
 
       if (isAccepted) {
         currChain = [encodedNotice];

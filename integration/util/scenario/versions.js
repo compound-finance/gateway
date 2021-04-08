@@ -38,8 +38,8 @@ function releaseContractsInfo(repoUrl, version) {
   };
 }
 
-async function pullVersion(repoUrl, version) {
-  this.ctx.log(`Fetching version: ${version}...`);
+async function pullVersion(ctx, repoUrl, version) {
+  ctx.log(`Fetching version: ${version}...`);
 
   let wasmInfo = releaseWasmInfo(repoUrl, version);
   let typesInfo = releaseTypesInfo(repoUrl, version);
@@ -48,7 +48,7 @@ async function pullVersion(repoUrl, version) {
   await fs.mkdir(baseReleasePath(version), { recursive: true });
 
   await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
-    this.ctx.log(`Downloading ${url} to ${path}`);
+    ctx.log(`Downloading ${url} to ${path}`);
     await download(url, path);
   }));
 }
@@ -122,7 +122,7 @@ class Version {
   }
 
   async pull() {
-    await pullVersion(this.ctx.__repoUrl(), this.version);
+    await pullVersion(this.ctx, this.ctx.__repoUrl(), this.version);
   }
 }
 

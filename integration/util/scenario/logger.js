@@ -12,7 +12,7 @@ class Logger {
   async openLogFile() {
     log("Writing scenario logs to " + this.logFile);
     if (this.logFile) {
-      this.logFD = await fs.open(this.logFile, 'w');    
+      this.logFD = await fs.open(this.logFile, 'w');
     } else {
       return; // Don't log to file
     }
@@ -50,8 +50,11 @@ class Logger {
 
   async teardown() {
     if (this.logFD) {
-      await this.logFD.close();
+      // Clear before we close, since closing is async and we might not
+      // be the next on the event loop for awhile.
+      let logFD = this.logFD;
       this.logFD = null;
+      await logFD.close();
     }
   }
 }

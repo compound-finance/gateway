@@ -7,6 +7,7 @@ class EventTracker {
     this.allEvents = [];
     this.callbacks = [];
     this.ctx = ctx;
+    this.unsubTimer = null;
   }
 
   async subscribeEvents() {
@@ -14,7 +15,7 @@ class EventTracker {
       events.forEach(({ event, phase }, i) => {
         this.ctx.debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
       });
-      // TODO: Clean this up
+      // TODO: Clean this up [trying to remember why we sleep here...]
       sleep(5000).then(() => {
         // let finalizedEvents = events.filter(({phase}) => phase.Finalization);
         // debug(`Found ${finalizedEvents.length } finalized event(s)`);
@@ -72,6 +73,11 @@ class EventTracker {
     return promise;
   }
 
+  setUnsubDelay() {
+    // Note: we happily overwrite any existing value (since we only move forward)
+    this.unsubTimer = Date.now() + 5000;
+  }
+
   sendAndWaitForEvents(call, opts = {}) {
     opts = {
       onFinalize: true,
@@ -89,6 +95,7 @@ class EventTracker {
       }
 
       const doResolve = async (events) => {
+        this.setUnsubDelay();
         await unsub(); // Note: unsub isn't apparently working, but we are calling it
 
         let cashFailures = events
@@ -162,6 +169,16 @@ class EventTracker {
 
       debugMsg(`Submitted unsigned transaction...`);
     });
+  }
+
+  async teardown() {
+    // Give time for unsubs before we exit, otherwise we get a teardown error from PolkadotJS
+    if (this.unsubTimer) {
+      let delta = this.unsubTimer - Date.now();
+      if (delta > 0) {
+        await sleep(delta);
+      }
+    }
   }
 }
 

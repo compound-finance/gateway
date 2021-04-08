@@ -149,6 +149,10 @@ class Ctx {
   }
 
   async teardown() {
+    if (this.eventTracker) {
+      await this.eventTracker.teardown();
+    }
+
     if (this.validators) {
       await this.validators.teardown();
     }
