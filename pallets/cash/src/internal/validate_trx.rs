@@ -30,7 +30,7 @@ pub fn check_validation_failure<T: Config>(
     res: Result<TransactionValidity, ValidationError>,
 ) -> Result<TransactionValidity, ValidationError> {
     if let Err(err) = res {
-        log!("validate_unsigned call {:#?}, Error {:#?}", call, err);
+        log!("validate_unsigned: call = {:#?}, error = {:#?}", call, err);
     }
     res
 }
