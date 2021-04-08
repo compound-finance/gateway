@@ -21,7 +21,7 @@ use crate::{
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
-        LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig, APR,
+        LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, APR,
     },
 };
 
@@ -120,10 +120,10 @@ decl_storage! {
         NextSessionIndex get(fn next_session_index): SessionIndex;
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
-        NextValidators get(fn next_validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
+        NextValidators get(fn next_validators): map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// The current set of allowed validators, and their associated keys.
-        Validators get(fn validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
+        Validators get(fn validators): map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// An index to track interest earned by CASH holders and owed by CASH borrowers.
         /// Note - the implementation of Default for CashIndex returns ONE. This also provides
@@ -565,16 +565,16 @@ decl_module! {
 
         // TODO: Do we need to sign the event id, too?
         #[weight = (<T as Config>::WeightInfo::receive_event(), DispatchClass::Operational, Pays::No)] // XXX
-        pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_chain_blocks(origin, blocks, signature): {:?} {}", blocks, hex::encode(&signature)); // XXX ?
+        pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
+            log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_chain_blocks::<T>(blocks, signature))?)
         }
 
         // TODO: Do we need to sign the event id, too?
         #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_chain_reorg(origin, reorg, signature): {:?} {}", reorg, hex::encode(&signature)); // XXX ?
+        pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
+            log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_chain_reorg::<T>(reorg, signature))?)
         }
@@ -582,7 +582,7 @@ decl_module! {
         #[weight = (<T as Config>::WeightInfo::publish_signature(), DispatchClass::Operational, Pays::No)]
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::notices::publish_signature(chain_id, notice_id, signature))?)
+            Ok(check_failure::<T>(internal::notices::publish_signature::<T>(chain_id, notice_id, signature))?)
         }
 
         /// Offchain Worker entry point.

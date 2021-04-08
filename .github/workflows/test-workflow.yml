@@ -13,9 +13,10 @@ jobs:
 
       - name: Cargo fmt
         run: |
-          rustup install nightly
-          rustup component add rustfmt --toolchain nightly
-          cargo +nightly fmt -- --check
+          NIGHTLY=nightly-2021-03-24
+          rustup install $NIGHTLY
+          rustup component add rustfmt --toolchain $NIGHTLY
+          cargo +$NIGHTLY fmt -- --check
 
   substrate-tests:
     name: Substrate Unit Tests
@@ -96,7 +97,7 @@ jobs:
         run: |
           PACKAGES="pallet-cash runtime-interfaces gateway-crypto ethereum-client open-oracle-mock-reporter trx-request"
           for PKG in $PACKAGES; do
-              RUSTFLAGS="-Z instrument-coverage" cargo +nightly test -p $PKG --no-run --message-format=json > messages
+              RUSTFLAGS="-Z instrument-coverage" cargo test -p $PKG --no-run --message-format=json > messages
               EXE=`scripts/list_executables.py < messages`
               $EXE
               llvm-profdata-11 merge -sparse default.profraw -o default.profdata

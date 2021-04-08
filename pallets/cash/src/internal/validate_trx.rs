@@ -1,5 +1,6 @@
 use crate::{
     chains::{Chain, ChainAccount, Ethereum},
+    core::{recover_validator, validator_sign},
     internal,
     notices::EncodeNotice,
     params::{UNSIGNED_TXS_LONGEVITY, UNSIGNED_TXS_PRIORITY},
@@ -57,37 +58,27 @@ pub fn validate_unsigned<T: Config>(
         }
 
         Call::receive_chain_blocks(blocks, signature) => {
-            let signer = <Ethereum as Chain>::recover_address(&blocks.encode(), *signature)
-                .map_err(|_| ValidationError::InvalidSignature)?;
-            let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
-            if validators.contains(&signer) {
-                Ok(
-                    ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
-                        .priority(UNSIGNED_TXS_PRIORITY)
-                        .longevity(UNSIGNED_TXS_LONGEVITY)
-                        .propagate(true)
-                        .build(),
-                )
-            } else {
-                Err(ValidationError::InvalidValidator)
-            }
+            let signer = recover_validator::<T>(&blocks.encode(), *signature)
+                .map_err(|_| ValidationError::InvalidValidator)?;
+            Ok(
+                ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
+                    .priority(UNSIGNED_TXS_PRIORITY)
+                    .longevity(UNSIGNED_TXS_LONGEVITY)
+                    .propagate(true)
+                    .build(),
+            )
         }
 
         Call::receive_chain_reorg(reorg, signature) => {
-            let signer = <Ethereum as Chain>::recover_address(&reorg.encode(), *signature)
-                .map_err(|_| ValidationError::InvalidSignature)?;
-            let validators: Vec<_> = Validators::iter().map(|v| v.1.eth_address).collect();
-            if validators.contains(&signer) {
-                Ok(
-                    ValidTransaction::with_tag_prefix("Gateway::receive_chain_reorg")
-                        .priority(100)
-                        .longevity(32)
-                        .propagate(true)
-                        .build(),
-                )
-            } else {
-                Err(ValidationError::InvalidValidator)
-            }
+            let signer = recover_validator::<T>(&reorg.encode(), *signature)
+                .map_err(|_| ValidationError::InvalidValidator)?;
+            Ok(
+                ValidTransaction::with_tag_prefix("Gateway::receive_chain_reorg")
+                    .priority(100)
+                    .longevity(32)
+                    .propagate(true)
+                    .build(),
+            )
         }
 
         Call::exec_trx_request(request, signature, nonce) => {
@@ -129,6 +120,8 @@ pub fn validate_unsigned<T: Config>(
                 Err(ValidationError::InvalidValidator)
             }
         }
+
+        _ => Err(ValidationError::InvalidCall),
     }
 }
 
@@ -136,15 +129,12 @@ pub fn validate_unsigned<T: Config>(
 mod tests {
     use super::*;
     use crate::{
-        chains::{
-            Chain, ChainAccount, ChainAccountSignature, ChainId, ChainSignature,
-            ChainSignatureList, Ethereum,
-        },
+        chains::*,
         events::{ChainLogEvent, ChainLogId},
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
         reason::TrxReqParseError,
         tests::*,
-        types::{ValidatorKeys, ValidatorSig},
+        types::ValidatorKeys,
         Call, Nonces, NoticeStates, Validators,
     };
     use ethereum_client::{events::EthereumEvent::Lock, EthereumLogEvent};
@@ -242,7 +232,7 @@ mod tests {
     fn test_receive_chain_blocks_recover_failure() {
         new_test_ext().execute_with(|| {
             let blocks = ChainBlocks::Eth(vec![]);
-            let signature: ValidatorSig = [0u8; 65];
+            let signature = ChainSignature::Eth([0u8; 65]);
             assert_eq!(
                 validate_unsigned(
                     TransactionSource::InBlock {},
@@ -257,7 +247,7 @@ mod tests {
     fn test_receive_chain_blocks_not_a_validator() {
         new_test_ext().execute_with(|| {
             let blocks = ChainBlocks::Eth(vec![]);
-            let signature = ChainId::Eth::sign(&blocks.encode);
+            let signature = validator_sign::<Test>(&blocks.encode()).unwrap();
 
             assert_eq!(
                 validate_unsigned(
@@ -283,7 +273,7 @@ mod tests {
             );
 
             let blocks = ChainBlocks::Eth(vec![]);
-            let signature = ChainId::Eth::sign(&blocks.encode());
+            let signature = validator_sign::<Test>(&blocks.encode()).unwrap();
             let exp = ValidTransaction::with_tag_prefix("Gateway::receive_event")
                 .priority(100)
                 .longevity(32)

@@ -20,7 +20,7 @@ use frame_support::{
 use pallet_oracle::types::Price;
 
 use crate::{
-    chains::{ChainAccount, ChainAsset, ChainHash, ChainId},
+    chains::{Chain, ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature, Ethereum},
     events::ChainLogEvent,
     factor::Factor,
     internal, log,
@@ -31,12 +31,13 @@ use crate::{
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
         CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, NoticeId, Quantity,
-        Timestamp, USDQuantity, Units, ValidatorIdentity, CASH,
+        Timestamp, USDQuantity, Units, ValidatorKeys, CASH,
     },
     AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
     CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp,
     LastIndices, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp, Miner, Module,
     SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    Validators,
 };
 
 #[macro_export]
@@ -132,17 +133,43 @@ pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
 }
 
-// Internal helpers
+/// Return the validator which signed the given data, given signature.
+pub fn recover_validator<T: Config>(
+    data: &[u8],
+    signature: ChainSignature,
+) -> Result<ValidatorKeys, Reason> {
+    // Note: inefficient, we should index by every key we want to query by
+    match signature {
+        ChainSignature::Eth(eth_sig) => {
+            let signer = <Ethereum as Chain>::recover_address(data, eth_sig)?;
+            for (_, validator) in Validators::iter() {
+                if validator.eth_address == signer {
+                    return Ok(validator);
+                }
+            }
+        }
 
-pub fn passes_validation_threshold(
-    signers: &BTreeSet<ValidatorIdentity>,
-    validators: &BTreeSet<ValidatorIdentity>,
-) -> bool {
-    // Intersection is taken for the situation when some of the signers are not currently active validators
-    let valid_signers: Vec<_> = validators.intersection(&signers).collect();
-    // Using ceil(2 * validators.len() / 3)
-    valid_signers.len() >= (2 * validators.len() + 3 - 1) / 3
+        _ => {
+            // XXX should we even be having other branches for signatures now?
+            //  we should probably delete all variants of ChainSignature except Eth
+            //   generally minimal since we dont want validators to have to add new keys
+            //    can be separate from ChainAccountSignature
+            return Err(Reason::NotImplemented); // XXX
+        }
+    }
+
+    Err(Reason::UnknownValidator)
 }
+
+/// Sign the given data as a validator, assuming we have the credentials.
+/// The validator can sign with any valid ChainSignature, which happens to only be Eth currently.
+pub fn validator_sign<T: Config>(data: &[u8]) -> Result<ChainSignature, Reason> {
+    Ok(ChainSignature::Eth(<Ethereum as Chain>::sign_message(
+        data,
+    )?))
+}
+
+// Internal helpers
 
 // XXX use Balances instead of raw balances everywhere and put all fns on types?
 

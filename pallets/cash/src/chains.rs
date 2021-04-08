@@ -3,13 +3,11 @@ pub use our_std::vec::Vec;
 
 use crate::rates::APR;
 use crate::reason::Reason;
-use crate::types::{
-    AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity, ValidatorSig,
-};
+use crate::types::{AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity};
 
 use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
-use our_std::{str::FromStr, Debuggable, Deserialize, RuntimeDebug, Serialize};
+use our_std::{str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serialize};
 
 use types_derive::{type_alias, Types};
 
@@ -300,19 +298,25 @@ pub enum ChainBlock {
 
 impl ChainBlock {
     pub fn chain_id(&self) -> ChainId {
-        match *self {
+        match self {
             ChainBlock::Eth(_) => ChainId::Eth,
         }
     }
 
     pub fn hash(&self) -> ChainHash {
-        match *self {
+        match self {
             ChainBlock::Eth(block) => ChainHash::Eth(block.hash),
         }
     }
 
+    pub fn parent_hash(&self) -> ChainHash {
+        match self {
+            ChainBlock::Eth(block) => ChainHash::Eth(block.parent_hash),
+        }
+    }
+
     pub fn number(&self) -> ChainBlockNumber {
-        match *self {
+        match self {
             ChainBlock::Eth(block) => block.number as ChainBlockNumber,
         }
     }
@@ -328,6 +332,22 @@ impl ChainBlocks {
     pub fn chain_id(&self) -> ChainId {
         match *self {
             ChainBlocks::Eth(_) => ChainId::Eth,
+        }
+    }
+}
+
+impl IntoIterator for ChainBlocks {
+    type Item = ChainBlock;
+    type IntoIter = vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
+            ChainBlocks::Eth(blocks) => blocks
+                .into_iter()
+                .map(|b| ChainBlock::Eth(b))
+                .collect::<Vec<ChainBlock>>()
+                .into_iter(),
         }
     }
 }
@@ -357,6 +377,17 @@ impl ChainReorg {
     }
 }
 
+// XXX old code
+// pub fn passes_validation_threshold(
+//     signers: &BTreeSet<ValidatorIdentity>,
+//     validators: &BTreeSet<ValidatorIdentity>,
+// ) -> bool {
+//     // Intersection is taken for the situation when some of the signers are not currently active validators
+//     let valid_signers: Vec<_> = validators.intersection(&signers).collect();
+//     // Using ceil(2 * validators.len() / 3)
+//     valid_signers.len() >= (2 * validators.len() + 3 - 1) / 3
+// }
+
 /// Type for tallying signatures for an underlying chain block.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct ChainBlockTally {
@@ -377,11 +408,19 @@ impl ChainBlockTally {
                 for_votes: [validator].iter().cloned().collect(),
                 against_votes: SignersSet::new(),
             },
+
+            _ => panic!("xxx not implemented"),
         }
     }
 
     pub fn passes_threshold(self) -> bool {
         false // XXX also need to check internally? use this or different?
+    }
+
+    // XXX delete?
+    // XXX for or against?
+    pub fn with_signer(self, signature: ValidatorIdentity) -> Self {
+        self
     }
 }
 
@@ -403,6 +442,8 @@ impl ChainReorgTally {
                 reorg,
                 votes: [validator].iter().cloned().collect(),
             },
+
+            _ => panic!("xxx not implemented"),
         }
     }
 
@@ -411,8 +452,8 @@ impl ChainReorgTally {
     }
 
     // XXX takes identity...
-    pub fn with_signature(&mut self, signature: ValidatorIdentity) {
-        // XXX add to votes in place?
+    pub fn with_signer(self, signer: ValidatorIdentity) -> Self {
+        self
     }
 }
 
@@ -423,13 +464,12 @@ pub enum ChainEvents {
 }
 
 impl ChainEvents {
-    pub fn push(&mut self, block: ChainBlock) {
+    pub fn push(&mut self, block: &ChainBlock) {
         // XXX add block to queue in place
-        match *self {
+        match self {
             ChainEvents::Eth(eth_events) => match block {
-                ChainBlock::Eth(eth_block) =>
-                    eth_events.extend(eth_block.events)
-            }
+                ChainBlock::Eth(eth_block) => eth_events.extend_from_slice(&eth_block.events),
+            },
         }
     }
 }
@@ -505,10 +545,10 @@ impl Chain for Gateway {
     type Signature = [u8; 65];
 
     #[type_alias("Gateway__Chain__")]
-    type EventId = comp::EventId;
+    type EventId = gate::EventId;
 
     #[type_alias("Gateway__Chain__")]
-    type Event = comp::Event;
+    type Event = gate::Event;
 
     #[type_alias("Gateway__Chain__")]
     type Block = gate::Block;
@@ -863,7 +903,7 @@ pub mod gate {
 
     use types_derive::type_alias;
 
-    #[type_alias("comp__")]
+    #[type_alias("gate__")]
     pub type EventId = (u64, u64); // XXX
 
     #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]

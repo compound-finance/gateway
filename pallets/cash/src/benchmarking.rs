@@ -99,7 +99,7 @@ mod benchmark_tests {
     fn test_benchmarks() {
         new_test_ext().execute_with(|| {
             initialize_storage();
-            assert_ok!(test_benchmark_receive_event::<Test>());
+            assert_ok!(test_benchmark_receive_chain_blocks::<Test>());
             assert_ok!(test_benchmark_publish_signature::<Test>());
             assert_ok!(test_benchmark_set_yield_next::<Test>());
         });

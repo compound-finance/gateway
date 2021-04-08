@@ -102,11 +102,7 @@ pub type SessionIndex = u32;
 
 /// Type for an address used to identify a validator.
 #[type_alias]
-pub type ValidatorIdentity = <Ethereum as Chain>::Address;
-
-/// Type for signature used to verify that a signed payload comes from a validator.
-#[type_alias]
-pub type ValidatorSig = <Ethereum as Chain>::Signature;
+pub type ValidatorIdentity = SubstrateId;
 
 /// Type for signers set used to identify validators that signed this event.
 #[type_alias]
