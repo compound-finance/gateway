@@ -131,14 +131,6 @@ class Chain {
     return await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.oracle.postPrice(payload, signature), { onFinalize });
   }
 
-  async setCode(code, onFinalize = true) {
-    let api = this.api();
-    // TODO: Sudo is removed
-    const sudoKey = await api.query.sudo.key();
-    const sudoPair = this.ctx.actors.first().chainKey;
-    return await this.ctx.eventTracker.sendAndWaitForEvents(api.tx.sudo.sudoUncheckedWeight(api.tx.system.setCode(code), 0), { onFinalize, signer: sudoPair });
-  }
-
   async cashIndex() {
     return await this.ctx.api().query.cash.globalCashIndex();
   }

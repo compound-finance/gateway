@@ -27,25 +27,6 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    name: "Upgrade Chain WASM [Set Code]",
-    info: {
-      versions: ['m1'],
-      genesis_version: 'm1',
-      validators: {
-        alice: {
-          version: 'm1',
-        }
-      }
-    },
-    scenario: async ({ ctx, zrx, chain, starport, curr, sleep }) => {
-      expect(await chain.getSemVer()).toEqual([1, 1, 1]);
-
-      let event = await chain.setCode(await curr.wasm());
-
-      expect(await chain.getSemVer()).toEqual([1, 2, 2]);
-    }
-  },
-  {
     skip: true,
     name: "Upgrade Chain WASM [Allow Next Code]",
     info: {
@@ -158,7 +139,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    name: "Does not add auth w/o session keys",
+    name: "Does not add auth without session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
       // spins up new validator charlie, doesnt add session keys, change validators should fail
       const keyring = ctx.actors.keyring;
