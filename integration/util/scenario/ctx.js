@@ -1,6 +1,5 @@
-const { debug, log, error } = require('../log');
-const { merge, sleep } = require('../util');
 const path = require('path');
+const { merge, sleep } = require('../util');
 const { declare } = require('./declare');
 
 const { baseScenInfo } = require('./scen_info');
@@ -15,6 +14,8 @@ const { buildTrxReq } = require('./trx_req');
 const { buildChain } = require('./chain');
 const { buildPrices } = require('./prices');
 const { buildVersions } = require('./versions');
+const { buildLogger } = require('./logger');
+const { buildEventTracker } = require('./event_tracker');
 
 class Ctx {
   constructor(scenInfo) {
@@ -100,16 +101,20 @@ class Ctx {
     return process.env['REPORTERS'] ? process.env['REPORTERS'].split(',') : this.scenInfo['reporters'];
   }
 
+  logFile() {
+    return process.env['LOG_FILE'] || this.scenInfo['log_file'];
+  }
+
   debug(...msg) {
-    debug(...msg);
+    this.logger.debug(...msg);
   }
 
   log(...msg) {
-    log(...msg);
+    this.logger.log(...msg);
   }
 
   error(...msg) {
-    error(...msg);
+    this.logger.error(...msg);
   }
 
   api() {
@@ -156,6 +161,10 @@ class Ctx {
       await this.prices.teardown();
     }
 
+    if (this.logger) {
+      await this.logger.teardown();
+    }
+
     await sleep(1000); // Give things a second to close
   }
 }
@@ -179,9 +188,10 @@ function aliasBy(ctx, iterator, key) {
 
 async function buildCtx(scenInfo={}) {
   scenInfo = merge(baseScenInfo, scenInfo);
-  debug(() => `Builing ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
-  debug(() => `test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   let ctx = new Ctx(scenInfo);
+  ctx.logger = await buildLogger(ctx);
+  ctx.log(`Building ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
+  ctx.log(`test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
 
@@ -199,6 +209,7 @@ async function buildCtx(scenInfo={}) {
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
   ctx.trxReq = await buildTrxReq(ctx);
   ctx.chain = await buildChain(ctx);
+  ctx.eventTracker = await buildEventTracker(ctx);
   ctx.sleep = sleep;
 
   // TODO: Post prices?

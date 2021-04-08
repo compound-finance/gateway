@@ -15,6 +15,7 @@ async function until(cond, opts = {}) {
     delay: 5000,
     retries: null,
     message: null,
+    ctx: null,
     ...opts
   };
 
@@ -24,7 +25,11 @@ async function until(cond, opts = {}) {
     return;
   } else {
     if (options.message) {
-      log(options.message);
+      if (options.ctx) {
+        options.ctx.log(options.message);
+      } else {
+        log(options.message)
+      }
     }
     await sleep(options.delay + start - new Date());
     return await until(cond, {

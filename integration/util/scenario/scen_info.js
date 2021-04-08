@@ -44,6 +44,7 @@ const baseScenInfo = {
   wasm_file: null, // [env=WASM_FILE]
   types_file: null, // types.json file [env=TYPES_FILE]
   opf_url: 'https://prices.compound.finance/coinbase', // use given open price feed [env=OPF_URL]
+  log_file: null, // write logs to file [env=LOG_FILE]
 };
 
 // Helper function to take an info that might be

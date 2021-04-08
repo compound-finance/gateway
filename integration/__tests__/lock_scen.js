@@ -32,7 +32,6 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   },
   {
     name: 'Lock Eth',
-    only: true,
     scenario: async ({ ashley, chain, ether }) => {
       await ashley.lock(0.01, ether);
       expect(await ashley.tokenBalance(ether)).toEqual(99.99);
@@ -109,7 +108,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
         ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
       });
       let data = getEventData(event);
-      expect(data.CashPrincipalAmount).toBeCloseTo(99999996);
+      expect(data.CashPrincipalAmount).toBeCloseTo(99999996); // TODO: Check this better
       expect(data.CashIndex).toBeWithinRange(1000000000000000000, 1000000100000000000);
     }
   },

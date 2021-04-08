@@ -14,7 +14,7 @@
     "jest-junit": "^12.0.0"
   },
   "scripts": {
-    "test": "jest --runInBand",
+    "test": "QUIET_SCENARIOS=true jest",
     "build": "(cd ../ethereum && yarn compile) && cargo build",
     "build:ethereum": "(cd ../ethereum && yarn compile)",
     "build:chain": "cargo build",

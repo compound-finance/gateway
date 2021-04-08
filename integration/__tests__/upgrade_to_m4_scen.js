@@ -14,6 +14,7 @@ let scen_info = {
 buildScenarios('Upgrade to m4', scen_info, [
   {
     name: "Upgrade from m3 to m4",
+    skip: true,
     info: {
       versions: ['m3'],
       genesis_version: 'm3',

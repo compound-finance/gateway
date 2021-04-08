@@ -1,4 +1,4 @@
-const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
+const { findEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
 const { sleep, arrayEquals, keccak256 } = require('../util');
 const {
   getNoticeChainId,
@@ -38,7 +38,7 @@ class Chain {
   }
 
   async waitForEvent(pallet, eventName, onFinalize = true, failureEvent = null) {
-    return await waitForEvent(this.api(), pallet, eventName, { failureEvent });
+    return await this.ctx.eventTracker.waitForEvent(pallet, eventName, { failureEvent });
   }
 
   // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingEthEvent` event
@@ -52,11 +52,11 @@ class Chain {
 
   async waitForChainProcessed(onFinalize = true, failureEvent = null) {
     // TODO: Match transaction id?
-    return await waitForEvent(this.api(), 'cash', 'ProcessedChainEvent', { failureEvent });
+    return await this.waitForEvent('cash', 'ProcessedChainEvent', { failureEvent });
   }
 
   async waitForNotice(onFinalize = true, failureEvent = null) {
-    return getEventData(await waitForEvent(this.api(), 'cash', 'Notice', { failureEvent }));
+    return getEventData(await this.waitForEvent('cash', 'Notice', { failureEvent }));
   }
 
   async getNoticeChain(notice) {
@@ -128,7 +128,7 @@ class Chain {
   }
 
   async postPrice(payload, signature, onFinalize = true) {
-    return await sendAndWaitForEvents(this.api().tx.oracle.postPrice(payload, signature), this.api(), { onFinalize });
+    return await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.oracle.postPrice(payload, signature), { onFinalize });
   }
 
   async setCode(code, onFinalize = true) {
@@ -136,7 +136,7 @@ class Chain {
     // TODO: Sudo is removed
     const sudoKey = await api.query.sudo.key();
     const sudoPair = this.ctx.actors.first().chainKey;
-    return await sendAndWaitForEvents(api.tx.sudo.sudoUncheckedWeight(api.tx.system.setCode(code), 0), api, { onFinalize, signer: sudoPair });
+    return await this.ctx.eventTracker.sendAndWaitForEvents(api.tx.sudo.sudoUncheckedWeight(api.tx.system.setCode(code), 0), { onFinalize, signer: sudoPair });
   }
 
   async cashIndex() {
@@ -166,17 +166,17 @@ class Chain {
     // the information for each of the contained extrinsics
     signedBlock.block.extrinsics.forEach((ex, index) => {
       // the extrinsics are decoded by the API, human-like view
-      console.log(index, ex.toHuman());
+      this.ctx.log(index, ex.toHuman());
 
       const { isSigned, meta, method: { args, method, section } } = ex;
 
       // explicit display of name, args & documentation
-      console.log(`${section}.${method}(${args.map((a) => a.toString()).join(', ')})`);
-      console.log(meta.documentation.map((d) => d.toString()).join('\n'));
+      this.ctx.log(`${section}.${method}(${args.map((a) => a.toString()).join(', ')})`);
+      this.ctx.log(meta.documentation.map((d) => d.toString()).join('\n'));
 
       // signer/nonce info
       if (isSigned) {
-        console.log(`signer=${ex.signer.toString()}, nonce=${ex.nonce.toString()}`);
+        this.ctx.log(`signer=${ex.signer.toString()}, nonce=${ex.nonce.toString()}`);
       }
     });
   }
@@ -202,7 +202,7 @@ class Chain {
   }
 
   async cullNotices() {
-    return await sendAndWaitForEvents(this.api().tx.cash.cullNotices(), this.api());
+    return await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.cash.cullNotices());
   }
 
   async nextCodeHash() {
@@ -210,7 +210,7 @@ class Chain {
   }
 
   async setNextCode(code, onFinalize = true) {
-    let events = await sendAndWaitForEvents(this.api().tx.cash.setNextCodeViaHash(code), this.api(), { onFinalize });
+    let events = await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.cash.setNextCodeViaHash(code), { onFinalize });
     return getEventData(findEvent(events, 'cash', 'AttemptedSetCodeByHash'));
   }
 
@@ -284,7 +284,7 @@ class Chain {
 
   async setKeys(signer, keys) {
     const call = this.ctx.api().tx.session.setKeys(keys, "0x5566");
-    await sendAndWaitForEvents(call, this.api(), { signer });
+    await this.ctx.eventTracker.sendAndWaitForEvents(call, { signer });
   }
 
   async waitUntilSession(target, retries = 60) {
@@ -292,7 +292,7 @@ class Chain {
     const checkIdx = async (r) => {
       const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
       if (idx < target) {
-        console.log(`Waiting for session=${target}, curr=${idx}`);
+        this.ctx.log(`Waiting for session=${target}, curr=${idx}`);
 
         if (r === 0) {
           throw new Error(`Unable to get session ${target} after ${retries} retries`);

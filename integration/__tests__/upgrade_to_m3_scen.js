@@ -13,6 +13,7 @@ let scen_info = {
 buildScenarios('Upgrade to m3', scen_info, [
   {
     name: "Upgrade from m2 to m3 with Live Events",
+    skip: true,
     info: {
       versions: ['m2'],
       genesis_version: 'm2',

@@ -43,7 +43,6 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
     }
   },
   {
-    only: true,
     name: "Extract Cash",
     scenario: async ({ ashley, zrx, chain, starport, cash, log }) => {
       let notice = getNotice(await ashley.extract(20, cash));

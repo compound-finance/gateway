@@ -145,7 +145,7 @@ class Validator {
       ];
     }
 
-    console.log(`Validator Env: ${JSON.stringify(env)}`);
+    this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let ps = spawnValidator(this.ctx, this.colorize(this.name), [
       '--chain',
@@ -195,7 +195,8 @@ class Validator {
     //       same time, since this isn't order dependent.
     await until(() => canConnectTo('localhost', this.wsPort), {
       retries: 50,
-      message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`
+      message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`,
+      ctx: this.ctx,
     });
 
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);

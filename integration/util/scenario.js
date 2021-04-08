@@ -1,5 +1,7 @@
 const { buildCtx } = require('./scenario/ctx');
 const { merge, sleep } = require('./util');
+const os = require('os');
+const path = require('path');
 
 async function expectRevert(fn, reason) {
   // TODO: Expectation
@@ -43,6 +45,10 @@ function buildScenariosInternal(name, baseScenInfo, opts, scenarios, testFn) {
 
       realTestFn(scenario.name, async () => {
         let scenInfo = merge(baseScenInfo, scenario.info || {});
+        if (process.env['QUIET_SCENARIOS']) {
+          let scenFileName = `scenario-${name}-${scenario.name}`.replace(/[^a-zA-Z0-9-_]/g, '-');
+          scenInfo.log_file = path.join(os.tmpdir(), scenFileName + '.log');
+        }
         let ctx = await buildCtx(scenInfo);
         ctx.ctx = ctx; // Self reference to make ctx pattern-matchable for scenario fns
         try {

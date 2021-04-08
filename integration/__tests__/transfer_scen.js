@@ -38,7 +38,6 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
     }
   },
   {
-    only: true,
     name: "Transfer Cash Max",
     scenario: async ({ ashley, bert, chuck, zrx, chain, starport, cash }) => {
       await ashley.transfer(10, cash, bert);
@@ -46,11 +45,6 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
       let ashleyCash = await ashley.cash();
       let bertCash = await bert.cash();
       let chuckCash = await chuck.cash();
-      console.log({
-        ashleyCash,
-        bertCash,
-        chuckCash,
-      })
 
       // TODO: Fix checks below
       expect(ashleyCash).toBeCloseTo(-10.01, 4);

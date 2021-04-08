@@ -10,6 +10,7 @@ let scen_info = {};
 buildScenarios('Upgrade to m8', scen_info, [
   {
     name: "Upgrade from m7 to m8",
+    skip: true,
     info: {
       versions: ['m7'],
       genesis_version: 'm7',
