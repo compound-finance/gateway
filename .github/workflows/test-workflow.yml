@@ -244,6 +244,7 @@ jobs:
         run: |
           set -eo pipefail
           cd integration
+          export QUIET_SCENARIOS=true
           sudo npx jest --ci --reporters=default --reporters=jest-junit
 
       - name: Prepublish Integration results
