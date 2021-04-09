@@ -12,7 +12,7 @@ buildScenarios('Upgrade to m8', scen_info, [
     name: "Upgrade from m7 to m8",
     skip: true,
     info: {
-      versions: ['m7'],
+      versions: ['m7', 'm8'],
       genesis_version: 'm7',
       eth_opts: {
         version: 'm7',
@@ -30,7 +30,7 @@ buildScenarios('Upgrade to m8', scen_info, [
         }
       },
     },
-    scenario: async ({ ctx, chain, validators, starport, curr, sleep }) => {
+    scenario: async ({ ctx, chain, validators, starport, m8, sleep }) => {
       const alice = validators.validatorInfoMap.alice;
       const bob = validators.validatorInfoMap.bob;
       const newAuthsRaw = [
@@ -55,7 +55,7 @@ buildScenarios('Upgrade to m8', scen_info, [
 
       // Okay great, we've executed the change-over, but we still have a notice hold...
       // But what if we upgrade to m8??
-      await chain.upgradeTo(curr);
+      await chain.upgradeTo(m8);
       await chain.cullNotices();
       expect(await chain.noticeHold('Eth')).toEqual(null);
 

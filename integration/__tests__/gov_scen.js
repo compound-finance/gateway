@@ -27,23 +27,22 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    skip: true,
     name: "Upgrade Chain WASM [Allow Next Code]",
     info: {
-      versions: ['m2'],
-      genesis_version: 'm2',
+      versions: ['m7'],
+      genesis_version: 'm7',
       validators: {
         alice: {
-          version: 'm2',
+          version: 'm7',
         }
       },
     },
     scenario: async ({ ctx, zrx, chain, starport, curr }) => {
-      expect(await chain.getSemVer()).toEqual([1, 2, 1]);
+      expect(await chain.getSemVer()).toEqual([1, 7, 1]);
       let currHash = await curr.hash();
       let extrinsic = ctx.api().tx.cash.allowNextCodeWithHash(currHash);
 
-      await starport.executeProposal("Upgrade from m2 to Current [Allow Next Code]", [extrinsic]);
+      await starport.executeProposal("Upgrade from m7 to Current [Allow Next Code]", [extrinsic]);
 
       expect(await chain.nextCodeHash()).toEqual(currHash);
 
@@ -55,7 +54,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
         }
       });
 
-      expect(await chain.getSemVer()).not.toEqual([1, 2, 1]);
+      expect(await chain.getSemVer()).not.toEqual([1, 7, 1]);
     }
   },
   {
@@ -139,9 +138,8 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    skip: true,
     name: "Does not add auth without session keys",
-    scenario: async ({ ctx, chain, starport, validators }) => {
+    scenario: async ({ ctx, chain, starport, validators, sleep }) => {
       // spins up new validator charlie, doesnt add session keys, change validators should fail
       const keyring = ctx.actors.keyring;
       const peer_id = "12D3KooW9qtwBHeQryg9mXBVMkz4YivUsj62g1tYBACUukKToKof";
@@ -163,9 +161,14 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       ];
 
       const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);
-      await starport.executeProposal("Update authorities", [extrinsic]);
+      let { event } = await starport.executeProposal("Update authorities", [extrinsic], { checkSuccess: false });
 
-      await chain.waitUntilSession(3);
+      let [payload, govResult] = event.data[0][0];
+      if (!govResult.isDispatchFailure) {
+        expect(govResult.toJSON()).toBe(null);
+      }
+
+      await sleep(20000); // Session won't roll over, now
 
       const newSessionAuths = await chain.sessionValidators();
       expect(newSessionAuths.sort()).toEqual([alice.aura_key, bob.aura_key].sort());
