@@ -100,10 +100,9 @@ where
     let FullDeps {
         client,
         pool,
-        select_chain, // XXX delete?
-        chain_spec,   // XXX delete?
         deny_unsafe,
         grandpa,
+        ..
     } = deps;
 
     let GrandpaDeps {

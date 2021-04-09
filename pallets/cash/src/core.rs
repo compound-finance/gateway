@@ -108,6 +108,14 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
         .get_rates(utilization, APR::ZERO, info.miner_shares)?)
 }
 
+/// Return the current list of assets.
+pub fn get_assets<T: Config>() -> Result<Vec<AssetInfo>, Reason> {
+    let info = SupportedAssets::iter()
+        .map(|(_chain_asset, asset_info)| asset_info)
+        .collect::<Vec<AssetInfo>>();
+    Ok(info)
+}
+
 /// Return the current total borrow and total supply balances for the asset.
 pub fn get_market_totals<T: Config>(
     asset: ChainAsset,
@@ -130,6 +138,28 @@ pub fn get_account_balance<T: Config>(
 /// Return the current cash yield.
 pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
+}
+
+/// Return the current borrow and supply rates for the asset.
+pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
+    let info: Vec<ChainAccount> = CashPrincipals::iter()
+        .map(|p| p.0)
+        .collect::<Vec<ChainAccount>>();
+    Ok(info)
+}
+
+/// Return the current borrow and supply rates for the asset.
+pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
+    let mut info: Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
+        .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
+        .collect::<Vec<(ChainAccount, AssetBalance)>>();
+    info.sort_by(|(_a_account, a_balance), (_b_account, b_balance)| a_balance.cmp(b_balance));
+    Ok(info)
+}
+
+/// Return the portfolio of the chain account
+pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
+    Ok(Portfolio::from_storage::<T>(account)?)
 }
 
 // Internal helpers
@@ -1487,6 +1517,38 @@ mod tests {
             let (borrow_rate, supply_rate) = crate::core::get_rates::<Test>(asset)?;
             assert_eq!(borrow_rate, kink_rate.into());
             assert_eq!(supply_rate, (kink_rate / 2 / 2).into());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_get_assets() -> Result<(), Reason> {
+        new_test_ext().execute_with(|| {
+            initialize_storage();
+            let assets = vec![
+                AssetInfo {
+                    ticker: FromStr::from_str("USD").unwrap(),
+                    liquidity_factor: FromStr::from_str("7890").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                            .unwrap(),
+                        FromStr::from_str("USDC/6").unwrap(),
+                    )
+                },
+                AssetInfo {
+                    liquidity_factor: FromStr::from_str("7890").unwrap(),
+                    ..AssetInfo::minimal(
+                        FromStr::from_str("eth:0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+                            .unwrap(),
+                        FromStr::from_str("ETH/18").unwrap(),
+                    )
+                },
+            ];
+
+            let found_assets = crate::core::get_assets::<Test>()?;
+
+            assert_eq!(assets, found_assets);
 
             Ok(())
         })

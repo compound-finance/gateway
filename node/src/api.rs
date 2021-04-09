@@ -11,9 +11,10 @@ use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
+    portfolio::Portfolio,
     rates::APR,
     reason::Reason,
-    types::{AssetAmount, AssetBalance, AssetInfo},
+    types::{AssetAmount, AssetBalance, AssetInfo, InterestRateModel, Symbol},
 };
 use pallet_cash_runtime_api::CashApi as CashRuntimeApi;
 use pallet_oracle::types::AssetPrice;
@@ -44,10 +45,38 @@ pub struct ApiAssetData {
 }
 
 #[derive(Deserialize, Serialize, Types)]
+pub enum ApiInterestRateModel {
+    Kink {
+        zero_rate: String,
+        kink_rate: String,
+        kink_utilization: String,
+        full_rate: String,
+    },
+}
+
+#[derive(Deserialize, Serialize, Types)]
+pub struct ApiAssetInfo {
+    asset: ChainAsset,
+    decimals: u8,
+    liquidity_factor: String,
+    rate_model: ApiInterestRateModel,
+    miner_shares: String,
+    supply_cap: String,
+    symbol: Symbol,
+    ticker: String,
+}
+
+#[derive(Deserialize, Serialize, Types)]
 pub struct ApiCashData {
     balance: String,
     cash_yield: String,
     price: String,
+}
+
+#[derive(Deserialize, Serialize, Types)]
+pub struct ApiPortfolio {
+    cash: String,
+    positions: Vec<(ChainAsset, String)>,
 }
 
 /// Converts a runtime trap into an RPC error.
@@ -93,6 +122,25 @@ pub trait GatewayRpcApi<BlockHash> {
 
     #[rpc(name = "gateway_rates")]
     fn gateway_rates(&self, asset: ChainAsset, at: Option<BlockHash>) -> RpcResult<ApiRates>;
+
+    #[rpc(name = "gateway_assets")]
+    fn gateway_assets(&self, at: Option<BlockHash>) -> RpcResult<Vec<ApiAssetInfo>>;
+
+    #[rpc(name = "gateway_chain_accounts")]
+    fn chain_accounts(&self, at: Option<BlockHash>) -> RpcResult<Vec<ChainAccount>>;
+
+    #[rpc(name = "gateway_chain_account_liquidities")]
+    fn chain_account_liquidities(
+        &self,
+        at: Option<BlockHash>,
+    ) -> RpcResult<Vec<(ChainAccount, String)>>;
+
+    #[rpc(name = "gateway_chain_account_portfolio")]
+    fn chain_account_portfolio(
+        &self,
+        account: ChainAccount,
+        at: Option<BlockHash>,
+    ) -> RpcResult<ApiPortfolio>;
 }
 
 pub struct GatewayRpcHandler<C, B> {
@@ -225,5 +273,93 @@ where
             .map_err(runtime_err)?
             .map_err(chain_err)?;
         Ok((borrow_rate.0 as ApiAPR, supply_rate.0 as ApiAPR)) // XXX try_into?
+    }
+
+    fn gateway_assets(&self, at: Option<<B as BlockT>::Hash>) -> RpcResult<Vec<ApiAssetInfo>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let assets = api
+            .get_assets(&at)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        fn api_rate_model(model: InterestRateModel) -> ApiInterestRateModel {
+            match model {
+                InterestRateModel::Kink {
+                    zero_rate,
+                    kink_rate,
+                    kink_utilization,
+                    full_rate,
+                } => ApiInterestRateModel::Kink {
+                    zero_rate: format!("{:?}", zero_rate.0),
+                    kink_rate: format!("{:?}", kink_rate.0),
+                    kink_utilization: format!("{:?}", kink_utilization.0),
+                    full_rate: format!("{:?}", full_rate.0),
+                },
+            }
+        }
+
+        let assets_lite = assets
+            .iter()
+            .map(|asset_info| ApiAssetInfo {
+                asset: asset_info.asset,
+                decimals: asset_info.decimals,
+                liquidity_factor: format!("{}", asset_info.liquidity_factor.0),
+                rate_model: api_rate_model(asset_info.rate_model),
+                miner_shares: format!("{}", asset_info.miner_shares.0),
+                supply_cap: format!("{}", asset_info.supply_cap),
+                symbol: asset_info.symbol,
+                ticker: String::from(asset_info.ticker),
+            })
+            .collect();
+
+        Ok(assets_lite) // XXX try_into?
+    }
+
+    fn chain_accounts(&self, at: Option<<B as BlockT>::Hash>) -> RpcResult<Vec<ChainAccount>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let accounts = api
+            .get_accounts(&at)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+        Ok(accounts) // XXX try_into?
+    }
+
+    fn chain_account_liquidities(
+        &self,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<Vec<(ChainAccount, String)>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let accounts = api
+            .get_accounts_liquidity(&at)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+        Ok(accounts) // XXX try_into?
+    }
+
+    fn chain_account_portfolio(
+        &self,
+        account: ChainAccount,
+        at: Option<<B as BlockT>::Hash>,
+    ) -> RpcResult<ApiPortfolio> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let result: Portfolio = api
+            .get_portfolio(&at, account)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        let positions_lite = result
+            .positions
+            .iter()
+            .map(|p| (p.0.asset, format!("{}", p.1.value)))
+            .collect();
+        print!("{:?}", positions_lite);
+        Ok(ApiPortfolio {
+            cash: format!("{}", result.cash.value),
+            positions: positions_lite,
+        })
     }
 }
