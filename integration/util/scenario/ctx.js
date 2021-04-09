@@ -54,6 +54,7 @@ class Ctx {
   }
 
   __abort(msg) {
+    console.error(msg);
     this.error(msg);
     process.exit(1);
   }
