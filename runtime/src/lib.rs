@@ -45,6 +45,7 @@ pub use pallet_timestamp::Call as TimestampCall;
 
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
+    portfolio::Portfolio,
     rates::APR,
     reason::Reason,
     types::{AssetAmount, AssetBalance, AssetInfo},
@@ -571,6 +572,22 @@ impl_runtime_apis! {
 
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
             Cash::get_rates(asset)
+        }
+
+        fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
+            Cash::get_assets()
+        }
+
+        fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
+            Cash::get_accounts()
+        }
+
+        fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
+            Cash::get_accounts_liquidity()
+        }
+
+        fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
+            Cash::get_portfolio(account)
         }
     }
 

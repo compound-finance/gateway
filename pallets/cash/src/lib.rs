@@ -17,6 +17,7 @@ use crate::{
     },
     events::{ChainLogEvent, ChainLogId, EventState},
     notices::{Notice, NoticeId, NoticeState},
+    portfolio::Portfolio,
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
@@ -28,7 +29,7 @@ use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
-    traits::{OnRuntimeUpgrade, StoredMap, UnfilteredDispatchable},
+    traits::{StoredMap, UnfilteredDispatchable},
     weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
@@ -591,7 +592,7 @@ decl_module! {
 
         // Remove any notice holds if they have been executed
         #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
-        pub fn cull_notices(origin) -> dispatch::DispatchResult {
+        pub fn cull_notices(_origin) -> dispatch::DispatchResult {
             log!("Culling executed notices");
             NoticeHolds::iter().for_each(|(chain_id, notice_id)| {
                 match NoticeStates::get(chain_id, notice_id) {
@@ -676,6 +677,29 @@ impl<T: Config> Module<T> {
     /// Get the rates for the given asset.
     pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
         Ok(core::get_rates::<T>(asset)?)
+    }
+
+    /// Get the list of assets
+    pub fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
+        Ok(core::get_assets::<T>()?)
+    }
+    /// Get the rates for the given asset.
+    pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
+        Ok(core::get_accounts::<T>()?)
+    }
+
+    /// Get the all liquidity
+    pub fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
+        let accounts: Vec<(ChainAccount, String)> = core::get_accounts_liquidity::<T>()?
+            .iter()
+            .map(|(chain_account, bal)| (chain_account.clone(), format!("{}", bal)))
+            .collect();
+        Ok(accounts)
+    }
+
+    /// Get the portfolio for the given chain account.
+    pub fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
+        Ok(core::get_portfolio::<T>(account)?)
     }
 }
 

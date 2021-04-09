@@ -241,7 +241,7 @@ pub(crate) mod tests {
     #[test]
     fn test_extract_configuration_from_properties_happy_path() {
         let expected_starport = "hello starport";
-        let expected_topic = "hello topic";
+        let _expected_topic = "hello topic";
         let properties = serde_json::json!({ "eth_starport_address": expected_starport });
         let properties = properties.as_object().unwrap();
 
