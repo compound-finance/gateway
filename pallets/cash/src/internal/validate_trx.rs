@@ -88,14 +88,29 @@ pub fn validate_unsigned<T: Config>(
 
             match (signer_res, nonce) {
                 (Err(e), _) => Err(ValidationError::InvalidTrxRequest(e)),
-                (Ok(sender), nonce) => Ok(ValidTransaction::with_tag_prefix(
-                    "Gateway::exec_trx_request",
-                )
-                .priority(UNSIGNED_TXS_PRIORITY)
-                .longevity(UNSIGNED_TXS_LONGEVITY)
-                .and_provides((sender, nonce))
-                .propagate(true)
-                .build()),
+                (Ok((sender, current_nonce)), nonce) => {
+                    // Nonce check
+                    if current_nonce == 0 || *nonce == current_nonce {
+                        Ok(
+                            ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
+                                .priority(UNSIGNED_TXS_PRIORITY)
+                                .longevity(UNSIGNED_TXS_LONGEVITY)
+                                .and_provides((sender, nonce))
+                                .propagate(true)
+                                .build(),
+                        )
+                    } else {
+                        Ok(
+                            ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
+                                .priority(UNSIGNED_TXS_PRIORITY)
+                                .longevity(UNSIGNED_TXS_LONGEVITY)
+                                .and_requires((sender, nonce - 1))
+                                .and_provides((sender, nonce))
+                                .propagate(true)
+                                .build(),
+                        )
+                    }
+                }
             }
         }
         Call::publish_signature(chain_id, notice_id, signature) => {
@@ -414,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn test_exec_trx_request_invalid_request_wrong_nonce() {
+    fn test_exec_trx_request_valid_request_wrong_nonce() {
         new_test_ext().execute_with(|| {
             let request: Vec<u8> = String::from(
                 "(Extract 50000000 Cash Eth:0xfc04833Ca66b7D6B4F540d4C2544228f64a25ac2)",
@@ -434,12 +449,21 @@ mod tests {
 
             Nonces::insert(ChainAccount::Eth(eth_address), nonce - 1);
 
+            let exp = ValidTransaction::with_tag_prefix("Gateway::exec_trx_request")
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
+                .and_requires((ChainAccount::Eth(eth_address), nonce - 1))
+                .and_provides((ChainAccount::Eth(eth_address), nonce))
+                .propagate(true)
+                .build();
+
+
             assert_eq!(
                 validate_unsigned(
                     TransactionSource::InBlock {},
                     &Call::exec_trx_request::<Test>(request, signature, nonce),
                 ),
-                Err(ValidationError::InvalidTrxRequest(Reason::IncorrectNonce(nonce, nonce - 1)))
+                Ok(exp)
             );
         });
     }
