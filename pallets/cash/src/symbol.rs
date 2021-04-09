@@ -1,4 +1,3 @@
-#![feature(str_split_once)]
 use codec::{Decode, Encode};
 use our_std::{
     convert::TryInto,

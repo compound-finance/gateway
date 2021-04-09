@@ -1,4 +1,3 @@
-#![feature(str_split_once)]
 // Note: The substrate build requires these be imported
 pub use our_std::vec::Vec;
 
