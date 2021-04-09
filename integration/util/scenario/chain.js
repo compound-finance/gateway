@@ -1,5 +1,5 @@
 const { findEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
-const { sleep, arrayEquals, keccak256 } = require('../util');
+const { arrayEquals, keccak256 } = require('../util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -117,7 +117,7 @@ class Chain {
 
     if (pairs.length < opts.signatures) {
       if (opts.retries > 0) {
-        await sleep(opts.sleep);
+        await this.ctx.sleep(opts.sleep);
         return await this.getNoticeSignatures(notice, { ...opts, retries: opts.retries - 1 });
       } else {
         throw new Error(`Unable to get signed notice in sufficient retries`);

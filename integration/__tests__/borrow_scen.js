@@ -1,6 +1,5 @@
 const {
-  buildScenarios,
-  sleep,
+  buildScenarios
 } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
@@ -23,7 +22,7 @@ buildScenarios('Borrow Scenarios', borrow_scen_info, { beforeEach: lockZRX }, [
   {
     name: "Borrow BAT and Garner Interest",
     notes: "This test allows arbitrary time passage, and thus has some estimation",
-    scenario: async ({ ashley, bert, bat, zrx, chain, starport, log, cash }) => {
+    scenario: async ({ ashley, bert, bat, zrx, chain, starport, log, cash, sleep }) => {
       let cashBalance0 = await ashley.chainBalance(cash);
       let cashIndex0 = await chain.cashIndex();
       let cash0 = await ashley.cash();

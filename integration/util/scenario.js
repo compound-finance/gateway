@@ -1,5 +1,5 @@
 const { buildCtx } = require('./scenario/ctx');
-const { merge, sleep } = require('./util');
+const { merge } = require('./util');
 const os = require('os');
 const path = require('path');
 
@@ -83,6 +83,5 @@ module.exports = {
   seconds,
   merge,
   expectRevert,
-  buildScenarios,
-  sleep,
+  buildScenarios
 };

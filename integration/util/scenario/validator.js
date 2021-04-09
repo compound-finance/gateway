@@ -1,6 +1,6 @@
 const util = require('util');
 const child_process = require('child_process');
-const { genPort, getInfoKey, until } = require('../util');
+const { genPort, getInfoKey } = require('../util');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { canConnectTo } = require('../net');
 const { instantiateInfo } = require('./scen_info');
@@ -193,10 +193,9 @@ class Validator {
 
     // TODO: Should we make awaiting optional? We could also spawn multiple at the
     //       same time, since this isn't order dependent.
-    await until(() => canConnectTo('localhost', this.wsPort), {
+    await this.ctx.until(() => canConnectTo('localhost', this.wsPort), {
       retries: 50,
-      message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`,
-      ctx: this.ctx,
+      message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`
     });
 
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
@@ -250,6 +249,10 @@ class Validators {
 
   api() {
     return this.first().api;
+  }
+
+  tryApi() {
+    return this.count() > 0 ? this.api() : null;
   }
 
   get(name) {

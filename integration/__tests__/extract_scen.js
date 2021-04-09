@@ -87,7 +87,7 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
       let ashleyLiquidity = await ashley.liquidity();
       expect(ashleyComp).toEqual(50);
       expect(ashleyCash).toBeCloseTo(-0.0003809713723277, 4);
-      expect(ashleyLiquidity).toBeCloseTo(64724.99962, 2);
+      expect(ashleyLiquidity).toBeCloseTo(64700, -3);
     }
   },
   {

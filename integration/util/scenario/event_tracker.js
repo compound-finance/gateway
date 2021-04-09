@@ -8,6 +8,7 @@ class EventTracker {
     this.callbacks = [];
     this.ctx = ctx;
     this.unsubTimer = null;
+    this.cancellers = [];
   }
 
   async subscribeEvents() {
@@ -16,7 +17,7 @@ class EventTracker {
         this.ctx.debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
       });
       // TODO: Clean this up [trying to remember why we sleep here...]
-      sleep(5000).then(() => {
+      this.ctx.sleep(5000).then(() => {
         // let finalizedEvents = events.filter(({phase}) => phase.Finalization);
         // debug(`Found ${finalizedEvents.length } finalized event(s)`);
 
@@ -34,10 +35,10 @@ class EventTracker {
       ...opts
     };
 
-    let resolve, reject;
+    let resolve, reject, timeoutId;
     let promise = new Promise((resolve_, reject_) => {
       if (opts.timeout) {
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
           reject_(new Error(`Timeout waiting for event ${pallet}:${method}`));
         }, opts.timeout);
       }
@@ -58,9 +59,11 @@ class EventTracker {
               this.lastEvent = i;
             }
             resolved = true;
+            clearTimeout(timeoutId);
             return resolve(event);
           } else if (opts.failureEvent && event.section === opts.failureEvent[0] && event.method === opts.failureEvent[1]) {
             resolved = true;
+            clearTimeout(timeoutId);
             return reject(new Error(`Found failure event ${event.section}:${event.method} - ${JSON.stringify(getEventData(event))}`));
           }
         });
@@ -69,6 +72,7 @@ class EventTracker {
 
     this.callbacks.push(handler);
     handler(this.allEvents);
+    this.cancellers.push(() => reject('cancelled'));
 
     return promise;
   }
@@ -173,10 +177,11 @@ class EventTracker {
 
   async teardown() {
     // Give time for unsubs before we exit, otherwise we get a teardown error from PolkadotJS
+    this.cancellers.forEach((canceller) => canceller());
     if (this.unsubTimer) {
       let delta = this.unsubTimer - Date.now();
       if (delta > 0) {
-        await sleep(delta);
+        await sleep(delta); // This is an allowed teardown sleep
       }
     }
   }
@@ -184,7 +189,9 @@ class EventTracker {
 
 async function buildEventTracker(ctx) {
   let eventTracker = new EventTracker(ctx);
-  await eventTracker.subscribeEvents();
+  if (ctx.validators.count() > 0) {
+    await eventTracker.subscribeEvents();
+  }
   return eventTracker;
 }
 

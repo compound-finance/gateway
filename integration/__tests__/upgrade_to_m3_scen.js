@@ -26,7 +26,7 @@ buildScenarios('Upgrade to m3', scen_info, [
         }
       },
     },
-    scenario: async ({ ctx, ashley, zrx, chain, starport, curr, sleep }) => {
+    scenario: async ({ ctx, ashley, zrx, chain, starport, curr }) => {
       // First, lock an asset in the Starport and check it
       let { tx, event } = await ashley.lock(100, zrx);
       expect(tx).toHaveEthEvent('Lock', {

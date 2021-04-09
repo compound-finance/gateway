@@ -12,7 +12,7 @@ let gov_scen_info = {
 buildScenarios('Gov Scenarios', gov_scen_info, [
   {
     name: "Update Interest Rate Model by Governance",
-    scenario: async ({ ctx, zrx, chain, starport, sleep }) => {
+    scenario: async ({ ctx, zrx, chain, starport }) => {
       let newKink = {
         Kink: {
           zero_rate: 100,
@@ -38,7 +38,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
         }
       },
     },
-    scenario: async ({ ctx, zrx, chain, starport, curr, sleep }) => {
+    scenario: async ({ ctx, zrx, chain, starport, curr }) => {
       expect(await chain.getSemVer()).toEqual([1, 2, 1]);
       let currHash = await curr.hash();
       let extrinsic = ctx.api().tx.cash.allowNextCodeWithHash(currHash);
@@ -139,6 +139,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
+    skip: true,
     name: "Does not add auth without session keys",
     scenario: async ({ ctx, chain, starport, validators }) => {
       // spins up new validator charlie, doesnt add session keys, change validators should fail

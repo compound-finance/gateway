@@ -10,35 +10,6 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function until(cond, opts = {}) {
-  let options = {
-    delay: 5000,
-    retries: null,
-    message: null,
-    ctx: null,
-    ...opts
-  };
-
-  let start = +new Date();
-
-  if (await cond()) {
-    return;
-  } else {
-    if (options.message) {
-      if (options.ctx) {
-        options.ctx.log(options.message);
-      } else {
-        log(options.message)
-      }
-    }
-    await sleep(options.delay + start - new Date());
-    return await until(cond, {
-      ...options,
-      retries: options.retries === null ? null : options.retries - 1
-    });
-  }
-}
-
 function merge(x, y) {
   Object.entries(y).forEach(([key, val]) => {
     if (typeof (x[key]) === 'object' && typeof (val) === 'object' && !Array.isArray(x[key]) && x[key] !== null) {
@@ -114,7 +85,6 @@ module.exports = {
   concatArray,
   genPort,
   sleep,
-  until,
   merge,
   getInfoKey,
   stripHexPrefix,

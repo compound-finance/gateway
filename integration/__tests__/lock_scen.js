@@ -108,7 +108,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
         ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
       });
       let data = getEventData(event);
-      expect(data.CashPrincipalAmount).toBeCloseTo(99999996); // TODO: Check this better
+      expect(data.CashPrincipalAmount).toBeCloseTo(99999996, -1); // TODO: Check this better
       expect(data.CashIndex).toBeWithinRange(1000000000000000000, 1000000100000000000);
     }
   },

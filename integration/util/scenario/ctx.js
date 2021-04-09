@@ -1,5 +1,5 @@
 const path = require('path');
-const { merge, sleep } = require('../util');
+const { merge } = require('../util');
 const { declare } = require('./declare');
 
 const { baseScenInfo } = require('./scen_info');
@@ -21,6 +21,7 @@ class Ctx {
   constructor(scenInfo) {
     this.scenInfo = scenInfo;
     this.startTime = Math.floor(Date.now() / 1000);
+    this.sleeps = [];
   }
 
   __startTime() {
@@ -121,6 +122,10 @@ class Ctx {
     return this.validators.api();
   }
 
+  tryApi() {
+    return this.validators.tryApi();
+  }
+
   declare(declareInfo, ...args) {
     return declare(this, declareInfo, ...args);
   }
@@ -148,7 +153,46 @@ class Ctx {
     return this.trxReq.generate(...args);
   }
 
+  __sleep(ms) {
+    let resolve, timerId;
+    let promise = new Promise((resolve_, reject_) => {
+      resolve = resolve_;
+      timerId = setTimeout(resolve_, ms)
+    });
+    this.sleeps.push([timerId, resolve]);
+    return promise;
+  }
+
+  async until(cond, opts = {}) {
+    let options = {
+      delay: 5000,
+      retries: null,
+      message: null,
+      ...opts
+    };
+
+    let start = +new Date();
+
+    if (await cond()) {
+      return;
+    } else {
+      if (options.message) {
+        this.log(options.message);
+      }
+      await this.__sleep(options.delay + start - new Date());
+      return await this.until(cond, {
+        ...options,
+        retries: options.retries === null ? null : options.retries - 1
+      });
+    }
+  }
+
   async teardown() {
+    this.sleeps.forEach(([timerId, resolve]) => {
+      clearTimeout(timerId)
+      resolve();
+    });
+
     if (this.eventTracker) {
       await this.eventTracker.teardown();
     }
@@ -169,7 +213,7 @@ class Ctx {
       await this.logger.teardown();
     }
 
-    await sleep(1000); // Give things a second to close
+    await this.sleep(1000); // Give things a second to close
   }
 }
 
@@ -214,7 +258,7 @@ async function buildCtx(scenInfo={}) {
   ctx.trxReq = await buildTrxReq(ctx);
   ctx.chain = await buildChain(ctx);
   ctx.eventTracker = await buildEventTracker(ctx);
-  ctx.sleep = sleep;
+  ctx.sleep = ctx.__sleep.bind(ctx);
 
   // TODO: Post prices?
 
