@@ -10,7 +10,6 @@ let scen_info = {};
 buildScenarios('Upgrade to m8', scen_info, [
   {
     name: "Upgrade from m7 to m8",
-    skip: true,
     info: {
       versions: ['m7', 'm8'],
       genesis_version: 'm7',
@@ -48,7 +47,7 @@ buildScenarios('Upgrade to m8', scen_info, [
 
       let signatures = await chain.getNoticeSignatures(notice, { signatures: 2 });
       await starport.invoke(notice, signatures);
-      await sleep(10000);
+      await sleep(20000);
 
       expect(await chain.noticeState(notice)).toEqual({"Executed": null});
       expect(await chain.noticeHold('Eth')).toEqual([1, 0]);
