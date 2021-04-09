@@ -1,14 +1,14 @@
 use crate::{error::OracleError, oracle, Call, Config};
 use codec::Decode;
 use codec::Encode;
-use our_std::RuntimeDebug;
+use our_std::{log, RuntimeDebug};
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
 const MAX_EXTERNAL_PAIRS: usize = 30;
 const UNSIGNED_TXS_PRIORITY: u64 = 100;
 const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
-#[derive(Encode, Eq, PartialEq, RuntimeDebug)]
+#[derive(Encode, Eq, PartialEq, RuntimeDebug, Clone, Copy)]
 #[cfg_attr(feature = "std", derive(Decode))]
 pub enum ValidationError {
     InvalidInternalOnly,
@@ -16,6 +16,16 @@ pub enum ValidationError {
     InvalidPrice(OracleError),
     InvalidCall,
     ExcessivePrices,
+}
+
+pub fn check_validation_failure<T: Config>(
+    call: &Call<T>,
+    res: Result<TransactionValidity, ValidationError>,
+) -> Result<TransactionValidity, ValidationError> {
+    if let Err(err) = res {
+        log!("validate_unsigned: call = {:#?}, error = {:#?}", call, err);
+    }
+    res
 }
 
 pub fn validate_unsigned<T: Config>(

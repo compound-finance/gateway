@@ -688,7 +688,10 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// here we make sure that some particular calls (the ones produced by offchain worker)
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-        internal::validate_trx::validate_unsigned::<T>(source, call)
-            .unwrap_or(InvalidTransaction::Call.into())
+        internal::validate_trx::check_validation_failure(
+            call,
+            internal::validate_trx::validate_unsigned::<T>(source, call),
+        )
+        .unwrap_or(InvalidTransaction::Call.into())
     }
 }
