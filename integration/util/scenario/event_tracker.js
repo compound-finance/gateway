@@ -130,7 +130,9 @@ class EventTracker {
                 const { documentation, method, section } = decoded;
 
                 return new Error(`DispatchError[id=${id}]: ${section}.${method}: ${documentation.join(' ')}`);
-              } catch (e) {}
+              } catch (e) {
+                console.error("Error looking up module", e);
+              }
             }
 
             // Other, CannotLookup, BadOrigin, no extra info

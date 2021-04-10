@@ -25,8 +25,7 @@ buildScenarios('Prices Scenarios', prices_scen_info, [
     }
   },
   {
-    skip: true,
-    name: "Prices from Storage",
+    name: "Post Price and Load from Storage",
     scenario: async ({ chain, zrx }) => {
       await chain.postPrice(pricePayloads.ZRX.payload, pricePayloads.ZRX.signature, false);
       expect(await zrx.getPrice()).toEqual(0.599453);
