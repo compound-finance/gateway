@@ -1,10 +1,10 @@
-use crate::chains::{eth, ChainId, ChainSignature};
+use crate::chains::{eth, Chain, ChainId, ChainSignature, Ethereum};
 use crate::log;
 use crate::reason::Reason;
 use crate::types::SignersSet;
 use codec::alloc::string::String;
 use codec::{Decode, Encode};
-use ethereum_client::{EthereumClientError, EthereumLogEvent};
+use ethereum_client::{EthereumClientError};
 use our_std::{vec::Vec, RuntimeDebug};
 
 use types_derive::Types;
@@ -34,7 +34,7 @@ impl ChainLogId {
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainLogEvent {
-    Eth(EthereumLogEvent),
+    Eth(<Ethereum as Chain>::Event),
 }
 
 impl ChainLogEvent {

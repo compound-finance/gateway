@@ -21,14 +21,18 @@ use crate::{
     PendingChainBlocks, PendingChainReorgs,
 };
 
-// OCW storage constants
-const OCW_STORAGE_LOCK_ETH_EVENTS: &[u8; 29] = b"cash::storage_lock_eth_events";
-const OCW_LATEST_CACHED_ETH_BLOCK: &[u8; 29] = b"cash::latest_cached_eth_block";
-
 pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
-    // XXX do we need to lock ocw?
-    // Note: these chains can be parallelized
-    track_eth_events::<T>()
+    const OCW_TRACK_CHAIN_EVENTS: &[u8; 24] = b"cash::track_chain_events";
+    let mut lock = StorageLock::<Time>::new(OCW_TRACK_CHAIN_EVENTS);
+    let result = match lock.try_lock() {
+        Ok(_guard) => {
+            // Note: chains could be parallelized
+            track_eth_events::<T>()
+        }
+
+        _ => Err(Reason::WorkerBusy)
+    };
+    result
 }
 
 pub fn track_eth_events<T: Config>() -> Result<(), Reason> {
@@ -37,19 +41,14 @@ pub fn track_eth_events<T: Config>() -> Result<(), Reason> {
     let last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let truth = fetch_chain_block(chain_id, last.number())?;
     if last.hash() == truth.hash() {
+        // worker sees same fork as chain
         let slack = calculate_queue_slack::<T>(chain_id);
-        if slack > 0 {
-            let pending = PendingChainBlocks::get(chain_id);
-            let blocks = fetch_chain_blocks(chain_id, last.number(), slack)?;
-            let filtered = filter_chain_blocks(chain_id, pending, blocks);
-            submit_chain_blocks::<T>(chain_id, filtered)
-        } else {
-            // no slack
-            // just let the Gateway chain catch up (noop)
-            Ok(())
-        }
+        let pending = PendingChainBlocks::get(chain_id);
+        let blocks = fetch_chain_blocks(chain_id, last.number(), slack)?;
+        let filtered = filter_chain_blocks(chain_id, pending, blocks);
+        submit_chain_blocks::<T>(chain_id, filtered)
     } else {
-        // different fork
+        // worker sees a different fork
         let reorg = formulate_reorg(chain_id, last, truth)?;
         if !already_voted_for_reorg(chain_id, me, &reorg) {
             submit_chain_reorg::<T>(chain_id, &reorg)
@@ -65,18 +64,39 @@ fn calculate_queue_slack<T: Config>(chain_id: ChainId) -> u32 {
     0 // XXX look at ingression queue, how backed up?
 }
 
-fn ingress_queue<T: Config>(chain_id: ChainId, ev_queue: &ChainEvents) -> ChainEvents {
-    use crate::types::{Quantity, USD};
-    const QUOTA: Quantity = Quantity::from_nominal("10000", USD); // XXX per chain?
-    ev_queue.clone() // XXX ingress one round (QUOTA)
+fn risk_adjusted_value(chain_event: &crate::events::ChainLogEvent, block_number: ChainBlockNumber) -> crate::types::USDQuantity { // XXX
+    // XXX
+    //  if Lock or LockCash -> Lock amount value risk decayed by blocks elapsed since block number
+    //  Gov -> max/set value probably also decayed since block number
+    //  otherwise -> 0, trx requests, what else?
+    crate::types::Quantity::from_nominal("1000", crate::types::USD) // XXX
+}
+
+// Ingress a single round (quota per underlying chain block ingested).
+fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, event_queue: &mut ChainEvents) {
+    use crate::types::{Quantity, USD, USDQuantity};
+    const QUOTA: USDQuantity = Quantity::from_nominal("10000", USD); // XXX per chain?
+    let available = QUOTA;
+    for event in event_queue.clone() { // XXX no clone
+        if risk_adjusted_value(&event, last_block.number()) < available {
+            match apply_chain_event_internal::<T>(event) {
+                Ok(()) => {
+                    // XXX remove from queue
+                }
+
+                Err(reason) => {
+                    // XXX emit event?
+                    // XXX remove and dont reprocess, right?
+                }
+            }
+        }
+    }
 }
 
 fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
     // XXX
     let from_block: String = encode_block_hex(number);
 
-    // let mut lock = StorageLock::<Time>::new(OCW_STORAGE_LOCK_ETH_EVENTS);
-    // if let Ok(_guard) = lock.try_lock() {
     match fetch_eth_blocks(from_block) {
         Ok(event_info) => {
             log!("Result: {:?}", event_info);
@@ -102,9 +122,6 @@ fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<Chai
             Err(Reason::WorkerFetchError)
         }
     }
-    // } else {
-    //     Err(Reason::WorkerLocked)
-    // }
 }
 
 fn fetch_chain_blocks(
@@ -113,6 +130,7 @@ fn fetch_chain_blocks(
     slack: u32,
 ) -> Result<ChainBlocks, Reason> {
     // XXX fetch given slack
+    //  slack 0 -> no results
     Ok(ChainBlocks::Eth(vec![])) // XXX eth
 }
 
@@ -183,7 +201,7 @@ pub fn receive_chain_blocks<T: Config>(
 ) -> Result<(), Reason> {
     let validator = recover_validator::<T>(&blocks.encode(), signature)?;
     let chain_id = blocks.chain_id();
-    let mut ev_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
+    let mut event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
     let mut last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let mut pending = PendingChainBlocks::get(chain_id);
     for block in blocks {
@@ -222,16 +240,16 @@ pub fn receive_chain_blocks<T: Config>(
         if tally.clone().passes_threshold() {
             //XXX
             // XXX 'forward block'?
-            ev_queue.push(&tally.block);
+            event_queue.push(&tally.block);
             last = tally.block.clone(); // XXX
             pending.remove(0); // XXX assert 0 == tally?
-            ingress_queue::<T>(chain_id, &ev_queue);
+            ingress_queue::<T>(chain_id, &last, &mut event_queue);
         } else {
             break;
         }
     }
 
-    IngressionQueue::insert(chain_id, ev_queue);
+    IngressionQueue::insert(chain_id, event_queue);
     LastProcessedBlock::insert(chain_id, last);
     PendingChainBlocks::insert(chain_id, pending);
 
@@ -244,7 +262,7 @@ pub fn receive_chain_reorg<T: Config>(
 ) -> Result<(), Reason> {
     let validator = recover_validator::<T>(&reorg.encode(), signature)?;
     let chain_id = reorg.chain_id();
-    let mut ev_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
+    let mut event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
     let mut last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let mut pending = PendingChainReorgs::get(chain_id);
 
@@ -271,7 +289,7 @@ pub fn receive_chain_reorg<T: Config>(
         //   push/ingress ev queue, update last block/pending
         //  pass last block for them to modify
         //   returns last block
-        IngressionQueue::insert(chain_id, ev_queue);
+        IngressionQueue::insert(chain_id, event_queue);
         LastProcessedBlock::insert(chain_id, last);
         PendingChainBlocks::insert(chain_id, Vec::<ChainBlockTally>::new());
         PendingChainReorgs::insert(chain_id, Vec::<ChainReorgTally>::new());

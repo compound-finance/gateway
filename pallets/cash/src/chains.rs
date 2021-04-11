@@ -474,6 +474,22 @@ impl ChainEvents {
     }
 }
 
+impl IntoIterator for ChainEvents {
+    type Item = crate::events::ChainLogEvent; // XXX ChainEvent?
+    type IntoIter = vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
+            ChainEvents::Eth(events) => events
+                .into_iter()
+                .map(|e| crate::events::ChainLogEvent::Eth(e))
+                .collect::<Vec<crate::events::ChainLogEvent>>()
+                .into_iter(),
+        }
+    }
+}
+
 pub trait Chain {
     const ID: ChainId;
 
@@ -937,31 +953,8 @@ pub mod eth {
     #[type_alias("eth__")]
     pub type EventId = (BlockNumber, LogIndex);
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Event {
-        pub id: EventId,
-        pub data: EventData,
-    }
-
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub enum EventData {
-        // XXX only event is 'do'?
-        Lock {
-            asset: <Ethereum as Chain>::Address,
-            holder: <Ethereum as Chain>::Address,
-            amount: <Ethereum as Chain>::Amount,
-        },
-
-        LockCash {
-            holder: <Ethereum as Chain>::Address,
-            amount: <Ethereum as Chain>::Amount,
-            index: <Ethereum as Chain>::CashIndex,
-        },
-
-        Gov {
-            extrinsics: Vec<Vec<u8>>,
-        },
-    }
+    #[type_alias("eth__")]
+    pub type Event = ethereum_client::EthereumLogEvent;
 
     #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
     pub struct Block {
