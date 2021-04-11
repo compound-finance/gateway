@@ -5,6 +5,7 @@ const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { canConnectTo } = require('../net');
 const { instantiateInfo } = require('./scen_info');
 const fs = require('fs').promises;
+const os = require('os');
 const path = require('path');
 const chalk = require('chalk');
 
@@ -88,6 +89,12 @@ let validatorInfoMap = {
   }
 };
 
+// TODO: Standardize
+async function tmpFile(name) {
+  folder = await fs.mkdtemp(path.join(os.tmpdir()));
+  return path.join(folder, name);
+}
+
 class Validator {
   constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, chainSpecFile) {
     this.ctx = ctx;
@@ -110,6 +117,30 @@ class Validator {
     this.api = null;
     this.ps = null;
     this.bootnodes = null;
+    this.freezeTimeFile = null;
+  }
+
+  async freezeTime(time) {
+    if (!this.freezeTimeFile) {
+      throw new Error(`Freeze time not set`);
+    }
+    await fs.writeFile(this.freezeTimeFile, time.toString());
+  }
+
+  async accelerateTime(interval) {
+    if (!this.freezeTimeFile) {
+      throw new Error(`Freeze time not set`);
+    }
+    let currentTimeStr = await fs.readFile(this.freezeTimeFile, 'utf8');
+    let currentTime = Number(currentTimeStr);
+    if (Number.isNaN(currentTime)) {
+      throw new Error(`Invalid current time: ${currentTimeStr}`);
+    }
+    console.log({currentTime});
+    if (currentTime === 0) {
+      throw new Error(`Cannot accelerate zero time`);
+    }
+    await this.freezeTime(currentTime + interval);
   }
 
   asPeer() {
@@ -145,6 +176,21 @@ class Validator {
       ];
     }
 
+    let executionArgs = [];
+    if (this.ctx.__native()) {
+      if (this.version) {
+        throw new Error('Cannot use `version` and `native` options together');
+      }
+      executionArgs = ['--execution', 'Native'];
+    }
+
+    if (this.ctx.__freezeTime()) {
+      this.freezeTimeFile = await tmpFile("freeze_time.txt");;
+      console.log({ freezeTimeFile: this.freezeTimeFile });
+      await fs.writeFile(this.freezeTimeFile, this.ctx.__freezeTime().toString());
+      env.FREEZE_TIME = this.freezeTimeFile;
+    }
+
     this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let ps = spawnValidator(this.ctx, this.colorize(this.name), [
@@ -169,6 +215,7 @@ class Validator {
       '-lruntime=debug',
       '--reserved-only',
       ...versioning,
+      ...executionArgs,
       ...this.bootnodes,
       ...this.extraArgs,
       ...this.validatorArgs

@@ -20,7 +20,7 @@ const { buildEventTracker } = require('./event_tracker');
 class Ctx {
   constructor(scenInfo) {
     this.scenInfo = scenInfo;
-    this.startTime = Math.floor(Date.now() / 1000);
+    this.startTime = Date.now();
     this.sleeps = [];
   }
 
@@ -36,8 +36,22 @@ class Ctx {
     return process.env['INITIAL_YIELD'] || this.scenInfo['initial_yield'] || 0;
   }
 
-  __initialYieldStart() {
+  __initialYieldStartRaw() {
     return process.env['INITIAL_YIELD_START'] || this.scenInfo['initial_yield_start'] || this.startTime;
+  }
+
+  __initialYieldStartMS() {
+    let raw = this.__initialYieldStartRaw();
+    if (raw > 4102444800) { // Jan 1, 2100 as seconds since 1970
+      // Time is in ms
+      return raw;
+    } else {
+      return raw * 1000;
+    }
+  }
+
+  __initialYieldStart() {
+    return Math.floor(this.__initialYieldStartMS() / 1000);
   }
 
   __getContractsDir() {
@@ -69,6 +83,26 @@ class Ctx {
 
   __target() {
     return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'gateway');
+  }
+
+  __native() {
+    return this.__freezeTime() || process.env['NATIVE'] || this.scenInfo['native'] || false;
+  }
+
+  __freezeTime() {
+    let value = process.env['FREEZE_TIME'] || this.scenInfo['freeze_time'];
+    if (value !== undefined && value !== null) {
+      if (value === true || value === "true") {
+        return 0;
+      } else {
+        let freezeTime = Number(value);
+        if (Number.isNaN(freezeTime)) {
+          throw new Error(`Invalid freeze time: ${value}`);
+        }
+        return freezeTime;
+      }
+    }
+    return null;
   }
 
   __wasmFile() {

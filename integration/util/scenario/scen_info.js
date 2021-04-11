@@ -45,6 +45,8 @@ const baseScenInfo = {
   types_file: null, // types.json file [env=TYPES_FILE]
   opf_url: 'https://prices.compound.finance/coinbase', // use given open price feed [env=OPF_URL]
   log_file: null, // write logs to file [env=LOG_FILE]
+  native: false, // always run native code [env=NATIVE]
+  freeze_time: false, // freeze time for precise interest testing (implies `native=true`) [env=FREEZE_TIME]
 };
 
 // Helper function to take an info that might be

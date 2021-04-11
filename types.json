@@ -353,6 +353,7 @@
       "SubmitError": ""
     }
   },
+<<<<<<< HEAD
   "Oracle__Timestamp": "u64",
   "Polkadot__Chain__Address": "[u8; 20]",
   "Polkadot__Chain__Amount": "u128",
@@ -383,6 +384,15 @@
       "KinkAboveFull": "",
       "KinkUtilizationTooHigh": "",
       "Overflowed": ""
+    }
+  },
+  "FixedModel": {
+    "rate": "APR"
+  },
+  "InterestRateModel": {
+    "_enum": {
+      "Kink": "KinkModel",
+      "Fixed": "FixedModel"
     }
   },
   "Reason": {

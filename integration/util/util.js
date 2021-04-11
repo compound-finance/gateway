@@ -80,16 +80,36 @@ function bytes32(x) {
   return x.toLowerCase() + [...new Array(padding)].map((i) => "0").join("");
 }
 
+function intervalToSeconds(interval) {
+  let intervalLengths = {
+    second: 1,
+    minute: 60,
+    hour: 60 * 60,
+    day: 24 * 60 * 60,
+    month: 30.5 * 24 * 60 * 60,
+    year: 365 * 24 * 60 * 60
+  };
+
+  return Object.entries(interval).reduce((acc, [k, v]) => {
+    let unit = k.endsWith('s') ? k.slice(0, k.length - 1) : k;
+    if (!intervalLengths.hasOwnProperty(unit)) {
+      throw new Error(`Unknown time unit: ${k}`);
+    }
+    return acc + Math.ceil(intervalLengths[unit] * v);
+  }, 0);
+}
+
 module.exports = {
+  arrayEquals,
   arrayToHex,
+  bytes32,
   concatArray,
   genPort,
-  sleep,
-  merge,
   getInfoKey,
-  stripHexPrefix,
-  lookupBy,
-  arrayEquals,
+  intervalToSeconds,
   keccak256: Web3Utils.keccak256,
-  bytes32,
+  lookupBy,
+  merge,
+  sleep,
+  stripHexPrefix,
 };

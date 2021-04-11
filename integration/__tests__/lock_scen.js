@@ -1,7 +1,4 @@
-const {
-  years,
-  buildScenarios
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 const { getEventData, getNotice } = require('../util/substrate');
 const { bytes32 } = require('../util/util');
 
@@ -20,6 +17,8 @@ async function getCash({ ashley, usdc, cash, chain, starport }) {
   expect(await ashley.tokenBalance(cash)).toBeCloseTo(100);
   expect(await ashley.chainBalance(cash)).toBeCloseTo(-100);
 }
+
+let now = Date.now();
 
 buildScenarios('Lock Scenarios', lock_scen_info, [
   {
@@ -138,21 +137,6 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       await ashley.lock(200, fee);
       expect(await ashley.tokenBalance(fee)).toEqual(300);
       expect(await ashley.chainBalance(fee)).toEqual(100);
-    }
-  },
-  {
-    skip: true,
-    name: 'Supply Collateral With Interest',
-    scenario: async ({ ashley, cash, chain, usdc }) => {
-      await chain.freezeTime(chain.timestamp());
-      await chain.setFixedRateBPS(usdc, 100n);
-      await chain.setPriceCents(usdc, 100n);
-      await ashley.supply(1000, usdc);
-      expect(await ashley.chainBalance(usdc)).toEqual(1000);
-      expect(await ashley.chainBalance(cash)).toEqual(0);
-      await chain.accelerateTime(years(1));
-      expect(await ashley.chainBalance(usdc)).toEqual(1000);
-      expect(await ashley.chainBalance(cash)).toEqual(10);
     }
   }
 ]);

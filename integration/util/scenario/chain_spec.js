@@ -48,7 +48,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         full_rate: 2000
       }
     },
-    miner_shares: 1000,
+    miner_shares: 0,
     supply_cap: 0
   }));
 
@@ -56,7 +56,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   if (ctx.__initialYield() > 0) {
     initialYieldConfig = {
       cashYield: ctx.__initialYield(),
-      lastYieldTimestamp: ctx.__initialYieldStart() * 1000
+      lastYieldTimestamp: ctx.__initialYieldStartMS()
     };
   }
 

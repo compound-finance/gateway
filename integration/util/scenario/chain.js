@@ -1,5 +1,5 @@
 const { findEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
-const { arrayEquals, keccak256 } = require('../util');
+const { arrayEquals, keccak256, intervalToSeconds } = require('../util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -57,6 +57,28 @@ class Chain {
 
   async waitForNotice(onFinalize = true, failureEvent = null) {
     return getEventData(await this.waitForEvent('cash', 'Notice', { failureEvent }));
+  }
+
+  async freezeTime(time) {
+    await Promise.all(this.ctx.validators.all().map(async (validator) => {
+      await validator.freezeTime(time);
+    }));
+  }
+
+  async accelerateTime(interval) {
+    await Promise.all(this.ctx.validators.all().map(async (validator) => {
+      await validator.accelerateTime(1000 * intervalToSeconds(interval));
+    }));
+  }
+
+  async setFixedRate(token, bps) {
+    let newModel = {
+      Fixed: {
+        rate: bps,
+      }
+    };
+    let extrinsic = this.ctx.api().tx.cash.setRateModel(token.toChainAsset(), newModel);
+    await this.ctx.starport.executeProposal("Update TokenRate Model", [extrinsic]);
   }
 
   async getNoticeChain(notice) {

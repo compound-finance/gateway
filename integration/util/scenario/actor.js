@@ -140,11 +140,14 @@ class Actor {
     }
   }
 
+  async cashData() {
+    return await this.ctx.api().rpc.gateway.cashdata(this.toTrxArg());
+  }
+
   async cash() {
-    // TODO: Use non-zero balances
-    let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
-    let chainCashBalance = await this.chainCashBalance();
-    return chainCashBalance + cashForTokens.reduce((acc, el) => acc + el, 0);
+    let cashData = await this.cashData();
+    let balance = cashData.balance.toJSON();
+    return Number(balance) / 1e6;
   }
 
   async liquidityForToken(token) {

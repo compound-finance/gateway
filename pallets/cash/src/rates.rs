@@ -112,6 +112,9 @@ pub enum InterestRateModel {
         kink_utilization: Factor,
         full_rate: APR,
     },
+    Fixed {
+        rate: APR,
+    },
 }
 
 /// This is for convenience, we shouldn't rely on a sane default model.
@@ -168,6 +171,11 @@ impl InterestRateModel {
 
                 if *kink_utilization >= Factor::ONE {
                     return Err(RatesError::KinkUtilizationTooHigh);
+                }
+            }
+            Self::Fixed { rate } => {
+                if *rate > APR::MAX {
+                    return Err(RatesError::ModelRateOutOfBounds);
                 }
             }
         };
@@ -230,7 +238,7 @@ impl InterestRateModel {
                     )
                     .ok_or(RatesError::Overflowed)?;
 
-                    return Ok(result.into());
+                    Ok(result.into())
                 } else {
                     let result = Self::right_line(
                         utilization.0,
@@ -241,10 +249,11 @@ impl InterestRateModel {
                     )
                     .ok_or(RatesError::Overflowed)?;
 
-                    return Ok(result.into());
+                    Ok(result.into())
                 }
             }
-        };
+            Self::Fixed { rate } => Ok(*rate),
+        }
     }
 
     fn borrow_rate_to_supply_rate(
