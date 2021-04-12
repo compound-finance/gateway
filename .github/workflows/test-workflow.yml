@@ -237,7 +237,7 @@ jobs:
 
       - name: Build Gateway
         run: |
-          cargo build --release
+          cargo build --release --features freeze-time --features runtime-debug
 
       - name: Run Integration Test
         timeout-minutes: 40
