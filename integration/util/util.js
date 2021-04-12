@@ -86,7 +86,7 @@ function intervalToSeconds(interval) {
     minute: 60,
     hour: 60 * 60,
     day: 24 * 60 * 60,
-    month: 30.5 * 24 * 60 * 60,
+    month: 365 * 24 * 60 * 60 / 12,
     year: 365 * 24 * 60 * 60
   };
 

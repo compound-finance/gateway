@@ -1,5 +1,18 @@
 const { sleep } = require('../util');
 
+function deferred() {
+  let resolve, reject;
+  let promise = new Promise((resolve_, reject_) => {
+    resolve = resolve_;
+    reject = reject_;
+  });
+
+  return {
+    promise,
+    resolve,
+    reject
+  };
+}
 class EventTracker {
   constructor(ctx) {
     this.trxId = 0;
@@ -9,6 +22,22 @@ class EventTracker {
     this.ctx = ctx;
     this.unsubTimer = null;
     this.cancellers = [];
+    this.unsubNewBlocks = null;
+    this.blockHeaders = [];
+    this.newBlockDeferred = deferred();
+  }
+
+  async subscribeBlocks() {
+    this.unsubNewBlocks = await this.ctx.api().rpc.chain.subscribeNewHeads((header) => {
+      let previous = this.newBlockDeferred;
+      this.newBlockDeferred = deferred();
+      previous.resolve(header);
+      this.blockHeaders.push(header);
+    });
+  }
+
+  async newBlock() {
+    return this.newBlockDeferred.promise;
   }
 
   async subscribeEvents() {
@@ -178,6 +207,12 @@ class EventTracker {
   }
 
   async teardown() {
+    if (this.unsubNewBlocks) {
+      this.unsubNewBlocks();
+      this.setUnsubDelay();
+    }
+    this.newBlockDeferred.resolve(null); // Silent resolution
+
     // Give time for unsubs before we exit, otherwise we get a teardown error from PolkadotJS
     this.cancellers.forEach((canceller) => canceller());
     if (this.unsubTimer) {
@@ -192,6 +227,7 @@ class EventTracker {
 async function buildEventTracker(ctx) {
   let eventTracker = new EventTracker(ctx);
   if (ctx.validators.count() > 0) {
+    await eventTracker.subscribeBlocks();
     await eventTracker.subscribeEvents();
   }
   return eventTracker;

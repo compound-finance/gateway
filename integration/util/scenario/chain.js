@@ -65,9 +65,15 @@ class Chain {
     }));
   }
 
-  async accelerateTime(interval) {
+  async accelerateTime(interval, awaitBlock = true) {
     await Promise.all(this.ctx.validators.all().map(async (validator) => {
-      await validator.accelerateTime(1000 * intervalToSeconds(interval));
+      let newTime = await validator.accelerateTime(1000 * intervalToSeconds(interval));
+      if (awaitBlock) {
+        await this.ctx.until(async () => {
+          let currentTime = await validator.currentTime();
+          return currentTime === newTime
+        }, { delay: 1000 });
+      }
     }));
   }
 
@@ -301,22 +307,20 @@ class Chain {
     await this.ctx.eventTracker.sendAndWaitForEvents(call, { signer });
   }
 
-  async waitUntilSession(target, retries = 60) {
-    const timer = ms => new Promise(res => setTimeout(res, ms));
-    const checkIdx = async (r) => {
+  async newBlock() {
+    await this.ctx.eventTracker.newBlock();
+  }
+
+  async waitUntilSession(target) {
+    await this.ctx.until(async () => {
       const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
       if (idx < target) {
         this.ctx.log(`Waiting for session=${target}, curr=${idx}`);
-
-        if (r === 0) {
-          throw new Error(`Unable to get session ${target} after ${retries} retries`);
-        } else {
-          await timer(1000);
-          await checkIdx(r - 1);
-        }
+        return false;
+      } else {
+        return true;
       }
-    };
-    await checkIdx(retries);
+    }, { delay: 1000 });
   }
 }
 

@@ -3,6 +3,8 @@ const {
 } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
+let now = Date.now();
+
 let extract_scen_info = {
   tokens: [
     { token: "zrx", balances: { ashley: 1000 } },
@@ -71,14 +73,19 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
   {
     name: "Extract Comp Torrey",
     beforeEach: null,
+    info: {
+      freeze_time: now,
+    },
     scenario: async ({ ashley, bert, usdc, comp, chain, starport, cash, log }) => {
-      // User A Supplied 100k USDC
+      // Alice supplies 100K USDC
       await ashley.lock(100_000, usdc);
-      // User B Supplied 200 COMP
+      // Bert supplies 200 COMP
       await bert.lock(200, comp);
-      // User A downloaded 50 COMP
+      // Alice extracts 50 COMP
       let notice = getNotice(await ashley.extract(50, comp));
       let signatures = await chain.getNoticeSignatures(notice);
+
+      await chain.accelerateTime({days: 1});
 
       expect(await ashley.tokenBalance(comp)).toEqual(0);
       let tx = await starport.invoke(notice, signatures);
@@ -86,7 +93,7 @@ buildScenarios('Extract Scenarios', extract_scen_info, { beforeEach: lockUSDC },
       let ashleyCash = await ashley.cash();
       let ashleyLiquidity = await ashley.liquidity();
       expect(ashleyComp).toEqual(50);
-      expect(ashleyCash).toBeCloseTo(-0.0003809713723277, 4);
+      expect(ashleyCash).toBeCloseTo(-2.743447, 4);
       expect(ashleyLiquidity).toBeCloseTo(64700, -3);
     }
   },

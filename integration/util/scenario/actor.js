@@ -123,23 +123,6 @@ class Actor {
     }
   }
 
-  async cashForToken(token) {
-    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
-    let lastIndex = await this.ctx.api().query.cash.lastIndices(token.toChainAsset(), this.toChainAccount());
-
-    if (assetBalance == 0) {
-      return 0;
-    } else if (assetBalance > 0) {
-      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
-      let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
-      return descale(assetBalance.toBigInt() * (supplyIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
-    } else {
-      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
-      let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
-      return descale(assetBalance.toBigInt() * (borrowIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
-    }
-  }
-
   async cashData() {
     return await this.ctx.api().rpc.gateway.cashdata(this.toTrxArg());
   }

@@ -120,6 +120,10 @@ class Validator {
     this.freezeTimeFile = null;
   }
 
+  async currentTime() {
+    return (await this.api.query.cash.lastBlockTimestamp()).toJSON();
+  }
+
   async freezeTime(time) {
     if (!this.freezeTimeFile) {
       throw new Error(`Freeze time not set`);
@@ -136,11 +140,12 @@ class Validator {
     if (Number.isNaN(currentTime)) {
       throw new Error(`Invalid current time: ${currentTimeStr}`);
     }
-    console.log({currentTime});
     if (currentTime === 0) {
       throw new Error(`Cannot accelerate zero time`);
     }
     await this.freezeTime(currentTime + interval);
+
+    return currentTime + interval;
   }
 
   asPeer() {
@@ -186,7 +191,6 @@ class Validator {
 
     if (this.ctx.__freezeTime()) {
       this.freezeTimeFile = await tmpFile("freeze_time.txt");;
-      console.log({ freezeTimeFile: this.freezeTimeFile });
       await fs.writeFile(this.freezeTimeFile, this.ctx.__freezeTime().toString());
       env.FREEZE_TIME = this.freezeTimeFile;
     }
