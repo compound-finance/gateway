@@ -6,13 +6,15 @@ use sp_runtime::offchain::{
     storage_lock::{StorageLock, Time},
 };
 
+use our_std::collections::btree_set::BTreeSet;
+
 use crate::{
     chains::{
         Chain, ChainBlock, ChainBlockNumber, ChainBlockTally, ChainBlocks, ChainEvents, ChainHash,
         ChainId, ChainReorg, ChainReorgTally, ChainSignature, Ethereum,
     },
     core::{apply_chain_event_internal, recover_validator, validator_sign},
-    events::{encode_block_hex, fetch_eth_blocks, ChainLogEvent, ChainLogId, EventState},
+    events::{fetch_chain_block, fetch_chain_blocks, filter_chain_blocks, ChainLogEvent, ChainLogId, EventState},
     log,
     reason::Reason,
     require,
@@ -27,7 +29,7 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     let result = match lock.try_lock() {
         Ok(_guard) => {
             // Note: chains could be parallelized
-            track_eth_events::<T>()
+            track_chain_events_on::<T>(ChainId::Eth)
         }
 
         _ => Err(Reason::WorkerBusy)
@@ -35,9 +37,8 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     result
 }
 
-pub fn track_eth_events<T: Config>() -> Result<(), Reason> {
+pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
     let me = sp_core::crypto::AccountId32::new([0u8; 32]); // XXX self worker identity
-    let chain_id = ChainId::Eth;
     let last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let truth = fetch_chain_block(chain_id, last.number())?;
     if last.hash() == truth.hash() {
@@ -50,7 +51,7 @@ pub fn track_eth_events<T: Config>() -> Result<(), Reason> {
     } else {
         // worker sees a different fork
         let reorg = formulate_reorg(chain_id, last, truth)?;
-        if !already_voted_for_reorg(chain_id, me, &reorg) {
+        if !already_voted_for_reorg::<T>(chain_id, me, &reorg) {
             submit_chain_reorg::<T>(chain_id, &reorg)
         } else {
             // just wait for the reorg to succeed or fail,
@@ -64,6 +65,7 @@ fn calculate_queue_slack<T: Config>(chain_id: ChainId) -> u32 {
     0 // XXX look at ingression queue, how backed up?
 }
 
+// XXX and move to src/events?
 fn risk_adjusted_value(chain_event: &crate::events::ChainLogEvent, block_number: ChainBlockNumber) -> crate::types::USDQuantity { // XXX
     // XXX
     //  if Lock or LockCash -> Lock amount value risk decayed by blocks elapsed since block number
@@ -93,57 +95,6 @@ fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, event_qu
     }
 }
 
-fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
-    // XXX
-    let from_block: String = encode_block_hex(number);
-
-    match fetch_eth_blocks(from_block) {
-        Ok(event_info) => {
-            log!("Result: {:?}", event_info);
-
-            // XXXXXXX submitted elsewhere now, this *just* gets the block
-            //  do we need caching block number at all now?
-
-            // TODO: The failability here is bad, since we don't want to re-process events
-            // We need to make sure this is fully idempotent
-
-            // Send extrinsics for all events
-            // XXX submit_blocks::<T>(event_info.events)
-            Ok(ChainBlock::Eth(crate::chains::eth::Block {
-                hash: [1u8; 32],
-                parent_hash: [0u8; 32],
-                number: 1,
-                events: vec![],
-            })) // XXX
-        }
-
-        Err(err) => {
-            log!("Error while fetching events: {:?}", err);
-            Err(Reason::WorkerFetchError)
-        }
-    }
-}
-
-fn fetch_chain_blocks(
-    chain_id: ChainId,
-    number: ChainBlockNumber,
-    slack: u32,
-) -> Result<ChainBlocks, Reason> {
-    // XXX fetch given slack
-    //  slack 0 -> no results
-    Ok(ChainBlocks::Eth(vec![])) // XXX eth
-}
-
-fn filter_chain_blocks(
-    chain_id: ChainId,
-    pending: Vec<ChainBlockTally>,
-    blocks: ChainBlocks,
-) -> ChainBlocks {
-    // XXX fetch given pending queue (eliminate vote?)
-    //  what can we really eliminate since we need negative vote?
-    blocks
-}
-
 fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) -> Result<(), Reason> {
     log!("Submitting chain blocks extrinsic: {:?}", blocks);
 
@@ -163,20 +114,38 @@ fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) -> Res
     Ok(())
 }
 
+// XXX move to src/events?
 fn formulate_reorg(
     chain_id: ChainId,
     last: ChainBlock,
     truth: ChainBlock,
 ) -> Result<ChainReorg, Reason> {
     // XXX try to form a path from last to truth
-    //  how do we actually form a reverse path without storing it?
-    //   (workers *must* store it)
+    let mut reverse_blocks: Vec<ChainBlock> = vec![]; // XXX convert to raw_block for type
+    let mut drawrof_blocks: Vec<ChainBlock> = vec![]; // XXX convert to raw_block and reverse
+    let mut reverse_hashes: BTreeSet<ChainHash>; // XXX init empty?
+    loop {
+        // XXX just always N == K?
+        // let reverse_blocks_next = storage.walk_backwards(last.hash(), N)?;
+        // let drawrof_blocks_next = storage.walk_backwards(truth.hash(), K)?
+        // reverse_blocks.extend_from_slice(reverse_blocks_next)
+        // reverse_hashes.extend index with reverse_blocks_next
+        // for block in drawrof_blocks_next {
+        //    if block.parent_hash in reverse_hashes {
+        //     reverse_blocks = take until block.parent_hash (stop before common ancestor)
+        //     drawrof_blocks = take until block.parent_hash
+        break;
+        //    } else {
+        //     drawrof_blocks.push(block);
+        //    }
+    }
+
     match (last.hash(), truth.hash()) {
         (ChainHash::Eth(from_hash), ChainHash::Eth(to_hash)) => Ok(ChainReorg::Eth {
             from_hash,
             to_hash,
-            reverse_blocks: vec![], // XXX
-            forward_blocks: vec![], // XXX
+            reverse_blocks: vec![], // XXX convert reverse_blocks to raw blocks for chain
+            forward_blocks: vec![], // XXX convert drawrof_blocks to raw blocks and reverse
         }),
 
         _ => panic!("xxx not implemented"),
@@ -184,7 +153,7 @@ fn formulate_reorg(
 }
 
 // XXX & refs here not blocks?
-fn already_voted_for_reorg(chain_id: ChainId, id: ValidatorIdentity, reorg: &ChainReorg) -> bool {
+fn already_voted_for_reorg<T: Config>(chain_id: ChainId, id: ValidatorIdentity, reorg: &ChainReorg) -> bool {
     // XXX dont revote for same thing
     false
 }

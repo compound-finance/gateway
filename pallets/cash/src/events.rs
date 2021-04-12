@@ -1,4 +1,4 @@
-use crate::chains::{eth, Chain, ChainId, ChainSignature, Ethereum};
+use crate::chains::{eth, Chain, ChainId, ChainSignature, Ethereum, ChainBlock, ChainBlocks, ChainBlockTally, ChainBlockNumber};
 use crate::log;
 use crate::reason::Reason;
 use crate::types::SignersSet;
@@ -74,10 +74,76 @@ pub enum EventError {
     ErrorDecodingHex,
 }
 
-// XXX does this belong here? all very eth specific...
-//  whats the separate with internal?
+pub fn encode_block_hex(block_number: u64) -> String {
+    format!("{:#X}", block_number)
+}
+
+pub fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
+    match chain_id {
+        ChainId::Gate => Err(Reason::Unreachable),
+        ChainId::Eth => fetch_eth_block(number),
+        ChainId::Dot => Err(Reason::Unreachable),
+        ChainId::Sol => Err(Reason::Unreachable),
+        ChainId::Tez => Err(Reason::Unreachable),
+    }
+}
+
+pub fn fetch_chain_blocks(
+    chain_id: ChainId,
+    number: ChainBlockNumber,
+    slack: u32,
+) -> Result<ChainBlocks, Reason> {
+    // XXX fetch given slack
+    //  slack 0 -> no results
+    Ok(ChainBlocks::Eth(vec![])) // XXX eth
+}
+
+pub fn filter_chain_blocks(
+    chain_id: ChainId,
+    pending: Vec<ChainBlockTally>,
+    blocks: ChainBlocks,
+) -> ChainBlocks {
+    // XXX fetch given pending queue (eliminate vote?)
+    //  what can we really eliminate since we need negative vote?
+    blocks
+}
+
+fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
+    // XXX
+    // XXX also whatever we fetch we store so we can formulate reorgs
+    //  worry about pruning history independently / later
+    let from_block: String = encode_block_hex(number);
+
+    match fetch_eth_blocks(from_block) {
+        Ok(event_info) => {
+            log!("Result: {:?}", event_info);
+
+            // XXXXXXX submitted elsewhere now, this *just* gets the block
+            //  do we need caching block number at all now?
+
+            // TODO: The failability here is bad, since we don't want to re-process events
+            // We need to make sure this is fully idempotent
+
+            // Send extrinsics for all events
+            // XXX submit_blocks::<T>(event_info.events)
+            Ok(ChainBlock::Eth(crate::chains::eth::Block {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            })) // XXX
+        }
+
+        Err(err) => {
+            log!("Error while fetching events: {:?}", err);
+            Err(Reason::WorkerFetchError)
+        }
+    }
+}
+
+// XXX where does this belong?
 /// Fetch all latest Starport events for the offchain worker.
-pub fn fetch_eth_blocks(from_block: String) -> Result<EventInfo, EventError> {
+fn fetch_eth_blocks(from_block: String) -> Result<EventInfo, EventError> {
     // Get a validator config from runtime-interfaces pallet
     // Use config to get an address for interacting with Ethereum JSON RPC client
     let config = runtime_interfaces::config_interface::get();
@@ -126,17 +192,13 @@ pub fn fetch_eth_blocks(from_block: String) -> Result<EventInfo, EventError> {
     })
 }
 
-pub fn encode_block_hex(block_number: u64) -> String {
-    format!("{:#X}", block_number)
-}
-
 #[cfg(test)]
 pub mod tests {
     use crate::{tests::*, *};
     use our_std::convert::*;
     use sp_core::offchain::testing;
 
-    pub fn get_mockup_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
+    pub fn get_mock_http_calls(events_response: Vec<u8>) -> Vec<testing::PendingRequest> {
         // Set up config values
         let given_eth_starport_address: Vec<u8> =
             "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into();
@@ -170,7 +232,7 @@ pub mod tests {
     #[test]
     fn test_fetch_events_with_3_events() {
         // let calls: Vec<testing::PendingRequest> =
-        //     get_mockup_http_calls(tests::testdata::json_responses::EVENTS_RESPONSE.to_vec());
+        //     get_mock_http_calls(tests::testdata::json_responses::EVENTS_RESPONSE.to_vec());
 
         // let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
         // t.execute_with(|| {
@@ -222,7 +284,7 @@ pub mod tests {
     #[test]
     fn test_fetch_events_with_no_events() {
         // let calls: Vec<testing::PendingRequest> =
-        //     get_mockup_http_calls(tests::testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
+        //     get_mock_http_calls(tests::testdata::json_responses::NO_EVENTS_RESPONSE.to_vec());
 
         // let (mut t, _pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);
         // t.execute_with(|| {

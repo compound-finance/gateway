@@ -64,6 +64,7 @@ pub enum Reason {
     InvalidChain,
     PendingAuthNotice,
     ChangeValidatorsError,
+    Unreachable,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -123,6 +124,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::InvalidChain => (29, 0, "invalid chain"),
             Reason::PendingAuthNotice => (30, 0, "change auth notice is already pending"),
             Reason::ChangeValidatorsError => (31, 0, "change validators error"),
+            Reason::Unreachable => (32, 0, "unreachable state should be impossible"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
