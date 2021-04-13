@@ -294,6 +294,7 @@ async function buildCtx(scenInfo={}) {
   ctx.chain = await buildChain(ctx);
   ctx.eventTracker = await buildEventTracker(ctx);
   ctx.sleep = ctx.__sleep.bind(ctx);
+  ctx.keyring = ctx.actors.keyring;
 
   // TODO: Post prices?
 
