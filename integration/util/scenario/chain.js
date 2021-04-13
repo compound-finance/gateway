@@ -34,7 +34,7 @@ class Chain {
   }
 
   api() {
-    return this.ctx.api();
+    return this.ctx.getApi();
   }
 
   async waitForEvent(pallet, eventName, onFinalize = true, failureEvent = null) {
@@ -83,7 +83,7 @@ class Chain {
         rate: bps,
       }
     };
-    let extrinsic = this.ctx.api().tx.cash.setRateModel(token.toChainAsset(), newModel);
+    let extrinsic = this.ctx.getApi().tx.cash.setRateModel(token.toChainAsset(), newModel);
     await this.ctx.starport.executeProposal("Update TokenRate Model", [extrinsic]);
   }
 
@@ -160,13 +160,13 @@ class Chain {
   }
 
   async cashIndex() {
-    return await this.ctx.api().query.cash.globalCashIndex();
+    return await this.ctx.getApi().query.cash.globalCashIndex();
   }
 
   async upgradeTo(version) {
     this.ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
     let versionHash = await version.hash();
-    let extrinsic = this.ctx.api().tx.cash.allowNextCodeWithHash(versionHash);
+    let extrinsic = this.ctx.getApi().tx.cash.allowNextCodeWithHash(versionHash);
 
     await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, [extrinsic]);
     expect(await this.nextCodeHash()).toEqual(versionHash);
@@ -181,7 +181,7 @@ class Chain {
   }
 
   async displayBlock() {
-    const signedBlock = await this.ctx.api().rpc.chain.getBlock();
+    const signedBlock = await this.ctx.getApi().rpc.chain.getBlock();
 
     // the information for each of the contained extrinsics
     signedBlock.block.extrinsics.forEach((ex, index) => {
@@ -207,7 +207,7 @@ class Chain {
   }
 
   async interestRateModel(token) {
-    let asset = await this.ctx.api().query.cash.supportedAssets(token.toChainAsset());
+    let asset = await this.ctx.getApi().query.cash.supportedAssets(token.toChainAsset());
     return asset.unwrap().rate_model.toJSON();
   }
 
@@ -226,7 +226,7 @@ class Chain {
   }
 
   async nextCodeHash() {
-    return mapToJson(await this.ctx.api().query.cash.allowedNextCodeHash());
+    return mapToJson(await this.ctx.getApi().query.cash.allowedNextCodeHash());
   }
 
   async setNextCode(code, onFinalize = true) {
@@ -257,7 +257,7 @@ class Chain {
   }
 
   async pendingCashValidators() {
-    let vals = await this.ctx.api().query.cash.nextValidators.entries();
+    let vals = await this.ctx.getApi().query.cash.nextValidators.entries();
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
         this.toSS58(valIdRaw.args[0]),
@@ -268,7 +268,7 @@ class Chain {
   }
 
   async cashValidators() {
-    let vals = await this.ctx.api().query.cash.validators.entries();
+    let vals = await this.ctx.getApi().query.cash.validators.entries();
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
         this.toSS58(valIdRaw.args[0]),
@@ -279,31 +279,31 @@ class Chain {
   }
 
   async sessionValidators() {
-    let vals = await this.ctx.api().query.session.validators();
+    let vals = await this.ctx.getApi().query.session.validators();
     return vals.map((valIdRaw) => this.toSS58(valIdRaw));
   }
 
   async getGrandpaAuthorities() {
     const grandpaStorageKey = ':grandpa_authorities';
-    const grandpaAuthorities = await this.ctx.api().rpc.state.getStorage(grandpaStorageKey);
-    const auths = this.ctx.api().createType('VersionedAuthorityList', grandpaAuthorities.value).authorityList;
+    const grandpaAuthorities = await this.ctx.getApi().rpc.state.getStorage(grandpaStorageKey);
+    const auths = this.ctx.getApi().createType('VersionedAuthorityList', grandpaAuthorities.value).authorityList;
     return auths.map(e => this.toSS58(e[0]));
   }
 
   async getAuraAuthorites() {
     const auraAuthStorageKey = this.getStorageKey("Aura", "Authorities");
-    const rawAuths = await this.ctx.api().rpc.state.getStorage(auraAuthStorageKey);
-    const auths = this.ctx.api().createType('Authorities', rawAuths.value);
+    const rawAuths = await this.ctx.getApi().rpc.state.getStorage(auraAuthStorageKey);
+    const auths = this.ctx.getApi().createType('Authorities', rawAuths.value);
     return auths.map(e => this.ctx.actors.keyring.encodeAddress(e));
   }
 
   async rotateKeys(validator) {
     const keysRaw = await validator.api.rpc.author.rotateKeys();
-    return this.ctx.api().createType('SessionKeys', keysRaw);
+    return this.ctx.getApi().createType('SessionKeys', keysRaw);
   }
 
   async setKeys(signer, keys) {
-    const call = this.ctx.api().tx.session.setKeys(keys, "0x5566");
+    const call = this.ctx.getApi().tx.session.setKeys(keys, "0x5566");
     await this.ctx.eventTracker.sendAndWaitForEvents(call, { signer });
   }
 
@@ -313,7 +313,7 @@ class Chain {
 
   async waitUntilSession(target) {
     await this.ctx.until(async () => {
-      const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
+      const idx = (await this.ctx.getApi().query.session.currentIndex()).toNumber();
       if (idx < target) {
         this.ctx.log(`Waiting for session=${target}, curr=${idx}`);
         return false;

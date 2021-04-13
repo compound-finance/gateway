@@ -6,6 +6,9 @@ let prices_scen_info = {
   tokens: [
     { token: "zrx", balances: { ashley: 1000 } }
   ],
+  prices: {
+    prices: {}
+  }
 };
 
 let pricePayloads = {
@@ -16,24 +19,22 @@ let pricePayloads = {
   }
 };
 
-buildScenarios('Prices Scenarios', prices_scen_info, [
+async function postPrice({ chain }) {
+  await chain.postPrice(pricePayloads.ZRX.payload, pricePayloads.ZRX.signature, false);
+}
+
+buildScenarios('Price Scenarios', prices_scen_info, { beforeEach: postPrice }, [
   {
-    name: "Prices from Price Server",
-    scenario: async ({ chain, zrx, sleep }) => {
-      await sleep(20000); // Wait for prices to come in naturally
-      expect(await zrx.getPrice()).toEqual(0.599453);
-    }
-  },
-  {
-    name: "Post Price and Load from Storage",
+    name: "Load Price from Storage",
     scenario: async ({ chain, zrx }) => {
-      await chain.postPrice(pricePayloads.ZRX.payload, pricePayloads.ZRX.signature, false);
       expect(await zrx.getPrice()).toEqual(0.599453);
     }
   },
   {
     name: "Prices from RPC",
-    skip: true
+    scenario: async ({ api }) => {
+      expect((await api.rpc.gateway.price("ZRX")).toJSON()).toEqual("599453");
+    }
   },
   {
     name: "Post Price Tx",

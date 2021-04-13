@@ -29,16 +29,16 @@ buildScenarios('Upgrade to m8', scen_info, [
         }
       },
     },
-    scenario: async ({ ctx, chain, validators, starport, m8, sleep }) => {
+    scenario: async ({ api, chain, keyring, validators, starport, m8, sleep }) => {
       const alice = validators.validatorInfoMap.alice;
       const bob = validators.validatorInfoMap.bob;
       const newAuthsRaw = [
-        { substrate_id: ctx.actors.keyring.decodeAddress(alice.aura_key), eth_address: alice.eth_account },
-        { substrate_id: ctx.actors.keyring.decodeAddress(bob.aura_key), eth_address: bob.eth_account }
+        { substrate_id: keyring.decodeAddress(alice.aura_key), eth_address: alice.eth_account },
+        { substrate_id: keyring.decodeAddress(bob.aura_key), eth_address: bob.eth_account }
       ];
 
       // Just set validators to same, but Bob won't be able to sign it
-      let extrinsic = ctx.api().tx.cash.changeValidators(newAuthsRaw);
+      let extrinsic = api.tx.cash.changeValidators(newAuthsRaw);
 
       let { notice } = await starport.executeProposal("Update authorities", [extrinsic], { awaitNotice: true });
       await chain.waitUntilSession(1);

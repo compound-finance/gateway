@@ -10,7 +10,7 @@ let gov_scen_info = {
 buildScenarios('Gov Scenarios', gov_scen_info, [
   {
     name: "Update Interest Rate Model by Governance",
-    scenario: async ({ ctx, zrx, chain, starport }) => {
+    scenario: async ({ api, zrx, chain, starport }) => {
       let newKink = {
         Kink: {
           zero_rate: 100,
@@ -19,7 +19,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
           full_rate: 1000
         }
       };
-      let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
+      let extrinsic = api.tx.cash.setRateModel(zrx.toChainAsset(), newKink);
       await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
       expect(await chain.interestRateModel(zrx)).toEqual(newKink);
     }
@@ -35,10 +35,10 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
         }
       },
     },
-    scenario: async ({ ctx, zrx, chain, starport, curr }) => {
+    scenario: async ({ api, zrx, chain, starport, curr }) => {
       expect(await chain.getSemVer()).toEqual([1, 7, 1]);
       let currHash = await curr.hash();
-      let extrinsic = ctx.api().tx.cash.allowNextCodeWithHash(currHash);
+      let extrinsic = api.tx.cash.allowNextCodeWithHash(currHash);
 
       await starport.executeProposal("Upgrade from m7 to Current [Allow Next Code]", [extrinsic]);
 
@@ -57,7 +57,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
   },
   {
     name: "Read Extrinsic from Event",
-    scenario: async ({ ctx, zrx, chain, starport }) => {
+    scenario: async ({ api, zrx, chain, starport }) => {
       let newKink = {
         Kink: {
           zero_rate: 100,
@@ -66,11 +66,11 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
           full_rate: 1000
         }
       };
-      let extrinsic = ctx.api().tx.cash.setRateModel(zrx.toChainAsset(), newKink);
+      let extrinsic = api.tx.cash.setRateModel(zrx.toChainAsset(), newKink);
       let { event } = await starport.executeProposal("Update ZRX Interest Rate Model", [extrinsic]);
       let [[[data]]] = event.data;
 
-      expect(decodeCall(ctx.api(), data)).toEqual({
+      expect(decodeCall(api, data)).toEqual({
         section: "cash",
         method: "setRateModel",
         args: [

@@ -153,7 +153,7 @@ class Ctx {
     this.logger.error(...msg);
   }
 
-  api() {
+  getApi() {
     return this.validators.api();
   }
 
@@ -295,6 +295,7 @@ async function buildCtx(scenInfo={}) {
   ctx.eventTracker = await buildEventTracker(ctx);
   ctx.sleep = ctx.__sleep.bind(ctx);
   ctx.keyring = ctx.actors.keyring;
+  ctx.api = ctx.tryApi();
 
   // TODO: Post prices?
 

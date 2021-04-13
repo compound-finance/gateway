@@ -15,12 +15,12 @@ function toValKeys(keyring, substrateId, ethAccount) {
 buildScenarios('Session Scenarios', session_scen_info, [
   {
     name: "Remove Authority Node (Alice & Bob -> Alice)",
-    scenario: async ({ alice, ctx, chain, keyring, starport, validators }) => {
+    scenario: async ({ api, alice, chain, keyring, starport, validators }) => {
       const newAuthoritiesRaw = [
         toValKeys(keyring, alice.info.aura_key, alice.info.eth_account)
       ];
 
-      let extrinsic = ctx.api().tx.cash.changeValidators(newAuthoritiesRaw);
+      let extrinsic = api.tx.cash.changeValidators(newAuthoritiesRaw);
       await starport.executeProposal("Update Authorities", [extrinsic]);
 
       const expectedAuthorities = [[ alice.info.aura_key, { eth_address: alice.info.eth_account } ]];
@@ -39,7 +39,7 @@ buildScenarios('Session Scenarios', session_scen_info, [
   },
   {
     name: "Add New Authority with Session Keys",
-    scenario: async ({ alice, bob, ctx, chain, starport, validators, keyring }) => {
+    scenario: async ({ api, alice, bob, chain, starport, validators, keyring }) => {
       // Spin up new validator Charlie and add to auth set
       const charlie = await validators.addValidator("Charlie", {
         peer_id: "12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x",
@@ -61,7 +61,7 @@ buildScenarios('Session Scenarios', session_scen_info, [
         toValKeys(keyring, charlieSubstrateId, charlie.info.eth_account),
       ];
 
-      const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);
+      const extrinsic = api.tx.cash.changeValidators(allAuthsRaw);
       const { notice } = await starport.executeProposal("Update authorities", [extrinsic], { awaitNotice: true });
 
       // start at 0, rotate through 1, actually perform change over on 2
@@ -85,7 +85,7 @@ buildScenarios('Session Scenarios', session_scen_info, [
   },
   {
     name: "Does Not Add Authority without Session Keys",
-    scenario: async ({ alice, bob, ctx, chain, starport, validators, keyring }) => {
+    scenario: async ({ api, alice, bob, chain, starport, validators, keyring }) => {
       // Spins up new validator charlie; doesn't add session keys. Change validators should fail.
       const charlie = await validators.addValidator("Charlie", {
         peer_id: "12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x",
@@ -105,7 +105,7 @@ buildScenarios('Session Scenarios', session_scen_info, [
         toValKeys(keyring, charlieSubstrateId, charlie.info.eth_account),
       ];
 
-      const extrinsic = ctx.api().tx.cash.changeValidators(allAuthsRaw);
+      const extrinsic = api.tx.cash.changeValidators(allAuthsRaw);
       let { event } = await starport.executeProposal("Update Authorities", [extrinsic], { checkSuccess: false });
 
       let [payload, govResult] = event.data[0][0];

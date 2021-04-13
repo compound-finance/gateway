@@ -50,7 +50,7 @@ class Actor {
   }
 
   async nonce() {
-    return await this.ctx.api().query.cash.nonces(this.toChainAccount());
+    return await this.ctx.getApi().query.cash.nonces(this.toChainAccount());
   }
 
   async sign(data) {
@@ -66,7 +66,7 @@ class Actor {
 
   async runTrxRequest(trxReq) {
     let [sig, currentNonce] = await this.signWithNonce(trxReq);
-    let call = this.ctx.api().tx.cash.execTrxRequest(trxReq, sig, currentNonce);
+    let call = this.ctx.getApi().tx.cash.execTrxRequest(trxReq, sig, currentNonce);
 
     return await this.ctx.eventTracker.sendAndWaitForEvents(call, { onFinalize: false });
   }
@@ -86,7 +86,7 @@ class Actor {
   }
 
   async chainCashPrincipal_() {
-    return await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
+    return await this.ctx.getApi().query.cash.cashPrincipals(this.toChainAccount());
   }
 
   async chainCashPrincipal() {
@@ -117,14 +117,14 @@ class Actor {
     if (token instanceof CashToken) {
       return await this.cash();
     } else {
-      let assetdata = await this.ctx.api().rpc.gateway.assetdata(this.toTrxArg(), token.toTrxArg());
+      let assetdata = await this.ctx.getApi().rpc.gateway.assetdata(this.toTrxArg(), token.toTrxArg());
       let weiAmount = assetdata.balance
       return token.toTokenAmount(weiAmount);
     }
   }
 
   async cashData() {
-    return await this.ctx.api().rpc.gateway.cashdata(this.toTrxArg());
+    return await this.ctx.getApi().rpc.gateway.cashdata(this.toTrxArg());
   }
 
   async cash() {
@@ -134,7 +134,7 @@ class Actor {
   }
 
   async liquidityForToken(token) {
-    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let assetBalance = await this.ctx.getApi().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
     let price = await token.getPrice();
     let liquidityFactor = await token.getLiquidityFactor();
 

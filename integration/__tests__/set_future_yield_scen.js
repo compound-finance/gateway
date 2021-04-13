@@ -10,14 +10,14 @@ let set_future_yield_scen_info = {
 buildScenarios('Set Future Yield Scenarios', set_future_yield_scen_info, [
   {
     name: 'Set a future yield',
-    scenario: async ({ ashley, zrx, starport, cash, chain, ctx }) => {
+    scenario: async ({ api, ashley, cash, chain, starport, zrx }) => {
       expect(await cash.nextCashYieldStart(zrx)).toEqual('0');
       expect(await cash.getNextCashYieldAndIndex(zrx)).toEqual({
         yield: '0',
         index: '0'
       });
       let futureDate = Date.now() + (2 * 24 * 60 * 60 * 1000);
-      let extrinsic = ctx.api().tx.cash.setYieldNext(1000, futureDate);
+      let extrinsic = api.tx.cash.setYieldNext(1000, futureDate);
       let { notice } = await starport.executeProposal("Set Future Yield", [extrinsic], { awaitNotice: true, awaitEvent: false });
       let signatures = await chain.getNoticeSignatures(notice, { signatures: 2 });
       await starport.invoke(notice, signatures);

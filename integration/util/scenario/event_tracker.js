@@ -28,7 +28,7 @@ class EventTracker {
   }
 
   async subscribeBlocks() {
-    this.unsubNewBlocks = await this.ctx.api().rpc.chain.subscribeNewHeads((header) => {
+    this.unsubNewBlocks = await this.ctx.getApi().rpc.chain.subscribeNewHeads((header) => {
       let previous = this.newBlockDeferred;
       this.newBlockDeferred = deferred();
       previous.resolve(header);
@@ -41,7 +41,7 @@ class EventTracker {
   }
 
   async subscribeEvents() {
-    this.ctx.api().query.system.events((events) => {
+    this.ctx.getApi().query.system.events((events) => {
       events.forEach(({ event, phase }, i) => {
         this.ctx.debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
       });
@@ -119,7 +119,7 @@ class EventTracker {
       ...opts
     };
 
-    let api = this.ctx.api();
+    let api = this.ctx.getApi();
 
     return new Promise(async (resolve, reject) => {
       const  id = this.trxId++;
