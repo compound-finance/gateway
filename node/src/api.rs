@@ -34,7 +34,7 @@ pub type ApiRates = (ApiAPR, ApiAPR);
 
 #[derive(Deserialize, Serialize, Types)]
 pub struct ApiAssetData {
-    asset: ChainAsset,
+    asset: String,
     balance: String,
     total_supply: String,
     total_borrow: String,
@@ -200,7 +200,7 @@ where
             .map_err(chain_err)?;
 
         Ok(ApiAssetData {
-            asset: asset,
+            asset: asset.into(),
             balance: format!("{}", account_balance),
             total_supply: format!("{}", total_supply),
             total_borrow: format!("{}", total_borrow),

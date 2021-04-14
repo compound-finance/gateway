@@ -17,7 +17,8 @@
     "postinstall": "cat /dev/null > node_modules/source-map-support/register.js",
     "test": "QUIET_SCENARIOS=true jest",
     "build": "(cd ../ethereum && yarn compile) && cargo build",
-    "full-test": "(cd ../ethereum && yarn compile) && cargo build --release --features freeze-time && PROFILE=release QUIET_SCENARIOS=true jest",
+    "build-full": "(cd ../ethereum && yarn compile) && cargo build --release --features freeze-time",
+    "full-test": "yarn build-full && PROFILE=release QUIET_SCENARIOS=true jest",
     "build:ethereum": "(cd ../ethereum && yarn compile)",
     "build:chain": "cargo build",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"

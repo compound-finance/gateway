@@ -4,7 +4,7 @@
   "Address": "MultiAddress",
   "ApiAPR": "u64",
   "ApiAssetData": {
-    "asset": "ChainAsset",
+    "asset": "String",
     "balance": "String",
     "total_supply": "String",
     "total_borrow": "String",
