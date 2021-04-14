@@ -11,7 +11,7 @@ buildScenarios('Upgrade to m8', scen_info, [
   {
     name: "Upgrade from m7 to m8",
     info: {
-      versions: ['m7'],
+      versions: ['m7', 'm8'],
       genesis_version: 'm7',
       eth_opts: {
         version: 'm7',
@@ -29,16 +29,16 @@ buildScenarios('Upgrade to m8', scen_info, [
         }
       },
     },
-    scenario: async ({ ctx, chain, validators, starport, curr, sleep }) => {
+    scenario: async ({ api, chain, keyring, validators, starport, m8, sleep }) => {
       const alice = validators.validatorInfoMap.alice;
       const bob = validators.validatorInfoMap.bob;
       const newAuthsRaw = [
-        { substrate_id: ctx.actors.keyring.decodeAddress(alice.aura_key), eth_address: alice.eth_account },
-        { substrate_id: ctx.actors.keyring.decodeAddress(bob.aura_key), eth_address: bob.eth_account }
+        { substrate_id: keyring.decodeAddress(alice.aura_key), eth_address: alice.eth_account },
+        { substrate_id: keyring.decodeAddress(bob.aura_key), eth_address: bob.eth_account }
       ];
 
       // Just set validators to same, but Bob won't be able to sign it
-      let extrinsic = ctx.api().tx.cash.changeValidators(newAuthsRaw);
+      let extrinsic = api.tx.cash.changeValidators(newAuthsRaw);
 
       let { notice } = await starport.executeProposal("Update authorities", [extrinsic], { awaitNotice: true });
       await chain.waitUntilSession(1);
@@ -47,14 +47,14 @@ buildScenarios('Upgrade to m8', scen_info, [
 
       let signatures = await chain.getNoticeSignatures(notice, { signatures: 2 });
       await starport.invoke(notice, signatures);
-      await sleep(10000);
+      await sleep(20000);
 
       expect(await chain.noticeState(notice)).toEqual({"Executed": null});
       expect(await chain.noticeHold('Eth')).toEqual([1, 0]);
 
       // Okay great, we've executed the change-over, but we still have a notice hold...
       // But what if we upgrade to m8??
-      await chain.upgradeTo(curr);
+      await chain.upgradeTo(m8);
       await chain.cullNotices();
       expect(await chain.noticeHold('Eth')).toEqual(null);
 

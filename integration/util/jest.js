@@ -99,5 +99,13 @@ expect.extend({
       pass: !!actual['message'] && actual.message === `VM Exception while processing transaction: ${msg}`,
       message: () => `expected revert, got: ${actual && actual.message ? actual : JSON.stringify(actual)}`
     }
+  },
+  toEqualSet(actual, expected) {
+    let actualSorted = [...actual].sort();
+    let expectedSorted = [...expected].sort();
+    expect(actualSorted).toEqual(expectedSorted);
+    return {
+      pass: true
+    };
   }
 });

@@ -45,11 +45,11 @@ buildScenarios('Liquidity Scenarios', liquidatity_scen_info, [
   },
   {
     name: "Liquidity when Underwater via Liquidity Factor Change",
-    scenario: async ({ ashley, bert, cash, usdc, ctx, starport }) => {
+    scenario: async ({ api, ashley, bert, cash, usdc, starport }) => {
       await ashley.lock(100, usdc); // +90 -> +20
       await ashley.transfer(50, cash, bert); // -50
       expect(await ashley.liquidity()).toBeCloseTo(39.99, 4); // Why not 40?
-      let extrinsic = ctx.api().tx.cash.setLiquidityFactor(usdc.toChainAsset(), 200000000000000000n);
+      let extrinsic = api.tx.cash.setLiquidityFactor(usdc.toChainAsset(), 200000000000000000n);
       await starport.executeProposal("Reduce USDC Liquidity Factor", [extrinsic]);
       expect(await ashley.liquidity()).toBeCloseTo(-30.01, 2); // -30
     }

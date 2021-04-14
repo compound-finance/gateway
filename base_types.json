@@ -5,8 +5,8 @@
   "Keys": "SessionKeys",
   "SignedPayload": "Vec<u8>",
   "VersionedAuthorityList": {
-    "authorityList": "AuthorityList",
-    "version": "u8"
+    "version": "u8",
+    "authorityList": "AuthorityList"
   },
   "LookupSource": "MultiAddress",
   "SessionKeys": {

@@ -5,7 +5,7 @@
   "dependencies": {
     "@polkadot/api": "^3.4.1",
     "chalk": "^4.1.0",
-    "ganache-core": "^2.13.1",
+    "ganache-core": "^2.13.2",
     "getopts": "^2.3.0",
     "web3": "^1.3.1"
   },
@@ -14,13 +14,17 @@
     "jest-junit": "^12.0.0"
   },
   "scripts": {
-    "test": "jest --runInBand",
+    "postinstall": "cat /dev/null > node_modules/source-map-support/register.js",
+    "test": "QUIET_SCENARIOS=true jest",
     "build": "(cd ../ethereum && yarn compile) && cargo build",
+    "build-full": "(cd ../ethereum && yarn compile) && cargo build --release --features freeze-time",
+    "full-test": "yarn build-full && PROFILE=release QUIET_SCENARIOS=true jest",
     "build:ethereum": "(cd ../ethereum && yarn compile)",
     "build:chain": "cargo build",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
   "resolutions": {
-    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git"
+    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",
+    "**/source-map-support": "=0.5.19"
   }
 }

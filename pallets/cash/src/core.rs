@@ -3,10 +3,13 @@ pub use our_std::{
     cmp::{max, min},
     collections::btree_set::BTreeSet,
     convert::{TryFrom, TryInto},
-    fmt, result,
+    fmt, if_std, result,
     result::Result,
     str,
 };
+
+#[cfg(feature = "freeze-time")]
+use std::{env, fs};
 
 use codec::Decode;
 use frame_support::traits::UnfilteredDispatchable;
@@ -64,6 +67,26 @@ pub fn get_some_miner<T: Config>() -> ChainAccount {
     Miner::get().unwrap_or(ChainAccount::Eth([0; 20]))
 }
 
+#[cfg(feature = "freeze-time")]
+pub fn get_now<T: Config>() -> Timestamp {
+    if_std! {
+        if let Ok(filename) = env::var("FREEZE_TIME") {
+            if let Ok(contents) = fs::read_to_string(filename) {
+                if let Ok(time) = contents.parse::<u64>() {
+                    println!("Freeze Time: {}", time);
+                    if time > 0 {
+                        return time;
+                    }
+                }
+            }
+        }
+    }
+
+    let now = <pallet_timestamp::Module<T>>::get();
+    T::TimeConverter::convert(now)
+}
+
+#[cfg(not(feature = "freeze-time"))]
 pub fn get_now<T: Config>() -> Timestamp {
     let now = <pallet_timestamp::Module<T>>::get();
     T::TimeConverter::convert(now)

@@ -4,7 +4,7 @@
   "Address": "MultiAddress",
   "ApiAPR": "u64",
   "ApiAssetData": {
-    "asset": "ChainAsset",
+    "asset": "String",
     "balance": "String",
     "total_supply": "String",
     "total_borrow": "String",
@@ -13,10 +13,39 @@
     "liquidity_factor": "String",
     "price": "String"
   },
+  "ApiAssetInfo": {
+    "asset": "ChainAsset",
+    "decimals": "u8",
+    "liquidity_factor": "String",
+    "rate_model": "ApiInterestRateModel",
+    "miner_shares": "String",
+    "supply_cap": "String",
+    "symbol": "Symbol",
+    "ticker": "String"
+  },
   "ApiCashData": {
     "balance": "String",
     "cash_yield": "String",
     "price": "String"
+  },
+  "ApiInterestRateModel": {
+    "_enum": {
+      "Kink": "ApiInterestRateModelKink",
+      "Fixed": "ApiInterestRateModelFixed"
+    }
+  },
+  "ApiInterestRateModelFixed": {
+    "rate": "String"
+  },
+  "ApiInterestRateModelKink": {
+    "zero_rate": "String",
+    "kink_rate": "String",
+    "kink_utilization": "String",
+    "full_rate": "String"
+  },
+  "ApiPortfolio": {
+    "cash": "String",
+    "positions": "Vec<(ChainAsset,String)>"
   },
   "ApiRates": "(ApiAPR,ApiAPR)",
   "AssetAmount": "Uint",
@@ -289,8 +318,12 @@
   "Int": "i128",
   "InterestRateModel": {
     "_enum": {
-      "Kink": "InterestRateModelKink"
+      "Kink": "InterestRateModelKink",
+      "Fixed": "InterestRateModelFixed"
     }
+  },
+  "InterestRateModelFixed": {
+    "rate": "APR"
   },
   "InterestRateModelKink": {
     "zero_rate": "APR",
@@ -515,8 +548,8 @@
   },
   "ValidatorSig": "Ethereum__Chain__Signature",
   "VersionedAuthorityList": {
-    "authorityList": "AuthorityList",
-    "version": "u8"
+    "version": "u8",
+    "authorityList": "AuthorityList"
   },
   "comp__EventId": "(u64,u64)",
   "dot__EventId": "(u64,u64)",

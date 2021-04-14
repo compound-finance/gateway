@@ -116,7 +116,7 @@ class Token {
   }
 
   async getAssetInfo(field = undefined) {
-    let assetRes = await this.ctx.api().query.cash.supportedAssets(this.toChainAsset());
+    let assetRes = await this.ctx.getApi().query.cash.supportedAssets(this.toChainAsset());
     let unwrapped = assetRes.unwrap();
     if (field) {
       if (unwrapped.hasOwnProperty(field)) {
@@ -133,7 +133,7 @@ class Token {
     if (['USD', 'CASH'].includes(this.priceTicker)) {
       return 1.0;
     } else {
-      let price = await this.ctx.api().query.oracle.prices(await this.getAssetInfo('ticker'));
+      let price = await this.ctx.getApi().query.oracle.prices(await this.getAssetInfo('ticker'));
       if (price.isSome) {
         return descale(price.unwrap(), 6);
       } else {
@@ -148,11 +148,11 @@ class Token {
   }
 
   async totalChainSupply() {
-    return this.toTokenAmount(await this.ctx.api().query.cash.totalSupplyAssets(this.toChainAsset()));
+    return this.toTokenAmount(await this.ctx.getApi().query.cash.totalSupplyAssets(this.toChainAsset()));
   }
 
   async totalChainBorrows() {
-    return this.toTokenAmount(await this.ctx.api().query.cash.totalBorrowAssets(this.toChainAsset()));
+    return this.toTokenAmount(await this.ctx.getApi().query.cash.totalBorrowAssets(this.toChainAsset()));
   }
 }
 

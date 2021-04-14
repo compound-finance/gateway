@@ -91,8 +91,8 @@ class Starport {
     };
   }
 
-  async isNoticeUsed(noticeHash) {
-    return await this.starport.methods.isNoticeUsed(noticeHash).call();
+  async isNoticeInvoked(noticeHash) {
+    return await this.starport.methods.isNoticeInvoked(noticeHash).call();
   }
 
   async getAuthorities() {

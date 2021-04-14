@@ -237,14 +237,14 @@ jobs:
 
       - name: Build Gateway
         run: |
-          cargo build
+          cargo build --release --features freeze-time --features runtime-debug
 
       - name: Run Integration Test
-        timeout-minutes: 20
+        timeout-minutes: 40
         run: |
           set -eo pipefail
           cd integration
-          sudo npx jest --ci --reporters=default --reporters=jest-junit
+          sudo PROFILE=release QUIET_SCENARIOS=true npx jest --ci --reporters=default --reporters=jest-junit
 
       - name: Prepublish Integration results
         if: always()

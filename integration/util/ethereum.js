@@ -12,7 +12,6 @@ function findContract(contracts, contractName) {
 }
 
 async function deployContract(web3, from, contracts, contractName, args) {
-  log(`Deploying contract ${contractName}`);
   let contract = findContract(contracts, contractName);
   let abi = typeof (contract.abi) === 'string' ? JSON.parse(contract.abi) : contract.abi;
   let constructor = abi.find((m) => m.type === 'constructor' && m.inputs.length === args.length);

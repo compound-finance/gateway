@@ -1,5 +1,5 @@
-const { findEvent, sendAndWaitForEvents, waitForEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
-const { sleep, arrayEquals, keccak256 } = require('../util');
+const { findEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
+const { arrayEquals, keccak256, intervalToSeconds } = require('../util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -34,11 +34,11 @@ class Chain {
   }
 
   api() {
-    return this.ctx.api();
+    return this.ctx.getApi();
   }
 
   async waitForEvent(pallet, eventName, onFinalize = true, failureEvent = null) {
-    return await waitForEvent(this.api(), pallet, eventName, { failureEvent });
+    return await this.ctx.eventTracker.waitForEvent(pallet, eventName, { failureEvent });
   }
 
   // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingEthEvent` event
@@ -52,11 +52,39 @@ class Chain {
 
   async waitForChainProcessed(onFinalize = true, failureEvent = null) {
     // TODO: Match transaction id?
-    return await waitForEvent(this.api(), 'cash', 'ProcessedChainEvent', { failureEvent });
+    return await this.waitForEvent('cash', 'ProcessedChainEvent', { failureEvent });
   }
 
   async waitForNotice(onFinalize = true, failureEvent = null) {
-    return getEventData(await waitForEvent(this.api(), 'cash', 'Notice', { failureEvent }));
+    return getEventData(await this.waitForEvent('cash', 'Notice', { failureEvent }));
+  }
+
+  async freezeTime(time) {
+    await Promise.all(this.ctx.validators.all().map(async (validator) => {
+      await validator.freezeTime(time);
+    }));
+  }
+
+  async accelerateTime(interval, awaitBlock = true) {
+    await Promise.all(this.ctx.validators.all().map(async (validator) => {
+      let newTime = await validator.accelerateTime(1000 * intervalToSeconds(interval));
+      if (awaitBlock) {
+        await this.ctx.until(async () => {
+          let currentTime = await validator.currentTime();
+          return currentTime === newTime
+        }, { delay: 1000 });
+      }
+    }));
+  }
+
+  async setFixedRate(token, bps) {
+    let newModel = {
+      Fixed: {
+        rate: bps,
+      }
+    };
+    let extrinsic = this.ctx.getApi().tx.cash.setRateModel(token.toChainAsset(), newModel);
+    await this.ctx.starport.executeProposal("Update TokenRate Model", [extrinsic]);
   }
 
   async getNoticeChain(notice) {
@@ -78,7 +106,7 @@ class Chain {
 
       let encodedNotice = encodeNotice(currNotice);
       let parentHash = getNoticeParentHash(currNotice);
-      let isAccepted = await this.ctx.starport.isNoticeUsed(currHash);
+      let isAccepted = await this.ctx.starport.isNoticeInvoked(currHash);
 
       if (isAccepted) {
         currChain = [encodedNotice];
@@ -117,7 +145,7 @@ class Chain {
 
     if (pairs.length < opts.signatures) {
       if (opts.retries > 0) {
-        await sleep(opts.sleep);
+        await this.ctx.sleep(opts.sleep);
         return await this.getNoticeSignatures(notice, { ...opts, retries: opts.retries - 1 });
       } else {
         throw new Error(`Unable to get signed notice in sufficient retries`);
@@ -128,25 +156,17 @@ class Chain {
   }
 
   async postPrice(payload, signature, onFinalize = true) {
-    return await sendAndWaitForEvents(this.api().tx.oracle.postPrice(payload, signature), this.api(), { onFinalize });
-  }
-
-  async setCode(code, onFinalize = true) {
-    let api = this.api();
-    // TODO: Sudo is removed
-    const sudoKey = await api.query.sudo.key();
-    const sudoPair = this.ctx.actors.first().chainKey;
-    return await sendAndWaitForEvents(api.tx.sudo.sudoUncheckedWeight(api.tx.system.setCode(code), 0), api, { onFinalize, signer: sudoPair });
+    return await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.oracle.postPrice(payload, signature), { onFinalize });
   }
 
   async cashIndex() {
-    return await this.ctx.api().query.cash.globalCashIndex();
+    return await this.ctx.getApi().query.cash.globalCashIndex();
   }
 
   async upgradeTo(version) {
     this.ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
     let versionHash = await version.hash();
-    let extrinsic = this.ctx.api().tx.cash.allowNextCodeWithHash(versionHash);
+    let extrinsic = this.ctx.getApi().tx.cash.allowNextCodeWithHash(versionHash);
 
     await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, [extrinsic]);
     expect(await this.nextCodeHash()).toEqual(versionHash);
@@ -161,33 +181,33 @@ class Chain {
   }
 
   async displayBlock() {
-    const signedBlock = await this.ctx.api().rpc.chain.getBlock();
+    const signedBlock = await this.ctx.getApi().rpc.chain.getBlock();
 
     // the information for each of the contained extrinsics
     signedBlock.block.extrinsics.forEach((ex, index) => {
       // the extrinsics are decoded by the API, human-like view
-      console.log(index, ex.toHuman());
+      this.ctx.log(index, ex.toHuman());
 
       const { isSigned, meta, method: { args, method, section } } = ex;
 
       // explicit display of name, args & documentation
-      console.log(`${section}.${method}(${args.map((a) => a.toString()).join(', ')})`);
-      console.log(meta.documentation.map((d) => d.toString()).join('\n'));
+      this.ctx.log(`${section}.${method}(${args.map((a) => a.toString()).join(', ')})`);
+      this.ctx.log(meta.documentation.map((d) => d.toString()).join('\n'));
 
       // signer/nonce info
       if (isSigned) {
-        console.log(`signer=${ex.signer.toString()}, nonce=${ex.nonce.toString()}`);
+        this.ctx.log(`signer=${ex.signer.toString()}, nonce=${ex.nonce.toString()}`);
       }
     });
   }
 
   async tokenBalance(token, chainAccount) {
-    let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), chainAccount);
+    let weiAmount = await this.api().query.cash.assetBalances(token.toChainAsset(), chainAccount);
     return token.toTokenAmount(weiAmount);
   }
 
   async interestRateModel(token) {
-    let asset = await this.ctx.api().query.cash.supportedAssets(token.toChainAsset());
+    let asset = await this.ctx.getApi().query.cash.supportedAssets(token.toChainAsset());
     return asset.unwrap().rate_model.toJSON();
   }
 
@@ -202,15 +222,15 @@ class Chain {
   }
 
   async cullNotices() {
-    return await sendAndWaitForEvents(this.api().tx.cash.cullNotices(), this.api());
+    return await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.cash.cullNotices());
   }
 
   async nextCodeHash() {
-    return mapToJson(await this.ctx.api().query.cash.allowedNextCodeHash());
+    return mapToJson(await this.ctx.getApi().query.cash.allowedNextCodeHash());
   }
 
   async setNextCode(code, onFinalize = true) {
-    let events = await sendAndWaitForEvents(this.api().tx.cash.setNextCodeViaHash(code), this.api(), { onFinalize });
+    let events = await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.cash.setNextCodeViaHash(code), { onFinalize });
     return getEventData(findEvent(events, 'cash', 'AttemptedSetCodeByHash'));
   }
 
@@ -237,7 +257,7 @@ class Chain {
   }
 
   async pendingCashValidators() {
-    let vals = await this.ctx.api().query.cash.nextValidators.entries();
+    let vals = await this.ctx.getApi().query.cash.nextValidators.entries();
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
         this.toSS58(valIdRaw.args[0]),
@@ -248,7 +268,7 @@ class Chain {
   }
 
   async cashValidators() {
-    let vals = await this.ctx.api().query.cash.validators.entries();
+    let vals = await this.ctx.getApi().query.cash.validators.entries();
     const authData = vals.map(([valIdRaw, chainKeys]) =>
       [
         this.toSS58(valIdRaw.args[0]),
@@ -259,50 +279,49 @@ class Chain {
   }
 
   async sessionValidators() {
-    let vals = await this.ctx.api().query.session.validators();
+    let vals = await this.ctx.getApi().query.session.validators();
     return vals.map((valIdRaw) => this.toSS58(valIdRaw));
   }
 
   async getGrandpaAuthorities() {
     const grandpaStorageKey = ':grandpa_authorities';
-    const grandpaAuthorities = await this.ctx.api().rpc.state.getStorage(grandpaStorageKey);
-    const auths = this.ctx.api().createType('VersionedAuthorityList', grandpaAuthorities.value).authorityList;
-    return auths.map(e => this.toSS58(e[0]));
+    const grandpaAuthorities = await this.ctx.getApi().rpc.state.getStorage(grandpaStorageKey);
+    let versionedAuthorities = this.ctx.getApi().createType('VersionedAuthorityList', grandpaAuthorities.unwrap());
+    const authorityList = versionedAuthorities.authorityList;
+    return authorityList.map(e => this.toSS58(e[0]));
   }
 
   async getAuraAuthorites() {
     const auraAuthStorageKey = this.getStorageKey("Aura", "Authorities");
-    const rawAuths = await this.ctx.api().rpc.state.getStorage(auraAuthStorageKey);
-    const auths = this.ctx.api().createType('Authorities', rawAuths.value);
+    const rawAuths = await this.ctx.getApi().rpc.state.getStorage(auraAuthStorageKey);
+    const auths = this.ctx.getApi().createType('Authorities', rawAuths.value);
     return auths.map(e => this.ctx.actors.keyring.encodeAddress(e));
   }
 
   async rotateKeys(validator) {
     const keysRaw = await validator.api.rpc.author.rotateKeys();
-    return this.ctx.api().createType('SessionKeys', keysRaw);
+    return this.ctx.getApi().createType('SessionKeys', keysRaw);
   }
 
   async setKeys(signer, keys) {
-    const call = this.ctx.api().tx.session.setKeys(keys, "0x5566");
-    await sendAndWaitForEvents(call, this.api(), { signer });
+    const call = this.ctx.getApi().tx.session.setKeys(keys, "0x5566");
+    await this.ctx.eventTracker.sendAndWaitForEvents(call, { signer });
   }
 
-  async waitUntilSession(target, retries = 60) {
-    const timer = ms => new Promise(res => setTimeout(res, ms));
-    const checkIdx = async (r) => {
-      const idx = (await this.ctx.api().query.session.currentIndex()).toNumber();
-      if (idx < target) {
-        console.log(`Waiting for session=${target}, curr=${idx}`);
+  async newBlock() {
+    await this.ctx.eventTracker.newBlock();
+  }
 
-        if (r === 0) {
-          throw new Error(`Unable to get session ${target} after ${retries} retries`);
-        } else {
-          await timer(1000);
-          await checkIdx(r - 1);
-        }
+  async waitUntilSession(target) {
+    await this.ctx.until(async () => {
+      const idx = (await this.ctx.getApi().query.session.currentIndex()).toNumber();
+      if (idx < target) {
+        this.ctx.log(`Waiting for session=${target}, curr=${idx}`);
+        return false;
+      } else {
+        return true;
       }
-    };
-    await checkIdx(retries);
+    }, { delay: 1000 });
   }
 }
 

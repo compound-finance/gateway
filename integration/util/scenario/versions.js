@@ -38,8 +38,8 @@ function releaseContractsInfo(repoUrl, version) {
   };
 }
 
-async function pullVersion(repoUrl, version) {
-  console.log(`Fetching version: ${version}...`);
+async function pullVersion(ctx, repoUrl, version) {
+  ctx.log(`Fetching version: ${version}...`);
 
   let wasmInfo = releaseWasmInfo(repoUrl, version);
   let typesInfo = releaseTypesInfo(repoUrl, version);
@@ -48,7 +48,7 @@ async function pullVersion(repoUrl, version) {
   await fs.mkdir(baseReleasePath(version), { recursive: true });
 
   await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
-    console.log(`Downloading ${url} to ${path}`);
+    ctx.log(`Downloading ${url} to ${path}`);
     await download(url, path);
   }));
 }
@@ -122,7 +122,7 @@ class Version {
   }
 
   async pull() {
-    await pullVersion(this.ctx.__repoUrl(), this.version);
+    await pullVersion(this.ctx, this.ctx.__repoUrl(), this.version);
   }
 }
 
@@ -134,7 +134,7 @@ class CurrentVersion extends Version {
   async pull() {}
 
   wasmFile() {
-    console.log({wasmFile: this.ctx.__wasmFile()});
+    this.ctx.log({wasmFile: this.ctx.__wasmFile()});
     return this.ctx.__wasmFile();
   }
 
@@ -148,15 +148,15 @@ class CurrentVersion extends Version {
 
   async check() {
     if (!await checkFile(this.wasmFile())) {
-      console.warn(`Missing wasm file at ${this.wasmFile()}`)
+      this.ctx.warn(`Missing wasm file at ${this.wasmFile()}`)
     }
 
     if (!await checkFile(this.typesJson())) {
-      console.warn(`Missing types file at ${this.typesJson()}`)
+      this.ctx.warn(`Missing types file at ${this.typesJson()}`)
     }
 
     if (!await checkFile(this.contractsFile())) {
-      console.warn(`Missing contracts file at ${this.contractsFile()}`)
+      this.ctx.warn(`Missing contracts file at ${this.contractsFile()}`)
     }
 
     return true;

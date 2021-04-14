@@ -71,3 +71,4 @@ std = [
 ]
 runtime-debug = ['our-std/runtime-debug']
 runtime-benchmarks = ['frame-benchmarking']
+freeze-time=[]

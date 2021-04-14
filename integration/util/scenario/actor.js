@@ -50,7 +50,7 @@ class Actor {
   }
 
   async nonce() {
-    return await this.ctx.api().query.cash.nonces(this.toChainAccount());
+    return await this.ctx.getApi().query.cash.nonces(this.toChainAccount());
   }
 
   async sign(data) {
@@ -66,9 +66,9 @@ class Actor {
 
   async runTrxRequest(trxReq) {
     let [sig, currentNonce] = await this.signWithNonce(trxReq);
-    let call = this.ctx.api().tx.cash.execTrxRequest(trxReq, sig, currentNonce);
+    let call = this.ctx.getApi().tx.cash.execTrxRequest(trxReq, sig, currentNonce);
 
-    return await sendAndWaitForEvents(call, this.ctx.api(), { onFinalize: false });
+    return await this.ctx.eventTracker.sendAndWaitForEvents(call, { onFinalize: false });
   }
 
   async ethBalance() {
@@ -86,7 +86,7 @@ class Actor {
   }
 
   async chainCashPrincipal_() {
-    return await this.ctx.api().query.cash.cashPrincipals(this.toChainAccount());
+    return await this.ctx.getApi().query.cash.cashPrincipals(this.toChainAccount());
   }
 
   async chainCashPrincipal() {
@@ -117,42 +117,26 @@ class Actor {
     if (token instanceof CashToken) {
       return await this.cash();
     } else {
-      let assetdata = await this.ctx.api().rpc.gateway.assetdata(this.toTrxArg(), token.toTrxArg());
+      let assetdata = await this.ctx.getApi().rpc.gateway.assetdata(this.toTrxArg(), token.toTrxArg());
       let weiAmount = assetdata.balance
       return token.toTokenAmount(weiAmount);
     }
   }
 
-  async cashForToken(token) {
-    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
-    let lastIndex = await this.ctx.api().query.cash.lastIndices(token.toChainAsset(), this.toChainAccount());
-
-    if (assetBalance == 0) {
-      return 0;
-    } else if (assetBalance > 0) {
-      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(SupplyIndexAsset-LastIndexAsset, Account)
-      let supplyIndex = await this.ctx.api().query.cash.supplyIndices(token.toChainAsset());
-      return descale(assetBalance.toBigInt() * (supplyIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
-    } else {
-      // Read CashPrincipalPost=CashPrincipalPre+AssetBalanceOld(BorrowIndexAsset-LastIndexAsset, Account)
-      let borrowIndex = await this.ctx.api().query.cash.borrowIndices(token.toChainAsset());
-      return descale(assetBalance.toBigInt() * (borrowIndex.toBigInt() - lastIndex.toBigInt()), 18 + token.decimals);
-    }
+  async cashData() {
+    return await this.ctx.getApi().rpc.gateway.cashdata(this.toTrxArg());
   }
 
   async cash() {
-    // TODO: Use non-zero balances
-    let cashForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.cashForToken(token)));
-    let chainCashBalance = await this.chainCashBalance();
-    console.log({cashForTokens, chainCashBalance});
-    return chainCashBalance + cashForTokens.reduce((acc, el) => acc + el, 0);
+    let cashData = await this.cashData();
+    let balance = cashData.balance.toJSON();
+    return Number(balance) / 1e6;
   }
 
   async liquidityForToken(token) {
-    let assetBalance = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    let assetBalance = await this.ctx.getApi().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
     let price = await token.getPrice();
     let liquidityFactor = await token.getLiquidityFactor();
-    console.log({token: token.symbol, assetBalance, price, liquidityFactor});
 
     if (assetBalance == 0) {
       return 0;
@@ -168,7 +152,6 @@ class Actor {
   async liquidity() {
     // TODO: Use non-zero balances
     let liquidityForTokens = await Promise.all(this.ctx.tokens.all().map((token) => this.liquidityForToken(token)));
-    console.log({liquidityForTokens});
     return await this.cash() + liquidityForTokens.reduce((acc, el) => acc + el, 0);
   }
 
