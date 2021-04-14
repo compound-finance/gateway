@@ -83,7 +83,7 @@ class Eth {
       from: this.defaultFrom,
       ...opts
     };
-    console.log("Deploying " + contractName + " from " + contractsFile)
+    this.ctx.log("Deploying " + contractName + " from " + contractsFile)
     let contracts = await this.getContractsFile(contractsFile);
 
     let contract = await deployContract(

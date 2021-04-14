@@ -10,11 +10,11 @@ let liquidate_scen_info = {
   ],
 };
 
-async function getUnhealthy({ ashley, usdc, bert, chuck, cash, ctx, starport }) {
+async function getUnhealthy({ api, ashley, usdc, bert, chuck, cash, starport }) {
   await ashley.lock(100, usdc); // +90 -> +20
   await ashley.transfer(50, cash, chuck); // -50
   expect(await ashley.liquidity()).toBeCloseTo(39.99, 4); // Why not 40?
-  let extrinsic = ctx.api().tx.cash.setLiquidityFactor(usdc.toChainAsset(), 200000000000000000n);
+  let extrinsic = api.tx.cash.setLiquidityFactor(usdc.toChainAsset(), 200000000000000000n);
   await starport.executeProposal("Reduce USDC Liquidity Factor", [extrinsic]);
   expect(await ashley.liquidity()).toBeCloseTo(-30.01, 2); // -30
 }

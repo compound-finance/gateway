@@ -1,17 +1,21 @@
 const util = require('util');
 const child_process = require('child_process');
-const { genPort, getInfoKey, until } = require('../util');
+const { genPort, getInfoKey } = require('../util');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { canConnectTo } = require('../net');
 const { instantiateInfo } = require('./scen_info');
 const fs = require('fs').promises;
+const os = require('os');
 const path = require('path');
 const chalk = require('chalk');
 
 async function loadTypes(ctx) {
   let contents = await fs.readFile(ctx.__typesFile());
   try {
-    return JSON.parse(contents);
+    return {
+      ...JSON.parse(contents),
+      ...ctx.__types()
+    };
   } catch (e) {
     let match = /in JSON at position (\d+)/.exec(e.message);
     if (match) {
@@ -88,6 +92,12 @@ let validatorInfoMap = {
   }
 };
 
+// TODO: Standardize
+async function tmpFile(name) {
+  folder = await fs.mkdtemp(path.join(os.tmpdir()));
+  return path.join(folder, name);
+}
+
 class Validator {
   constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, chainSpecFile) {
     this.ctx = ctx;
@@ -110,6 +120,35 @@ class Validator {
     this.api = null;
     this.ps = null;
     this.bootnodes = null;
+    this.freezeTimeFile = null;
+  }
+
+  async currentTime() {
+    return (await this.api.query.cash.lastBlockTimestamp()).toJSON();
+  }
+
+  async freezeTime(time) {
+    if (!this.freezeTimeFile) {
+      throw new Error(`Freeze time not set`);
+    }
+    await fs.writeFile(this.freezeTimeFile, time.toString());
+  }
+
+  async accelerateTime(interval) {
+    if (!this.freezeTimeFile) {
+      throw new Error(`Freeze time not set`);
+    }
+    let currentTimeStr = await fs.readFile(this.freezeTimeFile, 'utf8');
+    let currentTime = Number(currentTimeStr);
+    if (Number.isNaN(currentTime)) {
+      throw new Error(`Invalid current time: ${currentTimeStr}`);
+    }
+    if (currentTime === 0) {
+      throw new Error(`Cannot accelerate zero time`);
+    }
+    await this.freezeTime(currentTime + interval);
+
+    return currentTime + interval;
   }
 
   asPeer() {
@@ -145,7 +184,21 @@ class Validator {
       ];
     }
 
-    console.log(`Validator Env: ${JSON.stringify(env)}`);
+    let executionArgs = [];
+    if (this.ctx.__native()) {
+      if (this.version) {
+        throw new Error('Cannot use `version` and `native` options together');
+      }
+      executionArgs = ['--execution', 'Native'];
+    }
+
+    if (this.ctx.__freezeTime()) {
+      this.freezeTimeFile = await tmpFile("freeze_time.txt");;
+      await fs.writeFile(this.freezeTimeFile, this.ctx.__freezeTime().toString());
+      env.FREEZE_TIME = this.freezeTimeFile;
+    }
+
+    this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let ps = spawnValidator(this.ctx, this.colorize(this.name), [
       '--chain',
@@ -169,6 +222,7 @@ class Validator {
       '-lruntime=debug',
       '--reserved-only',
       ...versioning,
+      ...executionArgs,
       ...this.bootnodes,
       ...this.extraArgs,
       ...this.validatorArgs
@@ -193,7 +247,7 @@ class Validator {
 
     // TODO: Should we make awaiting optional? We could also spawn multiple at the
     //       same time, since this isn't order dependent.
-    await until(() => canConnectTo('localhost', this.wsPort), {
+    await this.ctx.until(() => canConnectTo('localhost', this.wsPort), {
       retries: 50,
       message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`
     });
@@ -249,6 +303,10 @@ class Validators {
 
   api() {
     return this.first().api;
+  }
+
+  tryApi() {
+    return this.count() > 0 ? this.api() : null;
   }
 
   get(name) {

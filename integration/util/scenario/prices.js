@@ -1,6 +1,5 @@
 const http = require('http');
 const util = require('util');
-const { sendAndWaitForEvents } = require('../substrate');
 const { getTokensInfo } = require('./token');
 const { genPort } = require('../util');
 
@@ -21,8 +20,8 @@ class Price {
 
   async post() {
     this.ctx.log(`Setting price of ${this.key}...`);
-    let call = this.ctx.api().tx.oracle.postPrice(this.priceInfo.payload, this.priceInfo.signature);
-    let events = await sendAndWaitForEvents(call, this.ctx.api(), { onFinalize: true, rejectOnFailure: false });
+    let call = this.ctx.getApi().tx.oracle.postPrice(this.priceInfo.payload, this.priceInfo.signature);
+    let events = await this.ctx.eventTracker.sendAndWaitForEvents(call, { onFinalize: true, rejectOnFailure: false });
   }
 }
 
