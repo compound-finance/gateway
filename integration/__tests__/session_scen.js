@@ -2,7 +2,10 @@ const { buildScenarios } = require('../util/scenario');
 const { decodeCall } = require('../util/substrate');
 
 let session_scen_info = {
-  tokens: []
+  tokens: [],
+  types: {
+    'Balance': 'u64' // TODO: Check type
+  }
 };
 
 function toValKeys(keyring, substrateId, ethAccount) {

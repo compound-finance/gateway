@@ -13,10 +13,39 @@
     "liquidity_factor": "String",
     "price": "String"
   },
+  "ApiAssetInfo": {
+    "asset": "ChainAsset",
+    "decimals": "u8",
+    "liquidity_factor": "String",
+    "rate_model": "ApiInterestRateModel",
+    "miner_shares": "String",
+    "supply_cap": "String",
+    "symbol": "Symbol",
+    "ticker": "String"
+  },
   "ApiCashData": {
     "balance": "String",
     "cash_yield": "String",
     "price": "String"
+  },
+  "ApiInterestRateModel": {
+    "_enum": {
+      "Kink": "ApiInterestRateModelKink",
+      "Fixed": "ApiInterestRateModelFixed"
+    }
+  },
+  "ApiInterestRateModelFixed": {
+    "rate": "String"
+  },
+  "ApiInterestRateModelKink": {
+    "zero_rate": "String",
+    "kink_rate": "String",
+    "kink_utilization": "String",
+    "full_rate": "String"
+  },
+  "ApiPortfolio": {
+    "cash": "String",
+    "positions": "Vec<(ChainAsset,String)>"
   },
   "ApiRates": "(ApiAPR,ApiAPR)",
   "AssetAmount": "Uint",
@@ -289,8 +318,12 @@
   "Int": "i128",
   "InterestRateModel": {
     "_enum": {
-      "Kink": "InterestRateModelKink"
+      "Kink": "InterestRateModelKink",
+      "Fixed": "InterestRateModelFixed"
     }
+  },
+  "InterestRateModelFixed": {
+    "rate": "APR"
   },
   "InterestRateModelKink": {
     "zero_rate": "APR",
@@ -353,7 +386,6 @@
       "SubmitError": ""
     }
   },
-<<<<<<< HEAD
   "Oracle__Timestamp": "u64",
   "Polkadot__Chain__Address": "[u8; 20]",
   "Polkadot__Chain__Amount": "u128",
@@ -384,15 +416,6 @@
       "KinkAboveFull": "",
       "KinkUtilizationTooHigh": "",
       "Overflowed": ""
-    }
-  },
-  "FixedModel": {
-    "rate": "APR"
-  },
-  "InterestRateModel": {
-    "_enum": {
-      "Kink": "KinkModel",
-      "Fixed": "FixedModel"
     }
   },
   "Reason": {
@@ -525,8 +548,8 @@
   },
   "ValidatorSig": "Ethereum__Chain__Signature",
   "VersionedAuthorityList": {
-    "authorityList": "AuthorityList",
-    "version": "u8"
+    "version": "u8",
+    "authorityList": "AuthorityList"
   },
   "comp__EventId": "(u64,u64)",
   "dot__EventId": "(u64,u64)",

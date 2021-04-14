@@ -117,6 +117,10 @@ class Ctx {
     return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json');
   }
 
+  __types() {
+    return this.scenInfo['types'] || undefined;
+  }
+
   __rpcFile() {
     return process.env['RPC_FILE'] || this.scenInfo['rpc_file'] || path.join(__dirname, '..', '..', '..', 'rpc.json');
   }

@@ -202,7 +202,7 @@ class Chain {
   }
 
   async tokenBalance(token, chainAccount) {
-    let weiAmount = await this.ctx.api().query.cash.assetBalances(token.toChainAsset(), chainAccount);
+    let weiAmount = await this.api().query.cash.assetBalances(token.toChainAsset(), chainAccount);
     return token.toTokenAmount(weiAmount);
   }
 
@@ -286,8 +286,9 @@ class Chain {
   async getGrandpaAuthorities() {
     const grandpaStorageKey = ':grandpa_authorities';
     const grandpaAuthorities = await this.ctx.getApi().rpc.state.getStorage(grandpaStorageKey);
-    const auths = this.ctx.getApi().createType('VersionedAuthorityList', grandpaAuthorities.value).authorityList;
-    return auths.map(e => this.toSS58(e[0]));
+    let versionedAuthorities = this.ctx.getApi().createType('VersionedAuthorityList', grandpaAuthorities.unwrap());
+    const authorityList = versionedAuthorities.authorityList;
+    return authorityList.map(e => this.toSS58(e[0]));
   }
 
   async getAuraAuthorites() {

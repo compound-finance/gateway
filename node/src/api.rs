@@ -52,6 +52,9 @@ pub enum ApiInterestRateModel {
         kink_utilization: String,
         full_rate: String,
     },
+    Fixed {
+        rate: String,
+    },
 }
 
 #[derive(Deserialize, Serialize, Types)]
@@ -295,6 +298,9 @@ where
                     kink_rate: format!("{:?}", kink_rate.0),
                     kink_utilization: format!("{:?}", kink_utilization.0),
                     full_rate: format!("{:?}", full_rate.0),
+                },
+                InterestRateModel::Fixed { rate } => ApiInterestRateModel::Fixed {
+                    rate: String::from(rate),
                 },
             }
         }

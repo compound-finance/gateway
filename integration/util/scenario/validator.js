@@ -12,7 +12,10 @@ const chalk = require('chalk');
 async function loadTypes(ctx) {
   let contents = await fs.readFile(ctx.__typesFile());
   try {
-    return JSON.parse(contents);
+    return {
+      ...JSON.parse(contents),
+      ...ctx.__types()
+    };
   } catch (e) {
     let match = /in JSON at position (\d+)/.exec(e.message);
     if (match) {

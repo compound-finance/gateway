@@ -43,6 +43,7 @@ const baseScenInfo = {
   target: null, // gateway binary [env=CHAIN_BIN]
   wasm_file: null, // [env=WASM_FILE]
   types_file: null, // types.json file [env=TYPES_FILE]
+  types: null, // overrides types.json definitions
   opf_url: 'https://prices.compound.finance/coinbase', // use given open price feed [env=OPF_URL]
   log_file: null, // write logs to file [env=LOG_FILE]
   native: false, // always run native code [env=NATIVE]
