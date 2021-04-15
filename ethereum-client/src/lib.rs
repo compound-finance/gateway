@@ -26,7 +26,7 @@ pub struct EthereumBlock {
     pub events: Vec<EthereumEvent>,
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EthereumClientError {
     DecodeError,
     HttpIoError,
@@ -131,9 +131,7 @@ pub struct BlockNumberResponse {
     pub error: Option<ResponseError>,
 }
 
-fn deserialize_get_logs_response(
-    response: &str,
-) -> Result<GetLogsResponse, EthereumClientError> {
+fn deserialize_get_logs_response(response: &str) -> Result<GetLogsResponse, EthereumClientError> {
     let result: serde_json::error::Result<GetLogsResponse> = serde_json::from_str(response);
     Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
 }
@@ -214,14 +212,19 @@ pub fn get_block(
     })];
     let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
-    let event_objects = get_logs_response.result.ok_or(EthereumClientError::JsonParseError)?;
+    let event_objects = get_logs_response
+        .result
+        .ok_or(EthereumClientError::JsonParseError)?;
 
     if event_objects.len() > 0 {
-        debug::native::info!("Found {} events @ Eth Starport {}", event_objects.len(), eth_starport_address);
+        debug::native::info!(
+            "Found {} events @ Eth Starport {}",
+            event_objects.len(),
+            eth_starport_address
+        );
     }
 
-    let events_result: Result<Vec<EthereumEvent>, EthereumClientError> =
-        event_objects
+    let events_result: Result<Vec<EthereumEvent>, EthereumClientError> = event_objects
         .into_iter()
         .map(|event| {
             let topics = event.topics.ok_or(EthereumClientError::JsonParseError)?;
@@ -232,16 +235,14 @@ pub fn get_block(
 
     Ok(EthereumBlock {
         hash: parse_word(block_object.hash).ok_or(EthereumClientError::JsonParseError)?,
-        parent_hash: parse_word(block_object.parentHash).ok_or(EthereumClientError::JsonParseError)?,
+        parent_hash: parse_word(block_object.parentHash)
+            .ok_or(EthereumClientError::JsonParseError)?,
         number: parse_u64(block_object.number).ok_or(EthereumClientError::JsonParseError)?,
         events: events_result?,
     })
 }
 
-pub fn get_block_object(
-    server: &str,
-    block_num: &str,
-) -> Result<BlockObject, EthereumClientError> {
+pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, EthereumClientError> {
     let params = vec![block_num.into(), true.into()];
     let response_str: String = send_rpc(server, "eth_getBlockByNumber".into(), params)?;
     let response = deserialize_get_block_by_number_response(&response_str)?;
@@ -252,10 +253,9 @@ pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError>
     let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
     let response = deserialize_block_number_response(&response_str)?;
     parse_u64(Some(
-        response
-            .result
-            .ok_or(EthereumClientError::JsonParseError)?,
-    )).ok_or(EthereumClientError::JsonParseError)
+        response.result.ok_or(EthereumClientError::JsonParseError)?,
+    ))
+    .ok_or(EthereumClientError::JsonParseError)
 }
 
 #[cfg(test)]
@@ -293,21 +293,47 @@ mod tests {
                 });
         }
         t.execute_with(|| {
-            let result = get_block("https://mainnet-eth.compound.finance", "0x3a275655586a049fe860be867d10cdae2ffc0f33", 1286);
+            let result = get_block(
+                "https://mainnet-eth.compound.finance",
+                "0x3a275655586a049fe860be867d10cdae2ffc0f33",
+                1286,
+            );
             let block = result.unwrap();
-            assert_eq!(block.hash, [97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37, 227, 236, 104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138]);
-            assert_eq!(block.parent_hash, [6, 46, 119, 220, 237, 67, 30, 182, 113, 165, 104, 57, 249, 109, 169, 18, 246, 141, 132, 16, 36, 102, 87, 72, 211, 140, 211, 214, 121, 89, 97, 234]);
+            assert_eq!(
+                block.hash,
+                [
+                    97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37,
+                    227, 236, 104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138
+                ]
+            );
+            assert_eq!(
+                block.parent_hash,
+                [
+                    6, 46, 119, 220, 237, 67, 30, 182, 113, 165, 104, 57, 249, 109, 169, 18, 246,
+                    141, 132, 16, 36, 102, 87, 72, 211, 140, 211, 214, 121, 89, 97, 234
+                ]
+            );
             assert_eq!(block.number, 1286);
-            assert_eq!(block.events, vec![
-                EthereumEvent::Lock {
-                    asset: [238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238],
-                    sender: [211, 163, 141, 75, 208, 123, 135, 228, 81, 111, 48, 238, 70, 207, 232, 236, 78, 139, 115, 164],
+            assert_eq!(
+                block.events,
+                vec![EthereumEvent::Lock {
+                    asset: [
+                        238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
+                        238, 238, 238, 238, 238
+                    ],
+                    sender: [
+                        211, 163, 141, 75, 208, 123, 135, 228, 81, 111, 48, 238, 70, 207, 232, 236,
+                        78, 139, 115, 164
+                    ],
                     chain: String::from("ETH"),
-                    recipient: [211, 163, 141, 75, 208, 123, 135, 228, 81, 111, 48, 238, 70, 207, 232, 236, 78, 139, 115, 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    recipient: [
+                        211, 163, 141, 75, 208, 123, 135, 228, 81, 111, 48, 238, 70, 207, 232, 236,
+                        78, 139, 115, 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                    ],
                     amount: 500000000000000000
-                }]);
+                }]
+            );
         });
-
     }
 
     #[test]
@@ -460,5 +486,10 @@ mod tests {
             error: None,
         };
         assert_eq!(result.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_encode_block_hex() {
+        assert_eq!(encode_block_hex(0xb27467 + 1), "0xB27468");
     }
 }

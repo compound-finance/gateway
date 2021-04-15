@@ -1,4 +1,5 @@
 use crate::chains::ChainId;
+use crate::events::EventError;
 use crate::internal::set_yield_next::SetYieldNextError;
 use crate::notices::NoticeId;
 use crate::rates::RatesError;
@@ -27,6 +28,7 @@ pub enum Reason {
     ChainMismatch,
     HashMismatch,
     CryptoError(CryptoError),
+    EventError(EventError),
     FailedToSubmitExtrinsic,
     WorkerFetchError,
     WorkerBusy,
@@ -87,6 +89,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::ChainMismatch => (2, 0, "chain mismatch"),
             Reason::HashMismatch => (2, 1, "hash mismatch"),
             Reason::CryptoError(_) => (3, 0, "crypto error"),
+            Reason::EventError(_) => (4, 0, "event error"),
             Reason::FailedToSubmitExtrinsic => (5, 0, "failed to submit extrinsic"),
             Reason::WorkerFetchError => (6, 0, "worker fetch error"),
             Reason::WorkerBusy => (6, 1, "worker busy"),
@@ -143,6 +146,12 @@ impl From<MathError> for Reason {
 impl From<CryptoError> for Reason {
     fn from(err: CryptoError) -> Self {
         Reason::CryptoError(err)
+    }
+}
+
+impl From<EventError> for Reason {
+    fn from(err: EventError) -> Self {
+        Reason::EventError(err)
     }
 }
 

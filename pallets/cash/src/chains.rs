@@ -17,8 +17,6 @@ use types_derive::{type_alias, Types};
 pub enum ChainId {
     Eth,
     Dot,
-    Sol,
-    Tez,
 }
 
 impl ChainId {
@@ -26,8 +24,6 @@ impl ChainId {
         match self {
             ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::str_to_address(addr)?)),
-            ChainId::Sol => Ok(ChainAccount::Sol(Solana::str_to_address(addr)?)),
-            ChainId::Tez => Ok(ChainAccount::Tez(Tezos::str_to_address(addr)?)),
         }
     }
 
@@ -35,8 +31,6 @@ impl ChainId {
         match self {
             ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::str_to_address(addr)?)),
-            ChainId::Sol => Ok(ChainAsset::Sol(Solana::str_to_address(addr)?)),
-            ChainId::Tez => Ok(ChainAsset::Tez(Tezos::str_to_address(addr)?)),
         }
     }
 
@@ -44,8 +38,6 @@ impl ChainId {
         match self {
             ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
             ChainId::Dot => Ok(ChainAccount::Dot(<Polkadot as Chain>::signer_address()?)),
-            ChainId::Sol => Ok(ChainAccount::Sol(<Solana as Chain>::signer_address()?)),
-            ChainId::Tez => Ok(ChainAccount::Tez(<Tezos as Chain>::signer_address()?)),
         }
     }
 
@@ -53,8 +45,6 @@ impl ChainId {
         match self {
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::hash_bytes(data)),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::hash_bytes(data)),
-            ChainId::Sol => ChainHash::Sol(<Solana as Chain>::hash_bytes(data)),
-            ChainId::Tez => ChainHash::Tez(<Tezos as Chain>::hash_bytes(data)),
         }
     }
 
@@ -66,12 +56,6 @@ impl ChainId {
             ChainId::Dot => Ok(ChainSignature::Dot(<Polkadot as Chain>::sign_message(
                 message,
             )?)),
-            ChainId::Sol => Ok(ChainSignature::Sol(<Solana as Chain>::sign_message(
-                message,
-            )?)),
-            ChainId::Tez => Ok(ChainSignature::Tez(<Tezos as Chain>::sign_message(
-                message,
-            )?)),
         }
     }
 
@@ -79,8 +63,6 @@ impl ChainId {
         match self {
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
-            ChainId::Sol => ChainHash::Sol(<Solana as Chain>::zero_hash()),
-            ChainId::Tez => ChainHash::Tez(<Tezos as Chain>::zero_hash()),
         }
     }
 }
@@ -97,15 +79,13 @@ impl Default for ChainId {
 pub enum ChainAccount {
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
-    Sol(<Solana as Chain>::Address),
-    Tez(<Tezos as Chain>::Address),
 }
 
 impl ChainAccount {
     pub fn chain_id(&self) -> ChainId {
         match *self {
             ChainAccount::Eth(_) => ChainId::Eth,
-            _ => panic!("XXX not implemented"),
+            ChainAccount::Dot(_) => ChainId::Dot,
         }
     }
 }
@@ -140,8 +120,6 @@ impl From<ChainAccount> for String {
 pub enum ChainAsset {
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
-    Sol(<Solana as Chain>::Address),
-    Tez(<Tezos as Chain>::Address),
 }
 
 // For serialize (which we don't really use, but are required to implement)
@@ -149,7 +127,7 @@ impl ChainAsset {
     pub fn chain_id(&self) -> ChainId {
         match *self {
             ChainAsset::Eth(_) => ChainId::Eth,
-            _ => panic!("XXX not implemented"),
+            ChainAsset::Dot(_) => ChainId::Dot,
         }
     }
 }
@@ -183,8 +161,6 @@ impl From<ChainAsset> for String {
 pub enum ChainAccountSignature {
     Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature),
-    Sol(<Solana as Chain>::Address, <Solana as Chain>::Signature),
-    Tez(<Tezos as Chain>::Address, <Tezos as Chain>::Signature),
 }
 
 impl ChainAccountSignature {
@@ -192,8 +168,6 @@ impl ChainAccountSignature {
         match self {
             ChainAccountSignature::Eth(_, sig) => ChainSignature::Eth(sig),
             ChainAccountSignature::Dot(_, sig) => ChainSignature::Dot(sig),
-            ChainAccountSignature::Sol(_, sig) => ChainSignature::Sol(sig),
-            ChainAccountSignature::Tez(_, sig) => ChainSignature::Tez(sig),
         }
     }
 
@@ -207,6 +181,7 @@ impl ChainAccountSignature {
                     Err(Reason::SignatureAccountMismatch)
                 }
             }
+
             _ => panic!("XXX not implemented"),
         }
     }
@@ -220,8 +195,6 @@ pub type ChainBlockNumber = u64;
 pub enum ChainHash {
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
-    Sol(<Solana as Chain>::Hash),
-    Tez(<Tezos as Chain>::Hash),
 }
 
 /// Type for a signature tied to a chain.
@@ -229,15 +202,13 @@ pub enum ChainHash {
 pub enum ChainSignature {
     Eth(<Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Signature),
-    Sol(<Solana as Chain>::Signature),
-    Tez(<Tezos as Chain>::Signature),
 }
 
 impl ChainSignature {
     pub fn chain_id(&self) -> ChainId {
         match *self {
             ChainSignature::Eth(_) => ChainId::Eth,
-            _ => panic!("XXX not implemented"),
+            ChainSignature::Dot(_) => ChainId::Dot,
         }
     }
 
@@ -257,8 +228,6 @@ impl ChainSignature {
 pub enum ChainSignatureList {
     Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
-    Sol(Vec<(<Solana as Chain>::Address, <Solana as Chain>::Signature)>),
-    Tez(Vec<(<Tezos as Chain>::Address, <Tezos as Chain>::Signature)>),
 }
 
 // Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
@@ -268,7 +237,7 @@ impl FromStr for ChainId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_uppercase().as_str() {
             "ETH" => Ok(ChainId::Eth),
-            "SOL" => Ok(ChainId::Sol),
+            "DOT" => Ok(ChainId::Dot),
             _ => Err(Reason::BadChainId),
         }
     }
@@ -301,7 +270,7 @@ impl ChainBlock {
 
     pub fn number(&self) -> ChainBlockNumber {
         match self {
-            ChainBlock::Eth(block) => block.number as ChainBlockNumber,
+            ChainBlock::Eth(block) => block.number,
         }
     }
 }
@@ -320,6 +289,15 @@ impl ChainBlocks {
     }
 }
 
+impl From<ChainBlock> for ChainBlocks {
+    fn from(block: ChainBlock) -> Self {
+        match block {
+            ChainBlock::Eth(block) => ChainBlocks::Eth(vec![block]),
+        }
+    }
+}
+
+// XXX
 impl IntoIterator for ChainBlocks {
     type Item = ChainBlock;
     type IntoIter = vec::IntoIter<Self::Item>;
@@ -441,6 +419,23 @@ impl ChainReorgTally {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+pub enum ChainEvent {
+    Eth(<Ethereum as Chain>::Event),
+}
+
+impl ChainEvent {
+    pub fn chain_id(&self) -> ChainId {
+        match self {
+            ChainEvent::Eth(_) => ChainId::Eth,
+        }
+    }
+
+    pub fn sign_event(&self) -> Result<ChainSignature, Reason> {
+        self.chain_id().sign(&self.encode())
+    }
+}
+
 /// Type for describing a set of events coming from an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainEvents {
@@ -458,8 +453,9 @@ impl ChainEvents {
     }
 }
 
+// XXX still?
 impl IntoIterator for ChainEvents {
-    type Item = crate::events::ChainLogEvent; // XXX ChainEvent?
+    type Item = ChainEvent;
     type IntoIter = vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -467,8 +463,24 @@ impl IntoIterator for ChainEvents {
             // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
             ChainEvents::Eth(events) => events
                 .into_iter()
-                .map(|e| crate::events::ChainLogEvent::Eth(e))
-                .collect::<Vec<crate::events::ChainLogEvent>>()
+                .map(|e| ChainEvent::Eth(e))
+                .collect::<Vec<ChainEvent>>()
+                .into_iter(),
+        }
+    }
+}
+
+impl IntoIterator for &mut ChainEvents {
+    type Item = ChainEvent;
+    type IntoIter = vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
+            ChainEvents::Eth(events) => events
+                .into_iter()
+                .map(|e| ChainEvent::Eth(e.clone())) // XXX avoid clone()?
+                .collect::<Vec<ChainEvent>>()
                 .into_iter(),
         }
     }
@@ -485,7 +497,6 @@ pub trait Chain {
     type Hash: Debuggable + Clone + Eq;
     type PublicKey: Debuggable + Clone + Eq;
     type Signature: Debuggable + Clone + Eq;
-    type EventId: Debuggable + Clone + Eq + Ord;
     type Event: Debuggable + Clone + Eq;
     type Block: Debuggable + Clone + Eq;
 
@@ -507,12 +518,6 @@ pub struct Ethereum {}
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Polkadot {}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct Solana {}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct Tezos {}
 
 impl Chain for Ethereum {
     const ID: ChainId = ChainId::Eth;
@@ -542,13 +547,10 @@ impl Chain for Ethereum {
     type Signature = [u8; 65];
 
     #[type_alias("Ethereum__Chain__")]
-    type EventId = eth::EventId;
+    type Event = ethereum_client::EthereumEvent;
 
     #[type_alias("Ethereum__Chain__")]
-    type Event = eth::Event;
-
-    #[type_alias("Ethereum__Chain__")]
-    type Block = eth::Block;
+    type Block = ethereum_client::EthereumBlock;
 
     fn zero_hash() -> Self::Hash {
         [0u8; 32]
@@ -638,13 +640,10 @@ impl Chain for Polkadot {
     type Signature = [u8; 65];
 
     #[type_alias("Polkadot__Chain__")]
-    type EventId = dot::EventId;
+    type Event = ();
 
     #[type_alias("Polkadot__Chain__")]
-    type Event = dot::Event;
-
-    #[type_alias("Polkadot__Chain__")]
-    type Block = dot::Block;
+    type Block = ();
 
     fn zero_hash() -> Self::Hash {
         panic!("XXX not implemented");
@@ -682,245 +681,17 @@ impl Chain for Polkadot {
     }
 }
 
-impl Chain for Solana {
-    const ID: ChainId = ChainId::Sol;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    #[type_alias("Solana__Chain__")]
-    type Address = [u8; 20];
+    #[test]
+    fn test_chain_events_push() {
+        // XXX
+        // let mut a = ChainEvents::Eth(vec![]);
+        // a.push(ChainEvent::Eth {
 
-    #[type_alias("Solana__Chain__")]
-    type Amount = u128;
-
-    #[type_alias("Solana__Chain__")]
-    type CashIndex = u128;
-
-    #[type_alias("Solana__Chain__")]
-    type Rate = u128;
-
-    #[type_alias("Solana__Chain__")]
-    type Timestamp = u64;
-
-    #[type_alias("Solana__Chain__")]
-    type Hash = [u8; 32];
-
-    #[type_alias("Solana__Chain__")]
-    type PublicKey = [u8; 64];
-
-    #[type_alias("Solana__Chain__")]
-    type Signature = [u8; 65];
-
-    #[type_alias("Solana__Chain__")]
-    type EventId = sol::EventId;
-
-    #[type_alias("Solana__Chain__")]
-    type Event = sol::Event;
-
-    #[type_alias("Solana__Chain__")]
-    type Block = sol::Block;
-
-    fn zero_hash() -> Self::Hash {
-        panic!("XXX not implemented");
+        // });
+        // assert_eq!(a, vec![]);
     }
-
-    fn hash_bytes(_data: &[u8]) -> Self::Hash {
-        panic!("XXX not implemented");
-    }
-
-    fn recover_user_address(
-        _data: &[u8],
-        _signature: Self::Signature,
-    ) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn signer_address() -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn address_string(_address: &Self::Address) -> String {
-        panic!("XXX not implemented");
-    }
-}
-
-impl Chain for Tezos {
-    const ID: ChainId = ChainId::Tez;
-
-    #[type_alias("Tezos__Chain__")]
-    type Address = [u8; 20];
-
-    #[type_alias("Tezos__Chain__")]
-    type Amount = u128;
-
-    #[type_alias("Tezos__Chain__")]
-    type CashIndex = u128;
-
-    #[type_alias("Tezos__Chain__")]
-    type Rate = u128;
-
-    #[type_alias("Tezos__Chain__")]
-    type Timestamp = u64;
-
-    #[type_alias("Tezos__Chain__")]
-    type Hash = [u8; 32];
-
-    #[type_alias("Tezos__Chain__")]
-    type PublicKey = [u8; 64];
-
-    #[type_alias("Tezos__Chain__")]
-    type Signature = [u8; 65];
-
-    #[type_alias("Tezos__Chain__")]
-    type EventId = tez::EventId;
-
-    #[type_alias("Tezos__Chain__")]
-    type Event = tez::Event;
-
-    #[type_alias("Tezos__Chain__")]
-    type Block = tez::Block;
-
-    fn zero_hash() -> Self::Hash {
-        panic!("XXX not implemented");
-    }
-
-    fn hash_bytes(_data: &[u8]) -> Self::Hash {
-        panic!("XXX not implemented");
-    }
-
-    fn recover_user_address(
-        _data: &[u8],
-        _signature: Self::Signature,
-    ) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn signer_address() -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn address_string(_address: &Self::Address) -> String {
-        panic!("XXX not implemented");
-    }
-}
-
-// XXX technically all the remaining mod::types I think could become ADTs instead
-//  which would also be a union type that would allow us to store them together
-//  in general storing types which add variants for chains over time *must* be ok
-//   or this strategy breaks and we need to re-visit everywhere in storage that's happening
-pub mod gate {
-    use codec::{Decode, Encode};
-    use our_std::RuntimeDebug;
-
-    use types_derive::type_alias;
-
-    #[type_alias("gate__")]
-    pub type EventId = (u64, u64); // XXX
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Event {}
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Block {}
-}
-
-pub mod eth {
-    // Note: The substrate build requires these be imported
-    pub use our_std::vec::Vec;
-
-    use super::{Chain, Ethereum};
-    use codec::{Decode, Encode};
-    use our_std::RuntimeDebug;
-
-    use types_derive::type_alias;
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub enum RecoveryError {
-        SignatureRecoveryError,
-    }
-
-    #[type_alias("eth__")]
-    pub type BlockNumber = u64;
-
-    #[type_alias("eth__")]
-    pub type LogIndex = u64;
-
-    #[type_alias("eth__")]
-    pub type EventId = (BlockNumber, LogIndex);
-
-    #[type_alias("eth__")]
-    pub type Event = ethereum_client::EthereumEvent;
-
-    #[type_alias("eth__")]
-    pub type Block = ethereum_client::EthereumBlock;
-}
-
-pub mod dot {
-    use codec::{Decode, Encode};
-    use our_std::RuntimeDebug;
-
-    use types_derive::type_alias;
-
-    #[type_alias("dot__")]
-    pub type EventId = (u64, u64);
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Event {}
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Block {}
-}
-
-pub mod sol {
-    use codec::{Decode, Encode};
-    use our_std::RuntimeDebug;
-
-    use types_derive::type_alias;
-
-    #[type_alias("sol__")]
-    pub type EventId = (u64, u64);
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Event {}
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Block {}
-}
-
-pub mod tez {
-    use codec::{Decode, Encode};
-    use our_std::RuntimeDebug;
-
-    use types_derive::type_alias;
-
-    #[type_alias("tez__")]
-    pub type EventId = (u128, u128);
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Event {}
-
-    #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Block {}
 }

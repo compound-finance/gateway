@@ -20,8 +20,9 @@ use frame_support::{
 use pallet_oracle::types::Price;
 
 use crate::{
-    chains::{Chain, ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature, Ethereum},
-    events::ChainLogEvent,
+    chains::{
+        Chain, ChainAccount, ChainAsset, ChainEvent, ChainHash, ChainId, ChainSignature, Ethereum,
+    },
     factor::Factor,
     internal, log,
     params::{MIN_TX_VALUE, TRANSFER_FEE},
@@ -302,12 +303,12 @@ fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount,
 
 // Protocol interface //
 
-pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(), Reason> {
+pub fn apply_chain_event_internal<T: Config>(event: ChainEvent) -> Result<(), Reason> {
     log!("apply_chain_event_internal(event): {:?}", &event);
 
     match event {
-        ChainLogEvent::Eth(eth_event) => match eth_event.event {
-            ethereum_client::events::EthereumEvent::Lock {
+        ChainEvent::Eth(eth_event) => match eth_event {
+            ethereum_client::EthereumEvent::Lock {
                 asset,
                 sender,
                 chain,
@@ -320,7 +321,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 get_quantity::<T>(ChainAsset::Eth(asset), amount)?,
             ),
 
-            ethereum_client::events::EthereumEvent::LockCash {
+            ethereum_client::EthereumEvent::LockCash {
                 sender,
                 chain,
                 recipient,
@@ -332,12 +333,12 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 CashPrincipalAmount(principal),
             ),
 
-            ethereum_client::events::EthereumEvent::ExecuteProposal {
+            ethereum_client::EthereumEvent::ExecuteProposal {
                 title: _title,
                 extrinsics,
             } => dispatch_extrinsics_internal::<T>(extrinsics),
 
-            ethereum_client::events::EthereumEvent::ExecTrxRequest {
+            ethereum_client::EthereumEvent::ExecTrxRequest {
                 account,
                 trx_request,
             } => internal::exec_trx_request::exec_trx_request::<T>(
@@ -346,7 +347,7 @@ pub fn apply_chain_event_internal<T: Config>(event: ChainLogEvent) -> Result<(),
                 None,
             ),
 
-            ethereum_client::events::EthereumEvent::NoticeInvoked {
+            ethereum_client::EthereumEvent::NoticeInvoked {
                 era_id,
                 era_index,
                 notice_hash,

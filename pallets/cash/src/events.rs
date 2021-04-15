@@ -1,66 +1,25 @@
-use crate::chains::{eth, Chain, ChainId, ChainSignature, Ethereum, ChainBlock, ChainBlocks, ChainBlockTally, ChainBlockNumber};
-use crate::log;
-use crate::reason::Reason;
-use crate::types::SignersSet;
-use codec::alloc::string::String;
-use codec::{Decode, Encode};
-use ethereum_client::{EthereumClientError};
-use our_std::{vec::Vec, RuntimeDebug};
+use codec::{alloc::string::String, Decode, Encode};
 
+extern crate ethereum_client; // XXX
+
+use ethereum_client::EthereumClientError;
+use our_std::{vec::Vec, RuntimeDebug};
 use types_derive::Types;
 
-extern crate ethereum_client;
+use crate::{
+    chains::{
+        Chain, ChainBlock, ChainBlockNumber, ChainBlockTally, ChainBlocks, ChainId, ChainSignature,
+        Ethereum,
+    },
+    log,
+    reason::Reason,
+    types::SignersSet,
+};
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
-pub enum ChainLogId {
-    Eth(eth::BlockNumber, eth::LogIndex),
-}
-
-impl ChainLogId {
-    pub fn show(&self) -> String {
-        match self {
-            ChainLogId::Eth(block_number, log_index) => {
-                format!("Eth({},{})", block_number, log_index)
-            }
-        }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
-pub enum ChainLogEvent {
-    Eth(<Ethereum as Chain>::Event),
-}
-
-impl ChainLogEvent {
-    pub fn chain_id(&self) -> ChainId {
-        match self {
-            ChainLogEvent::Eth(_) => ChainId::Eth,
-        }
-    }
-
-    pub fn sign_event(&self) -> Result<ChainSignature, Reason> {
-        self.chain_id().sign(&self.encode())
-    }
-}
-
-/// Type for the status of an event on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
-pub enum EventState {
-    Pending { signers: SignersSet },
-    Failed { reason: Reason },
-    Done,
-}
-
-impl Default for EventState {
-    fn default() -> Self {
-        EventState::Pending {
-            signers: SignersSet::new(),
-        }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+/// Type for errors coming from event ingression.
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventError {
+    NoRpcUrl,
     BadRpcUrl,
     BadStarportAddress,
     EthereumClientError(EthereumClientError),
@@ -68,16 +27,15 @@ pub enum EventError {
 }
 
 /// Fetch a block from the underlying chain.
-pub fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
+pub fn fetch_chain_block(
+    chain_id: ChainId,
+    number: ChainBlockNumber,
+) -> Result<ChainBlock, Reason> {
     match chain_id {
-        ChainId::Gate => Err(Reason::Unreachable),
         ChainId::Eth => fetch_eth_block(number),
         ChainId::Dot => Err(Reason::Unreachable),
-        ChainId::Sol => Err(Reason::Unreachable),
-        ChainId::Tez => Err(Reason::Unreachable),
     }
 }
-
 
 /// Fetch more blocks from the underlying chain.
 pub fn fetch_chain_blocks(
@@ -86,11 +44,8 @@ pub fn fetch_chain_blocks(
     nblocks: u32,
 ) -> Result<ChainBlocks, Reason> {
     match chain_id {
-        ChainId::Gate => Err(Reason::Unreachable),
         ChainId::Eth => fetch_eth_blocks(number, nblocks),
         ChainId::Dot => Err(Reason::Unreachable),
-        ChainId::Sol => Err(Reason::Unreachable),
-        ChainId::Tez => Err(Reason::Unreachable),
     }
 }
 
@@ -105,6 +60,7 @@ pub fn filter_chain_blocks(
     blocks
 }
 
+/// Fetch a single block from the Etherum Starport.
 fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
     let config = runtime_interfaces::config_interface::get();
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
@@ -114,66 +70,19 @@ fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
         .map_err(|_| EventError::BadStarportAddress)?;
     let eth_chain_block = ethereum_client::get_block(&eth_rpc_url, &eth_starport_address, number)
         .map_err(EventError::EthereumClientError)?;
-    Ok(ChainBlocks::Eth(eth_chain_block)
+    Ok(ChainBlock::Eth(eth_chain_block))
 }
 
-// XXX where does this belong?
-/// Fetch all latest Starport events for the offchain worker.
-fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<EventInfo, EventError> {
-    // XXX
-    let from_block: String = encode_block_hex(number);
-
-    // Get a validator config from runtime-interfaces pallet
-    // Use config to get an address for interacting with Ethereum JSON RPC client
-    let config = runtime_interfaces::config_interface::get();
-    let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
-        .ok_or(EventError::EthRpcUrlMissing)?;
-    let eth_rpc_url = String::from_utf8(eth_rpc_url).map_err(|_| EventError::EthRpcUrlInvalid)?;
-    let eth_starport_address = String::from_utf8(config.get_eth_starport_address())
-        .map_err(|_| EventError::StarportAddressInvalid)?;
-
-    log!(
-        "eth_rpc_url={}, starport_address={}",
-        eth_rpc_url,
-        eth_starport_address,
-    );
-
-    // Fetch the latest available ethereum block number
-    let latest_eth_block = ethereum_client::fetch_latest_block(&eth_rpc_url)
-        .map_err(EventError::EthereumClientError)?;
-
-    // Build parameters set for fetching starport events
-    let fetch_events_request = format!(
-        r#"{{"address": "{}", "fromBlock": "{}", "toBlock": "{}"}}"#,
-        eth_starport_address,
-        from_block,
-        encode_block_hex(latest_eth_block)
-    );
-
-    // Fetch events using ethereum_client
-    let logs =
-        ethereum_client::fetch_and_decode_logs(&eth_rpc_url, vec![fetch_events_request.into()])
-            .map_err(EventError::EthereumClientError)?;
-
-    let events = logs
-        .into_iter()
-        .map(|log| {
-            (
-                ChainLogId::Eth(log.block_number, log.log_index),
-                ChainLogEvent::Eth(log),
-            )
-        })
-        .collect();
-
-    Ok(EventInfo {
-        latest_eth_block,
-        events,
-    });
-
-    // XXX fetch given slack
-    //  slack 0 -> no results
-    Ok(ChainBlocks::Eth(vec![]))
-
+/// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
+fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks, Reason> {
+    match slack {
+        0 => Ok(ChainBlocks::Eth(vec![])),
+        _ => {
+            // Note: can be optimized to return up to `slack` blocks, for now just one
+            // XXX
+            Ok(fetch_eth_block(number)?.into())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -281,10 +190,5 @@ pub mod tests {
         // assert_eq!(latest_eth_block, 11695207);
         // assert_eq!(event_info.events.len(), 0);
         // });
-    }
-
-    #[test]
-    fn test_encode_block_hex() {
-        assert_eq!(events::encode_block_hex(0xb27467 + 1), "0xB27468");
     }
 }

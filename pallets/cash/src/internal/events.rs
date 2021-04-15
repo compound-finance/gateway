@@ -10,17 +10,17 @@ use our_std::collections::btree_set::BTreeSet;
 
 use crate::{
     chains::{
-        Chain, ChainBlock, ChainBlockNumber, ChainBlockTally, ChainBlocks, ChainEvents, ChainHash,
-        ChainId, ChainReorg, ChainReorgTally, ChainSignature, Ethereum,
+        Chain, ChainBlock, ChainBlockNumber, ChainBlockTally, ChainBlocks, ChainEvent, ChainEvents,
+        ChainHash, ChainId, ChainReorg, ChainReorgTally, ChainSignature, Ethereum,
     },
     core::{apply_chain_event_internal, recover_validator, validator_sign},
-    events::{fetch_chain_block, fetch_chain_blocks, filter_chain_blocks, ChainLogEvent, ChainLogId, EventState},
+    events::{fetch_chain_block, fetch_chain_blocks, filter_chain_blocks},
     log,
     reason::Reason,
     require,
     types::ValidatorIdentity,
-    Call, Config, Event as EventT, EventStates, IngressionQueue, LastProcessedBlock, Module,
-    PendingChainBlocks, PendingChainReorgs,
+    Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module, PendingChainBlocks,
+    PendingChainReorgs,
 };
 
 /// Incrementally perform the next step of tracking events from all the underlying chains.
@@ -33,7 +33,7 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
             track_chain_events_on::<T>(ChainId::Eth)
         }
 
-        _ => Err(Reason::WorkerBusy)
+        _ => Err(Reason::WorkerBusy),
     };
     result
 }
@@ -47,7 +47,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
         // worker sees same fork as chain
         let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
-        let slack = calculate_queue_slack::<T>(chain_id);
+        let slack = calculate_queue_slack::<T>(chain_id, &event_queue);
         let blocks = fetch_chain_blocks(chain_id, last_block.number(), slack)?;
         let filtered = filter_chain_blocks(chain_id, pending_blocks, blocks);
         submit_chain_blocks::<T>(chain_id, filtered)
@@ -65,12 +65,16 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
 }
 
 /// Determine the number of blocks which can still fit on the ingression queue.
-pub fn calculate_queue_slack<T: Config>(chain_id: ChainId) -> u32 { // XXX return usize?
-    0 // XXX look at ingression queue, how backed up?
+pub fn calculate_queue_slack<T: Config>(chain_id: ChainId, _event_queue: &ChainEvents) -> u32 {
+    1 // XXX look at ingression queue, how backed up is the queue?
 }
 
 // XXX and move to src/events?
-pub fn risk_adjusted_value(chain_event: &crate::events::ChainLogEvent, block_number: ChainBlockNumber) -> crate::types::USDQuantity { // XXX
+pub fn risk_adjusted_value(
+    chain_event: &ChainEvent,
+    block_number: ChainBlockNumber,
+) -> crate::types::USDQuantity {
+    // XXX
     // XXX
     //  if Lock or LockCash -> Lock amount value risk decayed by blocks elapsed since block number
     //  Gov -> max/set value probably also decayed since block number
@@ -82,13 +86,29 @@ pub fn risk_adjusted_value(chain_event: &crate::events::ChainLogEvent, block_num
     crate::types::Quantity::from_nominal("1000", crate::types::USD) // XXX
 }
 
+// XXX
+// pub fn extract_batch(&mut self, quota: USDQuantity) {
+//     // XXXX
+//     let available = QUOTA;
+
+// }
+
 /// Ingress a single round (quota per underlying chain block ingested).
-pub fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, event_queue: &mut ChainEvents) {
-    use crate::types::{Quantity, USD, USDQuantity};
+pub fn ingress_queue<T: Config>(
+    chain_id: ChainId,
+    last_block: &ChainBlock,
+    event_queue: &mut ChainEvents,
+) -> Result<(), Reason> {
+    use crate::types::{Quantity, USDQuantity, USD};
     const QUOTA: USDQuantity = Quantity::from_nominal("10000", USD); // XXX value? per chain?
     let available = QUOTA;
-    for event in event_queue.clone() { // XXX no clone
-        if risk_adjusted_value(&event, last_block.number()) < available {
+    //XXX let batch = extract_batch(QUOTA, &event_queue);
+    // for event in batch {
+    //  match apply ... err -> emit
+    for event in event_queue {
+        let value = risk_adjusted_value(&event, last_block.number());
+        if value < available {
+            // XXX available = available.sub(value);
             match apply_chain_event_internal::<T>(event) {
                 Ok(()) => {
                     // XXX remove from queue
@@ -101,6 +121,8 @@ pub fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, even
             }
         }
     }
+
+    Ok(()) // XXX
 }
 
 // XXX whatever we submit we must store first so we can formulate reorgs
@@ -108,7 +130,10 @@ pub fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, even
 //  but for both blocks added in chain_blocks or reorgs
 
 /// Submit the underlying chain blocks the worker calculates are needed by the chain next.
-pub fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) -> Result<(), Reason> {
+pub fn submit_chain_blocks<T: Config>(
+    chain_id: ChainId,
+    blocks: ChainBlocks,
+) -> Result<(), Reason> {
     log!("Submitting chain blocks extrinsic: {:?}", blocks);
 
     // XXX why are we signing with eth?
@@ -128,17 +153,20 @@ pub fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) ->
 }
 
 // XXX move to src/events?
-fn formulate_reorg(
+/// Try to form a path from the last block to the new true block.
+pub fn formulate_reorg(
     chain_id: ChainId,
     last_block: ChainBlock,
     true_block: ChainBlock,
 ) -> Result<ChainReorg, Reason> {
     // XXX try to form a path from last to truth
+    // XXX just always N == K?
+    const N: u32 = 10;
+    const K: u32 = 10;
     let mut reverse_blocks: Vec<ChainBlock> = vec![]; // XXX convert to raw_block for type
     let mut drawrof_blocks: Vec<ChainBlock> = vec![]; // XXX convert to raw_block and reverse
     let mut reverse_hashes: BTreeSet<ChainHash>; // XXX init empty?
     loop {
-        // XXX just always N == K?
         // let reverse_blocks_next = storage.walk_backwards(last_block.hash(), N)?;
         // let drawrof_blocks_next = storage.walk_backwards(truth.hash(), K)?
         // reverse_blocks.extend_from_slice(reverse_blocks_next)
@@ -166,7 +194,11 @@ fn formulate_reorg(
 }
 
 // XXX & refs here not blocks?
-fn already_voted_for_reorg<T: Config>(chain_id: ChainId, id: ValidatorIdentity, reorg: &ChainReorg) -> bool {
+fn already_voted_for_reorg<T: Config>(
+    chain_id: ChainId,
+    id: ValidatorIdentity,
+    reorg: &ChainReorg,
+) -> bool {
     // XXX dont revote for same thing
     false
 }
@@ -225,7 +257,7 @@ pub fn receive_chain_blocks<T: Config>(
             event_queue.push(&tally.block);
             last_block = tally.block.clone(); // XXX
             pending_blocks.remove(0); // XXX assert 0 == tally?
-            ingress_queue::<T>(chain_id, &last_block, &mut event_queue);
+            ingress_queue::<T>(chain_id, &last_block, &mut event_queue)?;
         } else {
             break;
         }
@@ -261,12 +293,15 @@ pub fn receive_chain_reorg<T: Config>(
         ChainReorgTally::new(chain_id, reorg, validator.substrate_id)
     };
 
-    // XXX specifically passes now but didnt before
+    // XXX specifically it should pass now but not previously before
     //  should with_signature stop including once done?
+    //   tricky bc we need to add sigs then check in order after for completion
     if tally.clone().passes_threshold() {
         // XXX
         // XXX perform reorg
         //  reverse blocks
+        //   undo events given (if lock -> debit account, interest is lost to system)
+        //    they earn a bit of others interest, but total interest is same
         //  forward blocks
         //   push/ingress ev queue, update last block/pending
         //  pass last block for them to modify

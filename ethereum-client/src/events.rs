@@ -363,9 +363,7 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
             parse_notice_invoked_log(log)
         }
 
-        t => {
-            Err(EventError::UnknownEventTopic(*t.as_fixed_bytes()))
-        }
+        t => Err(EventError::UnknownEventTopic(*t.as_fixed_bytes())),
     }
 }
 

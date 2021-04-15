@@ -738,7 +738,7 @@ mod tests {
             };
             let signer = <Ethereum as Chain>::signer_address().unwrap();
             let notice_state = NoticeState::Pending {
-                signature_pairs: ChainSignatureList::Gate(vec![(signer, eth_signature)]),
+                signature_pairs: ChainSignatureList::Dot(vec![(signer, eth_signature)]),
             };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);

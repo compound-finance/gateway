@@ -130,14 +130,12 @@ mod tests {
     use super::*;
     use crate::{
         chains::*,
-        events::{ChainLogEvent, ChainLogId},
         notices::{ExtractionNotice, Notice, NoticeId, NoticeState},
         reason::TrxReqParseError,
         tests::*,
         types::ValidatorKeys,
         Call, Nonces, NoticeStates, Validators,
     };
-    use ethereum_client::{events::EthereumEvent::Lock, EthereumLogEvent};
     use frame_support::storage::StorageMap;
 
     use sp_core::crypto::AccountId32;
