@@ -7,7 +7,8 @@ let liquidate_scen_info = {
   tokens: [
     { token: "usdc", balances: { ashley: 1000, chuck: 1000 }, liquidity_factor: 0.9 },
     { token: "bat", balances: { bert: 25000 }, liquidity_factor: 0.9 },
-    { token: "comp", balances: { ashley: 100 }, liquidity_factor: 0.5 }
+    { token: "comp", balances: { ashley: 100 }, liquidity_factor: 0.5 },
+    { token: "zrx", balances: { ashley: 100 }, liquidity_factor: 0.5 }
   ],
   prices: {
     prices: {
@@ -20,6 +21,11 @@ let liquidate_scen_info = {
         price: "229.125",
         payload: "0x00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000060124a7000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000da82b88000000000000000000000000000000000000000000000000000000000000000670726963657300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004434f4d5000000000000000000000000000000000000000000000000000000000",
         signature: "0x8e248059830bc2affb38f656f576e1b513e23fc9d30fb3c0193427f4b94524637b7f84eba4619116860b1cdd3987c447e0a3ae97c0adc614592b9f4dd9de14a3000000000000000000000000000000000000000000000000000000000000001b",
+      },
+      "ETH": {
+        price: "1277.15",
+        payload: "0x00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000060124aac00000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000004c1fc3300000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000",
+        signature: "0xa568da2015060b2292b9587771beae4d89968f00f613bf4800dc70addacf8fddcb6d0e9550018869ba5cf1da8665daf8e0f366a0af2ae38362ea006ec260fd4a000000000000000000000000000000000000000000000000000000000000001c",
       }
     }
   }
@@ -195,8 +201,9 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     name: "Fails when liquidator tries to close more than total borrow",
     notes:
       `A simple replay of the collateral-for-collateral scenario, but Bert goes
-       for the gusto and tries to liquidate more COMP than Ashley had even borrowed.`,
-    todo: 'This test is a counter-factual and should *not* pass',
+       for the gusto and tries to liquidate more COMP than Ashley had even borrowed.
+
+       Note: This test is a counter-factual and should *not* pass`,
     before: supplyUSDC_BorrowCOMP_ChangePrice,
     scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
       await bert.lock(4000, bat);
@@ -223,8 +230,9 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     name: "Fails when liquidator tries to liquidate healthy account",
     notes:
       `A simple replay of the collateral-for-collateral scenario, but Ashley's
-       account is in good standing.`,
-    todo: 'This test is a counter-factual and should *not* pass',
+       account is in good standing.
+
+       Note: This test is a counter-factual and should *not* pass`,
     before: supplyUSDC_BorrowCOMP,
     scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
       await bert.lock(4000, bat);
@@ -246,9 +254,109 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
 
       // Skip liquidity checks since this is not the expected long-term behavior
     }
+  },
+  {
+    name: "Fails when liquidator liquidates too much of borrower's given collateral",
+    notes:
+      `A simple replay of the collateral-for-collateral liquidation scenario, but Ashley
+       doesn't have much of the seized collateral (e.g. she's mostly in USDC, not ETH).
+
+       Note: This test is a counter-factual and should *not* pass`,
+    before: supplyUSDC_BorrowCOMP_ChangePrice,
+    scenario: async ({ ashley, ether, bert, bat, usdc, cash, comp, log }) => {
+      await ashley.lock(0.01, ether);
+      await bert.lock(4000, bat);
+      let ashleyLiquidityBefore = await ashley.liquidity();
+      let bertLiquidityBefore = await bert.liquidity();
+      expect(await bert.chainBalance(usdc)).toEqual(0);
+      expect(await bert.chainBalance(comp)).toEqual(0);
+
+      // Liquidate 0.5 COMP. Bert should receive [0.5 * ( 472.07 / 1277.15 ) * 1.08]=0.1995989507888658 Ether
+      await bert.liquidate(0.5, comp, ether, ashley); // TODO: This should probably fail
+
+      let ashleyLiquidityAfter = await ashley.liquidity();
+      let bertLiquidityAfter = await bert.liquidity();
+
+      expect(await ashley.chainBalance(ether)).toBeCloseTo(-0.189599); // 0.01 Supplied - 0.1995989507888658 Seized
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-0.5, 2); // -1 Borrowed + 0.5 COMP De-Liquidated
+      expect(await bert.chainBalance(ether)).toBeCloseTo(0.199599, 2); // Seized in Liquidation
+      expect(await bert.chainBalance(comp)).toBeCloseTo(-0.5, 2); // -0.5 COMP Debt Assumed in Liquidation
+
+      // Skip liquidity checks since this is not the expected long-term behavior
+    }
+  },
+  {
+    name: "Fails when liquidator liquidates self-liquidates",
+    notes:
+      `A simple replay of the collateral-for-collateral liquidation scenario, but Ashley
+       tries to liquidate herself. This is prohibited by rule.
+
+       Note: we may need to adjust this in some way to test it after making changes
+             above since if Ashley has negative liquidity to be liquidated, then clearly
+             she can't have positive liquidity to also *liquidate*. It may end up impossible
+             to clearly test this.
+    `,
+    before: supplyUSDC_BorrowCOMP_ChangePrice,
+    scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
+      await expect(ashley.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/SelfTransfer/);
+
+      expect(await ashley.chainBalance(usdc)).toBeCloseTo(600);
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
+    }
+  },
+  {
+    name: "Fails when liquidator liquidates in-kind",
+    notes:
+      `A simple replay of the collateral-for-collateral liquidation scenario, but Bert
+       tries to liquidate COMP for COMP. This is prohibited by rule.
+    `,
+    before: supplyUSDC_BorrowCOMP_ChangePrice,
+    scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
+      await bert.lock(4000, bat);
+      expect(await bert.chainBalance(comp)).toEqual(0);
+
+      await expect(bert.liquidate(0.5, comp, comp, ashley)).rejects.toThrow(/InKindLiquidation/);
+
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1); // -1 Borrowed
+      expect(await bert.chainBalance(comp)).toBeCloseTo(0); // -0.5 COMP Debt Assumed in Liquidation
+    }
+  },
+  {
+    name: "Fails when liquidator liquidates below min trx value",
+    notes:
+      `A simple replay of the collateral-for-collateral liquidation scenario, but Bert
+       tries to liquidate a very small amount of COMP that's below the min transaction threshold.
+    `,
+    before: supplyUSDC_BorrowCOMP_ChangePrice,
+    scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
+      await bert.lock(4000, bat);
+      expect(await bert.chainBalance(comp)).toEqual(0);
+
+      await expect(bert.liquidate(0.0005, comp, usdc, ashley)).rejects.toThrow(/MinTxValueNotMet/);
+
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
+      expect(await ashley.chainBalance(usdc)).toBeCloseTo(600);
+      expect(await bert.chainBalance(comp)).toBeCloseTo(0);
+      expect(await bert.chainBalance(usdc)).toBeCloseTo(0);
+    }
+  },
+  {
+    name: "Fails when seized asset is unpriced",
+    notes:
+      `A simple replay of the collateral-for-collateral liquidation scenario, but we
+      seize an asset that Ashley has supplied but is unpriced.`,
+    before: supplyUSDC_BorrowCOMP_ChangePrice,
+    scenario: async ({ ashley, bert, bat, usdc, cash, comp, zrx, log }) => {
+      await ashley.lock(1, zrx);
+      await bert.lock(4000, bat);
+      expect(await bert.chainBalance(comp)).toEqual(0);
+
+      await expect(bert.liquidate(0.5, comp, zrx, ashley)).rejects.toThrow(/DivisionByZero/);
+
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
+      expect(await ashley.chainBalance(zrx)).toBeCloseTo(1);
+      expect(await bert.chainBalance(comp)).toBeCloseTo(0);
+      expect(await bert.chainBalance(zrx)).toBeCloseTo(0);
+    }
   }
-  // Tries to liquidate too much collateral
-  // Tries to self-liquidate
-  // Tries to liquidate in-kind
-  // Tries to liquidate less than min tx value
 ]);
