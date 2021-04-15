@@ -23,6 +23,7 @@ use crate::{
     PendingChainBlocks, PendingChainReorgs,
 };
 
+/// Incrementally perform the next step of tracking events from all the underlying chains.
 pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     const OCW_TRACK_CHAIN_EVENTS: &[u8; 24] = b"cash::track_chain_events";
     let mut lock = StorageLock::<Time>::new(OCW_TRACK_CHAIN_EVENTS);
@@ -37,20 +38,22 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     result
 }
 
+/// Perform the next step of tracking events from an underlying chain.
 pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
     let me = sp_core::crypto::AccountId32::new([0u8; 32]); // XXX self worker identity
-    let last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
-    let truth = fetch_chain_block(chain_id, last.number())?;
-    if last.hash() == truth.hash() {
+    let last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
+    let true_block = fetch_chain_block(chain_id, last_block.number())?;
+    if last_block.hash() == true_block.hash() {
         // worker sees same fork as chain
+        let pending_blocks = PendingChainBlocks::get(chain_id);
+        let event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
         let slack = calculate_queue_slack::<T>(chain_id);
-        let pending = PendingChainBlocks::get(chain_id);
-        let blocks = fetch_chain_blocks(chain_id, last.number(), slack)?;
-        let filtered = filter_chain_blocks(chain_id, pending, blocks);
+        let blocks = fetch_chain_blocks(chain_id, last_block.number(), slack)?;
+        let filtered = filter_chain_blocks(chain_id, pending_blocks, blocks);
         submit_chain_blocks::<T>(chain_id, filtered)
     } else {
         // worker sees a different fork
-        let reorg = formulate_reorg(chain_id, last, truth)?;
+        let reorg = formulate_reorg(chain_id, last_block, true_block)?;
         if !already_voted_for_reorg::<T>(chain_id, me, &reorg) {
             submit_chain_reorg::<T>(chain_id, &reorg)
         } else {
@@ -61,23 +64,28 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     }
 }
 
-fn calculate_queue_slack<T: Config>(chain_id: ChainId) -> u32 {
+/// Determine the number of blocks which can still fit on the ingression queue.
+pub fn calculate_queue_slack<T: Config>(chain_id: ChainId) -> u32 { // XXX return usize?
     0 // XXX look at ingression queue, how backed up?
 }
 
 // XXX and move to src/events?
-fn risk_adjusted_value(chain_event: &crate::events::ChainLogEvent, block_number: ChainBlockNumber) -> crate::types::USDQuantity { // XXX
+pub fn risk_adjusted_value(chain_event: &crate::events::ChainLogEvent, block_number: ChainBlockNumber) -> crate::types::USDQuantity { // XXX
     // XXX
     //  if Lock or LockCash -> Lock amount value risk decayed by blocks elapsed since block number
     //  Gov -> max/set value probably also decayed since block number
     //  otherwise -> 0, trx requests, what else?
+    // XXX actually abstract out (type, amount) from each and do universally?
+    // match chain_event {
+
+    // }
     crate::types::Quantity::from_nominal("1000", crate::types::USD) // XXX
 }
 
-// Ingress a single round (quota per underlying chain block ingested).
-fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, event_queue: &mut ChainEvents) {
+/// Ingress a single round (quota per underlying chain block ingested).
+pub fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, event_queue: &mut ChainEvents) {
     use crate::types::{Quantity, USD, USDQuantity};
-    const QUOTA: USDQuantity = Quantity::from_nominal("10000", USD); // XXX per chain?
+    const QUOTA: USDQuantity = Quantity::from_nominal("10000", USD); // XXX value? per chain?
     let available = QUOTA;
     for event in event_queue.clone() { // XXX no clone
         if risk_adjusted_value(&event, last_block.number()) < available {
@@ -95,7 +103,12 @@ fn ingress_queue<T: Config>(chain_id: ChainId, last_block: &ChainBlock, event_qu
     }
 }
 
-fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) -> Result<(), Reason> {
+// XXX whatever we submit we must store first so we can formulate reorgs
+//  worry about pruning history independently / later
+//  but for both blocks added in chain_blocks or reorgs
+
+/// Submit the underlying chain blocks the worker calculates are needed by the chain next.
+pub fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) -> Result<(), Reason> {
     log!("Submitting chain blocks extrinsic: {:?}", blocks);
 
     // XXX why are we signing with eth?
@@ -117,8 +130,8 @@ fn submit_chain_blocks<T: Config>(chain_id: ChainId, blocks: ChainBlocks) -> Res
 // XXX move to src/events?
 fn formulate_reorg(
     chain_id: ChainId,
-    last: ChainBlock,
-    truth: ChainBlock,
+    last_block: ChainBlock,
+    true_block: ChainBlock,
 ) -> Result<ChainReorg, Reason> {
     // XXX try to form a path from last to truth
     let mut reverse_blocks: Vec<ChainBlock> = vec![]; // XXX convert to raw_block for type
@@ -126,7 +139,7 @@ fn formulate_reorg(
     let mut reverse_hashes: BTreeSet<ChainHash>; // XXX init empty?
     loop {
         // XXX just always N == K?
-        // let reverse_blocks_next = storage.walk_backwards(last.hash(), N)?;
+        // let reverse_blocks_next = storage.walk_backwards(last_block.hash(), N)?;
         // let drawrof_blocks_next = storage.walk_backwards(truth.hash(), K)?
         // reverse_blocks.extend_from_slice(reverse_blocks_next)
         // reverse_hashes.extend index with reverse_blocks_next
@@ -140,7 +153,7 @@ fn formulate_reorg(
         //    }
     }
 
-    match (last.hash(), truth.hash()) {
+    match (last_block.hash(), true_block.hash()) {
         (ChainHash::Eth(from_hash), ChainHash::Eth(to_hash)) => Ok(ChainReorg::Eth {
             from_hash,
             to_hash,
@@ -160,7 +173,7 @@ fn already_voted_for_reorg<T: Config>(chain_id: ChainId, id: ValidatorIdentity, 
 
 fn submit_chain_reorg<T: Config>(chain_id: ChainId, reorg: &ChainReorg) -> Result<(), Reason> {
     log!("Submitting chain reorg extrinsic: {:?}", reorg);
-
+    // XXX
     Ok(())
 }
 
@@ -170,57 +183,57 @@ pub fn receive_chain_blocks<T: Config>(
 ) -> Result<(), Reason> {
     let validator = recover_validator::<T>(&blocks.encode(), signature)?;
     let chain_id = blocks.chain_id();
+    let mut last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
+    let mut pending_blocks = PendingChainBlocks::get(chain_id);
     let mut event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
-    let mut last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
-    let mut pending = PendingChainBlocks::get(chain_id);
     for block in blocks {
-        if block.number() >= last.number() + 1 {
-            let offset = (block.number() - last.number() - 1) as usize;
-            if let Some(prior) = pending.get(offset) {
+        if block.number() >= last_block.number() + 1 {
+            let offset = (block.number() - last_block.number() - 1) as usize;
+            if let Some(prior) = pending_blocks.get(offset) {
                 if block != prior.block {
                     // XXX actually, vote against?
                     continue;
                 }
                 // XXX best way to store these?
-                pending[offset] = prior.clone().with_signer(validator.substrate_id.clone());
+                pending_blocks[offset] = prior.clone().with_signer(validator.substrate_id.clone());
             // XXX
             } else if offset == 0 {
-                if block.parent_hash() != last.hash() {
+                if block.parent_hash() != last_block.hash() {
                     // worker should reorg if it wants to build something else
                     //  but could just be a laggard message
                     continue;
                 }
-                pending[offset] =
+                pending_blocks[offset] =
                     ChainBlockTally::new(chain_id, block, validator.substrate_id.clone());
-            } else if let Some(parent) = pending.get(offset - 1) {
+            } else if let Some(parent) = pending_blocks.get(offset - 1) {
                 if block.parent_hash() != parent.block.hash() {
                     // worker is submitting block for parent that doesnt exist
                     //  if its also submitting the parent, which it should be,
                     //   that one will vote against and propagate forwards
                     continue;
                 }
-                pending[offset] =
+                pending_blocks[offset] =
                     ChainBlockTally::new(chain_id, block, validator.substrate_id.clone());
             }
         }
     }
 
-    for tally in pending.clone().iter() {
+    for tally in pending_blocks.clone().iter() {
         if tally.clone().passes_threshold() {
             //XXX
             // XXX 'forward block'?
             event_queue.push(&tally.block);
-            last = tally.block.clone(); // XXX
-            pending.remove(0); // XXX assert 0 == tally?
-            ingress_queue::<T>(chain_id, &last, &mut event_queue);
+            last_block = tally.block.clone(); // XXX
+            pending_blocks.remove(0); // XXX assert 0 == tally?
+            ingress_queue::<T>(chain_id, &last_block, &mut event_queue);
         } else {
             break;
         }
     }
 
+    LastProcessedBlock::insert(chain_id, last_block);
+    PendingChainBlocks::insert(chain_id, pending_blocks);
     IngressionQueue::insert(chain_id, event_queue);
-    LastProcessedBlock::insert(chain_id, last);
-    PendingChainBlocks::insert(chain_id, pending);
 
     Ok(())
 }
@@ -232,14 +245,14 @@ pub fn receive_chain_reorg<T: Config>(
     let validator = recover_validator::<T>(&reorg.encode(), signature)?;
     let chain_id = reorg.chain_id();
     let mut event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
-    let mut last = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
-    let mut pending = PendingChainReorgs::get(chain_id);
+    let mut last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
+    let mut pending_blocks = PendingChainReorgs::get(chain_id);
 
     // Note: Can reject / stop propagating once this check fails
-    require!(reorg.from_hash() == last.hash(), Reason::HashMismatch);
+    require!(reorg.from_hash() == last_block.hash(), Reason::HashMismatch);
 
     // XXX how to mutate pending?
-    let tally = if let Some(prior) = pending.iter().find(|&r| r.reorg == reorg) {
+    let tally = if let Some(prior) = pending_blocks.iter().find(|&r| r.reorg == reorg) {
         // XXXX some sort of mutate in place
         //  stops including after threshold is passed?
         //   rather just check passes threshold twice (if passed_threshold and tally.passes_threshold()...)
@@ -258,12 +271,12 @@ pub fn receive_chain_reorg<T: Config>(
         //   push/ingress ev queue, update last block/pending
         //  pass last block for them to modify
         //   returns last block
-        IngressionQueue::insert(chain_id, event_queue);
-        LastProcessedBlock::insert(chain_id, last);
+        LastProcessedBlock::insert(chain_id, last_block);
         PendingChainBlocks::insert(chain_id, Vec::<ChainBlockTally>::new());
         PendingChainReorgs::insert(chain_id, Vec::<ChainReorgTally>::new());
+        IngressionQueue::insert(chain_id, event_queue);
     } else {
-        PendingChainReorgs::insert(chain_id, pending);
+        PendingChainReorgs::insert(chain_id, pending_blocks);
     }
 
     Ok(())

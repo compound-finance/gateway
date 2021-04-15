@@ -1,15 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-pub mod events;
-pub mod hex;
-
-pub use crate::events::EthereumEvent;
-use crate::{
-    events::decode_event,
-    hex::{parse_u64, parse_word},
-};
-
 use codec::{Decode, Encode};
 use frame_support::debug;
 use serde::Deserialize;
@@ -18,8 +9,26 @@ use sp_runtime::offchain::{http, Duration};
 use our_std::RuntimeDebug;
 use types_derive::Types;
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub mod events;
+pub mod hex;
+
+pub use crate::events::EthereumEvent;
+pub use crate::hex::{parse_u64, parse_word};
+
+pub type EthereumBlockNumber = u64;
+pub type EthereumHash = [u8; 32];
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+pub struct EthereumBlock {
+    pub hash: EthereumHash,
+    pub parent_hash: EthereumHash,
+    pub number: EthereumBlockNumber,
+    pub events: Vec<EthereumEvent>,
+}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EthereumClientError {
+    DecodeError,
     HttpIoError,
     HttpTimeout,
     HttpErrorCode(u16),
@@ -34,9 +43,32 @@ pub struct ResponseError {
 }
 
 #[derive(Deserialize, RuntimeDebug, PartialEq)]
-pub struct EventsResponse<T> {
+#[serde(rename_all = "camelCase")]
+pub struct LogObject {
+    /// true when the log was removed, due to a chain reorganization. false if it's a valid log.
+    pub removed: Option<bool>,
+    /// integer of the log index position in the block. null when its pending log.
+    pub log_index: Option<String>,
+    /// integer of the transactions index position log was created from. null when its pending log.
+    pub transaction_index: Option<String>,
+    /// 32 Bytes - hash of the transactions this log was created from. null when its pending log.
+    pub transaction_hash: Option<String>,
+    /// 32 Bytes - hash of the block where this log was in. null when its pending. null when its pending log.
+    pub block_hash: Option<String>,
+    /// the block number where this log was in. null when its pending. null when its pending log.
+    pub block_number: Option<String>,
+    /// 20 Bytes - address from which this log originated.
+    pub address: Option<String>,
+    /// contains one or more 32 Bytes non-indexed arguments of the log.
+    pub data: Option<String>,
+    /// Array of 0 to 4 32 Bytes of indexed log arguments. (In solidity: The first topic is the hash of the signature of the event (e.g. Deposit(address,bytes32,uint256)), except you declared the event with the anonymous specifier.)
+    pub topics: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, RuntimeDebug, PartialEq)]
+pub struct GetLogsResponse {
     pub id: Option<u64>,
-    pub result: Option<Vec<T>>,
+    pub result: Option<Vec<LogObject>>,
     pub error: Option<ResponseError>,
 }
 
@@ -99,57 +131,32 @@ pub struct BlockNumberResponse {
     pub error: Option<ResponseError>,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct LogObject {
-    /// true when the log was removed, due to a chain reorganization. false if it's a valid log.
-    pub removed: Option<bool>,
-    /// integer of the log index position in the block. null when its pending log.
-    pub log_index: Option<String>,
-    /// integer of the transactions index position log was created from. null when its pending log.
-    pub transaction_index: Option<String>,
-    /// 32 Bytes - hash of the transactions this log was created from. null when its pending log.
-    pub transaction_hash: Option<String>,
-    /// 32 Bytes - hash of the block where this log was in. null when its pending. null when its pending log.
-    pub block_hash: Option<String>,
-    /// the block number where this log was in. null when its pending. null when its pending log.
-    pub block_number: Option<String>,
-    /// 20 Bytes - address from which this log originated.
-    pub address: Option<String>,
-    /// contains one or more 32 Bytes non-indexed arguments of the log.
-    pub data: Option<String>,
-    /// Array of 0 to 4 32 Bytes of indexed log arguments. (In solidity: The first topic is the hash of the signature of the event (e.g. Deposit(address,bytes32,uint256)), except you declared the event with the anonymous specifier.)
-    pub topics: Option<Vec<String>>,
-}
-
 fn deserialize_get_logs_response(
     response: &str,
-) -> serde_json::error::Result<EventsResponse<LogObject>> {
-    serde_json::from_str(response)
+) -> Result<GetLogsResponse, EthereumClientError> {
+    let result: serde_json::error::Result<GetLogsResponse> = serde_json::from_str(response);
+    Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
 }
 
 fn deserialize_get_block_by_number_response(
     response: &str,
-) -> serde_json::error::Result<BlockResponse> {
-    serde_json::from_str(response)
+) -> Result<BlockResponse, EthereumClientError> {
+    let result: serde_json::error::Result<BlockResponse> = serde_json::from_str(response);
+    Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
 }
 
 fn deserialize_block_number_response(
     response: &str,
-) -> serde_json::error::Result<BlockNumberResponse> {
-    serde_json::from_str(response)
+) -> Result<BlockNumberResponse, EthereumClientError> {
+    let result: serde_json::error::Result<BlockNumberResponse> = serde_json::from_str(response);
+    Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
-pub struct EthereumLogEvent {
-    pub block_hash: [u8; 32],
-    pub block_number: u64,
-    pub transaction_index: u64,
-    pub log_index: u64,
-    pub event: EthereumEvent,
+pub fn encode_block_hex(block_number: EthereumBlockNumber) -> String {
+    format!("{:#X}", block_number)
 }
 
-fn send_rpc(
+pub fn send_rpc(
     server: &str,
     method: serde_json::Value,
     params: Vec<serde_json::Value>,
@@ -193,90 +200,62 @@ fn send_rpc(
     Ok(String::from(body_str))
 }
 
-pub fn fetch_and_decode_logs(
+pub fn get_block(
     server: &str,
-    params: Vec<serde_json::Value>,
-) -> Result<Vec<EthereumLogEvent>, EthereumClientError> {
-    let body_str: String = send_rpc(server, "eth_getLogs".into(), params)?;
-    let deserialized_body = deserialize_get_logs_response(&body_str)
-        .map_err(|_| EthereumClientError::JsonParseError)?;
-    let eth_logs = deserialized_body
-        .result
-        .ok_or(EthereumClientError::JsonParseError)?;
+    eth_starport_address: &str,
+    block_num: EthereumBlockNumber,
+) -> Result<EthereumBlock, EthereumClientError> {
+    let block_str = encode_block_hex(block_num);
+    let block_object = get_block_object(server, &block_str)?;
+    let get_logs_params = vec![serde_json::json!({
+        "address": eth_starport_address,
+        "fromBlock": &block_str,
+        "toBlock": &block_str,
+    })];
+    let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
+    let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
+    let event_objects = get_logs_response.result.ok_or(EthereumClientError::JsonParseError)?;
 
-    if eth_logs.len() > 0 {
-        debug::native::info!("Eth Starport found {} logs", eth_logs.len());
+    if event_objects.len() > 0 {
+        debug::native::info!("Found {} events @ Eth Starport {}", event_objects.len(), eth_starport_address);
     }
 
-    Ok(eth_logs
+    let events_result: Result<Vec<EthereumEvent>, EthereumClientError> =
+        event_objects
         .into_iter()
-        .filter_map(|eth_log| {
-            match (
-                parse_word(eth_log.block_hash),
-                parse_u64(eth_log.transaction_index),
-                eth_log.data,
-                eth_log.topics,
-                parse_u64(eth_log.block_number),
-                parse_u64(eth_log.log_index),
-            ) {
-                (
-                    Some(block_hash),
-                    Some(transaction_index),
-                    Some(data),
-                    Some(topics),
-                    Some(block_number),
-                    Some(log_index),
-                ) => match decode_event(topics, data) {
-                    Ok(event) => Some(EthereumLogEvent {
-                        block_hash,
-                        block_number,
-                        transaction_index,
-                        log_index,
-                        event,
-                    }),
-                    Err(err) => {
-                        println!("Failed to parse log {:?}", err);
-                        None
-                    }
-                },
-                _ => {
-                    println!("Missing critical field from eth log event");
-
-                    None
-                }
-            }
+        .map(|event| {
+            let topics = event.topics.ok_or(EthereumClientError::JsonParseError)?;
+            let data = event.data.ok_or(EthereumClientError::JsonParseError)?;
+            events::decode_event(topics, data).map_err(|_| EthereumClientError::DecodeError)
         })
-        .collect())
+        .collect();
+
+    Ok(EthereumBlock {
+        hash: parse_word(block_object.hash).ok_or(EthereumClientError::JsonParseError)?,
+        parent_hash: parse_word(block_object.parentHash).ok_or(EthereumClientError::JsonParseError)?,
+        number: parse_u64(block_object.number).ok_or(EthereumClientError::JsonParseError)?,
+        events: events_result?,
+    })
 }
 
-pub fn fetch_block_with_number(
+pub fn get_block_object(
     server: &str,
     block_num: &str,
 ) -> Result<BlockObject, EthereumClientError> {
-    let body_str: String = send_rpc(
-        server,
-        "eth_getBlockByNumber".into(),
-        vec![block_num.into(), true.into()],
-    )?;
-    let deserialized_body = deserialize_get_block_by_number_response(&body_str)
-        .map_err(|_| EthereumClientError::JsonParseError)?;
-
-    deserialized_body
-        .result
-        .ok_or(EthereumClientError::JsonParseError)
+    let params = vec![block_num.into(), true.into()];
+    let response_str: String = send_rpc(server, "eth_getBlockByNumber".into(), params)?;
+    let response = deserialize_get_block_by_number_response(&response_str)?;
+    response.result.ok_or(EthereumClientError::JsonParseError)
 }
 
-pub fn fetch_latest_block(server: &str) -> Result<u64, EthereumClientError> {
-    let body_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
-    let deserialized_body = deserialize_block_number_response(&body_str)
-        .map_err(|_| EthereumClientError::JsonParseError)?;
-
+pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError> {
+    let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
+    let response = deserialize_block_number_response(&response_str)?;
     parse_u64(Some(
-        deserialized_body
+        response
             .result
             .ok_or(EthereumClientError::JsonParseError)?,
-    ))
-    .ok_or(EthereumClientError::JsonParseError)
+    )).ok_or(EthereumClientError::JsonParseError)
 }
 
 #[cfg(test)]
@@ -286,31 +265,7 @@ mod tests {
     use sp_core::offchain::{testing, OffchainExt};
 
     #[test]
-    fn test_fetch_latest_block() {
-        let (offchain, state) = testing::TestOffchainExt::new();
-        let mut t = sp_io::TestExternalities::default();
-        t.register_extension(OffchainExt::new(offchain));
-        {
-            let mut s = state.write();
-            s.expect_request(testing::PendingRequest {
-                method: "POST".into(),
-                uri: "https://mainnet-eth.compound.finance".into(),
-                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-                body: br#"{"id":1,"jsonrpc":"2.0","method":"eth_blockNumber","params":[]}"#
-                    .to_vec(),
-                response: Some(br#"{"jsonrpc":"2.0","id":1,"result": "0x123"}"#.to_vec()),
-                sent: true,
-                ..Default::default()
-            });
-        }
-        t.execute_with(|| {
-            let result = fetch_latest_block("https://mainnet-eth.compound.finance");
-            assert_eq!(result, Ok(291));
-        });
-    }
-
-    #[test]
-    fn test_fetch_block_with_number() {
+    fn test_get_block() {
         let (offchain, state) = testing::TestOffchainExt::new();
         let mut t = sp_io::TestExternalities::default();
         t.register_extension(OffchainExt::new(offchain));
@@ -321,14 +276,84 @@ mod tests {
                     method: "POST".into(),
                     uri: "https://mainnet-eth.compound.finance".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-                    body: br#"{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x506",true]}"#.to_vec(),
+                    body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x506",true],"id":1}"#.to_vec(),
+                    response: Some(br#"{"jsonrpc":"2.0","id":1,"result":{"difficulty":"0xb9e274f7969f5","extraData":"0x65746865726d696e652d657531","gasLimit":"0x7a121d","gasUsed":"0x781503","hash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a","logsBloom":"0x044410ea904e1020440110008000902200168801c81010301489212010002008080b0010004001b006040222c42004b001200408400500901889c908212040401020008d300010100198d10800100080027900254120000000530141030808140c299400162c0000d200204080008838240009002c020010400010101000481660200420a884b8020282204a00141ce10805004810800190180114180001b0001b1000020ac8040007000320b0480004018240891882a20080010281002c00000010102e0184210003010100438004202003080401000806204010000a42200104110100201200008081005001104002410140114a002010808c00200894c0c0","miner":"0xea674fdde714fd979de3edf0f56aa9716b898ec8","mixHash":"0xd733e12126a2155f0278c3987777eaca558a274b42d0396306dffb8fa6d21e76","nonce":"0x56a66f3802150748","number":"0x506","parentHash":"0x062e77dced431eb671a56839f96da912f68d841024665748d38cd3d6795961ea","receiptsRoot":"0x19ad317358916207491d4b64340153b924f4dda88fa8ef5dcb49090f234c00e7","sha3Uncles":"0xd21bed33f01dac18a3ee5538d1607ff2709d742eb4e13877cf66dcbed6c980f2","size":"0x5f50","stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6","timestamp":"0x5aae89b9","totalDifficulty":"0xa91291ae5c752d4885","transactions":[{"blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a","blockNumber":"0x508990","from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2","gas":"0x186a0","gasPrice":"0x153005ce00","hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c","input":"0x","nonce":"0x6740d","r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91","s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706","to":"0x1d53de4d66110689bf494a110e859f3a6d15661f","transactionIndex":"0x0","type":"0x0","v":"0x25","value":"0x453aa4214124000"}],"transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610","uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}}"#.to_vec()),
+                    sent: true,
+                    ..Default::default()
+                });
+            s.expect_request(
+                testing::PendingRequest {
+                    method: "POST".into(),
+                    uri: "https://mainnet-eth.compound.finance".into(),
+                    headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                    body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x3a275655586a049fe860be867d10cdae2ffc0f33","fromBlock":"0x506","toBlock":"0x506"}],"id":1}"#.to_vec(),
+                    response: Some(br#"{"jsonrpc":"2.0","id":1,"result":[{"address":"0xd905abba1c5ea48c0598be9f3f8ae31290b58613","blockHash":"0xc94ceed3c8c68f09b1c7be28f594cc6fb01f9cdd7b68f3bf516cab9e89486fcf","blockNumber":"0x9928cb","data":"0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000","logIndex":"0x58","removed":false,"topics":["0xc459acef3ffe957663bb49d644b20d0c790bcb41573893752a72ba6f023b9386","0x000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x000000000000000000000000d3a38d4bd07b87e4516f30ee46cfe8ec4e8b73a4","0xd3a38d4bd07b87e4516f30ee46cfe8ec4e8b73a4000000000000000000000000"],"transactionHash":"0xbae1c242aea30e9ae20cb6c37e2f2d08982e31b42bf3d7dbde6466396abb360e","transactionIndex":"0x24"}]}"#.to_vec()),
+                    sent: true,
+                    ..Default::default()
+                });
+        }
+        t.execute_with(|| {
+            let result = get_block("https://mainnet-eth.compound.finance", "0x3a275655586a049fe860be867d10cdae2ffc0f33", 1286);
+            let block = result.unwrap();
+            assert_eq!(block.hash, [97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37, 227, 236, 104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138]);
+            assert_eq!(block.parent_hash, [6, 46, 119, 220, 237, 67, 30, 182, 113, 165, 104, 57, 249, 109, 169, 18, 246, 141, 132, 16, 36, 102, 87, 72, 211, 140, 211, 214, 121, 89, 97, 234]);
+            assert_eq!(block.number, 1286);
+            assert_eq!(block.events, vec![
+                EthereumEvent::Lock {
+                    asset: [238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238],
+                    sender: [211, 163, 141, 75, 208, 123, 135, 228, 81, 111, 48, 238, 70, 207, 232, 236, 78, 139, 115, 164],
+                    chain: String::from("ETH"),
+                    recipient: [211, 163, 141, 75, 208, 123, 135, 228, 81, 111, 48, 238, 70, 207, 232, 236, 78, 139, 115, 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    amount: 500000000000000000
+                }]);
+        });
+
+    }
+
+    #[test]
+    fn test_get_latest_block_number() {
+        let (offchain, state) = testing::TestOffchainExt::new();
+        let mut t = sp_io::TestExternalities::default();
+        t.register_extension(OffchainExt::new(offchain));
+        {
+            let mut s = state.write();
+            s.expect_request(testing::PendingRequest {
+                method: "POST".into(),
+                uri: "https://mainnet-eth.compound.finance".into(),
+                headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                body: br#"{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}"#
+                    .to_vec(),
+                response: Some(br#"{"jsonrpc":"2.0","id":1,"result":"0x123"}"#.to_vec()),
+                sent: true,
+                ..Default::default()
+            });
+        }
+        t.execute_with(|| {
+            let result = get_latest_block_number("https://mainnet-eth.compound.finance");
+            assert_eq!(result, Ok(291));
+        });
+    }
+
+    #[test]
+    fn test_get_block_object() {
+        let (offchain, state) = testing::TestOffchainExt::new();
+        let mut t = sp_io::TestExternalities::default();
+        t.register_extension(OffchainExt::new(offchain));
+        {
+            let mut s = state.write();
+            s.expect_request(
+                testing::PendingRequest {
+                    method: "POST".into(),
+                    uri: "https://mainnet-eth.compound.finance".into(),
+                    headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+                    body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x506",true],"id":1}"#.to_vec(),
                     response: Some(br#"{"jsonrpc":"2.0","id":1,"result":{"difficulty":"0xb9e274f7969f5","extraData":"0x65746865726d696e652d657531","gasLimit":"0x7a121d","gasUsed":"0x781503","hash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a","logsBloom":"0x044410ea904e1020440110008000902200168801c81010301489212010002008080b0010004001b006040222c42004b001200408400500901889c908212040401020008d300010100198d10800100080027900254120000000530141030808140c299400162c0000d200204080008838240009002c020010400010101000481660200420a884b8020282204a00141ce10805004810800190180114180001b0001b1000020ac8040007000320b0480004018240891882a20080010281002c00000010102e0184210003010100438004202003080401000806204010000a42200104110100201200008081005001104002410140114a002010808c00200894c0c0","miner":"0xea674fdde714fd979de3edf0f56aa9716b898ec8","mixHash":"0xd733e12126a2155f0278c3987777eaca558a274b42d0396306dffb8fa6d21e76","nonce":"0x56a66f3802150748","number":"0x506","parentHash":"0x062e77dced431eb671a56839f96da912f68d841024665748d38cd3d6795961ea","receiptsRoot":"0x19ad317358916207491d4b64340153b924f4dda88fa8ef5dcb49090f234c00e7","sha3Uncles":"0xd21bed33f01dac18a3ee5538d1607ff2709d742eb4e13877cf66dcbed6c980f2","size":"0x5f50","stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6","timestamp":"0x5aae89b9","totalDifficulty":"0xa91291ae5c752d4885","transactions":[{"blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a","blockNumber":"0x508990","from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2","gas":"0x186a0","gasPrice":"0x153005ce00","hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c","input":"0x","nonce":"0x6740d","r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91","s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706","to":"0x1d53de4d66110689bf494a110e859f3a6d15661f","transactionIndex":"0x0","type":"0x0","v":"0x25","value":"0x453aa4214124000"}],"transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610","uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}}"#.to_vec()),
                     sent: true,
                     ..Default::default()
                 });
         }
         t.execute_with(|| {
-            let result = fetch_block_with_number("https://mainnet-eth.compound.finance", "0x506");
+            let result = get_block_object("https://mainnet-eth.compound.finance", "0x506");
             let block = result.unwrap();
             assert_eq!(block.difficulty, Some("0xb9e274f7969f5".into()));
             assert_eq!(block.number, Some("0x506".into()));
@@ -338,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_get_logs_request_happy_path() {
+    fn test_deserialize_get_logs_response() {
         const RESPONSE: &str = r#"{
       "jsonrpc": "2.0",
       "id": 1,
@@ -372,8 +397,7 @@ mod tests {
       ]
     }"#;
         let result = deserialize_get_logs_response(RESPONSE);
-
-        let expected = EventsResponse {
+        let expected = GetLogsResponse {
             id: Some(1),
             result: Some(vec![
                 LogObject {
@@ -405,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_get_logs_request_error_path() {
+    fn test_deserialize_get_logs_response_error() {
         const RESPONSE: &str = r#"{
       "jsonrpc": "2.0",
       "id": 1,
@@ -415,7 +439,7 @@ mod tests {
       }
     }"#;
         let result = deserialize_get_logs_response(RESPONSE);
-        let expected = EventsResponse {
+        let expected = GetLogsResponse {
             id: Some(1),
             result: None,
             error: Some(ResponseError {
@@ -427,10 +451,10 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_get_logs_request_totally_unexpected_input() {
+    fn test_deserialize_get_logs_response_unexpected_input() {
         const RESPONSE: &str = r#"{"USD": 2}"#;
         let result = deserialize_get_logs_response(RESPONSE);
-        let expected = EventsResponse {
+        let expected = GetLogsResponse {
             id: None,
             result: None,
             error: None,

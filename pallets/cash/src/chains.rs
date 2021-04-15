@@ -11,11 +11,10 @@ use our_std::{str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serializ
 
 use types_derive::{type_alias, Types};
 
-/// Type for representing the selection of a supported chain.
+/// Type for representing the selection of an underlying chain.
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainId {
-    Gate,
     Eth,
     Dot,
     Sol,
@@ -25,7 +24,6 @@ pub enum ChainId {
 impl ChainId {
     pub fn to_account(self, addr: &str) -> Result<ChainAccount, Reason> {
         match self {
-            ChainId::Gate => Ok(ChainAccount::Gate(Gateway::str_to_address(addr)?)),
             ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::str_to_address(addr)?)),
             ChainId::Sol => Ok(ChainAccount::Sol(Solana::str_to_address(addr)?)),
@@ -35,7 +33,6 @@ impl ChainId {
 
     pub fn to_asset(self, addr: &str) -> Result<ChainAsset, Reason> {
         match self {
-            ChainId::Gate => Ok(ChainAsset::Gate(Gateway::str_to_address(addr)?)),
             ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::str_to_address(addr)?)),
             ChainId::Sol => Ok(ChainAsset::Sol(Solana::str_to_address(addr)?)),
@@ -45,7 +42,6 @@ impl ChainId {
 
     pub fn signer_address(self) -> Result<ChainAccount, Reason> {
         match self {
-            ChainId::Gate => Ok(ChainAccount::Gate(<Gateway as Chain>::signer_address()?)),
             ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
             ChainId::Dot => Ok(ChainAccount::Dot(<Polkadot as Chain>::signer_address()?)),
             ChainId::Sol => Ok(ChainAccount::Sol(<Solana as Chain>::signer_address()?)),
@@ -55,7 +51,6 @@ impl ChainId {
 
     pub fn hash_bytes(self, data: &[u8]) -> ChainHash {
         match self {
-            ChainId::Gate => ChainHash::Gate(<Gateway as Chain>::hash_bytes(data)),
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::hash_bytes(data)),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::hash_bytes(data)),
             ChainId::Sol => ChainHash::Sol(<Solana as Chain>::hash_bytes(data)),
@@ -65,9 +60,6 @@ impl ChainId {
 
     pub fn sign(self, message: &[u8]) -> Result<ChainSignature, Reason> {
         match self {
-            ChainId::Gate => Ok(ChainSignature::Gate(<Gateway as Chain>::sign_message(
-                message,
-            )?)),
             ChainId::Eth => Ok(ChainSignature::Eth(<Ethereum as Chain>::sign_message(
                 message,
             )?)),
@@ -85,7 +77,6 @@ impl ChainId {
 
     pub fn zero_hash(self) -> ChainHash {
         match self {
-            ChainId::Gate => ChainHash::Gate(<Gateway as Chain>::zero_hash()),
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
             ChainId::Sol => ChainHash::Sol(<Solana as Chain>::zero_hash()),
@@ -104,7 +95,6 @@ impl Default for ChainId {
 /// Type for an account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccount {
-    Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
     Sol(<Solana as Chain>::Address),
@@ -148,7 +138,6 @@ impl From<ChainAccount> for String {
 /// Type for an asset tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAsset {
-    Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
     Sol(<Solana as Chain>::Address),
@@ -192,7 +181,6 @@ impl From<ChainAsset> for String {
 /// Type for a signature and account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccountSignature {
-    Gate(<Gateway as Chain>::Address, <Gateway as Chain>::Signature),
     Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature),
     Sol(<Solana as Chain>::Address, <Solana as Chain>::Signature),
@@ -202,7 +190,6 @@ pub enum ChainAccountSignature {
 impl ChainAccountSignature {
     pub fn to_chain_signature(self) -> ChainSignature {
         match self {
-            ChainAccountSignature::Gate(_, sig) => ChainSignature::Gate(sig),
             ChainAccountSignature::Eth(_, sig) => ChainSignature::Eth(sig),
             ChainAccountSignature::Dot(_, sig) => ChainSignature::Dot(sig),
             ChainAccountSignature::Sol(_, sig) => ChainSignature::Sol(sig),
@@ -231,7 +218,6 @@ pub type ChainBlockNumber = u64;
 /// Type for an hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
-    Gate(<Gateway as Chain>::Hash),
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
     Sol(<Solana as Chain>::Hash),
@@ -241,7 +227,6 @@ pub enum ChainHash {
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignature {
-    Gate(<Gateway as Chain>::Signature),
     Eth(<Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Signature),
     Sol(<Solana as Chain>::Signature),
@@ -270,7 +255,6 @@ impl ChainSignature {
 /// Type for a list of chain signatures.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignatureList {
-    Gate(Vec<(<Gateway as Chain>::Address, <Gateway as Chain>::Signature)>),
     Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
     Sol(Vec<(<Solana as Chain>::Address, <Solana as Chain>::Signature)>),
@@ -519,9 +503,6 @@ pub trait Chain {
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub struct Gateway {}
-
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Ethereum {}
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -532,78 +513,6 @@ pub struct Solana {}
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Tezos {}
-
-impl Chain for Gateway {
-    const ID: ChainId = ChainId::Gate;
-
-    #[type_alias("Gateway__Chain__")]
-    type Address = [u8; 20];
-
-    #[type_alias("Gateway__Chain__")]
-    type Amount = u128;
-
-    #[type_alias("Gateway__Chain__")]
-    type CashIndex = u128;
-
-    #[type_alias("Gateway__Chain__")]
-    type Rate = u128;
-
-    #[type_alias("Gateway__Chain__")]
-    type Timestamp = u64;
-
-    #[type_alias("Gateway__Chain__")]
-    type Hash = [u8; 32];
-
-    #[type_alias("Gateway__Chain__")]
-    type PublicKey = [u8; 64];
-
-    #[type_alias("Gateway__Chain__")]
-    type Signature = [u8; 65];
-
-    #[type_alias("Gateway__Chain__")]
-    type EventId = gate::EventId;
-
-    #[type_alias("Gateway__Chain__")]
-    type Event = gate::Event;
-
-    #[type_alias("Gateway__Chain__")]
-    type Block = gate::Block;
-
-    fn zero_hash() -> Self::Hash {
-        panic!("XXX not implemented");
-    }
-
-    fn hash_bytes(_data: &[u8]) -> Self::Hash {
-        panic!("XXX not implemented");
-    }
-
-    fn recover_user_address(
-        _data: &[u8],
-        _signature: Self::Signature,
-    ) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn signer_address() -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
-    }
-
-    fn address_string(_address: &Self::Address) -> String {
-        panic!("XXX not implemented");
-    }
-}
 
 impl Chain for Ethereum {
     const ID: ChainId = ChainId::Eth;
@@ -637,6 +546,8 @@ impl Chain for Ethereum {
 
     #[type_alias("Ethereum__Chain__")]
     type Event = eth::Event;
+
+    #[type_alias("Ethereum__Chain__")]
     type Block = eth::Block;
 
     fn zero_hash() -> Self::Hash {
@@ -731,6 +642,8 @@ impl Chain for Polkadot {
 
     #[type_alias("Polkadot__Chain__")]
     type Event = dot::Event;
+
+    #[type_alias("Polkadot__Chain__")]
     type Block = dot::Block;
 
     fn zero_hash() -> Self::Hash {
@@ -801,6 +714,8 @@ impl Chain for Solana {
 
     #[type_alias("Solana__Chain__")]
     type Event = sol::Event;
+
+    #[type_alias("Solana__Chain__")]
     type Block = sol::Block;
 
     fn zero_hash() -> Self::Hash {
@@ -871,6 +786,8 @@ impl Chain for Tezos {
 
     #[type_alias("Tezos__Chain__")]
     type Event = tez::Event;
+
+    #[type_alias("Tezos__Chain__")]
     type Block = tez::Block;
 
     fn zero_hash() -> Self::Hash {
@@ -954,15 +871,10 @@ pub mod eth {
     pub type EventId = (BlockNumber, LogIndex);
 
     #[type_alias("eth__")]
-    pub type Event = ethereum_client::EthereumLogEvent;
+    pub type Event = ethereum_client::EthereumEvent;
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-    pub struct Block {
-        pub hash: <Ethereum as Chain>::Hash,
-        pub parent_hash: <Ethereum as Chain>::Hash,
-        pub number: BlockNumber,
-        pub events: Vec<Event>,
-    }
+    #[type_alias("eth__")]
+    pub type Block = ethereum_client::EthereumBlock;
 }
 
 pub mod dot {

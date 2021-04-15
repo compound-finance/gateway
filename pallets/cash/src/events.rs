@@ -11,12 +11,6 @@ use types_derive::Types;
 
 extern crate ethereum_client;
 
-#[derive(RuntimeDebug, Types)]
-pub struct EventInfo {
-    pub latest_eth_block: u64,
-    pub events: Vec<(ChainLogId, ChainLogEvent)>,
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainLogId {
     Eth(eth::BlockNumber, eth::LogIndex),
@@ -67,17 +61,13 @@ impl Default for EventState {
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum EventError {
-    EthRpcUrlMissing,
-    EthRpcUrlInvalid,
-    StarportAddressInvalid,
+    BadRpcUrl,
+    BadStarportAddress,
     EthereumClientError(EthereumClientError),
     ErrorDecodingHex,
 }
 
-pub fn encode_block_hex(block_number: u64) -> String {
-    format!("{:#X}", block_number)
-}
-
+/// Fetch a block from the underlying chain.
 pub fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
     match chain_id {
         ChainId::Gate => Err(Reason::Unreachable),
@@ -88,16 +78,23 @@ pub fn fetch_chain_block(chain_id: ChainId, number: ChainBlockNumber) -> Result<
     }
 }
 
+
+/// Fetch more blocks from the underlying chain.
 pub fn fetch_chain_blocks(
     chain_id: ChainId,
     number: ChainBlockNumber,
-    slack: u32,
+    nblocks: u32,
 ) -> Result<ChainBlocks, Reason> {
-    // XXX fetch given slack
-    //  slack 0 -> no results
-    Ok(ChainBlocks::Eth(vec![])) // XXX eth
+    match chain_id {
+        ChainId::Gate => Err(Reason::Unreachable),
+        ChainId::Eth => fetch_eth_blocks(number, nblocks),
+        ChainId::Dot => Err(Reason::Unreachable),
+        ChainId::Sol => Err(Reason::Unreachable),
+        ChainId::Tez => Err(Reason::Unreachable),
+    }
 }
 
+/// Filter the `blocks` provided using the given `pending` queue to determine what's relevant.
 pub fn filter_chain_blocks(
     chain_id: ChainId,
     pending: Vec<ChainBlockTally>,
@@ -109,41 +106,23 @@ pub fn filter_chain_blocks(
 }
 
 fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
-    // XXX
-    // XXX also whatever we fetch we store so we can formulate reorgs
-    //  worry about pruning history independently / later
-    let from_block: String = encode_block_hex(number);
-
-    match fetch_eth_blocks(from_block) {
-        Ok(event_info) => {
-            log!("Result: {:?}", event_info);
-
-            // XXXXXXX submitted elsewhere now, this *just* gets the block
-            //  do we need caching block number at all now?
-
-            // TODO: The failability here is bad, since we don't want to re-process events
-            // We need to make sure this is fully idempotent
-
-            // Send extrinsics for all events
-            // XXX submit_blocks::<T>(event_info.events)
-            Ok(ChainBlock::Eth(crate::chains::eth::Block {
-                hash: [1u8; 32],
-                parent_hash: [0u8; 32],
-                number: 1,
-                events: vec![],
-            })) // XXX
-        }
-
-        Err(err) => {
-            log!("Error while fetching events: {:?}", err);
-            Err(Reason::WorkerFetchError)
-        }
-    }
+    let config = runtime_interfaces::config_interface::get();
+    let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
+        .ok_or(EventError::NoRpcUrl)?;
+    let eth_rpc_url = String::from_utf8(eth_rpc_url).map_err(|_| EventError::BadRpcUrl)?;
+    let eth_starport_address = String::from_utf8(config.get_eth_starport_address())
+        .map_err(|_| EventError::BadStarportAddress)?;
+    let eth_chain_block = ethereum_client::get_block(&eth_rpc_url, &eth_starport_address, number)
+        .map_err(EventError::EthereumClientError)?;
+    Ok(ChainBlocks::Eth(eth_chain_block)
 }
 
 // XXX where does this belong?
 /// Fetch all latest Starport events for the offchain worker.
-fn fetch_eth_blocks(from_block: String) -> Result<EventInfo, EventError> {
+fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<EventInfo, EventError> {
+    // XXX
+    let from_block: String = encode_block_hex(number);
+
     // Get a validator config from runtime-interfaces pallet
     // Use config to get an address for interacting with Ethereum JSON RPC client
     let config = runtime_interfaces::config_interface::get();
@@ -189,7 +168,12 @@ fn fetch_eth_blocks(from_block: String) -> Result<EventInfo, EventError> {
     Ok(EventInfo {
         latest_eth_block,
         events,
-    })
+    });
+
+    // XXX fetch given slack
+    //  slack 0 -> no results
+    Ok(ChainBlocks::Eth(vec![]))
+
 }
 
 #[cfg(test)]
