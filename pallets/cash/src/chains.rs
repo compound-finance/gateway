@@ -3,11 +3,13 @@ pub use our_std::vec::Vec;
 
 use crate::rates::APR;
 use crate::reason::Reason;
-use crate::types::{AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity};
+use crate::types::{AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorKeys};
 
 use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
-use our_std::{str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serialize};
+use our_std::{
+    iter::Iterator, str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serialize,
+};
 
 use types_derive::{type_alias, Types};
 
@@ -64,13 +66,6 @@ impl ChainId {
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
         }
-    }
-}
-
-// XXX why?
-impl Default for ChainId {
-    fn default() -> Self {
-        ChainId::Eth
     }
 }
 
@@ -191,14 +186,23 @@ impl ChainAccountSignature {
 pub type ChainBlockNumber = u64;
 
 /// Type for an hash tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
 }
 
+impl our_std::fmt::Display for ChainHash {
+    fn fmt(&self, f: &mut our_std::fmt::Formatter<'_>) -> our_std::fmt::Result {
+        match self {
+            ChainHash::Eth(eth_hash) => write!(f, "ETH#{:X?}", eth_hash),
+            ChainHash::Dot(dot_hash) => write!(f, "DOT#{:X?}", dot_hash),
+        }
+    }
+}
+
 /// Type for a signature tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignature {
     Eth(<Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Signature),
@@ -206,7 +210,7 @@ pub enum ChainSignature {
 
 impl ChainSignature {
     pub fn chain_id(&self) -> ChainId {
-        match *self {
+        match self {
             ChainSignature::Eth(_) => ChainId::Eth,
             ChainSignature::Dot(_) => ChainId::Dot,
         }
@@ -273,6 +277,15 @@ impl ChainBlock {
             ChainBlock::Eth(block) => block.number,
         }
     }
+
+    pub fn events(&self) -> impl Iterator<Item = ChainBlockEvent> + '_ {
+        match self {
+            ChainBlock::Eth(block) => block
+                .events
+                .iter()
+                .map(move |e| ChainBlockEvent::Eth(block.number, e.clone())),
+        }
+    }
 }
 
 /// Type for describing a set of blocks coming from an underlying chain.
@@ -283,8 +296,20 @@ pub enum ChainBlocks {
 
 impl ChainBlocks {
     pub fn chain_id(&self) -> ChainId {
-        match *self {
+        match self {
             ChainBlocks::Eth(_) => ChainId::Eth,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            ChainBlocks::Eth(blocks) => blocks.len(),
+        }
+    }
+
+    pub fn blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+        match self {
+            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| ChainBlock::Eth(b.clone())),
         }
     }
 }
@@ -293,23 +318,6 @@ impl From<ChainBlock> for ChainBlocks {
     fn from(block: ChainBlock) -> Self {
         match block {
             ChainBlock::Eth(block) => ChainBlocks::Eth(vec![block]),
-        }
-    }
-}
-
-// XXX
-impl IntoIterator for ChainBlocks {
-    type Item = ChainBlock;
-    type IntoIter = vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
-            ChainBlocks::Eth(blocks) => blocks
-                .into_iter()
-                .map(|b| ChainBlock::Eth(b))
-                .collect::<Vec<ChainBlock>>()
-                .into_iter(),
         }
     }
 }
@@ -327,62 +335,76 @@ pub enum ChainReorg {
 
 impl ChainReorg {
     pub fn chain_id(&self) -> ChainId {
-        match *self {
+        match self {
             ChainReorg::Eth { .. } => ChainId::Eth,
         }
     }
 
     pub fn from_hash(&self) -> ChainHash {
-        match *self {
-            ChainReorg::Eth { from_hash, .. } => ChainHash::Eth(from_hash),
+        match self {
+            ChainReorg::Eth { from_hash, .. } => ChainHash::Eth(*from_hash),
+        }
+    }
+
+    pub fn reverse_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+        match self {
+            ChainReorg::Eth { reverse_blocks, .. } => {
+                reverse_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
+            }
+        }
+    }
+
+    pub fn forward_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+        match self {
+            ChainReorg::Eth { forward_blocks, .. } => {
+                forward_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
+            }
         }
     }
 }
 
-// XXX old code
-// pub fn passes_validation_threshold(
-//     signers: &BTreeSet<ValidatorIdentity>,
-//     validators: &BTreeSet<ValidatorIdentity>,
-// ) -> bool {
-//     // Intersection is taken for the situation when some of the signers are not currently active validators
-//     let valid_signers: Vec<_> = validators.intersection(&signers).collect();
-//     // Using ceil(2 * validators.len() / 3)
-//     valid_signers.len() >= (2 * validators.len() + 3 - 1) / 3
-// }
+/// Calculate whether the signers have a super majority of the given validator set.
+pub fn has_super_majority(signers: &SignersSet, validator_set: &SignersSet) -> bool {
+    // using ⌈j/m⌉ = ⌊(j+m-1)/m⌋
+    let valid_signers: Vec<_> = validator_set.intersection(&signers).collect();
+    valid_signers.len() >= (2 * validator_set.len() + 3 - 1) / 3
+}
 
 /// Type for tallying signatures for an underlying chain block.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct ChainBlockTally {
     pub block: ChainBlock,
-    pub for_votes: SignersSet,
-    pub against_votes: SignersSet,
+    pub support: SignersSet,
+    pub dissent: SignersSet,
 }
 
 impl ChainBlockTally {
-    pub fn new(
-        chain_id: ChainId,
-        block: ChainBlock,
-        validator: ValidatorIdentity,
-    ) -> ChainBlockTally {
+    pub fn new(chain_id: ChainId, block: ChainBlock, validator: &ValidatorKeys) -> ChainBlockTally {
         match chain_id {
             ChainId::Eth => ChainBlockTally {
                 block,
-                for_votes: [validator].iter().cloned().collect(),
-                against_votes: SignersSet::new(),
+                support: [validator.substrate_id.clone()].iter().cloned().collect(),
+                dissent: SignersSet::new(),
             },
 
             _ => panic!("xxx not implemented"),
         }
     }
 
-    pub fn passes_threshold(self) -> bool {
-        false // XXX also need to check internally? use this or different?
+    pub fn add_support(&mut self, validator: &ValidatorKeys) {
+        self.support.insert(validator.substrate_id.clone());
     }
 
-    // XXX delete?
-    // XXX for or against?
-    pub fn with_signer(self, signature: ValidatorIdentity) -> Self {
-        self
+    pub fn add_dissent(&mut self, validator: &ValidatorKeys) {
+        self.dissent.insert(validator.substrate_id.clone());
+    }
+
+    pub fn has_enough_support(&self, validator_set: &SignersSet) -> bool {
+        has_super_majority(&self.support, validator_set)
+    }
+
+    pub fn has_enough_dissent(&self, validator_set: &SignersSet) -> bool {
+        has_super_majority(&self.dissent, validator_set)
     }
 }
 
@@ -390,44 +412,45 @@ impl ChainBlockTally {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct ChainReorgTally {
     pub reorg: ChainReorg,
-    pub votes: SignersSet,
+    pub support: SignersSet,
 }
 
 impl ChainReorgTally {
-    pub fn new(
-        chain_id: ChainId,
-        reorg: ChainReorg,
-        validator: ValidatorIdentity,
-    ) -> ChainReorgTally {
+    pub fn new(chain_id: ChainId, reorg: ChainReorg, validator: &ValidatorKeys) -> ChainReorgTally {
         match chain_id {
             ChainId::Eth => ChainReorgTally {
                 reorg,
-                votes: [validator].iter().cloned().collect(),
+                support: [validator.substrate_id.clone()].iter().cloned().collect(),
             },
 
             _ => panic!("xxx not implemented"),
         }
     }
 
-    pub fn passes_threshold(self) -> bool {
-        false // XXX also need to check internally? use this or different?
+    pub fn add_support(&mut self, validator: &ValidatorKeys) {
+        self.support.insert(validator.substrate_id.clone());
     }
 
-    // XXX takes identity...
-    pub fn with_signer(self, signer: ValidatorIdentity) -> Self {
-        self
+    pub fn has_enough_support(&self, validator_set: &SignersSet) -> bool {
+        has_super_majority(&self.support, validator_set)
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
-pub enum ChainEvent {
-    Eth(<Ethereum as Chain>::Event),
+pub enum ChainBlockEvent {
+    Eth(ChainBlockNumber, <Ethereum as Chain>::Event),
 }
 
-impl ChainEvent {
+impl ChainBlockEvent {
     pub fn chain_id(&self) -> ChainId {
         match self {
-            ChainEvent::Eth(_) => ChainId::Eth,
+            ChainBlockEvent::Eth(..) => ChainId::Eth,
+        }
+    }
+
+    pub fn block_number(&self) -> ChainBlockNumber {
+        match self {
+            ChainBlockEvent::Eth(block_num, _) => *block_num,
         }
     }
 
@@ -438,50 +461,55 @@ impl ChainEvent {
 
 /// Type for describing a set of events coming from an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum ChainEvents {
-    Eth(Vec<<Ethereum as Chain>::Event>),
+pub enum ChainBlockEvents {
+    Eth(Vec<(ChainBlockNumber, <Ethereum as Chain>::Event)>),
 }
 
-impl ChainEvents {
+impl ChainBlockEvents {
+    /// Push the events from block onto this queue of events.
     pub fn push(&mut self, block: &ChainBlock) {
-        // XXX add block to queue in place
         match self {
-            ChainEvents::Eth(eth_events) => match block {
-                ChainBlock::Eth(eth_block) => eth_events.extend_from_slice(&eth_block.events),
+            ChainBlockEvents::Eth(eth_block_events) => match block {
+                ChainBlock::Eth(eth_block) => {
+                    for event in eth_block.events.iter() {
+                        eth_block_events.push((eth_block.number, event.clone()));
+                    }
+                }
             },
         }
     }
-}
 
-// XXX still?
-impl IntoIterator for ChainEvents {
-    type Item = ChainEvent;
-    type IntoIter = vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
+    /// Sift through these events, retaining only the ones which pass the given predicate.
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&ChainBlockEvent) -> bool,
+    {
         match self {
-            // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
-            ChainEvents::Eth(events) => events
-                .into_iter()
-                .map(|e| ChainEvent::Eth(e))
-                .collect::<Vec<ChainEvent>>()
-                .into_iter(),
+            ChainBlockEvents::Eth(eth_block_events) => {
+                eth_block_events.retain(|(b, e)| f(&ChainBlockEvent::Eth(*b, e.clone())));
+            }
         }
     }
-}
 
-impl IntoIterator for &mut ChainEvents {
-    type Item = ChainEvent;
-    type IntoIter = vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
+    /// Find the index of the given event on this queue, or none.
+    pub fn position(&self, event: &ChainBlockEvent) -> Option<usize> {
         match self {
-            // XXX can we avoid collect without knowing inner type of (map function for iter::Map)?
-            ChainEvents::Eth(events) => events
-                .into_iter()
-                .map(|e| ChainEvent::Eth(e.clone())) // XXX avoid clone()?
-                .collect::<Vec<ChainEvent>>()
-                .into_iter(),
+            ChainBlockEvents::Eth(eth_block_events) => match event {
+                ChainBlockEvent::Eth(block_num, eth_block) => eth_block_events
+                    .iter()
+                    .position(|(b, e)| *b == *block_num && *e == *eth_block),
+
+                _ => None,
+            },
+        }
+    }
+
+    /// Remove the event at the given position.
+    pub fn remove(&mut self, pos: usize) {
+        match self {
+            ChainBlockEvents::Eth(eth_block_events) => {
+                eth_block_events.remove(pos);
+            }
         }
     }
 }
@@ -684,14 +712,42 @@ impl Chain for Polkadot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ethereum_client::{EthereumBlock, EthereumEvent};
 
     #[test]
     fn test_chain_events_push() {
-        // XXX
-        // let mut a = ChainEvents::Eth(vec![]);
-        // a.push(ChainEvent::Eth {
-
-        // });
-        // assert_eq!(a, vec![]);
+        let mut a = ChainBlockEvents::Eth(vec![]);
+        a.push(&ChainBlock::Eth(EthereumBlock {
+            hash: [2u8; 32],
+            parent_hash: [1u8; 32],
+            number: 2,
+            events: vec![],
+        }));
+        assert_eq!(a, ChainBlockEvents::Eth(vec![]));
+        a.push(&ChainBlock::Eth(EthereumBlock {
+            hash: [2u8; 32],
+            parent_hash: [1u8; 32],
+            number: 2,
+            events: vec![EthereumEvent::Lock {
+                asset: [4u8; 20],
+                sender: [5u8; 20],
+                chain: String::from("ETH"),
+                recipient: [6u8; 32],
+                amount: 100,
+            }],
+        }));
+        assert_eq!(
+            a,
+            ChainBlockEvents::Eth(vec![(
+                2,
+                EthereumEvent::Lock {
+                    asset: [4u8; 20],
+                    sender: [5u8; 20],
+                    chain: String::from("ETH"),
+                    recipient: [6u8; 32],
+                    amount: 100,
+                }
+            )])
+        );
     }
 }

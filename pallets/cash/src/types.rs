@@ -13,7 +13,7 @@ use pallet_oracle::{ticker::Ticker, types::Price};
 use types_derive::{type_alias, Types};
 
 pub use crate::{
-    chains::{Chain, ChainAsset, ChainId, Ethereum},
+    chains::{Chain, ChainAsset, ChainBlockNumber, ChainId, Ethereum},
     factor::{BigInt, BigUint, Factor},
     notices::{Notice, NoticeId},
     rates::{InterestRateModel, APR},
@@ -216,6 +216,19 @@ impl Quantity {
         ))
     }
 
+    // Quantity<U> - Quantity<U> -> Quantity<U>
+    pub fn sub(self, rhs: Quantity) -> Result<Quantity, MathError> {
+        if self.units != rhs.units {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Quantity::new(
+            self.value
+                .checked_sub(rhs.value)
+                .ok_or(MathError::Underflow)?,
+            self.units,
+        ))
+    }
+
     // Quantity<U.T> * Price<T> -> Quantity<{ USD }>
     pub fn mul_price(self, rhs: Price) -> Result<Quantity, MathError> {
         if self.units.ticker != rhs.ticker {
@@ -270,6 +283,14 @@ impl Quantity {
                 .to_uint()?,
             self.units,
         ))
+    }
+
+    pub fn decay(self, nblocks: ChainBlockNumber) -> Result<Quantity, MathError> {
+        // XXX TODO decide on what decay fn?
+        //  currently V / 2^T
+        let nbits = u32::try_from(nblocks).unwrap_or(u32::MAX);
+        let value = self.value.checked_shr(nbits).unwrap_or(0);
+        Ok(Quantity::new(value, self.units))
     }
 }
 
@@ -880,6 +901,21 @@ mod tests {
     }
 
     #[test]
+    fn test_add_quantities() {
+        let a = Quantity::from_nominal("5.5", ETH);
+        let b = Quantity::from_nominal("6.5", ETH);
+        assert_eq!(a.add(b), Ok(Quantity::from_nominal("12", ETH)));
+    }
+
+    #[test]
+    fn test_sub_quantities() {
+        let a = Quantity::from_nominal("5.5", ETH);
+        let b = Quantity::from_nominal("6.5", ETH);
+        assert_eq!(b.sub(a), Ok(Quantity::from_nominal("1", ETH)));
+        assert_eq!(a.sub(b), Err(MathError::Underflow));
+    }
+
+    #[test]
     fn test_quantity_times_price() {
         let price = Price::from_nominal(ETH.ticker, "1500");
         let quantity = Quantity::from_nominal("5.5", ETH);
@@ -896,6 +932,22 @@ mod tests {
         let number_of_eth = value.div_price(price, ETH).unwrap();
         let expected_number_of_eth = Quantity::from_nominal("5.5", ETH);
         assert_eq!(number_of_eth, expected_number_of_eth);
+    }
+
+    #[test]
+    fn test_quantity_decay() {
+        let value = Quantity::from_nominal("8250", USD);
+        assert_eq!(value.decay(1), Ok(Quantity::from_nominal("4125", USD)));
+        assert_eq!(value.decay(2), Ok(Quantity::from_nominal("2062.5", USD)));
+        assert_eq!(value.decay(3), Ok(Quantity::from_nominal("1031.25", USD)));
+        assert_eq!(value.decay(4), Ok(Quantity::from_nominal("515.625", USD)));
+        assert_eq!(value.decay(5), Ok(Quantity::from_nominal("257.8125", USD)));
+        assert_eq!(value.decay(6), Ok(Quantity::from_nominal("128.90625", USD)));
+        assert_eq!(value.decay(7), Ok(Quantity::from_nominal("64.453125", USD)));
+        assert_eq!(value.decay(14), Ok(Quantity::new(503540, USD)));
+        assert_eq!(value.decay(28), Ok(Quantity::new(30, USD)));
+        assert_eq!(value.decay(35), Ok(Quantity::new(0, USD)));
+        assert_eq!(value.decay(1000000), Ok(Quantity::new(0, USD)));
     }
 
     #[test]

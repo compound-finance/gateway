@@ -1,15 +1,56 @@
 // Note: The substrate build requires these be re-exported.
-use frame_support::storage::{StorageMap, StorageValue};
+use frame_support::storage::{StorageDoubleMap, StorageMap, StorageValue};
 
 // Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::ChainAccount,
-    core::{repay_and_supply_principal, sub_principal_amounts},
+    core::{
+        self, add_amount_to_balance, add_amount_to_raw, repay_and_supply_amount,
+        repay_and_supply_principal, sub_amount_from_raw, sub_principal_amounts,
+    },
     reason::Reason,
-    types::{CashIndex, CashPrincipalAmount},
-    CashPrincipals, ChainCashPrincipals, Config, Event, GlobalCashIndex, Module,
-    TotalCashPrincipal,
+    types::{AssetInfo, AssetQuantity, CashIndex, CashPrincipalAmount},
+    AssetBalances, CashPrincipals, ChainCashPrincipals, Config, Event, GlobalCashIndex,
+    LastIndices, Module, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
+
+pub fn lock_internal<T: Config>(
+    asset: AssetInfo,
+    sender: ChainAccount,
+    holder: ChainAccount,
+    amount: AssetQuantity,
+) -> Result<(), Reason> {
+    let holder_asset = AssetBalances::get(asset.asset, holder);
+    let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
+
+    let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
+    let total_supply_new =
+        add_amount_to_raw(TotalSupplyAssets::get(asset.asset), holder_supply_amount)?;
+    let total_borrow_new = sub_amount_from_raw(
+        TotalBorrowAssets::get(asset.asset),
+        holder_repay_amount,
+        Reason::RepayTooMuch,
+    )?;
+
+    let (cash_principal_post, last_index_post) = core::effect_of_asset_interest_internal(
+        asset,
+        holder,
+        holder_asset,
+        holder_asset_new,
+        CashPrincipals::get(holder),
+    )?;
+
+    LastIndices::insert(asset.asset, holder, last_index_post);
+    CashPrincipals::insert(holder, cash_principal_post);
+    TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
+
+    core::set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
+
+    <Module<T>>::deposit_event(Event::Locked(asset.asset, sender, holder, amount.value));
+
+    Ok(())
+}
 
 pub fn lock_cash_principal_internal<T: Config>(
     sender: ChainAccount,
@@ -39,6 +80,78 @@ pub fn lock_cash_principal_internal<T: Config>(
     TotalCashPrincipal::put(total_cash_principal_new);
 
     <Module<T>>::deposit_event(Event::LockedCash(sender, holder, principal, index));
+
+    Ok(())
+}
+
+pub fn undo_lock_internal<T: Config>(
+    asset: AssetInfo,
+    sender: ChainAccount,
+    holder: ChainAccount,
+    amount: AssetQuantity,
+) -> Result<(), Reason> {
+    // XXX undo effects as best as possible...
+    // let holder_asset = AssetBalances::get(asset.asset, holder);
+    // let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
+
+    // let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
+    // let total_supply_new =
+    //     add_amount_to_raw(TotalSupplyAssets::get(asset.asset), holder_supply_amount)?;
+    // let total_borrow_new = sub_amount_from_raw(
+    //     TotalBorrowAssets::get(asset.asset),
+    //     holder_repay_amount,
+    //     Reason::RepayTooMuch,
+    // )?;
+
+    // let (cash_principal_post, last_index_post) = core::effect_of_asset_interest_internal(
+    //     asset,
+    //     holder,
+    //     holder_asset,
+    //     holder_asset_new,
+    //     CashPrincipals::get(holder),
+    // )?;
+
+    // LastIndices::insert(asset.asset, holder, last_index_post);
+    // CashPrincipals::insert(holder, cash_principal_post);
+    // TotalSupplyAssets::insert(asset.asset, total_supply_new);
+    // TotalBorrowAssets::insert(asset.asset, total_borrow_new);
+
+    // core::set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
+
+    // <Module<T>>::deposit_event(Event::UnLocked(asset.asset, sender, holder, amount.value));
+
+    Ok(())
+}
+
+pub fn undo_lock_cash_principal_internal<T: Config>(
+    sender: ChainAccount,
+    holder: ChainAccount,
+    principal: CashPrincipalAmount,
+) -> Result<(), Reason> {
+    // XXX undo effects as best as possible...
+    // let holder_cash_principal = CashPrincipals::get(holder);
+    // let (holder_repay_principal, _holder_supply_principal) =
+    //     repay_and_supply_principal(holder_cash_principal, principal);
+
+    // let chain_id = holder.chain_id();
+    // let chain_cash_principal_new = sub_principal_amounts(
+    //     ChainCashPrincipals::get(chain_id),
+    //     principal,
+    //     Reason::InsufficientChainCash,
+    // )?;
+    // let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
+    // let total_cash_principal_new = sub_principal_amounts(
+    //     TotalCashPrincipal::get(),
+    //     holder_repay_principal,
+    //     Reason::RepayTooMuch,
+    // )?;
+
+    // let index: CashIndex = GlobalCashIndex::get(); // Grab cash index just for event
+    // ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
+    // CashPrincipals::insert(holder, holder_cash_principal_new);
+    // TotalCashPrincipal::put(total_cash_principal_new);
+
+    // <Module<T>>::deposit_event(Event::UnLockedCash(sender, holder, principal, index));
 
     Ok(())
 }

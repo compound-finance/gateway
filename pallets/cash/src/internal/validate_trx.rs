@@ -58,7 +58,7 @@ pub fn validate_unsigned<T: Config>(
         }
 
         Call::receive_chain_blocks(blocks, signature) => {
-            let signer = recover_validator::<T>(&blocks.encode(), *signature)
+            let _validator = recover_validator::<T>(&blocks.encode(), *signature)
                 .map_err(|_| ValidationError::InvalidValidator)?;
             Ok(
                 ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
@@ -70,7 +70,7 @@ pub fn validate_unsigned<T: Config>(
         }
 
         Call::receive_chain_reorg(reorg, signature) => {
-            let signer = recover_validator::<T>(&reorg.encode(), *signature)
+            let _validator = recover_validator::<T>(&reorg.encode(), *signature)
                 .map_err(|_| ValidationError::InvalidValidator)?;
             Ok(
                 ValidTransaction::with_tag_prefix("Gateway::receive_chain_reorg")

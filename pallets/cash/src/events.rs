@@ -1,7 +1,5 @@
 use codec::{alloc::string::String, Decode, Encode};
 
-extern crate ethereum_client; // XXX
-
 use ethereum_client::EthereumClientError;
 use our_std::{vec::Vec, RuntimeDebug};
 use types_derive::Types;
@@ -49,17 +47,6 @@ pub fn fetch_chain_blocks(
     }
 }
 
-/// Filter the `blocks` provided using the given `pending` queue to determine what's relevant.
-pub fn filter_chain_blocks(
-    chain_id: ChainId,
-    pending: Vec<ChainBlockTally>,
-    blocks: ChainBlocks,
-) -> ChainBlocks {
-    // XXX fetch given pending queue (eliminate vote?)
-    //  what can we really eliminate since we need negative vote?
-    blocks
-}
-
 /// Fetch a single block from the Etherum Starport.
 fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
     let config = runtime_interfaces::config_interface::get();
@@ -79,8 +66,7 @@ fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks,
         0 => Ok(ChainBlocks::Eth(vec![])),
         _ => {
             // Note: can be optimized to return up to `slack` blocks, for now just one
-            // XXX
-            Ok(fetch_eth_block(number)?.into())
+            Ok(fetch_eth_block(number)?.into()) // XXX
         }
     }
 }
