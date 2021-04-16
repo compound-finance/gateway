@@ -1,8 +1,5 @@
 use frame_support::storage::{StorageMap, StorageValue};
 
-#[cfg(test)]
-use crate::core::get_asset;
-#[cfg(not(test))]
 use crate::core::{
     extract_cash_principal_internal, extract_internal, get_asset,
     liquidate_cash_collateral_internal, liquidate_cash_principal_internal, liquidate_internal,
@@ -11,19 +8,14 @@ use crate::core::{
 use crate::{
     chains::{ChainAccount, ChainAccountSignature},
     log,
+    params::TRANSFER_FEE,
     reason::Reason,
     require,
     symbol::CASH,
-    types::{CashOrChainAsset, Nonce, Quantity},
+    types::{CashIndex, CashOrChainAsset, Nonce, Quantity},
     CashPrincipals, Config, GlobalCashIndex, Nonces,
 };
-#[cfg(test)]
-use mocked_core::{
-    extract_cash_principal_internal, extract_internal, liquidate_cash_collateral_internal,
-    liquidate_cash_principal_internal, liquidate_internal, transfer_cash_principal_internal,
-    transfer_internal,
-};
-use our_std::str;
+use our_std::{convert::TryInto, str};
 
 pub fn prepend_nonce(payload: &Vec<u8>, nonce: Nonce) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
@@ -127,7 +119,11 @@ pub fn exec_trx_request<T: Config>(
             match CashOrChainAsset::from(asset) {
                 CashOrChainAsset::Cash => match max_amount {
                     trx_request::MaxAmount::Max => {
-                        let principal_amount = CashPrincipals::get(sender).amount_withdrawable()?;
+                        let index: CashIndex = GlobalCashIndex::get();
+                        let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
+                        let principal =
+                            CashPrincipals::get(sender).sub(fee_principal.try_into()?)?;
+                        let principal_amount = principal.amount_withdrawable()?;
                         transfer_cash_principal_internal::<T>(
                             sender,
                             account.into(),
@@ -235,164 +231,6 @@ pub fn exec_trx_request<T: Config>(
     Ok(())
 }
 
-#[allow(dead_code)]
-mod mocked_core {
-    pub use our_std::result::Result;
-
-    use crate::{
-        chains::{ChainAccount, ChainAsset},
-        reason::Reason,
-        types::{AssetInfo, AssetQuantity, CashPrincipalAmount},
-        Config,
-    };
-
-    static mut LATEST_CALL: &str = "";
-
-    pub fn extract_internal<T: Config>(
-        asset: AssetInfo,
-        holder: ChainAccount,
-        recipient: ChainAccount,
-        amount: AssetQuantity,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "extract_internal: {:?}, {:?}, {:?}, {:?}",
-            ChainAsset::from(asset.asset),
-            String::from(holder),
-            String::from(recipient),
-            amount.value
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn extract_cash_principal_internal<T: Config>(
-        holder: ChainAccount,
-        recipient: ChainAccount,
-        principal: CashPrincipalAmount,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "extract_cash_principal_internal: {:?}, {:?}, {:?}",
-            String::from(holder),
-            String::from(recipient),
-            principal.0
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn transfer_internal<T: Config>(
-        asset: AssetInfo,
-        sender: ChainAccount,
-        recipient: ChainAccount,
-        amount: AssetQuantity,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "transfer_internal: {:?}, {:?}, {:?}, {:?}",
-            ChainAsset::from(asset.asset),
-            String::from(sender),
-            String::from(recipient),
-            amount.value
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn transfer_cash_principal_internal<T: Config>(
-        sender: ChainAccount,
-        recipient: ChainAccount,
-        principal: CashPrincipalAmount,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "transfer_cash_principal_internal: {:?}, {:?}, {:?}",
-            String::from(sender),
-            String::from(recipient),
-            principal.0
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn liquidate_internal<T: Config>(
-        asset: AssetInfo,
-        collateral_asset: AssetInfo,
-        liquidator: ChainAccount,
-        borrower: ChainAccount,
-        amount: AssetQuantity,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "liquidate_internal: {:?}, {:?}, {:?}, {:?}, {:?}",
-            ChainAsset::from(asset.asset),
-            ChainAsset::from(collateral_asset.asset),
-            String::from(liquidator),
-            String::from(borrower),
-            amount.value
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn liquidate_cash_principal_internal<T: Config>(
-        collateral_asset: AssetInfo,
-        liquidator: ChainAccount,
-        borrower: ChainAccount,
-        principal: CashPrincipalAmount,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "liquidate_cash_principal_internal: {:?}, {:?}, {:?}, {:?}",
-            ChainAsset::from(collateral_asset.asset),
-            String::from(liquidator),
-            String::from(borrower),
-            principal.0
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn liquidate_cash_collateral_internal<T: Config>(
-        asset: AssetInfo,
-        liquidator: ChainAccount,
-        borrower: ChainAccount,
-        amount: AssetQuantity,
-    ) -> Result<(), Reason> {
-        let latest_call_str = format!(
-            "liquidate_cash_collateral_internal: {:?}, {:?}, {:?}, {:?}",
-            ChainAsset::from(asset.asset),
-            String::from(liquidator),
-            String::from(borrower),
-            amount.value
-        );
-        unsafe {
-            LATEST_CALL = Box::leak(latest_call_str.into_boxed_str());
-        }
-
-        Ok(())
-    }
-
-    pub fn get_latest_call_result() -> String {
-        unsafe {
-            return LATEST_CALL.to_string();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,24 +238,26 @@ mod tests {
         chains::*, factor::*, rates::*, reason::TrxReqParseError, tests::mock::*, tests::*,
         types::*, *,
     };
-    use mocked_core::get_latest_call_result;
-    use serial_test::serial;
+    use pallet_oracle::types::Price;
+    const ETH: Units = Units::from_ticker_str("ETH", 18);
 
-    fn init_eth_asset() -> Result<(), Reason> {
+    fn init_eth_asset() -> Result<ChainAsset, Reason> {
         let kink_rate = 105;
-        let asset = Eth;
+        let asset = ChainAsset::from_str("Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")?;
         let asset_info = AssetInfo {
             rate_model: InterestRateModel::new_kink(0, kink_rate, Factor::from_nominal("0.5"), 202),
             miner_shares: MinerShares::from_nominal("0.5"),
+            liquidity_factor: Factor::from_nominal("0.8"),
             ..AssetInfo::minimal(asset, ETH)
         };
 
+        pallet_oracle::Prices::insert(ETH.ticker, Price::from_nominal(ETH.ticker, "2000.00").value);
         SupportedAssets::insert(&asset, asset_info);
 
-        Ok(())
+        Ok(asset)
     }
 
-    fn init_bat_asset() -> Result<(), Reason> {
+    fn init_bat_asset() -> Result<ChainAsset, Reason> {
         const BAT: Units = Units::from_ticker_str("BAT", 18);
         let asset = ChainAsset::from_str("Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef")?;
         let asset_info = AssetInfo {
@@ -427,146 +267,298 @@ mod tests {
 
         SupportedAssets::insert(&asset, asset_info);
 
-        Ok(())
+        Ok(asset)
+    }
+
+    fn init_asset_balance(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
+        AssetBalances::insert(asset, account, balance);
+        TotalSupplyAssets::insert(
+            asset,
+            (TotalSupplyAssets::get(asset) as i128 + balance) as u128,
+        );
+        AssetsWithNonZeroBalance::insert(account, asset, ());
+    }
+
+    fn init_cash(account: ChainAccount, amount: CashPrincipal) {
+        CashPrincipals::insert(account, amount);
     }
 
     #[test]
-    #[serial]
     fn exec_trx_request_extract_cash_principal_internal() {
         new_test_ext().execute_with(|| {
-            let req_str = "(Extract 3 CASH Eth:0x0101010101010101010101010101010101010101)";
+            let req_str = "(Extract 3000000 CASH Eth:0x0101010101010101010101010101010101010101)";
             let account = ChainAccount::Eth([20; 20]);
+            init_cash(account, CashPrincipal::from_nominal("4"));
             let nonce = Some(0);
 
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "extract_cash_principal_internal: \"ETH:0x1414141414141414141414141414141414141414\", \
-            \"ETH:0x0101010101010101010101010101010101010101\", 3";
-            assert_eq!(actual, expected);
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Ok(()));
+
+            // TODO: Check for Notice
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("1")
+            );
+            assert_eq!(Nonces::get(account), 1);
         });
     }
 
     #[test]
-    #[serial]
+    fn exec_trx_request_extract_cash_principal_max_internal() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Extract Max CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            init_cash(account, CashPrincipal::from_nominal("4"));
+            let nonce = Some(0);
+
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Ok(()));
+
+            // TODO: Check for Notice
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("0")
+            );
+            assert_eq!(Nonces::get(account), 1);
+        });
+    }
+
+    #[test]
     fn exec_trx_request_extract_internal() {
         new_test_ext().execute_with(|| {
-            assert_ok!(init_eth_asset());
-
-            let req_str = "(Extract 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-                Eth:0x0101010101010101010101010101010101010101)";
+            let asset = init_eth_asset().unwrap();
             let account = ChainAccount::Eth([20; 20]);
+            init_asset_balance(asset, account, Balance::from_nominal("3", ETH).value);
+            let req_str =
+                "(Extract 1000000000000000000 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0x0101010101010101010101010101010101010101)";
             let nonce = Some(0);
 
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "extract_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-            \"ETH:0x1414141414141414141414141414141414141414\", \
-            \"ETH:0x0101010101010101010101010101010101010101\", 3";
-            assert_eq!(actual, expected);
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Ok(()));
+
+            // TODO: Check for Notice
+            assert_eq!(
+                AssetBalances::get(asset, account),
+                Balance::from_nominal("2", ETH).value
+            );
+            assert_eq!(Nonces::get(account), 1);
         });
     }
 
     #[test]
-    #[serial]
     fn exec_trx_transfer_internal() {
         new_test_ext().execute_with(|| {
-            assert_ok!(init_eth_asset());
-
-            let req_str = "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-                Eth:0x0101010101010101010101010101010101010101)";
+            let asset = init_eth_asset().unwrap();
             let account = ChainAccount::Eth([20; 20]);
-            let nonce = Some(0);
+            init_asset_balance(asset, account, Balance::from_nominal("3", ETH).value);
+            let req_str =
+                "(Transfer 2000000000000000000 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+              Eth:0x0101010101010101010101010101010101010101)";
+            let to_account = ChainAccount::Eth([1; 20]);
+            let nonce = 0;
 
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "transfer_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-            \"ETH:0x1414141414141414141414141414141414141414\", \
-            \"ETH:0x0101010101010101010101010101010101010101\", 3";
-            assert_eq!(actual, expected);
-        });
-    }
-
-    #[test]
-    #[serial]
-    fn exec_trx_transfer_principal_cash_internal() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(init_eth_asset());
-
-            let req_str = "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-                Eth:0x0101010101010101010101010101010101010101)";
-            let account = ChainAccount::Eth([20; 20]);
-            let nonce = Some(0);
-
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "transfer_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-            \"ETH:0x1414141414141414141414141414141414141414\", \
-            \"ETH:0x0101010101010101010101010101010101010101\", 3";
-            assert_eq!(actual, expected);
-        });
-    }
-
-    #[test]
-    #[serial]
-    fn exec_trx_liquidate_cash_collateral_internal() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(init_eth_asset());
-
-            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-                Cash Eth:0x0101010101010101010101010101010101010101)";
-            let account = ChainAccount::Eth([20; 20]);
-            let nonce = Some(0);
-
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-            \"ETH:0x1414141414141414141414141414141414141414\", \
-            \"ETH:0x0101010101010101010101010101010101010101\", 55";
-            assert_eq!(actual, expected);
-        });
-    }
-
-    #[test]
-    #[serial]
-    fn exec_trx_liquidate_internal() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(init_eth_asset());
-            assert_ok!(init_bat_asset());
-
-            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef Eth:0x0101010101010101010101010101010101010101)";
-            let account = ChainAccount::Eth([20; 20]);
-            let nonce = Some(0);
-
-            assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-            let actual = get_latest_call_result();
-            let expected = "liquidate_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-            Eth([13, 135, 117, 246, 72, 67, 6, 121, 167, 9, 233, 141, 43, 12, 182, 37, 13, 40, 135, 239]), \
-            \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
-            assert_eq!(actual, expected);
-        });
-    }
-
-    #[test]
-    #[serial]
-    fn exec_trx_in_kind_liquidation() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(init_eth_asset());
-
-            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-                Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-                Eth:0x0101010101010101010101010101010101010101)";
-            let account = ChainAccount::Eth([20; 20]);
-            let nonce = Some(0);
+            let res = exec_trx_request::<Test>(req_str, account, Some(nonce));
+            assert_eq!(res, Ok(()));
 
             assert_eq!(
-                exec_trx_request::<Test>(req_str, account, nonce),
-                Err(Reason::InKindLiquidation)
+                AssetBalances::get(asset, account),
+                Balance::from_nominal("1", ETH).value
             );
+            assert_eq!(
+                AssetBalances::get(asset, to_account),
+                Balance::from_nominal("2", ETH).value
+            );
+            // Trx fee
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("-0.01")
+            );
+            assert_eq!(Nonces::get(account), nonce + 1);
         });
     }
 
     #[test]
-    #[serial]
+    fn exec_trx_transfer_principal_cash_internal() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Transfer 3000000 CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let to_account = ChainAccount::Eth([1; 20]);
+            init_cash(account, CashPrincipal::from_nominal("4"));
+            let nonce = Some(0);
+
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Ok(()));
+
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("0.99")
+            );
+            assert_eq!(
+                CashPrincipals::get(to_account),
+                CashPrincipal::from_nominal("3")
+            );
+            assert_eq!(Nonces::get(account), 1);
+        });
+    }
+
+    #[test]
+    fn exec_trx_transfer_principal_cash_max_internal() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Transfer Max CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let to_account = ChainAccount::Eth([1; 20]);
+            init_cash(account, CashPrincipal::from_nominal("4"));
+            let nonce = Some(0);
+
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Ok(()));
+
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("0")
+            );
+            assert_eq!(
+                CashPrincipals::get(to_account),
+                CashPrincipal::from_nominal("3.99")
+            );
+            assert_eq!(Nonces::get(account), 1);
+        });
+    }
+
+    #[test]
+    fn exec_trx_transfer_principal_cash_max_internal_insufficient() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Transfer Max CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let to_account = ChainAccount::Eth([1; 20]);
+            init_cash(account, CashPrincipal::from_nominal("0.005"));
+            let nonce = Some(0);
+
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("0.005")
+            );
+            assert_eq!(
+                CashPrincipals::get(to_account),
+                CashPrincipal::from_nominal("0")
+            );
+            assert_eq!(Nonces::get(account), 0);
+        });
+    }
+
+    #[test]
+    fn exec_trx_transfer_principal_cash_max_internal_zero() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Transfer Max CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let to_account = ChainAccount::Eth([1; 20]);
+            let nonce = Some(0);
+
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("0")
+            );
+            assert_eq!(
+                CashPrincipals::get(to_account),
+                CashPrincipal::from_nominal("0")
+            );
+            assert_eq!(Nonces::get(account), 0);
+        });
+    }
+
+    #[test]
+    fn exec_trx_transfer_principal_cash_max_internal_negative() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Transfer Max CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([20; 20]);
+            let to_account = ChainAccount::Eth([1; 20]);
+            init_cash(account, CashPrincipal::from_nominal("-100"));
+            let nonce = Some(0);
+
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+
+            assert_eq!(
+                CashPrincipals::get(account),
+                CashPrincipal::from_nominal("-100")
+            );
+            assert_eq!(
+                CashPrincipals::get(to_account),
+                CashPrincipal::from_nominal("0")
+            );
+            assert_eq!(Nonces::get(account), 0);
+        });
+    }
+
+    // TODO: Liquidation Unit Tests
+
+    // #[test]
+    // #[serial]
+    // fn exec_trx_liquidate_cash_collateral_internal() {
+    //     new_test_ext().execute_with(|| {
+    //         assert_ok!(init_eth_asset());
+
+    //         let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+    //             Cash Eth:0x0101010101010101010101010101010101010101)";
+    //         let account = ChainAccount::Eth([20; 20]);
+    //         let nonce = Some(0);
+
+    //         assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+    //         let actual = get_latest_call_result();
+    //         let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
+    //         \"ETH:0x1414141414141414141414141414141414141414\", \
+    //         \"ETH:0x0101010101010101010101010101010101010101\", 55";
+    //         assert_eq!(actual, expected);
+    //     });
+    // }
+
+    // #[test]
+    // #[serial]
+    // fn exec_trx_liquidate_internal() {
+    //     new_test_ext().execute_with(|| {
+    //         assert_ok!(init_eth_asset());
+    //         assert_ok!(init_bat_asset());
+
+    //         let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef Eth:0x0101010101010101010101010101010101010101)";
+    //         let account = ChainAccount::Eth([20; 20]);
+    //         let nonce = Some(0);
+
+    //         assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
+    //         let actual = get_latest_call_result();
+    //         let expected = "liquidate_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
+    //         Eth([13, 135, 117, 246, 72, 67, 6, 121, 167, 9, 233, 141, 43, 12, 182, 37, 13, 40, 135, 239]), \
+    //         \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
+    //         assert_eq!(actual, expected);
+    //     });
+    // }
+
+    // #[test]
+    // #[serial]
+    // fn exec_trx_in_kind_liquidation() {
+    //     new_test_ext().execute_with(|| {
+    //         assert_ok!(init_eth_asset());
+
+    //         let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+    //             Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+    //             Eth:0x0101010101010101010101010101010101010101)";
+    //         let account = ChainAccount::Eth([20; 20]);
+    //         let nonce = Some(0);
+
+    //         assert_eq!(
+    //             exec_trx_request::<Test>(req_str, account, nonce),
+    //             Err(Reason::InKindLiquidation)
+    //         );
+    //     });
+    // }
+
+    #[test]
     fn exec_trx_request_wrong_nonce() {
         new_test_ext().execute_with(|| {
             let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef Eth:0x0101010101010101010101010101010101010101)";
@@ -580,7 +572,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn exec_trx_request_invalid_request() {
         new_test_ext().execute_with(|| {
             let req_str = "(INVALID_REQUEST)";
