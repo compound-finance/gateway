@@ -12,7 +12,7 @@ use crate::{
     reason::Reason,
     require,
     symbol::CASH,
-    types::{CashIndex, CashOrChainAsset, Nonce, Quantity},
+    types::{CashIndex, CashOrChainAsset, CashPrincipalAmount, Nonce, Quantity},
     CashPrincipals, Config, GlobalCashIndex, Nonces,
 };
 use our_std::{convert::TryInto, str};
@@ -120,14 +120,16 @@ pub fn exec_trx_request<T: Config>(
                 CashOrChainAsset::Cash => match max_amount {
                     trx_request::MaxAmount::Max => {
                         let index: CashIndex = GlobalCashIndex::get();
+                        let user_principal = CashPrincipals::get(sender);
                         let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
-                        let principal =
-                            CashPrincipals::get(sender).sub(fee_principal.try_into()?)?;
-                        let principal_amount = principal.amount_withdrawable()?;
+                        let transfer_principal: CashPrincipalAmount = user_principal
+                            .sub_amount(fee_principal)?
+                            .try_into()
+                            .map_err(|_| Reason::InsufficientCashForMaxTransfer)?;
                         transfer_cash_principal_internal::<T>(
                             sender,
                             account.into(),
-                            principal_amount,
+                            transfer_principal,
                         )?;
                     }
 
@@ -440,7 +442,7 @@ mod tests {
             let nonce = Some(0);
 
             let res = exec_trx_request::<Test>(req_str, account, nonce);
-            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+            assert_eq!(res, Err(Reason::InsufficientCashForMaxTransfer));
 
             assert_eq!(
                 CashPrincipals::get(account),
@@ -463,7 +465,7 @@ mod tests {
             let nonce = Some(0);
 
             let res = exec_trx_request::<Test>(req_str, account, nonce);
-            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+            assert_eq!(res, Err(Reason::InsufficientCashForMaxTransfer));
 
             assert_eq!(
                 CashPrincipals::get(account),
@@ -487,7 +489,7 @@ mod tests {
             let nonce = Some(0);
 
             let res = exec_trx_request::<Test>(req_str, account, nonce);
-            assert_eq!(res, Err(Reason::MinTxValueNotMet));
+            assert_eq!(res, Err(Reason::InsufficientCashForMaxTransfer));
 
             assert_eq!(
                 CashPrincipals::get(account),
