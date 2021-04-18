@@ -240,6 +240,7 @@ mod tests {
     };
     use pallet_oracle::types::Price;
     const ETH: Units = Units::from_ticker_str("ETH", 18);
+    const WBTC: Units = Units::from_ticker_str("WBTC", 8);
 
     fn init_eth_asset() -> Result<ChainAsset, Reason> {
         let kink_rate = 105;
@@ -257,14 +258,17 @@ mod tests {
         Ok(asset)
     }
 
-    fn init_bat_asset() -> Result<ChainAsset, Reason> {
-        const BAT: Units = Units::from_ticker_str("BAT", 18);
-        let asset = ChainAsset::from_str("Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef")?;
+    fn init_wbtc_asset() -> Result<ChainAsset, Reason> {
+        let asset = ChainAsset::from_str("Eth:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")?;
         let asset_info = AssetInfo {
-            liquidity_factor: LiquidityFactor::from_nominal("0.6543"),
-            ..AssetInfo::minimal(asset, BAT)
+            liquidity_factor: LiquidityFactor::from_nominal("0.65"),
+            ..AssetInfo::minimal(asset, WBTC)
         };
 
+        pallet_oracle::Prices::insert(
+            WBTC.ticker,
+            Price::from_nominal(WBTC.ticker, "60000.00").value,
+        );
         SupportedAssets::insert(&asset, asset_info);
 
         Ok(asset)
@@ -499,64 +503,245 @@ mod tests {
 
     // TODO: Liquidation Unit Tests
 
-    // #[test]
-    // #[serial]
-    // fn exec_trx_liquidate_cash_collateral_internal() {
-    //     new_test_ext().execute_with(|| {
-    //         assert_ok!(init_eth_asset());
+    #[test]
+    fn exec_trx_liquidate_in_kind() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([1; 20]);
+            let nonce = Some(0);
 
-    //         let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-    //             Cash Eth:0x0101010101010101010101010101010101010101)";
-    //         let account = ChainAccount::Eth([20; 20]);
-    //         let nonce = Some(0);
+            assert_eq!(
+                exec_trx_request::<Test>(req_str, account, nonce),
+                Err(Reason::InKindLiquidation)
+            );
+        });
+    }
 
-    //         assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-    //         let actual = get_latest_call_result();
-    //         let expected = "liquidate_cash_collateral_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-    //         \"ETH:0x1414141414141414141414141414141414141414\", \
-    //         \"ETH:0x0101010101010101010101010101010101010101\", 55";
-    //         assert_eq!(actual, expected);
-    //     });
-    // }
+    #[test]
+    fn exec_trx_liquidate_cash_collateral_self_transfer() {
+        new_test_ext().execute_with(|| {
+            let _eth_asset = init_eth_asset().unwrap();
+            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                CASH Eth:0x0101010101010101010101010101010101010101)";
+            let account = ChainAccount::Eth([1; 20]);
+            let nonce = Some(0);
 
-    // #[test]
-    // #[serial]
-    // fn exec_trx_liquidate_internal() {
-    //     new_test_ext().execute_with(|| {
-    //         assert_ok!(init_eth_asset());
-    //         assert_ok!(init_bat_asset());
+            assert_eq!(
+                exec_trx_request::<Test>(req_str, account, nonce),
+                Err(Reason::SelfTransfer)
+            );
+        });
+    }
 
-    //         let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef Eth:0x0101010101010101010101010101010101010101)";
-    //         let account = ChainAccount::Eth([20; 20]);
-    //         let nonce = Some(0);
+    #[test]
+    fn exec_trx_liquidate_cash_collateral_success() {
+        new_test_ext().execute_with(|| {
+            let eth_asset = init_eth_asset().unwrap();
+            let borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                eth_asset,
+                liquidator_account,
+                Balance::from_nominal("3", ETH).value,
+            );
 
-    //         assert_ok!(exec_trx_request::<Test>(req_str, account, nonce));
-    //         let actual = get_latest_call_result();
-    //         let expected = "liquidate_internal: Eth([238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238]), \
-    //         Eth([13, 135, 117, 246, 72, 67, 6, 121, 167, 9, 233, 141, 43, 12, 182, 37, 13, 40, 135, 239]), \
-    //         \"ETH:0x1414141414141414141414141414141414141414\", \"ETH:0x0101010101010101010101010101010101010101\", 55";
-    //         assert_eq!(actual, expected);
-    //     });
-    // }
+            // Liquidate 1e18 Eth
+            let req_str =
+                "(Liquidate 1000000000000000000 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                CASH Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
 
-    // #[test]
-    // #[serial]
-    // fn exec_trx_in_kind_liquidation() {
-    //     new_test_ext().execute_with(|| {
-    //         assert_ok!(init_eth_asset());
+            assert_ok!(exec_trx_request::<Test>(
+                req_str,
+                liquidator_account,
+                Some(nonce)
+            ));
 
-    //         let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-    //             Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-    //             Eth:0x0101010101010101010101010101010101010101)";
-    //         let account = ChainAccount::Eth([20; 20]);
-    //         let nonce = Some(0);
+            assert_eq!(
+                AssetBalances::get(eth_asset, liquidator_account),
+                Balance::from_nominal("2", ETH).value
+            );
+            assert_eq!(
+                AssetBalances::get(eth_asset, borrower_account),
+                Balance::from_nominal("1", ETH).value
+            );
+            assert_eq!(
+                CashPrincipals::get(liquidator_account),
+                CashPrincipal::from_nominal("2160")
+            );
+            assert_eq!(
+                CashPrincipals::get(borrower_account),
+                CashPrincipal::from_nominal("-2160")
+            );
+            assert_eq!(Nonces::get(liquidator_account), nonce + 1);
+            assert_eq!(Nonces::get(borrower_account), 0);
+        });
+    }
 
-    //         assert_eq!(
-    //             exec_trx_request::<Test>(req_str, account, nonce),
-    //             Err(Reason::InKindLiquidation)
-    //         );
-    //     });
-    // }
+    // TODO: Implement max
+    #[test]
+    #[should_panic(expected = "Not supported")]
+    fn exec_trx_liquidate_cash_collateral_max() {
+        new_test_ext().execute_with(|| {
+            let eth_asset = init_eth_asset().unwrap();
+            let _borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                eth_asset,
+                liquidator_account,
+                Balance::from_nominal("3", ETH).value,
+            );
+
+            // Liquidate 1e18 Eth
+            let req_str = "(Liquidate Max Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                CASH Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
+
+            let _ = exec_trx_request::<Test>(req_str, liquidator_account, Some(nonce));
+
+            // TODO: Check balances
+        });
+    }
+
+    #[test]
+    fn exec_trx_liquidate_cash_borrowed_success() {
+        new_test_ext().execute_with(|| {
+            let eth_asset = init_eth_asset().unwrap();
+            let borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_cash(liquidator_account, CashPrincipal::from_nominal("4000"));
+
+            // Liquidate 1000 Cash
+            let req_str =
+                "(Liquidate 1000000000 CASH Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
+
+            assert_ok!(exec_trx_request::<Test>(
+                req_str,
+                liquidator_account,
+                Some(nonce)
+            ));
+
+            assert_eq!(
+                AssetBalances::get(eth_asset, liquidator_account),
+                Balance::from_nominal("0.54", ETH).value
+            );
+            assert_eq!(
+                AssetBalances::get(eth_asset, borrower_account),
+                Balance::from_nominal("-0.54", ETH).value
+            );
+            assert_eq!(
+                CashPrincipals::get(liquidator_account),
+                CashPrincipal::from_nominal("3000")
+            );
+            assert_eq!(
+                CashPrincipals::get(borrower_account),
+                CashPrincipal::from_nominal("1000")
+            );
+            assert_eq!(Nonces::get(liquidator_account), nonce + 1);
+            assert_eq!(Nonces::get(borrower_account), 0);
+        });
+    }
+
+    // TODO: Implement max
+    #[test]
+    #[should_panic(expected = "Not supported")]
+    fn exec_trx_liquidate_cash_borrowed_max() {
+        new_test_ext().execute_with(|| {
+            let eth_asset = init_eth_asset().unwrap();
+            let _borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                eth_asset,
+                liquidator_account,
+                Balance::from_nominal("3", ETH).value,
+            );
+
+            // Liquidate 1e18 Eth
+            let req_str = "(Liquidate Max CASH Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
+
+            let _ = exec_trx_request::<Test>(req_str, liquidator_account, Some(nonce));
+
+            // TODO: Check balances
+        });
+    }
+
+    #[test]
+    fn exec_trx_liquidate_asset_for_asset_success() {
+        new_test_ext().execute_with(|| {
+            let wbtc_asset = init_wbtc_asset().unwrap();
+            let eth_asset = init_eth_asset().unwrap();
+            let borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                wbtc_asset,
+                liquidator_account,
+                Balance::from_nominal("3", WBTC).value,
+            );
+
+            // Liquidate 1 WBTC
+            let req_str = "(Liquidate 100000000 Eth:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+                Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
+
+            assert_ok!(exec_trx_request::<Test>(
+                req_str,
+                liquidator_account,
+                Some(nonce)
+            ));
+
+            assert_eq!(
+                AssetBalances::get(eth_asset, liquidator_account),
+                Balance::from_nominal("32.4", ETH).value
+            );
+            assert_eq!(
+                AssetBalances::get(eth_asset, borrower_account),
+                Balance::from_nominal("-32.4", ETH).value
+            );
+            assert_eq!(
+                AssetBalances::get(wbtc_asset, liquidator_account),
+                Balance::from_nominal("2", WBTC).value
+            );
+            assert_eq!(
+                AssetBalances::get(wbtc_asset, borrower_account),
+                Balance::from_nominal("1", WBTC).value
+            );
+            assert_eq!(Nonces::get(liquidator_account), nonce + 1);
+            assert_eq!(Nonces::get(borrower_account), 0);
+        });
+    }
+
+    // TODO: Implement max
+    #[test]
+    #[should_panic(expected = "Not supported")]
+    fn exec_trx_liquidate_asset_for_asset_max() {
+        new_test_ext().execute_with(|| {
+            let _wbtc_asset = init_wbtc_asset().unwrap();
+            let eth_asset = init_eth_asset().unwrap();
+            let _borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                eth_asset,
+                liquidator_account,
+                Balance::from_nominal("3", ETH).value,
+            );
+
+            // Liquidate 1e18 Eth
+            let req_str = "(Liquidate Max Eth:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+                Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
+
+            let _ = exec_trx_request::<Test>(req_str, liquidator_account, Some(nonce));
+
+            // TODO: Check balances
+        });
+    }
 
     #[test]
     fn exec_trx_request_wrong_nonce() {
