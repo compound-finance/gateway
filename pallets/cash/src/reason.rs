@@ -62,6 +62,7 @@ pub enum Reason {
     InvalidChain,
     PendingAuthNotice,
     ChangeValidatorsError,
+    InsufficientCashForMaxTransfer,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -119,6 +120,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::InvalidChain => (29, 0, "invalid chain"),
             Reason::PendingAuthNotice => (30, 0, "change auth notice is already pending"),
             Reason::ChangeValidatorsError => (31, 0, "change validators error"),
+            Reason::InsufficientCashForMaxTransfer => (32, 0, "insufficient cash for max transfer"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

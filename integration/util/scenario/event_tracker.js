@@ -160,7 +160,7 @@ class EventTracker {
 
                 return new Error(`DispatchError[id=${id}]: ${section}.${method}: ${documentation.join(' ')}`);
               } catch (e) {
-                console.error("Error looking up module", e);
+                // Ignore
               }
             }
 

@@ -467,7 +467,8 @@
       "UnknownValidator": "",
       "InvalidChain": "",
       "PendingAuthNotice": "",
-      "ChangeValidatorsError": ""
+      "ChangeValidatorsError": "",
+      "InsufficientCashForMaxTransfer": ""
     }
   },
   "ReasonIncorrectNonce": "(Nonce,Nonce)",

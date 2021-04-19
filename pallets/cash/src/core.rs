@@ -666,12 +666,15 @@ pub fn transfer_cash_principal_internal<T: Config>(
 ) -> Result<(), Reason> {
     let miner = get_some_miner::<T>();
     let index: CashIndex = GlobalCashIndex::get();
+    let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
+    let principal_with_fee = principal.add(fee_principal)?;
     let amount = index.cash_quantity(principal)?;
+    let amount_with_fee = index.cash_quantity(principal_with_fee)?;
 
     require!(sender != recipient, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_cash::<T>(sender, amount.add(TRANSFER_FEE)?)?,
+        has_liquidity_to_reduce_cash::<T>(sender, amount_with_fee)?,
         Reason::InsufficientLiquidity
     );
 
@@ -679,8 +682,6 @@ pub fn transfer_cash_principal_internal<T: Config>(
     let recipient_cash_principal = CashPrincipals::get(recipient);
     let miner_cash_principal = CashPrincipals::get(miner);
 
-    let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
-    let principal_with_fee = principal.add(fee_principal)?;
     let (_sender_withdraw_principal, sender_borrow_principal) =
         withdraw_and_borrow_principal(sender_cash_principal, principal_with_fee);
     let (recipient_repay_principal, _recipient_supply_principal) =
