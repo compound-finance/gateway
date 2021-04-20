@@ -239,7 +239,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(ashley.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/SufficientLiquidity/);
+      await expect(bert.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/SufficientLiquidity/);
 
       expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
