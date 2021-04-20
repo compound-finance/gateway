@@ -11,18 +11,19 @@ use our_std::collections::btree_set::BTreeSet;
 
 use crate::{
     chains::{
-        Chain, ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents, ChainBlockNumber,
+        ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents, ChainBlockNumber,
         ChainBlockTally, ChainBlocks, ChainHash, ChainId, ChainReorg, ChainReorgTally,
-        ChainSignature, Ethereum,
+        ChainSignature,
     },
     core::{
-        self, get_cash_quantity, get_quantity, get_validator_set, get_value, recover_validator,
-        validator_sign,
+        self, get_cash_quantity, get_event_queue, get_quantity, get_validator_set, get_value,
+        recover_validator, validator_sign,
     },
+    debug,
     events::{fetch_chain_block, fetch_chain_blocks},
     log,
-    reason::Reason,
     params::{INGRESS_LARGE, INGRESS_QUOTA},
+    reason::Reason,
     require,
     types::{CashPrincipalAmount, Quantity, USDQuantity, ValidatorIdentity, USD},
     Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module, PendingChainBlocks,
@@ -99,18 +100,22 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     let last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let true_block = fetch_chain_block(chain_id, last_block.number())?;
     if last_block.hash() == true_block.hash() {
-        // worker sees same fork as chain
-        let event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
+        debug!("Worker sees same fork as chain: {:?}", true_block);
+        let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue);
-        let blocks = fetch_chain_blocks(chain_id, last_block.number(), slack)?;
+        let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?;
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
-        // worker sees a different fork
+        debug!(
+            "Worker sees a different fork: {:?} {:?}",
+            true_block, last_block
+        );
         let reorg = formulate_reorg::<T>(&last_block, &true_block)?;
         if !already_submitted_reorg::<T>(me, &reorg) {
             submit_chain_reorg::<T>(&reorg)
         } else {
+            debug!("Worker already submitted...waiting");
             // just wait for the reorg to succeed or fail,
             //  or we change our minds in another pass (noop)
             Ok(())
@@ -164,7 +169,6 @@ pub fn submit_chain_blocks<T: Config>(blocks: &ChainBlocks) -> Result<(), Reason
     Ok(())
 }
 
-
 /// Remember whatever blocks we submit, so we can formulate reorgs if needed.
 pub fn memorize_chain_blocks<T: Config>(blocks: &ChainBlocks) -> Result<(), Reason> {
     // Note: grows unboundedly, but pruning history can happen independently / later
@@ -211,7 +215,7 @@ pub fn formulate_reorg<T: Config>(
         let reverse_blocks_next = recall_chain_blocks::<T>(last_block.hash(), CHUNK)?;
         let drawrof_blocks_next = recall_chain_blocks::<T>(true_block.hash(), CHUNK)?;
         if reverse_blocks_next.len() == 0 && drawrof_blocks_next.len() == 0 {
-            return Err(Reason::CannotFormulateReorg)
+            return Err(Reason::CannotFormulateReorg);
         }
         for block in reverse_blocks_next {
             reverse_blocks.push(block.clone());
@@ -249,15 +253,12 @@ pub fn formulate_reorg<T: Config>(
                 .collect_rev(),
         }),
 
-        _ => panic!("xxx not implemented"),
+        _ => panic!("XXX not implemented"),
     }
 }
 
 /// Check whether the given validator already submitted the given reorg.
-pub fn already_submitted_reorg<T: Config>(
-    id: ValidatorIdentity,
-    reorg: &ChainReorg,
-) -> bool {
+pub fn already_submitted_reorg<T: Config>(id: ValidatorIdentity, reorg: &ChainReorg) -> bool {
     // XXX dont resubmit for same thing
     false
 }
@@ -282,32 +283,37 @@ pub fn receive_chain_blocks<T: Config>(
     let validator_set = get_validator_set::<T>()?;
     let validator = recover_validator::<T>(&blocks.encode(), signature)?;
     let chain_id = blocks.chain_id();
+    let mut event_queue = get_event_queue::<T>(chain_id)?;
     let mut last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
-    let mut event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
     for block in blocks.blocks() {
         if block.number() >= last_block.number() + 1 {
             let offset = (block.number() - last_block.number() - 1) as usize;
             if let Some(prior) = pending_blocks.get_mut(offset) {
                 if block != prior.block {
+                    debug!("Received conflicting block, dissenting: {:?} ({:?})", block, prior);
                     prior.add_dissent(&validator);
                 } else {
+                    debug!("Received support for existing block: {:?}", block);
                     prior.add_support(&validator);
                 }
             } else if offset == 0 {
                 if block.parent_hash() != last_block.hash() {
+                    debug!("Received block which would require fork: {:?} ({:?})", block, last_block);
                     // worker should reorg if it wants to build something else
                     //  but could just be a laggard message
                     // this *would* be a dissenting vote if prior existed
                     //  but that's ok bc worker will try to reorg instead
                     continue;
                 } else {
+                    debug!("Received valid first next pending block: {:?}", block);
                     // write to pending_blocks[offset]
                     //  we already checked offset doesn't exist, this is the first element
                     pending_blocks.push(ChainBlockTally::new(chain_id, block, &validator));
                 }
             } else if let Some(parent) = pending_blocks.get(offset - 1) {
                 if block.parent_hash() != parent.block.hash() {
+                    debug!("Received invalid derivative block: {:?} ({:?})", block, parent);
                     // worker is submitting block for parent that conflicts
                     //  if its also submitting the parent, which it should be,
                     //   that one will vote against and propagate forwards
@@ -315,17 +321,22 @@ pub fn receive_chain_blocks<T: Config>(
                     //  but that's ok bc worker should submit parent first
                     continue;
                 } else {
+                    debug!("Received valid pending block: {:?}", block);
                     // write to pending_blocks[offset]
                     //  we already checked offset doesn't exist, but offset - 1 does
                     pending_blocks.push(ChainBlockTally::new(chain_id, block, &validator));
                 }
             } else {
+                debug!("Received disconnected block: {:?} ({:?})", block, offset);
                 // we don't have the block, nor a parent for it
                 //  the worker shouldn't submit stuff like this
                 // blocks should be in order in which case this wouldn't happen
                 //  but just ignore, if workers aren't connecting blocks we won't make progress
                 continue;
             }
+        } else {
+            debug!("Received irrelevant past block: {:?} ({:?})", block, last_block);
+            continue;
         }
     }
 
@@ -361,7 +372,7 @@ pub fn receive_chain_reorg<T: Config>(
     let validator_set = get_validator_set::<T>()?;
     let validator = recover_validator::<T>(&reorg.encode(), signature)?;
     let chain_id = reorg.chain_id();
-    let mut event_queue = IngressionQueue::get(chain_id).ok_or(Reason::NoSuchQueue)?;
+    let mut event_queue = get_event_queue::<T>(chain_id)?;
     let mut last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
     let mut pending_reorgs = PendingChainReorgs::get(chain_id);
 
@@ -418,6 +429,7 @@ pub fn receive_chain_reorg<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::*;
 
     #[test]
     fn test_collect_rev() {
@@ -425,4 +437,83 @@ mod tests {
         let y = x.iter().map(|v| v + 1).collect_rev();
         assert_eq!(y, vec![4, 3, 2]);
     }
+
+    #[test]
+    fn test_receive_chain_blocks_fails_for_signed_origin() {
+        new_test_ext().execute_with(|| {
+            let blocks = ChainBlocks::Eth(vec![]);
+            let signature = ChainSignature::Eth([0u8; 65]);
+            assert_err!(
+            CashModule::receive_chain_blocks(Origin::signed(Default::default()), blocks, signature),
+            DispatchError::BadOrigin
+            );
+        });
+    }
+
+    #[test]
+    fn test_receive_chain_blocks_fails_for_invalid_signature() {
+        new_test_ext().execute_with(|| {
+            let blocks = ChainBlocks::Eth(vec![]);
+            let signature = ChainSignature::Eth([0u8; 65]);
+            assert_err!(
+                CashModule::receive_chain_blocks(Origin::none(), blocks, signature),
+                Reason::CryptoError(gateway_crypto::CryptoError::RecoverError),
+            );
+        });
+    }
+
+    #[test]
+    fn test_receive_chain_blocks_fails_if_not_validator() {
+        new_test_ext().execute_with(|| {
+            let blocks = ChainBlocks::Eth(vec![]);
+            let signature = ChainId::Eth.sign(&blocks.encode()).unwrap();
+            assert_err!(
+                CashModule::receive_chain_blocks(Origin::none(), blocks, signature),
+                Reason::UnknownValidator
+            );
+        });
+    }
+
+    #[test]
+    fn test_receive_chain_blocks_happy_path() {
+        sp_tracing::try_init_simple(); // Tip: add/remove from tests for logging
+
+        new_test_ext().execute_with(|| {
+            initialize_storage();
+
+            // Set validator signing key
+            std::env::set_var(
+                "ETH_KEY",
+                "6bc5ea78f041146e38233f5bc29c703c1cec8eaaa2214353ee8adf7fc598f23d",
+            );
+
+            // Dispatch a signed extrinsic.
+            let event = ethereum_client::EthereumEvent::Lock {
+                asset: [1; 20],
+                sender: [3; 20],
+                chain: String::from("ETH"),
+                recipient: [2; 32],
+                amount: 10,
+            };
+
+            let blocks = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [2; 32],
+                    parent_hash: [
+                        97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37, 227,
+                        236, 104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138,
+                    ],
+                    number: 2,
+                    events: vec![event],
+                }
+            ]);
+            let signature = validator_sign::<Test>(&blocks.encode()).unwrap();
+            assert_ok!(CashModule::receive_chain_blocks(Origin::none(), blocks, signature));
+
+            let pending_blocks = CashModule::pending_chain_blocks(ChainId::Eth);
+            assert_eq!(pending_blocks.len(), 1);
+        });
+    }
+
+    // XXX test reorg, event queues, etc
 }

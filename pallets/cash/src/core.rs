@@ -21,8 +21,8 @@ use pallet_oracle::types::Price;
 
 use crate::{
     chains::{
-        Chain, ChainAccount, ChainAsset, ChainBlockEvent, ChainHash, ChainId, ChainSignature,
-        Ethereum,
+        Chain, ChainAccount, ChainAsset, ChainBlockEvent, ChainBlockEvents, ChainHash, ChainId,
+        ChainSignature, Ethereum,
     },
     factor::Factor,
     internal, log,
@@ -36,10 +36,10 @@ use crate::{
         SignersSet, Timestamp, USDQuantity, Units, ValidatorKeys, CASH,
     },
     AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
-    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp,
-    LastIndices, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp, Miner, Module,
-    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
-    Validators,
+    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, IngressionQueue,
+    LastBlockTimestamp, LastIndices, LastMinerSharePrincipal, LastYieldCashIndex,
+    LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 #[macro_export]
@@ -114,6 +114,11 @@ pub fn get_rates<T: Config>(asset: ChainAsset) -> Result<(APR, APR), Reason> {
     Ok(info
         .rate_model
         .get_rates(utilization, APR::ZERO, info.miner_shares)?)
+}
+
+/// Return the event ingression queue for the underlying chain.
+pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents, Reason> {
+    Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
 }
 
 /// Return the current total borrow and total supply balances for the asset.

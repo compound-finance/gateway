@@ -466,6 +466,14 @@ pub enum ChainBlockEvents {
 }
 
 impl ChainBlockEvents {
+    /// Return an empty queue for the given chain.
+    pub fn empty(chain_id: ChainId) -> ChainBlockEvents {
+        match chain_id {
+            ChainId::Eth => ChainBlockEvents::Eth(vec![]),
+            _ => panic!("XXX not implemented"),
+        }
+    }
+
     /// Push the events from block onto this queue of events.
     pub fn push(&mut self, block: &ChainBlock) {
         match self {

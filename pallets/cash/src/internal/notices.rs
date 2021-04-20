@@ -1,6 +1,4 @@
-use frame_support::storage::{
-    IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap,
-};
+use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
 use frame_system::offchain::SubmitTransaction;
 
 use crate::{
@@ -248,7 +246,7 @@ pub fn publish_signature<T: Config>(
                 .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
             let validator = recover_validator::<T>(&notice.encode_notice(), signature)?;
 
-            // XXX what happens if not eth here?
+            // XXX what happens if not eth here? seems broken
             // Skip signatures already in the list
             if has_signer(&signature_pairs, ChainAccount::Eth(validator.eth_address)) {
                 return Ok(());

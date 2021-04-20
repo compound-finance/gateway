@@ -1,5 +1,5 @@
 use crate::{
-    chains::{Chain, ChainAccount, Ethereum},
+    chains::{Chain, Ethereum},
     core::{recover_validator, validator_sign},
     internal,
     notices::EncodeNotice,
@@ -18,7 +18,6 @@ pub enum ValidationError {
     InvalidInternalOnly,
     InvalidNextCode,
     InvalidValidator,
-    InvalidSignature,
     InvalidCall,
     InvalidPriceSignature,
     InvalidPrice(Reason),
@@ -103,11 +102,11 @@ pub fn validate_unsigned<T: Config>(
 
         Call::publish_signature(chain_id, notice_id, signature) => {
             let notice = Notices::get(chain_id, notice_id).ok_or(ValidationError::UnknownNotice)?;
-            let signer = signature
-                .recover(&notice.encode_notice())
-                .map_err(|_| ValidationError::InvalidSignature)?;
+            let validator = recover_validator::<T>(&notice.encode_notice(), *signature)
+                .map_err(|_| ValidationError::InvalidValidator)?;
 
-            if Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
+            // XXX what happens if not eth here? seems broken
+            if Validators::iter().any(|(_, v)| v.eth_address == validator.eth_address) {
                 Ok(
                     ValidTransaction::with_tag_prefix("Gateway::publish_signature")
                         .priority(UNSIGNED_TXS_PRIORITY)
@@ -236,7 +235,7 @@ mod tests {
                     TransactionSource::InBlock {},
                     &Call::receive_chain_blocks::<Test>(blocks, signature)
                 ),
-                Err(ValidationError::InvalidSignature)
+                Err(ValidationError::InvalidValidator)
             );
         });
     }
@@ -481,7 +480,7 @@ mod tests {
                     TransactionSource::InBlock {},
                     &Call::publish_signature::<Test>(chain_id, notice_id, signature),
                 ),
-                Err(ValidationError::InvalidSignature)
+                Err(ValidationError::InvalidValidator)
             );
         });
     }

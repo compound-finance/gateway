@@ -34,7 +34,7 @@ use frame_support::{
 };
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{collections::btree_set::BTreeSet, error, log, str, vec::Vec, Debuggable};
+use our_std::{collections::btree_set::BTreeSet, debug, error, log, str, vec::Vec, Debuggable};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity,
@@ -223,6 +223,7 @@ decl_storage! {
         /// The mapping of worker tallies for each alternate reorg, relative to current fork of underlying chain.
         PendingChainReorgs get(fn pending_chain_reorgs): map hasher(blake2_128_concat) ChainId => Vec<ChainReorgTally>;
     }
+
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
         config(validators): Vec<ValidatorKeys>;
@@ -491,11 +492,29 @@ decl_module! {
             }
         }
 
+        /// Offchain Worker entry point.
+        fn offchain_worker(block_number: T::BlockNumber) {
+            match internal::events::track_chain_events::<T>() {
+                Ok(()) => (),
+                Err(err) => {
+                    log!("offchain_worker error during track_chain_events: {:?}", err);
+                }
+            }
+
+            match internal::notices::process_notices::<T>(block_number) {
+                (succ, skip, failures) => {
+                    if succ > 0 || skip > 0 {
+                        log!("offchain_worker process_notices: {} successful, {} skipped", succ, skip);
+                    }
+                    if failures.len() > 0 {
+                        log!("offchain_worker error(s) during process notices: {:?}", failures);
+                    }
+                }
+            }
+        }
+
         /// Sets the miner of the this block via inherent
-        #[weight = (
-            0,
-            DispatchClass::Operational
-        )]
+        #[weight = (0, DispatchClass::Operational)]
         fn set_miner(origin, miner: ChainAccount) {
             ensure_none(origin)?;
 
@@ -559,16 +578,16 @@ decl_module! {
             Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset, asset_info))?)
         }
 
-        // TODO: Do we need to sign the event id, too?
-        #[weight = (<T as Config>::WeightInfo::receive_event(), DispatchClass::Operational, Pays::No)] // XXX
+        /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
+        #[weight = (<T as Config>::WeightInfo::receive_chain_blocks(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
             log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature); // XXX ?
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_chain_blocks::<T>(blocks, signature))?)
         }
 
-        // TODO: Do we need to sign the event id, too?
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
+        #[weight = (<T as Config>::WeightInfo::receive_chain_reorg(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
             log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature); // XXX ?
             ensure_none(origin)?;
@@ -579,25 +598,6 @@ decl_module! {
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::notices::publish_signature::<T>(chain_id, notice_id, signature))?)
-        }
-
-        /// Offchain Worker entry point.
-        fn offchain_worker(block_number: T::BlockNumber) {
-            if let Err(e) = internal::events::track_chain_events::<T>() {
-                log!("offchain_worker error during track_chain_events: {:?}", e);
-            }
-
-            let (succ, skip, failures) = internal::notices::process_notices::<T>(block_number);
-
-            let fail: usize = failures.iter().count();
-
-            if succ > 0 || skip > 0 || fail > 0 {
-                log!("offchain_worker process_notices: {} succ, {} skip, {} fail", succ, skip, fail);
-            }
-
-            if fail > 0 {
-                log!("offchain_worker error(s) during process notices: {:?}", failures);
-            }
         }
 
         /// Execute a transaction request on behalf of a user
