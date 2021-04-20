@@ -26,15 +26,16 @@ use crate::{
     chains::{ChainAccount, ChainAsset, ChainHash, ChainId},
     events::ChainLogEvent,
     factor::Factor,
-    internal, log,
+    internal::{self, liquidity},
+    log,
     params::{MIN_TX_VALUE, TRANSFER_FEE},
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
-        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, NoticeId, Quantity,
-        Timestamp, USDQuantity, Units, ValidatorIdentity, CASH,
+        CashPrincipal, CashPrincipalAmount, GovernanceResult, NoticeId, Quantity, Timestamp,
+        USDQuantity, Units, ValidatorIdentity, CASH,
     },
     AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
     CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, LastBlockTimestamp,
@@ -174,7 +175,12 @@ pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
     let mut info: Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
-        .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
+        .map(|a| {
+            (
+                a.0.clone(),
+                liquidity::get_liquidity::<T>(a.0).unwrap().value,
+            )
+        })
         .collect::<Vec<(ChainAccount, AssetBalance)>>();
     info.sort_by(|(_a_account, a_balance), (_b_account, b_balance)| a_balance.cmp(b_balance));
     Ok(info)
@@ -490,7 +496,7 @@ pub fn extract_internal<T: Config>(
 ) -> Result<(), Reason> {
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_asset::<T>(holder, asset, amount)?,
+        liquidity::has_liquidity_to_reduce_asset::<T>(holder, asset, amount)?,
         Reason::InsufficientLiquidity
     );
 
@@ -543,7 +549,7 @@ pub fn extract_cash_principal_internal<T: Config>(
 
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_cash::<T>(holder, amount)?,
+        liquidity::has_liquidity_to_reduce_cash::<T>(holder, amount)?,
         Reason::InsufficientLiquidity
     );
 
@@ -581,7 +587,12 @@ pub fn transfer_internal<T: Config>(
     require!(sender != recipient, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_asset_with_fee::<T>(sender, asset, amount, TRANSFER_FEE)?,
+        liquidity::has_liquidity_to_reduce_asset_with_fee::<T>(
+            sender,
+            asset,
+            amount,
+            TRANSFER_FEE
+        )?,
         Reason::InsufficientLiquidity
     );
 
@@ -674,7 +685,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
     require!(sender != recipient, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
     require!(
-        has_liquidity_to_reduce_cash::<T>(sender, amount_with_fee)?,
+        liquidity::has_liquidity_to_reduce_cash::<T>(sender, amount_with_fee)?,
         Reason::InsufficientLiquidity
     );
 
@@ -734,7 +745,11 @@ pub fn liquidate_internal<T: Config>(
         )?;
 
     require!(
-        has_liquidity_to_reduce_asset_with_added_collateral::<T>(
+        !liquidity::has_non_negative_liquidity::<T>(borrower)?,
+        Reason::SufficientLiquidity
+    );
+    require!(
+        liquidity::has_liquidity_to_reduce_asset_with_added_collateral::<T>(
             liquidator,
             asset,
             amount,
@@ -889,7 +904,11 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         )?;
 
     require!(
-        has_liquidity_to_reduce_cash_with_added_collateral::<T>(
+        !liquidity::has_non_negative_liquidity::<T>(borrower)?,
+        Reason::SufficientLiquidity
+    );
+    require!(
+        liquidity::has_liquidity_to_reduce_cash_with_added_collateral::<T>(
             liquidator,
             amount,
             collateral_asset,
@@ -1011,7 +1030,11 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     let seize_principal = index.cash_principal_amount(seize_amount)?;
 
     require!(
-        has_liquidity_to_reduce_asset_with_added_cash::<T>(
+        !liquidity::has_non_negative_liquidity::<T>(borrower)?,
+        Reason::SufficientLiquidity
+    );
+    require!(
+        liquidity::has_liquidity_to_reduce_asset_with_added_cash::<T>(
             liquidator,
             asset,
             amount,
@@ -1092,94 +1115,6 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     ));
 
     Ok(())
-}
-
-// Liquidity Checks //
-
-/// Calculates if an account will remain solvent after reducing asset by amount.
-pub fn has_liquidity_to_reduce_asset<T: Config>(
-    account: ChainAccount,
-    asset: AssetInfo,
-    amount: AssetQuantity,
-) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
-        .asset_change(asset, amount.as_decrease()?)?
-        .get_liquidity::<T>()?;
-    Ok(liquidity.value >= 0)
-}
-
-/// Calculates if an account will remain solvent after reducing asset by amount and paying a CASH fee.
-pub fn has_liquidity_to_reduce_asset_with_fee<T: Config>(
-    account: ChainAccount,
-    asset: AssetInfo,
-    amount: AssetQuantity,
-    fee: CashQuantity,
-) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
-        .asset_change(asset, amount.as_decrease()?)?
-        .cash_change(fee.as_decrease()?)?
-        .get_liquidity::<T>()?;
-    Ok(liquidity.value >= 0)
-}
-
-/// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of asset collateral.
-pub fn has_liquidity_to_reduce_asset_with_added_collateral<T: Config>(
-    account: ChainAccount,
-    asset: AssetInfo,
-    amount: AssetQuantity,
-    collateral_asset: AssetInfo,
-    collateral_amount: AssetQuantity,
-) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
-        .asset_change(asset, amount.as_decrease()?)?
-        .asset_change(collateral_asset, collateral_amount.as_increase()?)?
-        .get_liquidity::<T>()?;
-    Ok(liquidity.value >= 0)
-}
-
-/// Calculates if an account will remain solvent after reducing asset by amount and adding an amount of CASH collateral.
-pub fn has_liquidity_to_reduce_asset_with_added_cash<T: Config>(
-    account: ChainAccount,
-    asset: AssetInfo,
-    amount: AssetQuantity,
-    cash_amount: CashQuantity,
-) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
-        .asset_change(asset, amount.as_decrease()?)?
-        .cash_change(cash_amount.as_increase()?)?
-        .get_liquidity::<T>()?;
-    Ok(liquidity.value >= 0)
-}
-
-/// Calculates if an account will remain solvent after reducing CASH by amount.
-pub fn has_liquidity_to_reduce_cash<T: Config>(
-    account: ChainAccount,
-    amount: CashQuantity,
-) -> Result<bool, Reason> {
-    let portfolio = Portfolio::from_storage::<T>(account)?;
-    let liquidity = portfolio
-        .cash_change(amount.as_decrease()?)?
-        .get_liquidity::<T>()?;
-    Ok(liquidity.value >= 0)
-}
-
-/// Calculates if an account will remain solvent after reducing CASH by amount and adding an amount of asset collateral.
-pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
-    account: ChainAccount,
-    amount: CashQuantity,
-    collateral_asset: AssetInfo,
-    collateral_amount: AssetQuantity,
-) -> Result<bool, Reason> {
-    let liquidity = Portfolio::from_storage::<T>(account)?
-        .cash_change(amount.as_decrease()?)?
-        .asset_change(collateral_asset, collateral_amount.as_increase()?)?
-        .get_liquidity::<T>()?;
-    Ok(liquidity.value >= 0)
-}
-
-/// Calculates the current liquidity value for an account.
-pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
-    Ok(Portfolio::from_storage::<T>(account)?.get_liquidity::<T>()?)
 }
 
 /// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
@@ -1573,35 +1508,6 @@ mod tests {
             let found_assets = crate::core::get_assets::<Test>()?;
 
             assert_eq!(assets, found_assets);
-
-            Ok(())
-        })
-    }
-
-    #[test]
-    fn test_has_liquidity_to_reduce_cash() -> Result<(), Reason> {
-        const BAT: Units = Units::from_ticker_str("BAT", 18);
-        let asset = ChainAsset::from_str("Eth:0x0d8775f648430679a709e98d2b0cb6250d2887ef")?;
-        let asset_info = AssetInfo {
-            liquidity_factor: LiquidityFactor::from_nominal("0.6543"),
-            ..AssetInfo::minimal(asset, BAT)
-        };
-
-        new_test_ext().execute_with(|| {
-            let account = ChainAccount::Eth([0u8; 20]);
-            let amount = Quantity::from_nominal("5", CASH);
-
-            assert!(!has_liquidity_to_reduce_cash::<Test>(account, amount)?);
-
-            pallet_oracle::Prices::insert(
-                BAT.ticker,
-                Price::from_nominal(BAT.ticker, "0.53").value,
-            );
-            SupportedAssets::insert(&asset, asset_info);
-            AssetBalances::insert(&asset, &account, Balance::from_nominal("25000", BAT).value);
-            AssetsWithNonZeroBalance::insert(account, asset, ());
-
-            assert!(has_liquidity_to_reduce_cash::<Test>(account, amount)?);
 
             Ok(())
         })

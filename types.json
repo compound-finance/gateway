@@ -468,7 +468,8 @@
       "InvalidChain": "",
       "PendingAuthNotice": "",
       "ChangeValidatorsError": "",
-      "InsufficientCashForMaxTransfer": ""
+      "InsufficientCashForMaxTransfer": "",
+      "SufficientLiquidity": ""
     }
   },
   "ReasonIncorrectNonce": "(Nonce,Nonce)",

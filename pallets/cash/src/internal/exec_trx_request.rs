@@ -237,57 +237,13 @@ pub fn exec_trx_request<T: Config>(
 mod tests {
     use super::*;
     use crate::{
-        chains::*, factor::*, rates::*, reason::TrxReqParseError, tests::mock::*, tests::*,
-        types::*, *,
+        chains::*,
+        reason::TrxReqParseError,
+        tests::mock::*,
+        tests::{common::*, *},
+        types::*,
+        *,
     };
-    use pallet_oracle::types::Price;
-    const ETH: Units = Units::from_ticker_str("ETH", 18);
-    const WBTC: Units = Units::from_ticker_str("WBTC", 8);
-
-    fn init_eth_asset() -> Result<ChainAsset, Reason> {
-        let kink_rate = 105;
-        let asset = ChainAsset::from_str("Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")?;
-        let asset_info = AssetInfo {
-            rate_model: InterestRateModel::new_kink(0, kink_rate, Factor::from_nominal("0.5"), 202),
-            miner_shares: MinerShares::from_nominal("0.5"),
-            liquidity_factor: Factor::from_nominal("0.8"),
-            ..AssetInfo::minimal(asset, ETH)
-        };
-
-        pallet_oracle::Prices::insert(ETH.ticker, Price::from_nominal(ETH.ticker, "2000.00").value);
-        SupportedAssets::insert(&asset, asset_info);
-
-        Ok(asset)
-    }
-
-    fn init_wbtc_asset() -> Result<ChainAsset, Reason> {
-        let asset = ChainAsset::from_str("Eth:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")?;
-        let asset_info = AssetInfo {
-            liquidity_factor: LiquidityFactor::from_nominal("0.65"),
-            ..AssetInfo::minimal(asset, WBTC)
-        };
-
-        pallet_oracle::Prices::insert(
-            WBTC.ticker,
-            Price::from_nominal(WBTC.ticker, "60000.00").value,
-        );
-        SupportedAssets::insert(&asset, asset_info);
-
-        Ok(asset)
-    }
-
-    fn init_asset_balance(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
-        AssetBalances::insert(asset, account, balance);
-        TotalSupplyAssets::insert(
-            asset,
-            (TotalSupplyAssets::get(asset) as i128 + balance) as u128,
-        );
-        AssetsWithNonZeroBalance::insert(account, asset, ());
-    }
-
-    fn init_cash(account: ChainAccount, amount: CashPrincipal) {
-        CashPrincipals::insert(account, amount);
-    }
 
     #[test]
     fn exec_trx_request_extract_cash_principal_internal() {
@@ -544,6 +500,11 @@ mod tests {
             let liquidator_account = ChainAccount::Eth([2; 20]);
             init_asset_balance(
                 eth_asset,
+                borrower_account,
+                Balance::from_nominal("-10", ETH).value,
+            );
+            init_asset_balance(
+                eth_asset,
                 liquidator_account,
                 Balance::from_nominal("3", ETH).value,
             );
@@ -566,7 +527,7 @@ mod tests {
             );
             assert_eq!(
                 AssetBalances::get(eth_asset, borrower_account),
-                Balance::from_nominal("1", ETH).value
+                Balance::from_nominal("-9", ETH).value
             );
             assert_eq!(
                 CashPrincipals::get(liquidator_account),
@@ -612,6 +573,7 @@ mod tests {
             let eth_asset = init_eth_asset().unwrap();
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_cash(borrower_account, CashPrincipal::from_nominal("-10000"));
             init_cash(liquidator_account, CashPrincipal::from_nominal("4000"));
 
             // Liquidate 1000 Cash
@@ -640,7 +602,7 @@ mod tests {
             );
             assert_eq!(
                 CashPrincipals::get(borrower_account),
-                CashPrincipal::from_nominal("1000")
+                CashPrincipal::from_nominal("-9000")
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);
@@ -672,6 +634,59 @@ mod tests {
         });
     }
 
+    // TODO: Test insufficient collateral
+    // TODO: Test close too big
+
+    #[test]
+    fn exec_trx_liquidate_asset_for_asset_sufficient_liquidity() {
+        new_test_ext().execute_with(|| {
+            let wbtc_asset = init_wbtc_asset().unwrap();
+            let eth_asset = init_eth_asset().unwrap();
+            let borrower_account = ChainAccount::Eth([1; 20]);
+            let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                wbtc_asset,
+                borrower_account,
+                Balance::from_nominal("5", WBTC).value,
+            );
+            init_asset_balance(
+                wbtc_asset,
+                liquidator_account,
+                Balance::from_nominal("3", WBTC).value,
+            );
+
+            // Liquidate 1 WBTC
+            let req_str = "(Liquidate 100000000 Eth:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+                Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+                Eth:0x0101010101010101010101010101010101010101)";
+            let nonce = 0;
+
+            assert_eq!(
+                exec_trx_request::<Test>(req_str, liquidator_account, Some(nonce)),
+                Err(Reason::SufficientLiquidity)
+            );
+
+            assert_eq!(
+                AssetBalances::get(eth_asset, liquidator_account),
+                Balance::from_nominal("0", ETH).value
+            );
+            assert_eq!(
+                AssetBalances::get(eth_asset, borrower_account),
+                Balance::from_nominal("0", ETH).value
+            );
+            assert_eq!(
+                AssetBalances::get(wbtc_asset, liquidator_account),
+                Balance::from_nominal("3", WBTC).value
+            );
+            assert_eq!(
+                AssetBalances::get(wbtc_asset, borrower_account),
+                Balance::from_nominal("5", WBTC).value
+            );
+            assert_eq!(Nonces::get(liquidator_account), nonce);
+            assert_eq!(Nonces::get(borrower_account), 0);
+        });
+    }
+
     #[test]
     fn exec_trx_liquidate_asset_for_asset_success() {
         new_test_ext().execute_with(|| {
@@ -679,6 +694,11 @@ mod tests {
             let eth_asset = init_eth_asset().unwrap();
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                wbtc_asset,
+                borrower_account,
+                Balance::from_nominal("-5", WBTC).value,
+            );
             init_asset_balance(
                 wbtc_asset,
                 liquidator_account,
@@ -711,7 +731,7 @@ mod tests {
             );
             assert_eq!(
                 AssetBalances::get(wbtc_asset, borrower_account),
-                Balance::from_nominal("1", WBTC).value
+                Balance::from_nominal("-4", WBTC).value
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);

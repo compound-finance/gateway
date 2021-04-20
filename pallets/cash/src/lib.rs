@@ -666,7 +666,7 @@ impl<T: Config> Module<T> {
 
     /// Get the liquidity for the given account.
     pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
-        Ok(core::get_liquidity::<T>(account)?.value)
+        Ok(internal::liquidity::get_liquidity::<T>(account)?.value)
     }
 
     /// Get the total supply for the given asset.
