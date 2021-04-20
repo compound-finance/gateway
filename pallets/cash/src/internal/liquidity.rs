@@ -250,7 +250,6 @@ mod tests {
 
     #[test]
     fn test_has_liquidity_to_reduce_asset_mismatch() {
-        // TODO: This should fail -- and currently doesn't
         new_test_ext().execute_with(|| {
             assert_eq!(
                 has_liquidity_to_reduce_asset::<Test>(
@@ -265,7 +264,6 @@ mod tests {
 
     #[test]
     fn test_has_liquidity_to_reduce_asset_unpriced() {
-        // TODO: This should fail -- and currently doesn't
         new_test_ext().execute_with(|| {
             pallet_oracle::Prices::insert(
                 ETH.ticker,
