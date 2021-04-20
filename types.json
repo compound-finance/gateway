@@ -383,7 +383,8 @@
       "JsonParseError": "",
       "NoPriceFeedURL": "",
       "StalePrice": "",
-      "SubmitError": ""
+      "SubmitError": "",
+      "NoPrice": ""
     }
   },
   "Oracle__Timestamp": "u64",
@@ -469,7 +470,8 @@
       "PendingAuthNotice": "",
       "ChangeValidatorsError": "",
       "InsufficientCashForMaxTransfer": "",
-      "SufficientLiquidity": ""
+      "SufficientLiquidity": "",
+      "AssetQuantityMismatch": ""
     }
   },
   "ReasonIncorrectNonce": "(Nonce,Nonce)",

@@ -23,6 +23,7 @@ pub enum OracleError {
     NoPriceFeedURL,
     StalePrice,
     SubmitError,
+    NoPrice,
 }
 
 impl From<CryptoError> for OracleError {
@@ -49,6 +50,7 @@ impl From<OracleError> for frame_support::dispatch::DispatchError {
             OracleError::NoPriceFeedURL => (12, 0, "NoPriceFeedURL"),
             OracleError::StalePrice => (13, 0, "StalePrice"),
             OracleError::SubmitError => (14, 0, "SubmitError"),
+            OracleError::NoPrice => (15, 0, "NoPrice"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

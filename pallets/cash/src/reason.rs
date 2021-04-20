@@ -64,6 +64,7 @@ pub enum Reason {
     ChangeValidatorsError,
     InsufficientCashForMaxTransfer,
     SufficientLiquidity,
+    AssetQuantityMismatch,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -123,6 +124,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::ChangeValidatorsError => (31, 0, "change validators error"),
             Reason::InsufficientCashForMaxTransfer => (32, 0, "insufficient cash for max transfer"),
             Reason::SufficientLiquidity => (33, 0, "sufficient liquidity for borrower"),
+            Reason::AssetQuantityMismatch => (34, 0, "asset does not match quantity"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

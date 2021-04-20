@@ -30,6 +30,9 @@ pub fn has_liquidity_to_reduce_asset<T: Config>(
     asset: AssetInfo,
     amount: AssetQuantity,
 ) -> Result<bool, Reason> {
+    if asset.ticker != amount.units.ticker {
+        Err(Reason::AssetQuantityMismatch)?
+    }
     let liquidity = Portfolio::from_storage::<T>(account)?
         .asset_change(asset, amount.as_decrease()?)?
         .get_liquidity::<T>()?;
@@ -43,6 +46,9 @@ pub fn has_liquidity_to_reduce_asset_with_fee<T: Config>(
     amount: AssetQuantity,
     fee: CashQuantity,
 ) -> Result<bool, Reason> {
+    if asset.ticker != amount.units.ticker {
+        Err(Reason::AssetQuantityMismatch)?
+    }
     let liquidity = Portfolio::from_storage::<T>(account)?
         .asset_change(asset, amount.as_decrease()?)?
         .cash_change(fee.as_decrease()?)?
@@ -58,6 +64,12 @@ pub fn has_liquidity_to_reduce_asset_with_added_collateral<T: Config>(
     collateral_asset: AssetInfo,
     collateral_amount: AssetQuantity,
 ) -> Result<bool, Reason> {
+    if asset.ticker != amount.units.ticker {
+        Err(Reason::AssetQuantityMismatch)?
+    }
+    if collateral_asset.ticker != collateral_amount.units.ticker {
+        Err(Reason::AssetQuantityMismatch)?
+    }
     let liquidity = Portfolio::from_storage::<T>(account)?
         .asset_change(asset, amount.as_decrease()?)?
         .asset_change(collateral_asset, collateral_amount.as_increase()?)?
@@ -72,6 +84,9 @@ pub fn has_liquidity_to_reduce_asset_with_added_cash<T: Config>(
     amount: AssetQuantity,
     cash_amount: CashQuantity,
 ) -> Result<bool, Reason> {
+    if asset.ticker != amount.units.ticker {
+        Err(Reason::AssetQuantityMismatch)?
+    }
     let liquidity = Portfolio::from_storage::<T>(account)?
         .asset_change(asset, amount.as_decrease()?)?
         .cash_change(cash_amount.as_increase()?)?
@@ -98,6 +113,9 @@ pub fn has_liquidity_to_reduce_cash_with_added_collateral<T: Config>(
     collateral_asset: AssetInfo,
     collateral_amount: AssetQuantity,
 ) -> Result<bool, Reason> {
+    if collateral_asset.ticker != collateral_amount.units.ticker {
+        Err(Reason::AssetQuantityMismatch)?
+    }
     let liquidity = Portfolio::from_storage::<T>(account)?
         .cash_change(amount.as_decrease()?)?
         .asset_change(collateral_asset, collateral_amount.as_increase()?)?
@@ -115,9 +133,12 @@ mod tests {
     use super::*;
     use crate::{
         chains::*,
-        tests::{common::*, mock::*, *},
+        tests::{assets::*, common::*, mock::*},
         types::*,
+        SupportedAssets,
     };
+    use frame_support::storage::StorageMap;
+    use pallet_oracle::{self, types::Price};
 
     #[test]
     fn test_has_non_negative_liquidity_positive() {
@@ -227,11 +248,8 @@ mod tests {
         })
     }
 
-    // TODO: Better handle unsupported, non-collateral and/or unpriced assets
-
     #[test]
-    fn test_has_liquidity_to_reduce_unsupported_asset_mismatch() {
-        // TODO: This should fail -- and currently doesn't
+    fn test_has_liquidity_to_reduce_asset_mismatch() {
         new_test_ext().execute_with(|| {
             assert_eq!(
                 has_liquidity_to_reduce_asset::<Test>(
@@ -239,10 +257,32 @@ mod tests {
                     eth,
                     Quantity::from_nominal("0.01", WBTC)
                 ),
-                Ok(true)
+                Err(Reason::AssetQuantityMismatch)
             );
         })
     }
+
+    #[test]
+    fn test_has_liquidity_to_reduce_asset_unpriced() {
+        new_test_ext().execute_with(|| {
+            pallet_oracle::Prices::insert(
+                ETH.ticker,
+                Price::from_nominal(ETH.ticker, "2000.00").value,
+            );
+            SupportedAssets::insert(&Eth, eth);
+
+            assert_eq!(
+                has_liquidity_to_reduce_asset::<Test>(
+                    ChainAccount::Eth([0u8; 20]),
+                    wbtc,
+                    Quantity::from_nominal("0.01", WBTC)
+                ),
+                Err(Reason::NoPrice)
+            );
+        })
+    }
+
+    // TODO: Consider what to do with unsupported assets
 
     #[test]
     fn test_has_liquidity_to_reduce_asset_with_fee() {

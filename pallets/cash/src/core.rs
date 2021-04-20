@@ -100,7 +100,12 @@ pub fn get_asset<T: Config>(asset: ChainAsset) -> Result<AssetInfo, Reason> {
 
 /// Return the USD price associated with the given units.
 pub fn get_price<T: pallet_oracle::Config>(units: Units) -> Result<Price, Reason> {
-    pallet_oracle::get_price_by_ticker::<T>(units.ticker).map_err(Reason::OracleError)
+    pallet_oracle::get_price_by_ticker::<T>(units.ticker).ok_or(Reason::NoPrice)
+}
+
+/// Return the price or zero if not given
+pub fn get_price_or_zero<T: pallet_oracle::Config>(units: Units) -> Price {
+    pallet_oracle::get_price_by_ticker::<T>(units.ticker).unwrap_or(Price::new(units.ticker, 0))
 }
 
 /// Return a quantity with units of the given asset.
@@ -1227,13 +1232,13 @@ pub fn on_initialize_internal<T: Config>(
     let last_block_cash_index = GlobalCashIndex::get();
     let last_yield_cash_index = LastYieldCashIndex::get();
     let cash_yield = CashYield::get();
-    let price_cash = get_price::<T>(CASH)?;
+    let price_cash = get_price_or_zero::<T>(CASH);
 
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     for (asset, asset_info) in SupportedAssets::iter() {
         let (asset_cost, asset_yield) = crate::core::get_rates::<T>(asset)?;
         let asset_units = asset_info.units();
-        let price_asset = get_price::<T>(asset_units)?;
+        let price_asset = get_price_or_zero::<T>(asset_units);
         let price_ratio = ratio(price_asset, price_cash)?;
         let cash_borrow_principal_per_asset = last_block_cash_index
             .cash_principal_per_asset(asset_cost.simple(dt_since_last_block)?, price_ratio)?;
