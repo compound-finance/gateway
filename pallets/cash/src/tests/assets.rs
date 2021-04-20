@@ -1,4 +1,4 @@
-use crate::tests::*;
+use crate::{symbol::USD, tests::*};
 
 pub const ETH: Units = Units::from_ticker_str("ETH", 18);
 pub const Eth: ChainAsset = ChainAsset::Eth(hex!("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"));
@@ -52,4 +52,21 @@ pub const wbtc: AssetInfo = AssetInfo {
     supply_cap: Quantity::from_nominal("1000", WBTC).value,
     symbol: Symbol(WBTC.ticker.0),
     ticker: Ticker(WBTC.ticker.0),
+};
+
+pub const _Usdc: ChainAsset = ChainAsset::Eth(hex!("cccccccccccccccccccccccccccccccccccccccc"));
+pub const _usdc: AssetInfo = AssetInfo {
+    asset: Usdc,
+    decimals: USD.decimals,
+    liquidity_factor: LiquidityFactor::from_nominal("0.9"),
+    rate_model: InterestRateModel::Kink {
+        zero_rate: APR(0),
+        kink_rate: APR(500),
+        kink_utilization: Factor::from_nominal("0.8"),
+        full_rate: APR(2000),
+    },
+    miner_shares: Factor::from_nominal("0.05"),
+    supply_cap: Quantity::from_nominal("1000", USD).value,
+    symbol: Symbol(USD.ticker.0),
+    ticker: Ticker(USD.ticker.0),
 };
