@@ -4,7 +4,7 @@ use frame_support::storage::{StorageMap, StorageValue};
 // Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::ChainAccount,
-    core::{repay_and_supply_principal, sub_principal_amounts},
+    internal::balance_helpers::{repay_and_supply_principal, sub_principal_amounts},
     reason::Reason,
     types::{CashIndex, CashPrincipalAmount},
     CashPrincipals, ChainCashPrincipals, Config, Event, GlobalCashIndex, Module,
@@ -18,7 +18,7 @@ pub fn lock_cash_principal_internal<T: Config>(
 ) -> Result<(), Reason> {
     let holder_cash_principal = CashPrincipals::get(holder);
     let (holder_repay_principal, _holder_supply_principal) =
-        repay_and_supply_principal(holder_cash_principal, principal);
+        repay_and_supply_principal(holder_cash_principal, principal)?;
 
     let chain_id = holder.chain_id();
     let chain_cash_principal_new = sub_principal_amounts(
