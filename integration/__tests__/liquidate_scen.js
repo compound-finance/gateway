@@ -230,9 +230,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     name: "Fails when liquidator tries to liquidate healthy account",
     notes:
       `A simple replay of the collateral-for-collateral scenario, but Ashley's
-       account is in good standing.
-
-       Note: This test is a counter-factual and should *not* pass`,
+       account is in good standing.`,
     before: supplyUSDC_BorrowCOMP,
     scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
       await bert.lock(4000, bat);
@@ -241,18 +239,12 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      // Liquidate 0.5 COMP. Bert should receive [0.5 * 229.125 / 1.00 * 1.08]=123.7275 USDC
-      await bert.liquidate(0.5, comp, usdc, ashley); // TODO: This should probably fail
+      await expect(ashley.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/SufficientLiquidity/);
 
-      let ashleyLiquidityAfter = await ashley.liquidity();
-      let bertLiquidityAfter = await bert.liquidity();
-
-      expect(await ashley.chainBalance(usdc)).toBeCloseTo(476.2725); // 600 Received - 123.7275 Liquidated
-      expect(await ashley.chainBalance(comp)).toBeCloseTo(-0.5, 2); // -1 Borrowed + 0.5 COMP De-Liquidated
-      expect(await bert.chainBalance(usdc)).toBeCloseTo(123.7275, 2); // 123.7275 Seized in Liquidation
-      expect(await bert.chainBalance(comp)).toBeCloseTo(-0.5, 2); // -0.5 COMP Debt Assumed in Liquidation
-
-      // Skip liquidity checks since this is not the expected long-term behavior
+      expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
+      expect(await bert.chainBalance(usdc)).toBeCloseTo(0, 2);
+      expect(await bert.chainBalance(comp)).toBeCloseTo(0, 2);
     }
   },
   {
@@ -286,7 +278,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     }
   },
   {
-    name: "Fails when liquidator liquidates self-liquidates",
+    name: "Fails when liquidator self-liquidates",
     notes:
       `A simple replay of the collateral-for-collateral liquidation scenario, but Ashley
        tries to liquidate herself. This is prohibited by rule.
