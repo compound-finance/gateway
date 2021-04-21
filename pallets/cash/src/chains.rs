@@ -234,6 +234,37 @@ pub enum ChainSignatureList {
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
 }
 
+impl ChainSignatureList {
+    pub fn has_signer(&self, signer: ChainAccount) -> bool {
+        match (self, signer) {
+            (ChainSignatureList::Eth(eth_signature_pairs), ChainAccount::Eth(eth_account)) => {
+                eth_signature_pairs.iter().any(|(s, _)| *s == eth_account)
+            }
+            _ => false,
+        }
+    }
+
+    pub fn has_validator_signature(&self, chain_id: ChainId, validator: &ValidatorKeys) -> bool {
+        match chain_id {
+            ChainId::Eth => self.has_signer(ChainAccount::Eth(validator.eth_address)),
+            _ => false,
+        }
+    }
+
+    pub fn add_validator_signature(
+        &mut self,
+        signature: &ChainSignature,
+        validator: &ValidatorKeys,
+    ) -> Result<(), Reason> {
+        match (self, signature) {
+            (ChainSignatureList::Eth(eth_sig_list), ChainSignature::Eth(eth_sig)) => {
+                Ok(eth_sig_list.push((validator.eth_address, eth_sig.clone())))
+            }
+            _ => Err(Reason::SignatureMismatch),
+        }
+    }
+}
+
 // Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
 impl FromStr for ChainId {
     type Err = Reason;

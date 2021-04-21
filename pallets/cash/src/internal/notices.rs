@@ -6,7 +6,7 @@ use crate::{
     core::recover_validator,
     log,
     notices::{
-        has_signer, CashExtractionNotice, ChangeAuthorityNotice, EncodeNotice, ExtractionNotice,
+        CashExtractionNotice, ChangeAuthorityNotice, EncodeNotice, ExtractionNotice,
         FutureYieldNotice, Notice, NoticeId, NoticeState, SetSupplyCapNotice,
     },
     require,
@@ -198,7 +198,7 @@ fn process_notice_state<T: Config>(
     match notice_state {
         NoticeState::Pending { signature_pairs } => {
             let signer = chain_id.signer_address()?;
-            if !has_signer(&signature_pairs, signer) {
+            if !signature_pairs.has_signer(signer) {
                 let notice = Notices::get(chain_id, notice_id)
                     .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
                 let signature: ChainSignature = notice.sign_notice()?; // NO_COV_FAIL: key already checked
@@ -236,39 +236,27 @@ pub fn publish_signature<T: Config>(
     signature: ChainSignature,
 ) -> Result<(), Reason> {
     log!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1);
-    let state = NoticeStates::get(chain_id, notice_id);
 
-    match state {
+    match NoticeStates::get(chain_id, notice_id) {
         NoticeState::Missing => Ok(()),
 
-        NoticeState::Pending { signature_pairs } => {
+        NoticeState::Pending { mut signature_pairs } => {
             let notice = Notices::get(chain_id, notice_id)
                 .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
             let validator = recover_validator::<T>(&notice.encode_notice(), signature)?;
 
-            // XXX what happens if not eth here? seems broken
-            // Skip signatures already in the list
-            if has_signer(&signature_pairs, ChainAccount::Eth(validator.eth_address)) {
+            if signature_pairs.has_validator_signature(signature.chain_id(), &validator) {
                 return Ok(());
             }
 
-            // TODO: Can this be easier?
-            let signature_pairs_next = match (signature_pairs, signature) {
-                (ChainSignatureList::Eth(eth_signature_list), ChainSignature::Eth(eth_sig)) => {
-                    let mut eth_signature_list_mut = eth_signature_list.clone();
-                    eth_signature_list_mut.push((validator.eth_address, eth_sig));
-                    Ok(ChainSignatureList::Eth(eth_signature_list_mut))
-                }
-                _ => Err(Reason::SignatureMismatch),
-            }?;
+            signature_pairs.add_validator_signature(&signature, &validator)?;
 
             NoticeStates::insert(
                 chain_id,
                 notice_id,
-                NoticeState::Pending {
-                    signature_pairs: signature_pairs_next,
-                },
+                NoticeState::Pending { signature_pairs },
             );
+
             Ok(())
         }
 
