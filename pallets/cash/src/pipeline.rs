@@ -18,7 +18,7 @@ use crate::{
 };
 
 trait Apply {
-    fn apply<T: Config>(self: &Self, state: &State) -> Result<State, Reason>;
+    fn apply<T: Config>(self: Self, state: State) -> Result<State, Reason>;
 }
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug)]
@@ -46,7 +46,7 @@ impl State {
     }
 
     pub fn build_portfolio<T: Config>(
-        self: Self,
+        self: &Self,
         account: ChainAccount,
     ) -> Result<Portfolio, Reason> {
         let mut principal = self.get_cash_principal::<T>(account);
@@ -76,7 +76,7 @@ impl State {
         Ok(Portfolio { cash, positions })
     }
 
-    pub fn get_total_supply_asset<T: Config>(self: &mut Self, asset_info: AssetInfo) -> Quantity {
+    pub fn get_total_supply_asset<T: Config>(self: &Self, asset_info: AssetInfo) -> Quantity {
         asset_info.as_quantity(
             self.total_supply_asset
                 .get(&asset_info.asset)
@@ -94,7 +94,7 @@ impl State {
             .insert(asset_info.asset, quantity.value);
     }
 
-    pub fn get_total_borrow_asset<T: Config>(self: &mut Self, asset_info: AssetInfo) -> Quantity {
+    pub fn get_total_borrow_asset<T: Config>(self: &Self, asset_info: AssetInfo) -> Quantity {
         asset_info.as_quantity(
             self.total_borrow_asset
                 .get(&asset_info.asset)
@@ -209,25 +209,25 @@ impl State {
         self.total_cash_principal = Some(total_cash_principal);
     }
 
-    pub fn commit<T: Config>(self: Self) {
+    pub fn commit<T: Config>(self: &Self) {
         self.total_supply_asset
-            .into_iter()
+            .iter()
             .for_each(|(chain_asset, asset_amount)| {
                 TotalSupplyAssets::insert(chain_asset, asset_amount);
             });
         self.total_borrow_asset
-            .into_iter()
+            .iter()
             .for_each(|(chain_asset, asset_amount)| {
                 TotalBorrowAssets::insert(chain_asset, asset_amount);
             });
         self.asset_balances
-            .into_iter()
+            .iter()
             .for_each(|((chain_asset, account), balance)| {
                 AssetBalances::insert(chain_asset, account, balance);
             });
-        self.assets_with_non_zero_balance.into_iter().for_each(
+        self.assets_with_non_zero_balance.iter().for_each(
             |((chain_asset, account), is_non_zero)| {
-                if is_non_zero {
+                if *is_non_zero {
                     AssetsWithNonZeroBalance::insert(account, chain_asset, ());
                 } else {
                     AssetsWithNonZeroBalance::remove(account, chain_asset);
@@ -235,12 +235,12 @@ impl State {
             },
         );
         self.last_indices
-            .into_iter()
+            .iter()
             .for_each(|((chain_asset, account), last_index)| {
                 LastIndices::insert(chain_asset, account, last_index);
             });
         self.cash_principals
-            .into_iter()
+            .iter()
             .for_each(|(account, cash_principal)| {
                 CashPrincipals::insert(account, cash_principal);
             });
@@ -251,14 +251,12 @@ impl State {
 }
 
 fn prepare_transfer_asset<T: Config>(
-    st_pre: &State,
+    mut st: State,
     sender: ChainAccount,
     recipient: ChainAccount,
     asset: ChainAsset,
     quantity: Quantity,
 ) -> Result<State, Reason> {
-    let mut st: State = st_pre.clone();
-
     if sender == recipient {
         Err(Reason::SelfTransfer)?
     }
@@ -325,13 +323,11 @@ fn prepare_transfer_asset<T: Config>(
 }
 
 fn prepare_transfer_cash<T: Config>(
-    st_pre: &State,
+    mut st: State,
     sender: ChainAccount,
     recipient: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<State, Reason> {
-    let mut st: State = st_pre.clone();
-
     let sender_cash_pre = st.get_cash_principal::<T>(sender);
     let recipient_cash_pre = st.get_cash_principal::<T>(recipient);
 
@@ -358,7 +354,6 @@ fn prepare_transfer_cash<T: Config>(
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub enum Effect {
-    Init,
     TransferAsset {
         sender: ChainAccount,
         recipient: ChainAccount,
@@ -373,20 +368,19 @@ pub enum Effect {
 }
 
 impl Apply for Effect {
-    fn apply<T: Config>(self: &Self, state: &State) -> Result<State, Reason> {
+    fn apply<T: Config>(self: Self, state: State) -> Result<State, Reason> {
         match self {
-            Effect::Init => Ok(state.clone()),
             Effect::TransferAsset {
                 sender,
                 recipient,
                 asset,
                 quantity,
-            } => prepare_transfer_asset::<T>(state, *sender, *recipient, *asset, *quantity),
+            } => prepare_transfer_asset::<T>(state, sender, recipient, asset, quantity),
             Effect::TransferCash {
                 sender,
                 recipient,
                 principal,
-            } => prepare_transfer_cash::<T>(state, *sender, *recipient, *principal),
+            } => prepare_transfer_cash::<T>(state, sender, recipient, principal),
         }
     }
 }
@@ -394,64 +388,58 @@ impl Apply for Effect {
 /// Type for representing a set of positions for an account.
 #[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub struct CashPipeline {
-    pub effects: Vec<(Effect, State)>,
+    pub effects: Vec<Effect>,
+    pub state: State,
 }
 
 impl CashPipeline {
     pub fn new() -> Self {
         CashPipeline {
-            effects: vec![(Effect::Init, State::new())],
+            effects: vec![],
+            state: State::new(),
         }
     }
 
-    fn state(self: &Self) -> &State {
-        &self.effects.last().expect("expected last state").1
+    fn apply_effect<T: Config>(mut self: Self, effect: Effect) -> Result<Self, Reason> {
+        self.state = effect.clone().apply::<T>(self.state)?;
+        self.effects.push(effect);
+        Ok(self)
     }
 
     pub fn transfer_asset<T: Config>(
-        self: &mut Self,
+        self: Self,
         sender: ChainAccount,
         recipient: ChainAccount,
         asset: ChainAsset,
         quantity: Quantity,
-    ) -> Result<&mut Self, Reason> {
-        let effect = Effect::TransferAsset {
+    ) -> Result<Self, Reason> {
+        self.apply_effect::<T>(Effect::TransferAsset {
             sender,
             recipient,
             asset,
             quantity,
-        };
-        let state_old = self.state();
-        let state_new = effect.apply::<T>(state_old)?;
-        self.effects.push((effect, state_new));
-        Ok(self)
+        })
     }
 
     pub fn transfer_cash<T: Config>(
-        self: &mut Self,
+        self: Self,
         sender: ChainAccount,
         recipient: ChainAccount,
         principal: CashPrincipalAmount,
-    ) -> Result<&mut Self, Reason> {
-        let effect = Effect::TransferCash {
+    ) -> Result<Self, Reason> {
+        self.apply_effect::<T>(Effect::TransferCash {
             sender,
             recipient,
             principal,
-        };
-        let state_old = self.state();
-        let state_new = effect.apply::<T>(state_old)?;
-        self.effects.push((effect, state_new));
-        Ok(self)
+        })
     }
 
-    pub fn check_liquidity<T: Config>(
-        self: &mut Self,
+    pub fn check_collateralized<T: Config>(
+        self: Self,
         account: ChainAccount,
-    ) -> Result<&mut Self, Reason> {
-        // TODO: Consider removing all the state cloning
+    ) -> Result<Self, Reason> {
         let liquidity = self
-            .state()
-            .clone()
+            .state
             .build_portfolio::<T>(account)?
             .get_liquidity::<T>()?;
         if liquidity.value < 0 {
@@ -461,9 +449,8 @@ impl CashPipeline {
         }
     }
 
-    pub fn commit<T: Config>(self: &mut Self) {
-        // TODO: Consider removing all the state cloning
-        self.state().clone().commit::<T>();
+    pub fn commit<T: Config>(self: Self) {
+        self.state.commit::<T>();
     }
 }
 
@@ -517,8 +504,7 @@ mod tests {
             let state = CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, quantity)
                 .expect("transfer_asset failed")
-                .state()
-                .clone();
+                .state;
 
             assert_eq!(
                 state,
@@ -560,8 +546,7 @@ mod tests {
             let state = CashPipeline::new()
                 .transfer_cash::<Test>(account_a, account_b, quantity)
                 .expect("transfer_cash failed")
-                .state()
-                .clone();
+                .state;
 
             assert_eq!(
                 state,
@@ -603,8 +588,7 @@ mod tests {
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
                 .expect("transfer_asset(wbtc) failed")
-                .state()
-                .clone();
+                .state;
 
             let portfolio_a = state.clone().build_portfolio::<Test>(account_a);
 
@@ -665,7 +649,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_liquidity() {
+    fn test_check_collateralized() {
         new_test_ext().execute_with(|| {
             assert_ok!(init_eth_asset());
             assert_ok!(init_wbtc_asset());
@@ -676,18 +660,16 @@ mod tests {
             let eth_quantity = eth.as_quantity_nominal("1");
             let wbtc_quantity = wbtc.as_quantity_nominal("0.02");
 
-            let mut effect = CashPipeline::new()
+            let res = CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
                 .expect("transfer_asset(wbtc) failed")
-                .clone();
+                .check_collateralized::<Test>(account_a)
+                .expect("account_a should be liquid")
+                .check_collateralized::<Test>(account_b);
 
-            assert_ok!(effect.check_liquidity::<Test>(account_a));
-            assert_eq!(
-                effect.check_liquidity::<Test>(account_b),
-                Err(Reason::InsufficientLiquidity)
-            );
+            assert_eq!(res, Err(Reason::InsufficientLiquidity));
         })
     }
 
@@ -708,8 +690,7 @@ mod tests {
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
                 .expect("transfer_asset(wbtc) failed")
-                .state()
-                .clone();
+                .state;
 
             assert_eq!(
                 state,

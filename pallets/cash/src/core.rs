@@ -520,7 +520,7 @@ pub fn transfer_internal<T: Config>(
     CashPipeline::new()
         .transfer_asset::<T>(sender, recipient, asset.asset, amount)?
         .transfer_cash::<T>(sender, miner, fee_principal)?
-        .check_liquidity::<T>(sender)?
+        .check_collateralized::<T>(sender)?
         .commit::<T>();
 
     <Module<T>>::deposit_event(Event::Transfer(
@@ -548,7 +548,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
     CashPipeline::new()
         .transfer_cash::<T>(sender, recipient, principal)?
         .transfer_cash::<T>(sender, miner, fee_principal)?
-        .check_liquidity::<T>(sender)?
+        .check_collateralized::<T>(sender)?
         .commit::<T>();
 
     <Module<T>>::deposit_event(Event::TransferCash(sender, recipient, principal, index));

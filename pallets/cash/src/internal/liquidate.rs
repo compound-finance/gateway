@@ -50,7 +50,7 @@ pub fn liquidate_internal<T: Config>(
     CashPipeline::new()
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
-        .check_liquidity::<T>(liquidator)?
+        .check_collateralized::<T>(liquidator)?
         // Note: don't check borrower liquidity
         .commit::<T>();
 
@@ -92,7 +92,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     CashPipeline::new()
         .transfer_cash::<T>(liquidator, borrower, principal)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
-        .check_liquidity::<T>(liquidator)?
+        .check_collateralized::<T>(liquidator)?
         // Note: don't check borrower liquidity
         .commit::<T>();
 
@@ -132,7 +132,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     CashPipeline::new()
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_cash::<T>(borrower, liquidator, seize_principal)?
-        .check_liquidity::<T>(liquidator)?
+        .check_collateralized::<T>(liquidator)?
         // Note: don't check borrower liquidity
         .commit::<T>();
 
