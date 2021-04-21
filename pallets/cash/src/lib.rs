@@ -53,6 +53,7 @@ extern crate lazy_static;
 pub mod chains;
 pub mod converters;
 pub mod core;
+pub mod effectful;
 pub mod events;
 pub mod factor;
 pub mod internal;

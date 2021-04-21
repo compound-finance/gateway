@@ -7,6 +7,7 @@ pub fn init_eth_asset() -> Result<ChainAsset, Reason> {
     Ok(Eth)
 }
 
+#[allow(dead_code)]
 pub fn init_uni_asset() -> Result<ChainAsset, Reason> {
     pallet_oracle::Prices::insert(
         UNI.ticker,

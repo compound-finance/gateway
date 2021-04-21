@@ -54,8 +54,9 @@ pub const wbtc: AssetInfo = AssetInfo {
     ticker: Ticker(WBTC.ticker.0),
 };
 
-pub const _Usdc: ChainAsset = ChainAsset::Eth(hex!("cccccccccccccccccccccccccccccccccccccccc"));
-pub const _usdc: AssetInfo = AssetInfo {
+pub const Usdc: ChainAsset = ChainAsset::Eth(hex!("cccccccccccccccccccccccccccccccccccccccc"));
+#[allow(dead_code)]
+pub const usdc: AssetInfo = AssetInfo {
     asset: Usdc,
     decimals: USD.decimals,
     liquidity_factor: LiquidityFactor::from_nominal("0.9"),
