@@ -36,7 +36,7 @@ use frame_support::{
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{
-    collections::btree_set::BTreeSet, convert::TryInto, error, log, str, vec::Vec, Debuggable,
+    collections::btree_set::BTreeSet, convert::TryInto, error, debug, log, str, vec::Vec, Debuggable,
 };
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
@@ -320,7 +320,6 @@ decl_event!(
 
 fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
     if let Err(err) = res {
-        println!("WE HIT AN ERR {:?}", err);
         <Module<T>>::deposit_event(Event::Failure(err));
         log!("Cash Failure {:#?}", err);
     }
@@ -603,7 +602,7 @@ decl_module! {
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (<T as Config>::WeightInfo::receive_chain_blocks(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (0, DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
             log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature); // XXX ?
             ensure_none(origin)?;
@@ -611,7 +610,7 @@ decl_module! {
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (<T as Config>::WeightInfo::receive_chain_reorg(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (0, DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
             log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature); // XXX ?
             ensure_none(origin)?;

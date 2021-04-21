@@ -49,8 +49,6 @@ use sp_std::marker::PhantomData;
 
 /// Weight functions needed for pallet_cash.
 pub trait WeightInfo {
-    fn receive_chain_blocks() -> Weight;
-    fn receive_chain_reorg() -> Weight;
 	fn on_initialize(z: u32, ) -> Weight;
 	fn publish_signature() -> Weight;
 	fn set_yield_next() -> Weight;
@@ -64,19 +62,12 @@ pub trait WeightInfo {
 	fn change_validators() -> Weight;
 	fn exec_trx_request_extract() -> Weight;
 	fn exec_trx_request_transfer() -> Weight;
-	fn exec_trx_request_liquidate() -> Weight;
 }
 
 /// Weights for pallet_cash using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 
-    fn receive_chain_blocks() -> Weight {
-        (243_000_000 as Weight) // XXX
-    }
-    fn receive_chain_reorg() -> Weight {
-        (243_000_000 as Weight) // XXX
-    }
 	fn on_initialize(z: u32, ) -> Weight {
 		(429_280_000 as Weight)
 			// Standard Error: 1_504_000
@@ -118,7 +109,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(2 as Weight))
 			.saturating_add(T::DbWeight::get().writes(5 as Weight))
 	}
-	fn allow_next_code_with_hash(_z: u32, ) -> Weight {
+	fn allow_next_code_with_hash() -> Weight {
 		(26_801_000 as Weight)
 			.saturating_add(T::DbWeight::get().writes(1 as Weight))
 	}
@@ -148,12 +139,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 
 // For backwards compatibility and tests
 impl WeightInfo for () {
-    fn receive_chain_blocks() -> Weight {
-        (243_000_000 as Weight) // XXX
-    }
-    fn receive_chain_reorg() -> Weight {
-        (243_000_000 as Weight) // XXX
-    }
 	fn on_initialize(z: u32, ) -> Weight {
 		(429_280_000 as Weight)
 			// Standard Error: 1_504_000
@@ -195,7 +180,7 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().reads(2 as Weight))
 			.saturating_add(RocksDbWeight::get().writes(5 as Weight))
 	}
-	fn allow_next_code_with_hash(_z: u32, ) -> Weight {
+	fn allow_next_code_with_hash() -> Weight {
 		(26_801_000 as Weight)
 			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
 	}
