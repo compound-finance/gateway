@@ -481,11 +481,18 @@ mod tests {
     #[test]
     fn exec_trx_liquidate_cash_collateral_self_transfer() {
         new_test_ext().execute_with(|| {
-            let _eth_asset = init_eth_asset().unwrap();
-            let req_str = "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
+            let eth_asset = init_eth_asset().unwrap();
+            let borrower_account = ChainAccount::Eth([1; 20]);
+            let req_str =
+                "(Liquidate 555555555555555555 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
                 CASH Eth:0x0101010101010101010101010101010101010101)";
             let account = ChainAccount::Eth([1; 20]);
             let nonce = Some(0);
+            init_asset_balance(
+                eth_asset,
+                borrower_account,
+                Balance::from_nominal("-10", ETH).value,
+            );
 
             assert_eq!(
                 exec_trx_request::<Test>(req_str, account, nonce),

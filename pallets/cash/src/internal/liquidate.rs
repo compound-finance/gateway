@@ -13,10 +13,10 @@ use frame_support::storage::{StorageMap, StorageValue};
 use crate::{
     chains::ChainAccount,
     core::{self, get_price, get_value},
-    effectful::Effectful,
     factor::Factor,
     internal::liquidity,
     params::MIN_TX_VALUE,
+    pipeline::CashPipeline,
     reason::Reason,
     require, require_min_tx_value,
     types::{AssetInfo, AssetQuantity, CashPrincipalAmount, CASH},
@@ -47,7 +47,7 @@ pub fn liquidate_internal<T: Config>(
         Reason::SufficientLiquidity
     );
 
-    Effectful::new()
+    CashPipeline::new()
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
         .check_liquidity::<T>(liquidator)?
@@ -89,7 +89,7 @@ pub fn liquidate_cash_principal_internal<T: Config>(
             collateral_asset.units(),
         )?;
 
-    Effectful::new()
+    CashPipeline::new()
         .transfer_cash::<T>(liquidator, borrower, principal)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
         .check_liquidity::<T>(liquidator)?
@@ -129,7 +129,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
         .div_price(get_price::<T>(CASH)?, CASH)?;
     let seize_principal = index.cash_principal_amount(seize_amount)?;
 
-    Effectful::new()
+    CashPipeline::new()
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_cash::<T>(borrower, liquidator, seize_principal)?
         .check_liquidity::<T>(liquidator)?
@@ -168,7 +168,13 @@ mod tests {
     #[test]
     fn test_liquidate_internal_self_liquidate() {
         new_test_ext().execute_with(|| {
+            init_eth_asset().unwrap();
             let amount: AssetQuantity = eth.as_quantity_nominal("1");
+
+            init_eth_asset().unwrap();
+            init_wbtc_asset().unwrap();
+
+            init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value); // 1 * 60000 / 0.6 = -100000
 
             assert_eq!(
                 liquidate_internal::<Test>(asset, collateral_asset, borrower, borrower, amount),
@@ -242,7 +248,6 @@ mod tests {
         })
     }
 
-    // TODO: Check that it's supported (?)
     #[test]
     fn test_liquidate_internal_no_asset_price() {
         new_test_ext().execute_with(|| {
@@ -257,7 +262,6 @@ mod tests {
         })
     }
 
-    // TODO: Check that it's supported (?)
     #[test]
     fn test_liquidate_internal_no_collateral_asset_price() {
         new_test_ext().execute_with(|| {
@@ -268,6 +272,52 @@ mod tests {
             assert_eq!(
                 liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
                 Err(Reason::NoPrice)
+            );
+        })
+    }
+
+    #[test]
+    fn test_liquidate_internal_not_supported() {
+        new_test_ext().execute_with(|| {
+            let amount: AssetQuantity = eth.as_quantity_nominal("1");
+
+            pallet_oracle::Prices::insert(
+                ETH.ticker,
+                Price::from_nominal(ETH.ticker, "2000.00").value,
+            );
+            pallet_oracle::Prices::insert(
+                WBTC.ticker,
+                Price::from_nominal(WBTC.ticker, "60000.00").value,
+            );
+            init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value); // 1 * 60000 / 0.6 = -100000
+
+            init_wbtc_asset().unwrap();
+
+            assert_eq!(
+                liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
+                Err(Reason::AssetNotSupported)
+            );
+        })
+    }
+
+    #[test]
+    fn test_liquidate_internal_not_supported_collateral() {
+        new_test_ext().execute_with(|| {
+            let amount: AssetQuantity = eth.as_quantity_nominal("1");
+
+            pallet_oracle::Prices::insert(
+                ETH.ticker,
+                Price::from_nominal(ETH.ticker, "2000.00").value,
+            );
+            pallet_oracle::Prices::insert(
+                WBTC.ticker,
+                Price::from_nominal(WBTC.ticker, "60000.00").value,
+            );
+            init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value); // 1 * 60000 / 0.6 = -100000
+
+            assert_eq!(
+                liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
+                Err(Reason::AssetNotSupported)
             );
         })
     }
@@ -346,48 +396,6 @@ mod tests {
     }
 
     #[test]
-    fn test_liquidate_internal_asset_repay_and_supply_amount_overflow() {
-        new_test_ext().execute_with(|| {
-            let amount: AssetQuantity = eth.as_quantity_nominal("1");
-
-            init_eth_asset().unwrap();
-            init_wbtc_asset().unwrap();
-
-            init_asset_balance(Eth, borrower, Balance::from_nominal("3", ETH).value); // 3 * 2000 * 0.8 = 4800
-            init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value); // 1 * 60000 / 0.6 = -100000
-            init_cash(borrower, CashPrincipal::from_nominal("95000")); // 95000 + 4800 - 1000000 = -200
-
-            init_cash(liquidator, CashPrincipal::from_nominal("1000000"));
-            init_asset_balance(Eth, liquidator, i128::MIN);
-
-            assert_eq!(
-                liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
-                Err(Reason::MathError(MathError::Overflow))
-            );
-        })
-    }
-
-    #[test]
-    fn test_liquidate_internal_collateral_asset_repay_and_supply_amount_overflow() {
-        new_test_ext().execute_with(|| {
-            let amount: AssetQuantity = eth.as_quantity_nominal("1");
-
-            init_eth_asset().unwrap();
-            init_wbtc_asset().unwrap();
-
-            init_asset_balance(Eth, borrower, Balance::from_nominal("-3", ETH).value);
-
-            init_cash(liquidator, CashPrincipal::from_nominal("1000000"));
-            init_asset_balance(Wbtc, liquidator, i128::MIN);
-
-            assert_eq!(
-                liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
-                Err(Reason::MathError(MathError::Overflow))
-            );
-        })
-    }
-
-    #[test]
     fn test_liquidate_internal_borrower_asset_overflow() {
         new_test_ext().execute_with(|| {
             let amount: AssetQuantity = eth.as_quantity_nominal("1");
@@ -441,15 +449,18 @@ mod tests {
 
     #[test]
     fn test_liquidate_internal_total_supply_underflow() {
+        /* The underwater user has -3 Eth the liquidator has 3 Eth, but the protocol magically
+           has zero total supplied Eth. The liquidation causes a net-loss of Eth and thus underflows.
+           This scenario cannot happen in normal conditions due to the set-up
+        */
         new_test_ext().execute_with(|| {
             let amount: AssetQuantity = eth.as_quantity_nominal("1");
 
             init_eth_asset().unwrap();
             init_wbtc_asset().unwrap();
 
-            init_asset_balance(Eth, borrower, Balance::from_nominal("3", ETH).value); // 3 * 2000 * 0.8 = 4800
-            init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value); // 1 * 60000 / 0.6 = -100000
-            init_cash(borrower, CashPrincipal::from_nominal("95000")); // 95000 + 4800 - 1000000 = -200
+            init_asset_balance(Eth, borrower, Balance::from_nominal("-3", ETH).value);
+            init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value);
 
             init_cash(liquidator, CashPrincipal::from_nominal("1000000"));
 
@@ -481,7 +492,7 @@ mod tests {
 
             assert_eq!(
                 liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
-                Err(Reason::MathError(MathError::DivisionByZero))
+                Err(Reason::MathError(MathError::Overflow))
             );
         })
     }

@@ -27,11 +27,11 @@ use crate::{
         Chain, ChainAccount, ChainAsset, ChainBlockEvent, ChainBlockEvents, ChainHash, ChainId,
         ChainSignature, Ethereum,
     },
-    effectful::Effectful,
     factor::Factor,
     internal::{self, balance_helpers::*, liquidity},
     log,
     params::{MIN_TX_VALUE, TRANSFER_FEE},
+    pipeline::CashPipeline,
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
@@ -517,7 +517,7 @@ pub fn transfer_internal<T: Config>(
 
     require_min_tx_value!(get_value::<T>(amount)?);
 
-    Effectful::new()
+    CashPipeline::new()
         .transfer_asset::<T>(sender, recipient, asset.asset, amount)?
         .transfer_cash::<T>(sender, miner, fee_principal)?
         .check_liquidity::<T>(sender)?
@@ -545,7 +545,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
 
     require_min_tx_value!(get_value::<T>(amount)?);
 
-    Effectful::new()
+    CashPipeline::new()
         .transfer_cash::<T>(sender, recipient, principal)?
         .transfer_cash::<T>(sender, miner, fee_principal)?
         .check_liquidity::<T>(sender)?

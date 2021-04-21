@@ -287,7 +287,8 @@ fn prepare_transfer_asset<T: Config>(
 
     let total_borrow_new = total_borrow_pre
         .add(sender_borrow_amount)?
-        .sub(recipient_repay_amount)?;
+        .sub(recipient_repay_amount)
+        .map_err(|_| Reason::TotalBorrowUnderflow)?;
 
     let sender_balance_post = sender_balance_pre.sub_quantity(quantity)?;
     let recipient_balance_post = recipient_balance_pre.add_quantity(quantity)?;
@@ -345,7 +346,8 @@ fn prepare_transfer_cash<T: Config>(
     let total_cash_post = st
         .get_total_cash_principal::<T>()
         .add(sender_borrow_principal)?
-        .sub(recipient_repay_principal)?;
+        .sub(recipient_repay_principal)
+        .map_err(|_| Reason::InsufficientChainCash)?;
 
     st.set_cash_principal::<T>(sender, sender_cash_post);
     st.set_cash_principal::<T>(recipient, recipient_cash_post);
@@ -391,13 +393,13 @@ impl Apply for Effect {
 
 /// Type for representing a set of positions for an account.
 #[derive(Clone, Eq, PartialEq, RuntimeDebug)]
-pub struct Effectful {
+pub struct CashPipeline {
     pub effects: Vec<(Effect, State)>,
 }
 
-impl Effectful {
+impl CashPipeline {
     pub fn new() -> Self {
-        Effectful {
+        CashPipeline {
             effects: vec![(Effect::Init, State::new())],
         }
     }
@@ -512,7 +514,7 @@ mod tests {
             let quantity = eth.as_quantity_nominal("1");
             let amount = quantity.value as i128;
 
-            let state = Effectful::new()
+            let state = CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, quantity)
                 .expect("transfer_asset failed")
                 .state()
@@ -555,7 +557,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let quantity = CashPrincipalAmount::from_nominal("1");
 
-            let state = Effectful::new()
+            let state = CashPipeline::new()
                 .transfer_cash::<Test>(account_a, account_b, quantity)
                 .expect("transfer_cash failed")
                 .state()
@@ -596,7 +598,7 @@ mod tests {
             let wbtc_quantity = wbtc.as_quantity_nominal("0.02");
             let wbtc_amount = wbtc_quantity.value as i128;
 
-            let state = Effectful::new()
+            let state = CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
@@ -674,7 +676,7 @@ mod tests {
             let eth_quantity = eth.as_quantity_nominal("1");
             let wbtc_quantity = wbtc.as_quantity_nominal("0.02");
 
-            let mut effect = Effectful::new()
+            let mut effect = CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
@@ -701,7 +703,7 @@ mod tests {
             let wbtc_quantity = wbtc.as_quantity_nominal("0.1");
             let wbtc_amount = wbtc_quantity.value as i128;
 
-            let state = Effectful::new()
+            let state = CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
@@ -768,7 +770,7 @@ mod tests {
             let quantity = eth.as_quantity_nominal("1");
             let amount = quantity.value as i128;
 
-            Effectful::new()
+            CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, quantity)
                 .expect("transfer_asset failed")
                 .commit::<Test>();
@@ -824,7 +826,7 @@ mod tests {
             let wbtc_quantity = wbtc.as_quantity_nominal("0.1");
             let wbtc_amount = wbtc_quantity.value as i128;
 
-            Effectful::new()
+            CashPipeline::new()
                 .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
                 .expect("transfer_asset(eth) failed")
                 .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
@@ -964,4 +966,46 @@ mod tests {
             );
         })
     }
+
+    // #[test]
+    // fn test_liquidate_internal_asset_repay_and_supply_amount_overflow() {
+    //     new_test_ext().execute_with(|| {
+    //         let amount: AssetQuantity = eth.as_quantity_nominal("1");
+
+    //         init_eth_asset().unwrap();
+    //         init_wbtc_asset().unwrap();
+
+    //         init_asset_balance(Eth, borrower, Balance::from_nominal("3", ETH).value); // 3 * 2000 * 0.8 = 4800
+    //         init_asset_balance(Wbtc, borrower, Balance::from_nominal("-1", WBTC).value); // 1 * 60000 / 0.6 = -100000
+    //         init_cash(borrower, CashPrincipal::from_nominal("95000")); // 95000 + 4800 - 1000000 = -200
+
+    //         init_cash(liquidator, CashPrincipal::from_nominal("1000000"));
+    //         init_asset_balance(Eth, liquidator, i128::MIN);
+
+    //         assert_eq!(
+    //             liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
+    //             Err(Reason::MathError(MathError::Overflow))
+    //         );
+    //     })
+    // }
+
+    // #[test]
+    // fn test_liquidate_internal_collateral_asset_repay_and_supply_amount_overflow() {
+    //     new_test_ext().execute_with(|| {
+    //         let amount: AssetQuantity = eth.as_quantity_nominal("1");
+
+    //         init_eth_asset().unwrap();
+    //         init_wbtc_asset().unwrap();
+
+    //         init_asset_balance(Eth, borrower, Balance::from_nominal("-3", ETH).value);
+
+    //         init_cash(liquidator, CashPrincipal::from_nominal("1000000"));
+    //         init_asset_balance(Wbtc, liquidator, i128::MIN);
+
+    //         assert_eq!(
+    //             liquidate_internal::<Test>(asset, collateral_asset, liquidator, borrower, amount),
+    //             Err(Reason::MathError(MathError::Overflow))
+    //         );
+    //     })
+    // }
 }
