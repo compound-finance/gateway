@@ -328,6 +328,32 @@ impl Balance {
         ))
     }
 
+    // Balance<U> + Quantity<U> -> Balance<U>
+    pub fn add_quantity(self, delta: Quantity) -> Result<Balance, MathError> {
+        if self.units.ticker != delta.units.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Balance::new(
+            self.value
+                .checked_add(delta.value.try_into().map_err(|_| MathError::Overflow)?)
+                .ok_or(MathError::Underflow)?,
+            self.units,
+        ))
+    }
+
+    // Balance<U> - Quantity<U> -> Balance<U>
+    pub fn sub_quantity(self, delta: Quantity) -> Result<Balance, MathError> {
+        if self.units.ticker != delta.units.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Balance::new(
+            self.value
+                .checked_sub(delta.value.try_into().map_err(|_| MathError::Overflow)?)
+                .ok_or(MathError::Underflow)?,
+            self.units,
+        ))
+    }
+
     // Balance<U.T> * Price<T> -> Balance<{ USD }>
     pub fn mul_price(self, rhs: Price) -> Result<Balance, MathError> {
         if self.units.ticker != rhs.ticker {

@@ -7,6 +7,7 @@ pub fn init_eth_asset() -> Result<ChainAsset, Reason> {
     Ok(Eth)
 }
 
+#[allow(dead_code)]
 pub fn init_uni_asset() -> Result<ChainAsset, Reason> {
     pallet_oracle::Prices::insert(
         UNI.ticker,
@@ -29,13 +30,31 @@ pub fn init_wbtc_asset() -> Result<ChainAsset, Reason> {
 
 pub fn init_asset_balance(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
     AssetBalances::insert(asset, account, balance);
-    TotalSupplyAssets::insert(
-        asset,
-        (TotalSupplyAssets::get(asset) as i128 + balance) as u128,
-    );
+    if balance >= 0 {
+        TotalSupplyAssets::insert(
+            asset,
+            (TotalSupplyAssets::get(asset) as i128 + balance) as u128,
+        );
+    } else {
+        TotalBorrowAssets::insert(
+            asset,
+            (TotalBorrowAssets::get(asset) as i128 + balance) as u128,
+        );
+    }
     AssetsWithNonZeroBalance::insert(account, asset, ());
 }
 
 pub fn init_cash(account: ChainAccount, amount: CashPrincipal) {
+    if amount.0 < 0 {
+        init_cash(ChainAccount::Eth([0; 20]), amount.negate());
+    }
+    let pre: CashPrincipal = TotalCashPrincipal::get().try_into().unwrap();
+
+    TotalCashPrincipal::set(
+        pre.add(amount)
+            .expect("cash setup overflow")
+            .try_into()
+            .unwrap(),
+    );
     CashPrincipals::insert(account, amount);
 }

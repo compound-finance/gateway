@@ -58,6 +58,7 @@ pub mod factor;
 pub mod internal;
 pub mod notices;
 pub mod params;
+pub mod pipeline;
 pub mod portfolio;
 pub mod rates;
 pub mod reason;
