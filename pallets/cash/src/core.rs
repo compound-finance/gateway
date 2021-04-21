@@ -134,7 +134,6 @@ pub fn get_utilization<T: Config>(asset: ChainAsset) -> Result<Factor, Reason> {
     let _info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let total_supply = TotalSupplyAssets::get(asset);
     let total_borrow = TotalBorrowAssets::get(asset);
-    println!("util formula {:?}, {:?}", total_supply, total_borrow);
     Ok(crate::rates::get_utilization(total_supply, total_borrow)?)
 }
 
@@ -671,7 +670,6 @@ pub fn on_initialize_internal<T: Config>(
 
     let mut asset_updates: Vec<(ChainAsset, AssetIndex, AssetIndex)> = Vec::new();
     for (asset, asset_info) in SupportedAssets::iter() {
-        println!("{:?}", asset);
         let (asset_cost, asset_yield) = crate::core::get_rates::<T>(asset)?;
         let asset_units = asset_info.units();
         let price_asset = get_price_or_zero::<T>(asset_units);
@@ -918,7 +916,7 @@ mod tests {
                 1450_000000 as pallet_oracle::types::AssetPrice,
             ); // $1450 eth
 
-            assert_ne!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp), 0);
+            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp), ());
 
             assert_eq!(
                 SupplyIndices::get(&asset),
@@ -944,7 +942,7 @@ mod tests {
                 CashPrincipal::from_nominal("1.000000")
             );
             // Run again to set miner true principal
-            assert_ne!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp), 0);
+            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp), ());
             assert_eq!(
                 CashPrincipals::get(&miner),
                 CashPrincipal::from_nominal("243.097062")
@@ -970,7 +968,7 @@ mod tests {
             LastYieldCashIndex::put(last_yield_cash_index_initial);
             LastYieldTimestamp::put(last_yield_timestamp);
 
-            assert_ne!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp), 0);
+            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp), ());
 
             let increment_expected = cash_yield_initial
                 .compound(now - last_yield_timestamp)
@@ -1008,7 +1006,7 @@ mod tests {
             let last_block_timestamp = now;
             let now = next_yield_timestamp;
 
-            assert_ne!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp), 0);
+            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp), ());
 
             let increment_expected = cash_yield_initial
                 .compound(now - last_yield_timestamp)
@@ -1043,7 +1041,7 @@ mod tests {
             let now = now + 6 * 1000;
             let new_cash_index_baseline = new_index_actual;
 
-            assert_ne!(on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp), 0);
+            assert_ok!(on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp), ());
 
             let increment_expected = cash_yield_next
                 .compound(now - next_yield_timestamp)

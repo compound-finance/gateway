@@ -22,10 +22,10 @@ use sp_std::prelude::*;
 use crate::sp_api_hidden_includes_decl_storage::hidden_include::traits::OriginTrait;
 
 const TKN: Units = Units::from_ticker_str("TKN", 18);
-const TKN_ADDR_BYTES: [u8; 20] = [1; 20];
 const TKN_ADDR: &str = "0x0101010101010101010101010101010101010101";
+const TKN_ADDR_BYTES: [u8; 20] = [1; 20];
 const ALICE_ADDRESS: &str = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
-const BOB_ADDRESS: &str = "0x59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e"; //pk: 0xd2fc4263a66e44feba54a518158d7e5a5ee9d3b768a62c22b8b2be1518f1d43d
+const BOB_ADDRESS: &str = "0x59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e";
 
 pub struct Pallet<T: Config>(Module<T>);
 
@@ -35,7 +35,7 @@ impl<T: Config> OnInitialize<T::BlockNumber> for Pallet<T> {
     }
 }
 
-// 1 time endow
+// endow token to user, create market, add some dummy data
 fn endow_tkn<T: Config>(holder: [u8; 20], amount: AssetAmount, addr: <Ethereum as Chain>::Address) {
     let asset = ChainAsset::Eth(addr);
     let asset_info = AssetInfo {
@@ -234,7 +234,6 @@ benchmarks! {
     assert_eq!(Cash::<T>::change_validators(RawOrigin::Root.into(), val_keys), Ok(()));
   }
 
-  // do extract max?
   exec_trx_request_extract {
     let signer_vec = <Ethereum as Chain>::signer_address().unwrap();
     let nonce: Nonce = 0u32.into();
@@ -279,44 +278,32 @@ benchmarks! {
     assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec, signature, nonce), Ok(()));
   }
 
-  // ashley, supply eth, transfer cash
-  // bert supply eth, liquidate via sig
-  // exec_trx_request_liquidate {
-  //   let signer_vec = <Ethereum as Chain>::signer_address().unwrap();
-  //   let holder = ChainAccount::Eth(signer_vec);
-  //   let nonce: Nonce = 0u32.into();
-  //   let bob_address_bytes: [u8;20] = ethereum_client::hex::decode_address(&BOB_ADDRESS.to_string()).unwrap();
+  exec_trx_request_liquidate {
+    let signer_vec = <Ethereum as Chain>::signer_address().unwrap();
+    let holder = ChainAccount::Eth(signer_vec);
+    let nonce: Nonce = 0u32.into();
+    let transfer_amt = 5_000_000_000_000_000_000;// 5e18
+    
+    // bob supply tkn, transfer cash
+    let bob_address_bytes: [u8;20] = ethereum_client::hex::decode_address(&BOB_ADDRESS.to_string()).unwrap();
+    endow_tkn::<T>(bob_address_bytes, transfer_amt * 5, TKN_ADDR_BYTES);
+    assert_ok!(transfer_cash_principal_internal::<T>(ChainAccount::Eth(bob_address_bytes), ChainAccount::Eth(signer_vec), CashPrincipalAmount(params::MIN_TX_VALUE.value)), ());
 
-  //   let transfer_amt = 5_000_000_000_000_000_000;// 5e18
-  //   endow_tkn::<T>(signer_vec, transfer_amt * 5, TKN_ADDR_BYTES);
-  //   endow_tkn::<T>(bob_address_bytes, transfer_amt * 5, TKN_ADDR_BYTES);
-
-  //   // Alice transfer
-  //   let raw_req: String = format!("(Transfer {} Eth:{} Eth:{})", transfer_amt, TKN_ADDR, BOB_ADDRESS);
-  //   let request_vec: Vec<u8> = raw_req.as_bytes().into();
-  //   let prepended_request = format!("{}:{}", nonce, raw_req);
-
-  //   let full_request: Vec<u8> =  format!("\x19Ethereum Signed Message:\n{}{}", prepended_request.len(), prepended_request).as_bytes().into();
-
-  //   let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
-  //   let signature_raw = runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
-  //   let signature = ChainAccountSignature::Eth(signer_vec, signature_raw);
-  //   assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec, signature, nonce), Ok(()));
-
-  //   // get unhealthy
-  //   assert_ok!(Cash::<T>::set_liquidity_factor(RawOrigin::Root.into(), ChainAsset::Eth(TKN_ADDR_BYTES), Factor(0u128)));
-
-  //   // liquidate
-  //   let raw_req2: String = format!("(Liquidate Max Eth:{} Eth:{})", TKN_ADDR, BOB_ADDRESS);
-  //   let request_vec2: Vec<u8> = raw_req.as_bytes().into();
-  //   let prepended_request2 = format!("{}:{}", nonce, raw_req);
-
-  //   // sign in js via web3.eth.accounts.sign(prepended_request, bob.privateKey)
-  //   let sig: String = "0x0bbbf34221c3f108bbbc473ba07866b6771d2cca1e40a70b4f11e317f52c17501897722ceda7824e63b9d60623632c5eb31cf27aeefdfcc93a407c4dcd5f12261c".to_string();
-  //   let liq_signature: [u8;65] = ethereum_client::hex::decode_signature(&sig).unwrap();
-  // }: {
-  //   assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec2, ChainAccountSignature::Eth(bob_address_bytes, liq_signature), nonce), Ok(()));
-  // }
+    // get bob unhealthy
+    assert_ok!(Cash::<T>::set_liquidity_factor(RawOrigin::Root.into(), ChainAsset::Eth(TKN_ADDR_BYTES), Factor(0u128)));
+    
+    // alice supply some collateral, liquidate
+    endow_tkn::<T>(signer_vec, transfer_amt * 5, [2; 20]);
+    let raw_req: String = format!("(Liquidate 1 Cash Eth:{} Eth:{})", TKN_ADDR, BOB_ADDRESS);
+    let request_vec: Vec<u8> = raw_req.as_bytes().into();
+    let prepended_request = format!("{}:{}", nonce, raw_req);
+    let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n{}{}", prepended_request.len(), prepended_request).as_bytes().into();
+    let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+    let signature_raw = runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+    let signature = ChainAccountSignature::Eth(signer_vec, signature_raw);
+  }: {
+    assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec, signature, nonce), Ok(()));
+  }
 }
 
 #[cfg(test)]
