@@ -245,16 +245,8 @@ pub(crate) mod tests {
         let properties = serde_json::json!({ "eth_starport_address": expected_starport });
         let properties = properties.as_object().unwrap();
 
-        let config = extract_configuration_from_properties(&properties);
-        assert!(config.is_some());
-        let config = config.unwrap();
-        let actual_eth_starport_address = config.get_eth_starport_address();
-        // let actual = String::from_utf8(actual).unwrap();
-
-        assert_eq!(
-            actual_eth_starport_address.as_slice(),
-            expected_starport.as_bytes()
-        );
+        let config = extract_configuration_from_properties(&properties).unwrap();
+        assert_eq!(config.eth_starport_address, expected_starport);
     }
 
     /// Bad case - we do _not_ have the keys we need to return the OCW configuration

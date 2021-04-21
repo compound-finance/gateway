@@ -1,4 +1,5 @@
 use crate::chains::ChainId;
+use crate::events::EventError;
 use crate::internal::set_yield_next::SetYieldNextError;
 use crate::notices::NoticeId;
 use crate::rates::RatesError;
@@ -25,9 +26,13 @@ pub enum Reason {
     BadTicker,
     BadUnits,
     ChainMismatch,
+    HashMismatch,
     CryptoError(CryptoError),
+    EventError(EventError),
     FailedToSubmitExtrinsic,
-    FetchError,
+    CannotFormulateReorg,
+    WorkerFetchError,
+    WorkerBusy,
     IncorrectNonce(Nonce, Nonce),
     InKindLiquidation,
     InsufficientChainCash,
@@ -44,8 +49,7 @@ pub enum Reason {
     None,
     NoPrice,
     NoSuchAsset,
-    DeprecatedNoticeAlreadySigned,
-    NoticeHashMismatch,
+    NoSuchBlock,
     NoticeMissing(ChainId, NoticeId),
     NotImplemented,
     OracleError(OracleError),
@@ -65,6 +69,7 @@ pub enum Reason {
     InsufficientCashForMaxTransfer,
     SufficientLiquidity,
     AssetQuantityMismatch,
+    Unreachable,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -85,9 +90,13 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::BadTicker => (1, 6, "bad ticker"),
             Reason::BadUnits => (1, 7, "bad units"),
             Reason::ChainMismatch => (2, 0, "chain mismatch"),
+            Reason::HashMismatch => (2, 1, "hash mismatch"),
             Reason::CryptoError(_) => (3, 0, "crypto error"),
+            Reason::EventError(_) => (4, 0, "event error"),
             Reason::FailedToSubmitExtrinsic => (5, 0, "failed to submit extrinsic"),
-            Reason::FetchError => (6, 0, "fetch error"),
+            Reason::CannotFormulateReorg => (5, 1, "cannot formulate the reorg path"),
+            Reason::WorkerFetchError => (6, 0, "worker fetch error"),
+            Reason::WorkerBusy => (6, 1, "worker busy"),
             Reason::IncorrectNonce(_, _) => (7, 0, "incorrect nonce"),
             Reason::InKindLiquidation => (8, 0, "in kind liquidation"),
             Reason::InsufficientChainCash => (9, 0, "insufficient chain cash"),
@@ -104,9 +113,8 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::None => (15, 0, "none"),
             Reason::NoPrice => (16, 0, "no price"),
             Reason::NoSuchAsset => (16, 1, "no such asset"),
-            Reason::DeprecatedNoticeAlreadySigned => (17, 0, "deprecated: notice already signed"),
-            Reason::NoticeHashMismatch => (17, 1, "notice hash mismatch"),
-            Reason::NoticeMissing(_, _) => (17, 2, "notice missing"),
+            Reason::NoSuchBlock => (16, 2, "no such block"),
+            Reason::NoticeMissing(_, _) => (17, 0, "notice missing"),
             Reason::NotImplemented => (18, 0, "not implemented"),
             Reason::OracleError(_) => (19, 0, "oracle error"),
             Reason::RatesError(_) => (20, 0, "rates error"),
@@ -125,6 +133,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::InsufficientCashForMaxTransfer => (32, 0, "insufficient cash for max transfer"),
             Reason::SufficientLiquidity => (33, 0, "sufficient liquidity for borrower"),
             Reason::AssetQuantityMismatch => (34, 0, "asset does not match quantity"),
+            Reason::Unreachable => (35, 0, "unreachable state should be impossible"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
@@ -143,6 +152,12 @@ impl From<MathError> for Reason {
 impl From<CryptoError> for Reason {
     fn from(err: CryptoError) -> Self {
         Reason::CryptoError(err)
+    }
+}
+
+impl From<EventError> for Reason {
+    fn from(err: EventError) -> Self {
+        Reason::EventError(err)
     }
 }
 

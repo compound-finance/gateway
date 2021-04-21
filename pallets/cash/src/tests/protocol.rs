@@ -1,3 +1,4 @@
+use super::test;
 use super::*;
 use pallet_oracle::{types::Price, Prices};
 
@@ -12,7 +13,12 @@ fn upload_transfer_download() -> Result<(), Reason> {
 
         // Upload
 
-        assert_ok!(core::lock_internal::<Test>(uni, jared, jared, lock_amount));
+        assert_ok!(internal::lock::lock_internal::<Test>(
+            uni,
+            jared,
+            jared,
+            lock_amount
+        ));
         assert_eq!(CashPrincipals::get(&jared), CashPrincipal(0));
         assert_eq!(CashPrincipals::get(&geoff), CashPrincipal(0));
         assert_eq!(AssetBalances::get(&Uni, &jared), bal!("1000", UNI).value);
