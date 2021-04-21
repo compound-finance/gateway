@@ -40,13 +40,11 @@
 // --template=./.maintain/frame-weight-template.hbs
 // --output=./pallets/cash/src/weights.rs
 
+
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
-use frame_support::{
-    traits::Get,
-    weights::{constants::RocksDbWeight, Weight},
-};
+use frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
 use sp_std::marker::PhantomData;
 
 /// Weight functions needed for pallet_cash.
@@ -61,11 +59,12 @@ pub trait WeightInfo {
 	fn set_rate_model() -> Weight;
 	fn set_liquidity_factor() -> Weight;
 	fn set_supply_cap() -> Weight;
-	fn allow_next_code_with_hash(z: u32, ) -> Weight;
+	fn allow_next_code_with_hash() -> Weight;
 	fn set_next_code_via_hash(z: u32, ) -> Weight;
 	fn change_validators() -> Weight;
 	fn exec_trx_request_extract() -> Weight;
 	fn exec_trx_request_transfer() -> Weight;
+	fn exec_trx_request_liquidate() -> Weight;
 }
 
 /// Weights for pallet_cash using the Substrate node and recommended hardware.
