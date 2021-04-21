@@ -27,6 +27,7 @@ use crate::{
         Chain, ChainAccount, ChainAsset, ChainBlockEvent, ChainBlockEvents, ChainHash, ChainId,
         ChainSignature, Ethereum,
     },
+    effectful::Effectful,
     factor::Factor,
     internal::{self, balance_helpers::*, liquidity},
     log,
@@ -36,8 +37,8 @@ use crate::{
     reason::{MathError, Reason},
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, AssetQuantity, Balance, CashIndex,
-        CashPrincipal, CashPrincipalAmount, CashQuantity, GovernanceResult, NoticeId, Quantity,
-        SignersSet, Timestamp, USDQuantity, Units, ValidatorKeys, CASH,
+        CashPrincipal, CashPrincipalAmount, GovernanceResult, NoticeId, Quantity, SignersSet,
+        Timestamp, USDQuantity, Units, ValidatorKeys, CASH,
     },
     AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
     CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, IngressionQueue,
@@ -512,82 +513,15 @@ pub fn transfer_internal<T: Config>(
 ) -> Result<(), Reason> {
     let miner = get_some_miner::<T>();
     let index = GlobalCashIndex::get();
-
-    require!(sender != recipient, Reason::SelfTransfer);
-    require_min_tx_value!(get_value::<T>(amount)?);
-    require!(
-        liquidity::has_liquidity_to_reduce_asset_with_fee::<T>(
-            sender,
-            asset,
-            amount,
-            TRANSFER_FEE
-        )?,
-        Reason::InsufficientLiquidity
-    );
-
-    let sender_asset = AssetBalances::get(asset.asset, sender);
-    let recipient_asset = AssetBalances::get(asset.asset, recipient);
-    let sender_cash_principal = CashPrincipals::get(sender);
-    let miner_cash_principal = CashPrincipals::get(miner);
-
     let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
-    let (sender_withdraw_amount, sender_borrow_amount) =
-        withdraw_and_borrow_amount(sender_asset, amount)?;
-    let (recipient_repay_amount, recipient_supply_amount) =
-        repay_and_supply_amount(recipient_asset, amount)?;
-    let (_sender_withdraw_principal, sender_borrow_principal) =
-        withdraw_and_borrow_principal(sender_cash_principal, fee_principal)?;
-    let (miner_repay_principal, _miner_supply_principal) =
-        repay_and_supply_principal(miner_cash_principal, fee_principal)?;
 
-    let miner_cash_principal_new = miner_cash_principal.add_amount(fee_principal)?;
-    let sender_cash_principal_new = sender_cash_principal.sub_amount(fee_principal)?;
-    let sender_asset_new = sub_amount_from_balance(sender_asset, amount)?;
-    let recipient_asset_new = add_amount_to_balance(recipient_asset, amount)?;
+    require_min_tx_value!(get_value::<T>(amount)?);
 
-    let total_supply_new = sub_amount_from_raw(
-        add_amount_to_raw(TotalSupplyAssets::get(asset.asset), recipient_supply_amount)?,
-        sender_withdraw_amount,
-        Reason::InsufficientTotalFunds,
-    )?;
-    let total_borrow_new = sub_amount_from_raw(
-        add_amount_to_raw(TotalBorrowAssets::get(asset.asset), sender_borrow_amount)?,
-        recipient_repay_amount,
-        Reason::RepayTooMuch,
-    )?;
-    let total_cash_principal_new = sub_principal_amounts(
-        add_principal_amounts(TotalCashPrincipal::get(), sender_borrow_principal)?,
-        miner_repay_principal,
-        Reason::RepayTooMuch,
-    )?;
-
-    let (sender_cash_principal_post, sender_last_index_post) = effect_of_asset_interest_internal(
-        asset,
-        sender,
-        sender_asset,
-        sender_asset_new,
-        sender_cash_principal_new,
-    )?;
-    let (recipient_cash_principal_post, recipient_last_index_post) =
-        effect_of_asset_interest_internal(
-            asset,
-            recipient,
-            recipient_asset,
-            recipient_asset_new,
-            CashPrincipals::get(recipient),
-        )?;
-
-    LastIndices::insert(asset.asset, sender, sender_last_index_post);
-    LastIndices::insert(asset.asset, recipient, recipient_last_index_post);
-    CashPrincipals::insert(sender, sender_cash_principal_post);
-    CashPrincipals::insert(recipient, recipient_cash_principal_post);
-    CashPrincipals::insert(miner, miner_cash_principal_new);
-    TotalSupplyAssets::insert(asset.asset, total_supply_new);
-    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
-
-    set_asset_balance_internal::<T>(asset.asset, sender, sender_asset_new);
-    set_asset_balance_internal::<T>(asset.asset, recipient, recipient_asset_new);
+    Effectful::new()
+        .transfer_asset::<T>(sender, recipient, asset.asset, amount)?
+        .transfer_cash::<T>(sender, miner, fee_principal)?
+        .check_liquidity::<T>(sender)?
+        .commit::<T>();
 
     <Module<T>>::deposit_event(Event::Transfer(
         asset.asset,
@@ -607,42 +541,15 @@ pub fn transfer_cash_principal_internal<T: Config>(
     let miner = get_some_miner::<T>();
     let index = GlobalCashIndex::get();
     let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
-    let principal_with_fee = principal.add(fee_principal)?;
     let amount = index.cash_quantity(principal)?;
-    let amount_with_fee = index.cash_quantity(principal_with_fee)?;
 
-    require!(sender != recipient, Reason::SelfTransfer);
     require_min_tx_value!(get_value::<T>(amount)?);
-    require!(
-        liquidity::has_liquidity_to_reduce_cash::<T>(sender, amount_with_fee)?,
-        Reason::InsufficientLiquidity
-    );
 
-    let sender_cash_principal = CashPrincipals::get(sender);
-    let recipient_cash_principal = CashPrincipals::get(recipient);
-    let miner_cash_principal = CashPrincipals::get(miner);
-
-    let (_sender_withdraw_principal, sender_borrow_principal) =
-        withdraw_and_borrow_principal(sender_cash_principal, principal_with_fee)?;
-    let (recipient_repay_principal, _recipient_supply_principal) =
-        repay_and_supply_principal(recipient_cash_principal, principal)?;
-    let (miner_repay_principal, _miner_supply_principal) =
-        repay_and_supply_principal(miner_cash_principal, fee_principal)?;
-
-    let miner_cash_principal_new = miner_cash_principal.add_amount(fee_principal)?;
-    let sender_cash_principal_new = sender_cash_principal.sub_amount(principal_with_fee)?;
-    let recipient_cash_principal_new = recipient_cash_principal.add_amount(principal)?;
-
-    let total_cash_principal_new = sub_principal_amounts(
-        add_principal_amounts(TotalCashPrincipal::get(), sender_borrow_principal)?,
-        add_principal_amounts(recipient_repay_principal, miner_repay_principal)?,
-        Reason::RepayTooMuch,
-    )?;
-
-    CashPrincipals::insert(miner, miner_cash_principal_new);
-    CashPrincipals::insert(sender, sender_cash_principal_new);
-    CashPrincipals::insert(recipient, recipient_cash_principal_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
+    Effectful::new()
+        .transfer_cash::<T>(sender, recipient, principal)?
+        .transfer_cash::<T>(sender, miner, fee_principal)?
+        .check_liquidity::<T>(sender)?
+        .commit::<T>();
 
     <Module<T>>::deposit_event(Event::TransferCash(sender, recipient, principal, index));
 

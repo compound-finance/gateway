@@ -6,7 +6,6 @@ use our_std::RuntimeDebug;
 
 use crate::{
     chains::ChainAccount,
-    core::get_some_miner,
     internal::balance_helpers::*,
     portfolio::Portfolio,
     reason::Reason,
@@ -245,10 +244,12 @@ impl State {
             .for_each(|(account, cash_principal)| {
                 CashPrincipals::insert(account, cash_principal);
             });
+        if let Some(total_cash_principal_new) = self.total_cash_principal {
+            TotalCashPrincipal::put(total_cash_principal_new);
+        }
     }
 }
 
-// TODO: require!(sender != recipient, Reason::SelfTransfer);
 fn prepare_transfer_asset<T: Config>(
     st_pre: &State,
     sender: ChainAccount,
@@ -258,7 +259,7 @@ fn prepare_transfer_asset<T: Config>(
 ) -> Result<State, Reason> {
     let mut st: State = st_pre.clone();
 
-    if (sender == recipient) {
+    if sender == recipient {
         Err(Reason::SelfTransfer)?
     }
 
@@ -327,35 +328,25 @@ fn prepare_transfer_cash<T: Config>(
     sender: ChainAccount,
     recipient: ChainAccount,
     principal: CashPrincipalAmount,
-    fee_principal: CashPrincipalAmount,
 ) -> Result<State, Reason> {
     let mut st: State = st_pre.clone();
-    let miner = get_some_miner::<T>();
-
-    let principal_with_fee = principal.add(fee_principal)?;
 
     let sender_cash_pre = st.get_cash_principal::<T>(sender);
     let recipient_cash_pre = st.get_cash_principal::<T>(recipient);
-    let miner_cash_pre = st.get_cash_principal::<T>(miner);
 
     let (_sender_withdraw_principal, sender_borrow_principal) =
-        withdraw_and_borrow_principal(sender_cash_pre, principal_with_fee)?;
+        withdraw_and_borrow_principal(sender_cash_pre, principal)?;
     let (recipient_repay_principal, _recipient_supply_principal) =
         repay_and_supply_principal(recipient_cash_pre, principal)?;
-    let (miner_repay_principal, _miner_supply_principal) =
-        repay_and_supply_principal(miner_cash_pre, fee_principal)?;
 
-    let miner_cash_post = miner_cash_pre.add_amount(fee_principal)?;
-    let sender_cash_post = sender_cash_pre.sub_amount(principal_with_fee)?;
+    let sender_cash_post = sender_cash_pre.sub_amount(principal)?;
     let recipient_cash_post = recipient_cash_pre.add_amount(principal)?;
 
     let total_cash_post = st
         .get_total_cash_principal::<T>()
         .add(sender_borrow_principal)?
-        .sub(recipient_repay_principal)?
-        .sub(miner_repay_principal)?;
+        .sub(recipient_repay_principal)?;
 
-    st.set_cash_principal::<T>(miner, miner_cash_post);
     st.set_cash_principal::<T>(sender, sender_cash_post);
     st.set_cash_principal::<T>(recipient, recipient_cash_post);
     st.set_total_cash_principal::<T>(total_cash_post);
@@ -372,6 +363,11 @@ pub enum Effect {
         asset: ChainAsset,
         quantity: Quantity,
     },
+    TransferCash {
+        sender: ChainAccount,
+        recipient: ChainAccount,
+        principal: CashPrincipalAmount,
+    },
 }
 
 impl Apply for Effect {
@@ -384,6 +380,11 @@ impl Apply for Effect {
                 asset,
                 quantity,
             } => prepare_transfer_asset::<T>(state, *sender, *recipient, *asset, *quantity),
+            Effect::TransferCash {
+                sender,
+                recipient,
+                principal,
+            } => prepare_transfer_cash::<T>(state, *sender, *recipient, *principal),
         }
     }
 }
@@ -417,6 +418,23 @@ impl Effectful {
             recipient,
             asset,
             quantity,
+        };
+        let state_old = self.state();
+        let state_new = effect.apply::<T>(state_old)?;
+        self.effects.push((effect, state_new));
+        Ok(self)
+    }
+
+    pub fn transfer_cash<T: Config>(
+        self: &mut Self,
+        sender: ChainAccount,
+        recipient: ChainAccount,
+        principal: CashPrincipalAmount,
+    ) -> Result<&mut Self, Reason> {
+        let effect = Effect::TransferCash {
+            sender,
+            recipient,
+            principal,
         };
         let state_old = self.state();
         let state_new = effect.apply::<T>(state_old)?;
@@ -526,6 +544,38 @@ mod tests {
                     ]
                     .into_iter()
                     .collect(),
+                    total_cash_principal: None
+                }
+            );
+        })
+    }
+
+    #[test]
+    fn test_transfer_cash_success_state() {
+        new_test_ext().execute_with(|| {
+            let quantity = CashPrincipalAmount::from_nominal("1");
+
+            let state = Effectful::new()
+                .transfer_cash::<Test>(account_a, account_b, quantity)
+                .expect("transfer_cash failed")
+                .state()
+                .clone();
+
+            assert_eq!(
+                state,
+                State {
+                    total_supply_asset: vec![].into_iter().collect(),
+                    total_borrow_asset: vec![].into_iter().collect(),
+                    asset_balances: vec![].into_iter().collect(),
+                    assets_with_non_zero_balance: vec![].into_iter().collect(),
+                    last_indices: vec![].into_iter().collect(),
+                    cash_principals: vec![
+                        (account_a, CashPrincipal::from_nominal("-1")),
+                        (account_b, CashPrincipal::from_nominal("1")),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    total_cash_principal: Some(quantity)
                 }
             );
         })
@@ -704,6 +754,7 @@ mod tests {
                     ]
                     .into_iter()
                     .collect(),
+                    total_cash_principal: None
                 }
             );
         })
@@ -862,6 +913,7 @@ mod tests {
                 ]
                 .into_iter()
                 .collect(),
+                total_cash_principal: Some(CashPrincipalAmount::from_nominal("15000")),
             };
 
             state.commit::<Test>();
@@ -905,6 +957,10 @@ mod tests {
             assert_eq!(
                 CashPrincipals::get(account_b),
                 CashPrincipal::from_nominal("14000")
+            );
+            assert_eq!(
+                TotalCashPrincipal::get(),
+                CashPrincipalAmount::from_nominal("15000")
             );
         })
     }
