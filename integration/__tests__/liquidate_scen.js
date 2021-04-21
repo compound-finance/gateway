@@ -343,7 +343,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       await bert.lock(4000, bat);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(0.5, comp, zrx, ashley)).rejects.toThrow(/DivisionByZero/);
+      await expect(bert.liquidate(0.5, comp, zrx, ashley)).rejects.toThrow(/NoPrice/);
 
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
       expect(await ashley.chainBalance(zrx)).toBeCloseTo(1);

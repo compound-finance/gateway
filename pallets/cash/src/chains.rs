@@ -70,7 +70,7 @@ impl ChainId {
 }
 
 /// Type for an account tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccount {
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
@@ -111,7 +111,7 @@ impl From<ChainAccount> for String {
 }
 
 /// Type for an asset tied to a chain.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAsset {
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
