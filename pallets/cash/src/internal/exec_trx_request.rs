@@ -170,7 +170,8 @@ pub fn exec_trx_request<T: Config>(
             CashOrChainAsset::from(trx_borrowed_asset),
             CashOrChainAsset::from(trx_collateral_asset),
         ) {
-            (x, y) if x == y => Err(Reason::InKindLiquidation),
+            (x, y) if x == y => return Err(Reason::InKindLiquidation),
+
             (CashOrChainAsset::Cash, CashOrChainAsset::ChainAsset(collateral)) => {
                 let collateral_asset = get_asset::<T>(collateral)?;
                 let cash_principal_amount = match max_amount {
@@ -186,8 +187,9 @@ pub fn exec_trx_request<T: Config>(
                     sender,
                     borrower.into(),
                     cash_principal_amount,
-                )
+                )?;
             }
+
             (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::Cash) => {
                 let borrowed_asset = get_asset::<T>(borrowed)?;
                 let borrowed_asset_amount = match max_amount {
@@ -202,7 +204,7 @@ pub fn exec_trx_request<T: Config>(
                     sender,
                     borrower.into(),
                     borrowed_asset_amount,
-                )
+                )?;
             }
 
             (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::ChainAsset(collateral)) => {
@@ -221,10 +223,11 @@ pub fn exec_trx_request<T: Config>(
                     sender,
                     borrower.into(),
                     borrowed_asset_amount,
-                )
+                )?;
             }
-            _ => Err(Reason::InvalidLiquidation), // Probably isn't possible
-        }?,
+
+            _ => return Err(Reason::InvalidLiquidation), // Probably isn't possible
+        },
     }
 
     if let Some(nonce) = nonce_opt {
