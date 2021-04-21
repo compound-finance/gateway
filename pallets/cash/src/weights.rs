@@ -40,170 +40,167 @@
 // --template=./.maintain/frame-weight-template.hbs
 // --output=./pallets/cash/src/weights.rs
 
-
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
-use frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
+use frame_support::{
+    traits::Get,
+    weights::{constants::RocksDbWeight, Weight},
+};
 use sp_std::marker::PhantomData;
 
 /// Weight functions needed for pallet_cash.
 pub trait WeightInfo {
-	fn on_initialize(z: u32, ) -> Weight;
-	fn publish_signature() -> Weight;
-	fn set_yield_next() -> Weight;
-	fn receive_event() -> Weight;
-	fn support_asset() -> Weight;
-	fn set_rate_model() -> Weight;
-	fn set_liquidity_factor() -> Weight;
-	fn set_supply_cap() -> Weight;
-	fn allow_next_code_with_hash() -> Weight;
-	fn set_next_code_via_hash(z: u32, ) -> Weight;
-	fn change_validators() -> Weight;
-	fn exec_trx_request_extract() -> Weight;
-	fn exec_trx_request_transfer() -> Weight;
+    fn on_initialize(z: u32) -> Weight;
+    fn publish_signature() -> Weight;
+    fn set_yield_next() -> Weight;
+    fn receive_event() -> Weight;
+    fn support_asset() -> Weight;
+    fn set_rate_model() -> Weight;
+    fn set_liquidity_factor() -> Weight;
+    fn set_supply_cap() -> Weight;
+    fn allow_next_code_with_hash() -> Weight;
+    fn set_next_code_via_hash(z: u32) -> Weight;
+    fn change_validators() -> Weight;
+    fn exec_trx_request_extract() -> Weight;
+    fn exec_trx_request_transfer() -> Weight;
 }
 
 /// Weights for pallet_cash using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-
-	fn on_initialize(z: u32, ) -> Weight {
-		(429_280_000 as Weight)
-			// Standard Error: 1_504_000
-			.saturating_add((3_192_000 as Weight).saturating_mul(z as Weight))
-			.saturating_add(T::DbWeight::get().reads(27 as Weight))
-			.saturating_add(T::DbWeight::get().writes(10 as Weight))
-	}
-	fn publish_signature() -> Weight {
-		(255_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(5 as Weight))
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn set_yield_next() -> Weight {
-		(163_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(5 as Weight))
-			.saturating_add(T::DbWeight::get().writes(5 as Weight))
-	}
-	fn receive_event() -> Weight {
-		(243_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(4 as Weight))
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn support_asset() -> Weight {
-		(11_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn set_rate_model() -> Weight {
-		(23_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(1 as Weight))
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn set_liquidity_factor() -> Weight {
-		(23_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(1 as Weight))
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn set_supply_cap() -> Weight {
-		(143_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(2 as Weight))
-			.saturating_add(T::DbWeight::get().writes(5 as Weight))
-	}
-	fn allow_next_code_with_hash() -> Weight {
-		(26_801_000 as Weight)
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn set_next_code_via_hash(z: u32, ) -> Weight {
-		(105_912_000 as Weight)
-			// Standard Error: 0
-			.saturating_add((4_000 as Weight).saturating_mul(z as Weight))
-			.saturating_add(T::DbWeight::get().reads(1 as Weight))
-			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-	}
-	fn change_validators() -> Weight {
-		(301_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(11 as Weight))
-			.saturating_add(T::DbWeight::get().writes(12 as Weight))
-	}
-	fn exec_trx_request_extract() -> Weight {
-		(611_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(14 as Weight))
-			.saturating_add(T::DbWeight::get().writes(12 as Weight))
-	}
-	fn exec_trx_request_transfer() -> Weight {
-		(702_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(18 as Weight))
-			.saturating_add(T::DbWeight::get().writes(13 as Weight))
-	}
+    fn on_initialize(z: u32) -> Weight {
+        (429_280_000 as Weight)
+            // Standard Error: 1_504_000
+            .saturating_add((3_192_000 as Weight).saturating_mul(z as Weight))
+            .saturating_add(T::DbWeight::get().reads(27 as Weight))
+            .saturating_add(T::DbWeight::get().writes(10 as Weight))
+    }
+    fn publish_signature() -> Weight {
+        (255_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(5 as Weight))
+            .saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn set_yield_next() -> Weight {
+        (163_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(5 as Weight))
+            .saturating_add(T::DbWeight::get().writes(5 as Weight))
+    }
+    fn receive_event() -> Weight {
+        (243_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(4 as Weight))
+            .saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn support_asset() -> Weight {
+        (11_000_000 as Weight).saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn set_rate_model() -> Weight {
+        (23_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(1 as Weight))
+            .saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn set_liquidity_factor() -> Weight {
+        (23_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(1 as Weight))
+            .saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn set_supply_cap() -> Weight {
+        (143_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(2 as Weight))
+            .saturating_add(T::DbWeight::get().writes(5 as Weight))
+    }
+    fn allow_next_code_with_hash() -> Weight {
+        (26_801_000 as Weight).saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn set_next_code_via_hash(z: u32) -> Weight {
+        (105_912_000 as Weight)
+            // Standard Error: 0
+            .saturating_add((4_000 as Weight).saturating_mul(z as Weight))
+            .saturating_add(T::DbWeight::get().reads(1 as Weight))
+            .saturating_add(T::DbWeight::get().writes(1 as Weight))
+    }
+    fn change_validators() -> Weight {
+        (301_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(11 as Weight))
+            .saturating_add(T::DbWeight::get().writes(12 as Weight))
+    }
+    fn exec_trx_request_extract() -> Weight {
+        (611_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(14 as Weight))
+            .saturating_add(T::DbWeight::get().writes(12 as Weight))
+    }
+    fn exec_trx_request_transfer() -> Weight {
+        (702_000_000 as Weight)
+            .saturating_add(T::DbWeight::get().reads(18 as Weight))
+            .saturating_add(T::DbWeight::get().writes(13 as Weight))
+    }
 }
 
 // For backwards compatibility and tests
 impl WeightInfo for () {
-	fn on_initialize(z: u32, ) -> Weight {
-		(429_280_000 as Weight)
-			// Standard Error: 1_504_000
-			.saturating_add((3_192_000 as Weight).saturating_mul(z as Weight))
-			.saturating_add(RocksDbWeight::get().reads(27 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(10 as Weight))
-	}
-	fn publish_signature() -> Weight {
-		(255_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(5 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn set_yield_next() -> Weight {
-		(163_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(5 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(5 as Weight))
-	}
-	fn receive_event() -> Weight {
-		(243_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(4 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn support_asset() -> Weight {
-		(11_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn set_rate_model() -> Weight {
-		(23_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(1 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn set_liquidity_factor() -> Weight {
-		(23_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(1 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn set_supply_cap() -> Weight {
-		(143_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(2 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(5 as Weight))
-	}
-	fn allow_next_code_with_hash() -> Weight {
-		(26_801_000 as Weight)
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn set_next_code_via_hash(z: u32, ) -> Weight {
-		(105_912_000 as Weight)
-			// Standard Error: 0
-			.saturating_add((4_000 as Weight).saturating_mul(z as Weight))
-			.saturating_add(RocksDbWeight::get().reads(1 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(1 as Weight))
-	}
-	fn change_validators() -> Weight {
-		(301_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(11 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(12 as Weight))
-	}
-	fn exec_trx_request_extract() -> Weight {
-		(611_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(14 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(12 as Weight))
-	}
-	fn exec_trx_request_transfer() -> Weight {
-		(702_000_000 as Weight)
-			.saturating_add(RocksDbWeight::get().reads(18 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(13 as Weight))
-	}
+    fn on_initialize(z: u32) -> Weight {
+        (429_280_000 as Weight)
+            // Standard Error: 1_504_000
+            .saturating_add((3_192_000 as Weight).saturating_mul(z as Weight))
+            .saturating_add(RocksDbWeight::get().reads(27 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(10 as Weight))
+    }
+    fn publish_signature() -> Weight {
+        (255_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(5 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn set_yield_next() -> Weight {
+        (163_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(5 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(5 as Weight))
+    }
+    fn receive_event() -> Weight {
+        (243_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(4 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn support_asset() -> Weight {
+        (11_000_000 as Weight).saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn set_rate_model() -> Weight {
+        (23_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(1 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn set_liquidity_factor() -> Weight {
+        (23_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(1 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn set_supply_cap() -> Weight {
+        (143_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(2 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(5 as Weight))
+    }
+    fn allow_next_code_with_hash() -> Weight {
+        (26_801_000 as Weight).saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn set_next_code_via_hash(z: u32) -> Weight {
+        (105_912_000 as Weight)
+            // Standard Error: 0
+            .saturating_add((4_000 as Weight).saturating_mul(z as Weight))
+            .saturating_add(RocksDbWeight::get().reads(1 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    }
+    fn change_validators() -> Weight {
+        (301_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(11 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(12 as Weight))
+    }
+    fn exec_trx_request_extract() -> Weight {
+        (611_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(14 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(12 as Weight))
+    }
+    fn exec_trx_request_transfer() -> Weight {
+        (702_000_000 as Weight)
+            .saturating_add(RocksDbWeight::get().reads(18 as Weight))
+            .saturating_add(RocksDbWeight::get().writes(13 as Weight))
+    }
 }

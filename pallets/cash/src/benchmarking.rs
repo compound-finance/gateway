@@ -43,7 +43,7 @@ fn endow_tkn<T: Config>(holder: [u8; 20], amount: AssetAmount, addr: <Ethereum a
         liquidity_factor: LiquidityFactor::from_nominal("1"),
         miner_shares: MinerShares::from_nominal("0.02"),
         ..AssetInfo::minimal(asset, TKN_UNITS)
-    }; 
+    };
 
     SupportedAssets::insert(&asset, asset_info);
     Prices::insert(asset_info.ticker, 1_000_000); // $1
@@ -317,21 +317,21 @@ mod tests {
     #[test]
     fn test_benchmarks() {
         new_test_ext().execute_with(|| {
-          initialize_storage();
-          assert_ok!(test_benchmark_on_initialize::<Test>());
-          // assert_ok!(test_benchmark_receive_chain_blocks::<Test>());
-          assert_ok!(test_benchmark_publish_signature::<Test>());
-          assert_ok!(test_benchmark_set_yield_next::<Test>());
-          assert_ok!(test_benchmark_support_asset::<Test>());
-          assert_ok!(test_benchmark_set_rate_model::<Test>());
-          assert_ok!(test_benchmark_set_liquidity_factor::<Test>());
-          assert_ok!(test_benchmark_set_supply_cap::<Test>());
-          assert_ok!(test_benchmark_allow_next_code_with_hash::<Test>());
-          assert_ok!(test_benchmark_set_next_code_via_hash::<Test>());
-          assert_ok!(test_benchmark_change_validators::<Test>());
-          assert_ok!(test_benchmark_exec_trx_request_extract::<Test>());
-          assert_ok!(test_benchmark_exec_trx_request_transfer::<Test>());
-          // assert_ok!(test_benchmark_exec_trx_request_liquidate::<Test>());
+            initialize_storage();
+            assert_ok!(test_benchmark_on_initialize::<Test>());
+            // assert_ok!(test_benchmark_receive_chain_blocks::<Test>());
+            assert_ok!(test_benchmark_publish_signature::<Test>());
+            assert_ok!(test_benchmark_set_yield_next::<Test>());
+            assert_ok!(test_benchmark_support_asset::<Test>());
+            assert_ok!(test_benchmark_set_rate_model::<Test>());
+            assert_ok!(test_benchmark_set_liquidity_factor::<Test>());
+            assert_ok!(test_benchmark_set_supply_cap::<Test>());
+            assert_ok!(test_benchmark_allow_next_code_with_hash::<Test>());
+            assert_ok!(test_benchmark_set_next_code_via_hash::<Test>());
+            assert_ok!(test_benchmark_change_validators::<Test>());
+            assert_ok!(test_benchmark_exec_trx_request_extract::<Test>());
+            assert_ok!(test_benchmark_exec_trx_request_transfer::<Test>());
+            // assert_ok!(test_benchmark_exec_trx_request_liquidate::<Test>());
         });
     }
 }
