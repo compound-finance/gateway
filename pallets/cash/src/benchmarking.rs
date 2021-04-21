@@ -8,7 +8,7 @@ use crate::{
     types::*,
     types::{AssetInfo, Factor, ValidatorKeys},
 };
-use codec::{EncodeLike, Encode};
+use codec::{Encode, EncodeLike};
 use frame_benchmarking::benchmarks;
 pub use frame_support::{assert_err, assert_ok, traits::OnInitialize, StorageValue};
 use frame_system::RawOrigin;
@@ -58,7 +58,6 @@ fn endow_tkn<T: Config>(holder: [u8; 20], amount: AssetAmount, addr: <Ethereum a
     SupplyIndices::insert(&asset, AssetIndex::from_nominal("1234"));
     BorrowIndices::insert(&asset, AssetIndex::from_nominal("1345"));
 }
-
 
 benchmarks! {
   where_clause {
@@ -283,7 +282,7 @@ benchmarks! {
     let holder = ChainAccount::Eth(signer_vec);
     let nonce: Nonce = 0u32.into();
     let transfer_amt = 5_000_000_000_000_000_000;// 5e18
-    
+
     // bob supply tkn, transfer cash
     let bob_address_bytes: [u8;20] = ethereum_client::hex::decode_address(&BOB_ADDRESS.to_string()).unwrap();
     endow_tkn::<T>(bob_address_bytes, transfer_amt * 5, TKN_ADDR_BYTES);
@@ -291,7 +290,7 @@ benchmarks! {
 
     // get bob unhealthy
     assert_ok!(Cash::<T>::set_liquidity_factor(RawOrigin::Root.into(), ChainAsset::Eth(TKN_ADDR_BYTES), Factor(0u128)));
-    
+
     // alice supply some collateral, liquidate
     endow_tkn::<T>(signer_vec, transfer_amt * 5, [2; 20]);
     let raw_req: String = format!("(Liquidate 1 Cash Eth:{} Eth:{})", TKN_ADDR, BOB_ADDRESS);

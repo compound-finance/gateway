@@ -471,9 +471,7 @@ impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumbe
 }
 
 // weight is 0 if request is invalid
-fn get_exec_req_weights<T: Config>(
-    request: Vec<u8>
-) -> frame_support::weights::Weight {
+fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::Weight {
     let request_str = match str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8) {
         Err(e) => return 0,
         Ok(f) => f,
@@ -481,15 +479,13 @@ fn get_exec_req_weights<T: Config>(
     match trx_request::parse_request(request_str) {
         Ok(trx_request::TrxRequest::Extract(max_amount, asset, account)) => {
             <T as Config>::WeightInfo::exec_trx_request_extract()
-        } 
-        
+        }
+
         Ok(trx_request::TrxRequest::Transfer(max_amount, asset, account)) => {
             <T as Config>::WeightInfo::exec_trx_request_transfer()
         }
-    
-        _ => {
-            0
-        }
+
+        _ => 0,
     }
 }
 

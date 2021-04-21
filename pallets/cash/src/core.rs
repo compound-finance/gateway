@@ -441,8 +441,8 @@ pub fn extract_internal<T: Config>(
         Reason::InsufficientTotalFunds,
     )?;
     let total_borrow_new =
-    add_amount_to_raw(TotalBorrowAssets::get(asset.asset), holder_borrow_amount)?;
-    
+        add_amount_to_raw(TotalBorrowAssets::get(asset.asset), holder_borrow_amount)?;
+
     let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
         asset,
         holder,
@@ -916,7 +916,10 @@ mod tests {
                 1450_000000 as pallet_oracle::types::AssetPrice,
             ); // $1450 eth
 
-            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp), ());
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp),
+                ()
+            );
 
             assert_eq!(
                 SupplyIndices::get(&asset),
@@ -942,7 +945,10 @@ mod tests {
                 CashPrincipal::from_nominal("1.000000")
             );
             // Run again to set miner true principal
-            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp), ());
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp),
+                ()
+            );
             assert_eq!(
                 CashPrincipals::get(&miner),
                 CashPrincipal::from_nominal("243.097062")
@@ -968,7 +974,10 @@ mod tests {
             LastYieldCashIndex::put(last_yield_cash_index_initial);
             LastYieldTimestamp::put(last_yield_timestamp);
 
-            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp), ());
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp),
+                ()
+            );
 
             let increment_expected = cash_yield_initial
                 .compound(now - last_yield_timestamp)
@@ -1006,7 +1015,10 @@ mod tests {
             let last_block_timestamp = now;
             let now = next_yield_timestamp;
 
-            assert_ok!(on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp), ());
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp),
+                ()
+            );
 
             let increment_expected = cash_yield_initial
                 .compound(now - last_yield_timestamp)
@@ -1041,7 +1053,10 @@ mod tests {
             let now = now + 6 * 1000;
             let new_cash_index_baseline = new_index_actual;
 
-            assert_ok!(on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp), ());
+            assert_ok!(
+                on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp),
+                ()
+            );
 
             let increment_expected = cash_yield_next
                 .compound(now - next_yield_timestamp)
