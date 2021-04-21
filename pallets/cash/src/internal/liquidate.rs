@@ -14,7 +14,6 @@ use crate::{
     chains::ChainAccount,
     core::{self, get_price, get_value},
     factor::Factor,
-    internal::liquidity,
     params::MIN_TX_VALUE,
     pipeline::CashPipeline,
     reason::Reason,
@@ -30,7 +29,7 @@ pub fn liquidate_internal<T: Config>(
     borrower: ChainAccount,
     amount: AssetQuantity,
 ) -> Result<(), Reason> {
-    require!(asset != collateral_asset, Reason::InKindLiquidation); // TODO: Can we allow this now?
+    require!(asset != collateral_asset, Reason::InKindLiquidation); // Note: this doesn't make sense with signed balances
     require_min_tx_value!(get_value::<T>(amount)?);
 
     let liquidation_incentive = Factor::from_nominal("1.08"); // XXX spec first
@@ -42,16 +41,11 @@ pub fn liquidate_internal<T: Config>(
             collateral_asset.units(),
         )?;
 
-    require!(
-        !liquidity::has_non_negative_liquidity::<T>(borrower)?,
-        Reason::SufficientLiquidity
-    );
-
     CashPipeline::new()
+        .check_underwater::<T>(borrower)?
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
         .check_collateralized::<T>(liquidator)?
-        // Note: don't check borrower liquidity
         .commit::<T>();
 
     <Module<T>>::deposit_event(Event::Liquidate(
@@ -75,10 +69,6 @@ pub fn liquidate_cash_principal_internal<T: Config>(
     let amount = index.cash_quantity(principal)?;
 
     require_min_tx_value!(get_value::<T>(amount)?);
-    require!(
-        !liquidity::has_non_negative_liquidity::<T>(borrower)?,
-        Reason::SufficientLiquidity
-    );
 
     let liquidation_incentive = Factor::from_nominal("1.08"); // XXX spec first
     let seize_amount = amount
@@ -90,10 +80,10 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         )?;
 
     CashPipeline::new()
+        .check_underwater::<T>(borrower)?
         .transfer_cash::<T>(liquidator, borrower, principal)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
         .check_collateralized::<T>(liquidator)?
-        // Note: don't check borrower liquidity
         .commit::<T>();
 
     <Module<T>>::deposit_event(Event::LiquidateCash(
@@ -117,11 +107,6 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
 
     require_min_tx_value!(get_value::<T>(amount)?);
 
-    require!(
-        !liquidity::has_non_negative_liquidity::<T>(borrower)?,
-        Reason::SufficientLiquidity
-    );
-
     let liquidation_incentive = Factor::from_nominal("1.08"); // XXX spec first
     let seize_amount = amount
         .mul_factor(liquidation_incentive)?
@@ -130,10 +115,10 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
     let seize_principal = index.cash_principal_amount(seize_amount)?;
 
     CashPipeline::new()
+        .check_underwater::<T>(borrower)?
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_cash::<T>(borrower, liquidator, seize_principal)?
         .check_collateralized::<T>(liquidator)?
-        // Note: don't check borrower liquidity
         .commit::<T>();
 
     <Module<T>>::deposit_event(Event::LiquidateCashCollateral(

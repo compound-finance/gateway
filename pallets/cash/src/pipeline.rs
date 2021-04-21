@@ -449,6 +449,18 @@ impl CashPipeline {
         }
     }
 
+    pub fn check_underwater<T: Config>(self: Self, account: ChainAccount) -> Result<Self, Reason> {
+        let liquidity = self
+            .state
+            .build_portfolio::<T>(account)?
+            .get_liquidity::<T>()?;
+        if liquidity.value > 0 {
+            Err(Reason::SufficientLiquidity)?
+        } else {
+            Ok(self)
+        }
+    }
+
     pub fn commit<T: Config>(self: Self) {
         self.state.commit::<T>();
     }
