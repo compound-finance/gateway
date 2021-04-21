@@ -1,13 +1,14 @@
-use codec::{Decode, Encode};
 use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
+use our_std::collections::btree_map::BTreeMap;
 use our_std::RuntimeDebug;
 
 use crate::{
     chains::ChainAccount,
     core::{get_asset, get_cash_balance_with_asset_interest, get_price},
+    internal::balance_helpers::*,
     reason::Reason,
     symbol::CASH,
-    types::{AssetInfo, Balance, Quantity},
+    types::{AssetBalance, AssetInfo, Balance, Quantity},
     AssetAmount, AssetBalances, AssetsWithNonZeroBalance, ChainAsset, Config, TotalBorrowAssets,
     TotalSupplyAssets,
 };
@@ -18,27 +19,27 @@ trait Apply {
     fn apply<T: Config>(self: &Self, state: &State) -> Result<State, Reason>;
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub struct State {
-    total_supply_asset_: Vec<(ChainAsset, AssetAmount)>,
-    total_borrow_asset_: Vec<(ChainAsset, AssetAmount)>,
+    total_supply_asset_: BTreeMap<ChainAsset, AssetAmount>,
+    total_borrow_asset_: BTreeMap<ChainAsset, AssetAmount>,
+    asset_balances_: BTreeMap<(ChainAsset, ChainAccount), AssetBalance>,
 }
 
 impl State {
     pub fn new() -> Self {
         State {
-            total_supply_asset_: vec![],
-            total_borrow_asset_: vec![],
+            total_supply_asset_: BTreeMap::new(),
+            total_borrow_asset_: BTreeMap::new(),
+            asset_balances_: BTreeMap::new(),
         }
     }
 
     pub fn get_total_supply_asset<T: Config>(self: &mut Self, asset: ChainAsset) -> AssetAmount {
-        find_or_fetch(
-            &mut self.total_supply_asset_,
-            |el| el.0 == asset,
-            || (asset, TotalSupplyAssets::get(asset)),
-            |el| el.1,
-        )
+        self.total_supply_asset_
+            .get(&asset)
+            .map(|x| *x)
+            .unwrap_or_else(|| TotalSupplyAssets::get(asset))
     }
 
     pub fn set_total_supply_asset<T: Config>(
@@ -46,20 +47,14 @@ impl State {
         asset: ChainAsset,
         amount: AssetAmount,
     ) {
-        set_or_push(
-            &mut self.total_supply_asset_,
-            |el| el.0 == asset,
-            (asset, amount),
-        )
+        self.total_supply_asset_.insert(asset, amount);
     }
 
     pub fn get_total_borrow_asset<T: Config>(self: &mut Self, asset: ChainAsset) -> AssetAmount {
-        find_or_fetch(
-            &mut self.total_borrow_asset_,
-            |el| el.0 == asset,
-            || (asset, TotalBorrowAssets::get(asset)),
-            |el| el.1,
-        )
+        self.total_borrow_asset_
+            .get(&asset)
+            .map(|x| *x)
+            .unwrap_or_else(|| TotalBorrowAssets::get(asset))
     }
 
     pub fn set_total_borrow_asset<T: Config>(
@@ -67,18 +62,34 @@ impl State {
         asset: ChainAsset,
         amount: AssetAmount,
     ) {
-        set_or_push(
-            &mut self.total_borrow_asset_,
-            |el| el.0 == asset,
-            (asset, amount),
-        )
+        self.total_borrow_asset_.insert(asset, amount);
+    }
+
+    pub fn get_asset_balance<T: Config>(
+        self: &mut Self,
+        asset: ChainAsset,
+        account: ChainAccount,
+    ) -> AssetBalance {
+        self.asset_balances_
+            .get(&(asset, account))
+            .map(|x| *x)
+            .unwrap_or_else(|| AssetBalances::get(asset, account))
+    }
+
+    pub fn set_asset_balance<T: Config>(
+        self: &mut Self,
+        asset: ChainAsset,
+        account: ChainAccount,
+        balance: AssetBalance,
+    ) {
+        self.asset_balances_.insert((asset, account), balance);
     }
 }
 
 fn prepare_transfer_asset<T: Config>(
     st_pre: &State,
-    from: ChainAccount,
-    to: ChainAccount,
+    sender: ChainAccount,
+    recipient: ChainAccount,
     asset: ChainAsset,
     quantity: Quantity,
 ) -> Result<State, Reason> {
@@ -87,30 +98,34 @@ fn prepare_transfer_asset<T: Config>(
     // TODO: Get some things
     let total_supply_pre = st.get_total_supply_asset::<T>(asset);
     let total_borrow_pre = st.get_total_borrow_asset::<T>(asset);
-    let from_asset_balance = AssetBalances::get(asset, from);
-    let to_asset_balance = AssetBalances::get(asset, to);
+    let sender_asset_balance = st.get_asset_balance::<T>(asset, sender);
+    let recipient_asset_balance = st.get_asset_balance::<T>(asset, recipient);
 
-    let (recipient_repay_amount, recipient_supply_amount) = repay_and_supply_amount(asset, amount)?;
-    let (sender_withdraw_amount, sender_borrow_amount) = withdraw_and_borrow_amount(asset, amount)?;
+    let (recipient_repay_amount, recipient_supply_amount) =
+        repay_and_supply_amount(recipient_asset_balance, quantity)?;
+    let (sender_withdraw_amount, sender_borrow_amount) =
+        withdraw_and_borrow_amount(sender_asset_balance, quantity)?;
 
-    // let total_supply_new = total_supply_pre
-    //     .add_amount(recipient_supply_amount)?
-    //     .sub_amount(sender_withdraw_amount)
-    //     .ok_or(Reason::InsufficientTotalFunds);
+    let total_supply_new = total_supply_pre
+        .add_amount(recipient_supply_amount)?
+        .sub_amount(sender_withdraw_amount)
+        .ok_or(Reason::InsufficientTotalFunds);
 
-    // let total_borrow_new = total_borrow_pre
-    //     .add_amount(sender_borrow_amount)?
-    //     .sub_amount(sender_withdraw_amount)?; // Neither should happen under normal conditions
+    let total_borrow_new = total_borrow_pre
+        .add_amount(sender_borrow_amount)?
+        .sub_amount(sender_repay_amount)?;
 
     st.set_total_supply_asset::<T>(asset, total_supply_pre);
     st.set_total_borrow_asset::<T>(asset, total_borrow_pre);
+
+    // TODO: Set accounts data
 
     Ok(st)
 }
 
 // fn exec_transfer_asset(from: ChainAccount, to: ChainAccount, asset_amount: ChainAssetAmount) {}
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub enum Effect {
     Init,
     TransferAsset {
@@ -136,7 +151,7 @@ impl Apply for Effect {
 }
 
 /// Type for representing a set of positions for an account.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub struct Effectful {
     pub effects: Vec<(Effect, State)>,
 }
@@ -170,40 +185,6 @@ impl Effectful {
         self.effects.push((effect, state_new));
         Ok(self)
     }
-}
-
-fn find_or_fetch<T, V, F0, F1, F2>(vec: &mut Vec<T>, find_fn: F0, fetch_fn: F1, read_fn: F2) -> V
-where
-    F0: Fn(&T) -> bool,
-    F1: Fn() -> T,
-    F2: Fn(&T) -> V,
-{
-    for elem in vec.iter() {
-        if find_fn(elem) {
-            // Found
-            return read_fn(elem);
-        }
-    }
-
-    // Not found
-    let fetched_value = fetch_fn();
-    let res = read_fn(&fetched_value);
-    vec.push(fetched_value);
-    res
-}
-
-fn set_or_push<T, F>(vec: &mut Vec<T>, find_fn: F, value: T)
-where
-    F: Fn(&T) -> bool,
-{
-    for elem in vec.iter_mut() {
-        if find_fn(elem) {
-            *elem = value;
-            return;
-        }
-    }
-    // Not found
-    vec.push(value);
 }
 
 #[cfg(test)]
