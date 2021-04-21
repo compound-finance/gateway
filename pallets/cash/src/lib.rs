@@ -35,7 +35,9 @@ use frame_support::{
 };
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{collections::btree_set::BTreeSet, debug, error, log, str, vec::Vec, Debuggable};
+use our_std::{
+    collections::btree_set::BTreeSet, convert::TryInto, error, log, str, vec::Vec, Debuggable,
+};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity,
@@ -484,7 +486,7 @@ fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::
         Ok(trx_request::TrxRequest::Transfer(max_amount, asset, account)) => {
             <T as Config>::WeightInfo::exec_trx_request_transfer()
         }
-
+        // todo: liquidate
         _ => 0,
     }
 }
@@ -504,7 +506,7 @@ decl_module! {
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
             match core::on_initialize::<T>() {
-                Ok(()) => <T as Config>::WeightInfo::set_yield_next(),
+                Ok(()) => <T as Config>::WeightInfo::on_initialize(SupportedAssets::iter().count().try_into().unwrap()),
                 Err(err) => {
                     // This should never happen...
                     error!("Could not initialize block!!! {:#?} {:#?}", block, err);
@@ -544,42 +546,42 @@ decl_module! {
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::change_validators(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn change_validators(origin, validators: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::change_validators::change_validators::<T>(validators))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::allow_next_code_with_hash(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn allow_next_code_with_hash(origin, hash: CodeHash) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::next_code::allow_next_code_with_hash::<T>(hash))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [User] [Free]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_next_code_via_hash(code.len().try_into().unwrap()), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
         }
 
         /// Sets the supply cap for a given chain asset [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::supply_cap::set_supply_cap::<T>(asset, amount))?)
         }
 
         /// Set the liquidity factor for an asset [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_liquidity_factor(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_liquidity_factor::<T>(asset, factor))?)
         }
 
         /// Update the interest rate model for a given asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_rate_model(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
@@ -593,7 +595,7 @@ decl_module! {
         }
 
         /// Adds the asset to the runtime by defining it as a supported asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)]
+        #[weight = (<T as Config>::WeightInfo::support_asset(), DispatchClass::Operational, Pays::No)]
         pub fn support_asset(origin, asset_info: AssetInfo) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset_info))?)

@@ -198,8 +198,7 @@ benchmarks! {
   }
 
   allow_next_code_with_hash {
-    let z in 10_000 .. 100_000;
-    let new_code = vec![3u8; z.try_into().unwrap()];
+    let new_code = vec![3u8; 100_000];
     let hash = <Ethereum as Chain>::hash_bytes(&new_code);
   }: {
     assert_eq!(Cash::<T>::allow_next_code_with_hash(RawOrigin::Root.into(), hash), Ok(()));
@@ -214,6 +213,7 @@ benchmarks! {
     assert_eq!(Cash::<T>::set_next_code_via_hash(RawOrigin::None.into(), new_code), Ok(()));
   }
 
+  // todo: parameterize over # vals?
   change_validators {
     let substrate_id: SubstrateId = [2; 32].into();
     let eth_address = [1; 20];
@@ -277,32 +277,33 @@ benchmarks! {
     assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec, signature, nonce), Ok(()));
   }
 
-  exec_trx_request_liquidate {
-    let signer_vec = <Ethereum as Chain>::signer_address().unwrap();
-    let holder = ChainAccount::Eth(signer_vec);
-    let nonce: Nonce = 0u32.into();
-    let transfer_amt = 5_000_000_000_000_000_000;// 5e18
+  //WIP
+  // exec_trx_request_liquidate {
+  //   let signer_vec = <Ethereum as Chain>::signer_address().unwrap();
+  //   let holder = ChainAccount::Eth(signer_vec);
+  //   let nonce: Nonce = 0u32.into();
+  //   let transfer_amt = 5_000_000_000_000_000_000;// 5e18
 
-    // bob supply tkn, transfer cash
-    let bob_address_bytes: [u8;20] = ethereum_client::hex::decode_address(&BOB_ADDRESS.to_string()).unwrap();
-    endow_tkn::<T>(bob_address_bytes, transfer_amt * 5, TKN_ADDR_BYTES);
-    assert_ok!(transfer_cash_principal_internal::<T>(ChainAccount::Eth(bob_address_bytes), ChainAccount::Eth(signer_vec), CashPrincipalAmount(params::MIN_TX_VALUE.value)), ());
+  //   // bob supply tkn, transfer cash
+  //   let bob_address_bytes: [u8;20] = ethereum_client::hex::decode_address(&BOB_ADDRESS.to_string()).unwrap();
+  //   endow_tkn::<T>(bob_address_bytes, transfer_amt * 5, TKN_ADDR_BYTES);
+  //   assert_ok!(transfer_cash_principal_internal::<T>(ChainAccount::Eth(bob_address_bytes), ChainAccount::Eth(signer_vec), CashPrincipalAmount(params::MIN_TX_VALUE.value)), ());
 
-    // get bob unhealthy
-    assert_ok!(Cash::<T>::set_liquidity_factor(RawOrigin::Root.into(), ChainAsset::Eth(TKN_ADDR_BYTES), Factor(0u128)));
+  //   // get bob unhealthy
+  //   assert_ok!(Cash::<T>::set_liquidity_factor(RawOrigin::Root.into(), ChainAsset::Eth(TKN_ADDR_BYTES), Factor(0u128)));
 
-    // alice supply some collateral, liquidate
-    endow_tkn::<T>(signer_vec, transfer_amt * 5, [2; 20]);
-    let raw_req: String = format!("(Liquidate 1 Cash Eth:{} Eth:{})", TKN_ADDR, BOB_ADDRESS);
-    let request_vec: Vec<u8> = raw_req.as_bytes().into();
-    let prepended_request = format!("{}:{}", nonce, raw_req);
-    let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n{}{}", prepended_request.len(), prepended_request).as_bytes().into();
-    let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
-    let signature_raw = runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
-    let signature = ChainAccountSignature::Eth(signer_vec, signature_raw);
-  }: {
-    assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec, signature, nonce), Ok(()));
-  }
+  //   // alice supply some collateral, liquidate
+  //   endow_tkn::<T>(signer_vec, transfer_amt * 5, [2; 20]);
+  //   let raw_req: String = format!("(Liquidate 1 Cash Eth:{} Eth:{})", TKN_ADDR, BOB_ADDRESS);
+  //   let request_vec: Vec<u8> = raw_req.as_bytes().into();
+  //   let prepended_request = format!("{}:{}", nonce, raw_req);
+  //   let full_request: Vec<u8> = format!("\x19Ethereum Signed Message:\n{}{}", prepended_request.len(), prepended_request).as_bytes().into();
+  //   let eth_key_id = runtime_interfaces::validator_config_interface::get_eth_key_id().unwrap();
+  //   let signature_raw = runtime_interfaces::keyring_interface::sign_one(full_request, eth_key_id).unwrap();
+  //   let signature = ChainAccountSignature::Eth(signer_vec, signature_raw);
+  // }: {
+  //   assert_eq!(Cash::<T>::exec_trx_request(RawOrigin::None.into(), request_vec, signature, nonce), Ok(()));
+  // }
 }
 
 #[cfg(test)]
