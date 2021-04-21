@@ -82,9 +82,7 @@ impl Portfolio {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{chains::*, core::*, rates::*, reason::*, symbol::*, tests::*, types::*, *};
-    use pallet_oracle;
-    use pallet_oracle::types::Price;
+    use crate::tests::*;
 
     struct TestAsset {
         asset: u8,

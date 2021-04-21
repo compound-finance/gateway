@@ -229,7 +229,8 @@ pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Ora
     }
 
     // get the URL to poll, just return if there is no URL set up
-    let url = runtime_interfaces::validator_config_interface::get_opf_url().unwrap_or(vec![]);
+    let url =
+        runtime_interfaces::validator_config_interface::get_opf_url().unwrap_or(String::new());
     if url.len() == 0 {
         return Ok(());
     }
@@ -246,7 +247,6 @@ pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Ora
             return Ok(());
         }
     }
-    let url = String::from_utf8(url).map_err(|_| OracleError::InvalidApiEndpoint)?;
 
     // poll
     let (messages_and_signatures, timestamp) =

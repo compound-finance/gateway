@@ -5,7 +5,6 @@ use our_std::{consts::uint_from_string_with_decimals, convert::TryFrom, RuntimeD
 use types_derive::{type_alias, Types};
 
 /// Type for an open price feed reporter.
-
 #[type_alias]
 pub type Reporter = [u8; 20];
 
@@ -17,9 +16,9 @@ pub type Timestamp = u64;
 #[type_alias]
 pub type AssetPrice = u128;
 
-// XXX ideally we should really impl Ord ourselves for these
-//  and should assert ticker/units is same when comparing
-//   would have to panic, though not for partial ord
+// Note: ideally we would impl Ord ourselves for all these Ord types,
+//  and assert ticker/units are the same when comparing.
+// We would have to panic, though not for PartialOrd...
 
 /// Type for representing a price (in USD), bound to its ticker.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]

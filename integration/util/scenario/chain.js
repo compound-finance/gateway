@@ -41,9 +41,9 @@ class Chain {
     return await this.ctx.eventTracker.waitForEvent(pallet, eventName, { failureEvent });
   }
 
-  // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingEthEvent` event
+  // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingChainBlockEvent` event
   async waitForEthProcessEvent(pallet, eventName, onFinalize = true) {
-    return this.waitForEvent(pallet, eventName, { failureEvent: ['cash', 'FailedProcessingEthEvent'] });
+    return this.waitForEvent(pallet, eventName, { failureEvent: ['cash', 'FailedProcessingChainBlockEvent'] });
   }
 
   async waitForEthProcessFailure(onFinalize = true) {
@@ -52,7 +52,7 @@ class Chain {
 
   async waitForChainProcessed(onFinalize = true, failureEvent = null) {
     // TODO: Match transaction id?
-    return await this.waitForEvent('cash', 'ProcessedChainEvent', { failureEvent });
+    return await this.waitForEvent('cash', 'ProcessedChainBlockEvent', { failureEvent });
   }
 
   async waitForNotice(onFinalize = true, failureEvent = null) {

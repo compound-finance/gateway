@@ -1,5 +1,4 @@
 use crate::tests::{assets::*, *};
-use pallet_oracle::types::Price;
 
 pub fn init_eth_asset() -> Result<ChainAsset, Reason> {
     pallet_oracle::Prices::insert(ETH.ticker, Price::from_nominal(ETH.ticker, "2000.00").value);

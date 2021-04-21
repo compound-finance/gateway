@@ -51,7 +51,8 @@ use sp_std::marker::PhantomData;
 pub trait WeightInfo {
     fn publish_signature() -> Weight;
     fn set_yield_next() -> Weight;
-    fn receive_event() -> Weight;
+    fn receive_chain_blocks() -> Weight;
+    fn receive_chain_reorg() -> Weight;
 }
 
 /// Weights for pallet_cash using the Substrate node and recommended hardware.
@@ -67,10 +68,11 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(5 as Weight))
             .saturating_add(T::DbWeight::get().writes(5 as Weight))
     }
-    fn receive_event() -> Weight {
-        (243_000_000 as Weight)
-            .saturating_add(T::DbWeight::get().reads(4 as Weight))
-            .saturating_add(T::DbWeight::get().writes(1 as Weight))
+    fn receive_chain_blocks() -> Weight {
+        (243_000_000 as Weight) // XXX
+    }
+    fn receive_chain_reorg() -> Weight {
+        (243_000_000 as Weight) // XXX
     }
 }
 
@@ -86,9 +88,10 @@ impl WeightInfo for () {
             .saturating_add(RocksDbWeight::get().reads(5 as Weight))
             .saturating_add(RocksDbWeight::get().writes(5 as Weight))
     }
-    fn receive_event() -> Weight {
-        (243_000_000 as Weight)
-            .saturating_add(RocksDbWeight::get().reads(4 as Weight))
-            .saturating_add(RocksDbWeight::get().writes(1 as Weight))
+    fn receive_chain_blocks() -> Weight {
+        (243_000_000 as Weight) // XXX
+    }
+    fn receive_chain_reorg() -> Weight {
+        (243_000_000 as Weight) // XXX
     }
 }
