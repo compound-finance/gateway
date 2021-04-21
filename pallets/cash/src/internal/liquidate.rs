@@ -14,6 +14,7 @@ use crate::{
     chains::ChainAccount,
     core::{self, get_price, get_value},
     factor::Factor,
+    must,
     params::MIN_TX_VALUE,
     pipeline::CashPipeline,
     reason::Reason,
@@ -45,6 +46,12 @@ pub fn liquidate_internal<T: Config>(
         .check_underwater::<T>(borrower)?
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
+        .check_asset_balance::<T, _>(borrower, asset, |asset_balance| {
+            must!(asset_balance.lte(0), Reason::RepayTooMuch)
+        })?
+        .check_asset_balance::<T, _>(borrower, collateral_asset, |collateral_balance| {
+            must!(collateral_balance.gte(0), Reason::InsufficientCollateral)
+        })?
         .check_collateralized::<T>(liquidator)?
         .commit::<T>();
 
@@ -83,6 +90,12 @@ pub fn liquidate_cash_principal_internal<T: Config>(
         .check_underwater::<T>(borrower)?
         .transfer_cash::<T>(liquidator, borrower, principal)?
         .transfer_asset::<T>(borrower, liquidator, collateral_asset.asset, seize_amount)?
+        .check_cash_principal::<T, _>(borrower, |cash_principal| {
+            must!(cash_principal.lte(0), Reason::RepayTooMuch)
+        })?
+        .check_asset_balance::<T, _>(borrower, collateral_asset, |collateral_balance| {
+            must!(collateral_balance.gte(0), Reason::InsufficientCollateral)
+        })?
         .check_collateralized::<T>(liquidator)?
         .commit::<T>();
 
@@ -118,6 +131,12 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
         .check_underwater::<T>(borrower)?
         .transfer_asset::<T>(liquidator, borrower, asset.asset, amount)?
         .transfer_cash::<T>(borrower, liquidator, seize_principal)?
+        .check_asset_balance::<T, _>(borrower, asset, |asset_balance| {
+            must!(asset_balance.lte(0), Reason::RepayTooMuch)
+        })?
+        .check_cash_principal::<T, _>(borrower, |cash_principal| {
+            must!(cash_principal.gte(0), Reason::InsufficientCollateral)
+        })?
         .check_collateralized::<T>(liquidator)?
         .commit::<T>();
 

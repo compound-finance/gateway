@@ -392,6 +392,16 @@ impl Balance {
         )?;
         Ok(Balance::new(result, self.units))
     }
+
+    /// Returns true if the balance is greater than or equal to given value
+    pub fn gte(self: &Self, v: i128) -> bool {
+        self.value >= v
+    }
+
+    /// Returns true if the balance is less than or equal to given value
+    pub fn lte(self: &Self, v: i128) -> bool {
+        self.value <= v
+    }
 }
 
 /// Type for representing a balance of CASH Principal.
@@ -451,6 +461,16 @@ impl CashPrincipal {
 
     pub fn negate(self) -> Self {
         Self(-self.0)
+    }
+
+    /// Returns true if the principal is greater than or equal to given value
+    pub fn gte(self: &Self, v: i128) -> bool {
+        self.0 >= v
+    }
+
+    /// Returns true if the principal is less than or equal to given value
+    pub fn lte(self: &Self, v: i128) -> bool {
+        self.0 <= v
     }
 }
 

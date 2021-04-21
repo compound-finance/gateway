@@ -461,6 +461,33 @@ impl CashPipeline {
         }
     }
 
+    pub fn check_asset_balance<T: Config, F>(
+        self: Self,
+        account: ChainAccount,
+        asset: AssetInfo,
+        check_fn: F,
+    ) -> Result<Self, Reason>
+    where
+        F: FnOnce(Balance) -> Result<(), Reason>,
+    {
+        let balance = self.state.get_asset_balance::<T>(asset, account);
+        check_fn(balance)?;
+        Ok(self)
+    }
+
+    pub fn check_cash_principal<T: Config, F>(
+        self: Self,
+        account: ChainAccount,
+        check_fn: F,
+    ) -> Result<Self, Reason>
+    where
+        F: FnOnce(CashPrincipal) -> Result<(), Reason>,
+    {
+        let principal = self.state.get_cash_principal::<T>(account);
+        check_fn(principal)?;
+        Ok(self)
+    }
+
     pub fn commit<T: Config>(self: Self) {
         self.state.commit::<T>();
     }
