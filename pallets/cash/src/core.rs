@@ -90,6 +90,11 @@ pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
 }
 
+/// Return the cash total supply data.
+pub fn get_cash_data<T: Config>() -> Result<(CashIndex, CashPrincipalAmount), Reason> {
+    Ok((GlobalCashIndex::get(), TotalCashPrincipal::get()))
+}
+
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
     let info: Vec<ChainAccount> = CashPrincipals::iter()
