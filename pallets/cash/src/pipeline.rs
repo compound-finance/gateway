@@ -667,6 +667,10 @@ fn effect_of_asset_interest_internal(
     Ok((cash_principal_post, last_index_post))
 }
 
+pub fn load_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
+    CashPipeline::new().state.build_portfolio::<T>(account)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
