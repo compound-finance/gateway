@@ -11,7 +11,6 @@ use crate::{
 use codec::{Decode, Encode};
 use frame_support::storage::StorageValue;
 use our_std::Debuggable;
-
 use types_derive::Types;
 
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable, Types)]

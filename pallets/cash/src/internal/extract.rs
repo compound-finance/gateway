@@ -1,7 +1,3 @@
-// Note: The substrate build requires these be re-exported.
-use frame_support::storage::StorageValue;
-
-// Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::ChainAccount,
     core::get_value,
@@ -13,6 +9,7 @@ use crate::{
     types::{AssetInfo, AssetQuantity, CashIndex, CashPrincipalAmount},
     Config, Event, GlobalCashIndex, Module,
 };
+use frame_support::storage::StorageValue;
 
 pub fn extract_internal<T: Config>(
     asset: AssetInfo,
@@ -63,7 +60,6 @@ pub fn extract_cash_principal_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::tests::*;
     use pallet_oracle::{types::Price, Prices};
 

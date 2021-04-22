@@ -1,7 +1,3 @@
-// Note: The substrate build requires these be re-exported.
-use frame_support::storage::StorageValue;
-
-// Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::ChainAccount,
     pipeline::CashPipeline,
@@ -9,6 +5,7 @@ use crate::{
     types::{AssetInfo, AssetQuantity, CashIndex, CashPrincipalAmount},
     Config, Event, GlobalCashIndex, Module,
 };
+use frame_support::storage::StorageValue;
 
 pub fn lock_internal<T: Config>(
     asset: AssetInfo,
