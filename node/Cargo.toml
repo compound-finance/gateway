@@ -32,6 +32,8 @@ serde_json = { version = "1.0.58", features=["alloc"] } # XXX 128 bit also arbit
 wasm-timer = "0.2"
 
 # Substrate dependencies
+frame-support = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-chain-spec = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-client-api = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-cli = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -73,6 +75,7 @@ frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', br
 frame-benchmarking-cli = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
 
 # Local dependencies
+ethereum-client = { path = '../ethereum-client' }
 gateway-runtime = { path = '../runtime' }
 gateway-crypto = { path = '../gateway-crypto' }
 our-std = { path = '../our-std' }
@@ -90,8 +93,6 @@ sc-consensus-aura = { git = 'https://github.com/compound-finance/substrate', bra
 sp-keyring = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-service-test = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-
-frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
 [features]
 default = ['with-parity-db']

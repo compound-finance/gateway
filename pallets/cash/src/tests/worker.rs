@@ -8,6 +8,7 @@ fn test_offchain_worker() {
     // XXX this creates problems for test parallelization...
     runtime_interfaces::config_interface::set(runtime_interfaces::new_config(
         "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into(),
+        runtime_interfaces::NULL_ETH_BLOCK,
     ));
 
     let calls = vec![

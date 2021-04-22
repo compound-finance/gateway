@@ -36,6 +36,13 @@ impl ChainId {
         }
     }
 
+    pub fn to_hash(self, hash: &str) -> Result<ChainHash, Reason> {
+        match self {
+            ChainId::Eth => Ok(ChainHash::Eth(Ethereum::str_to_hash(hash)?)),
+            ChainId::Dot => Ok(ChainHash::Dot(Polkadot::str_to_hash(hash)?)),
+        }
+    }
+
     pub fn signer_address(self) -> Result<ChainAccount, Reason> {
         match self {
             ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
@@ -185,18 +192,43 @@ impl ChainAccountSignature {
 /// Type for a block number tied on an underlying chain.
 pub type ChainBlockNumber = u64;
 
-/// Type for an hash tied to a chain.
+/// Type for a hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
 }
 
+// Display so we can format local storage keys.
 impl our_std::fmt::Display for ChainHash {
     fn fmt(&self, f: &mut our_std::fmt::Formatter<'_>) -> our_std::fmt::Result {
         match self {
             ChainHash::Eth(eth_hash) => write!(f, "ETH#{:X?}", eth_hash),
             ChainHash::Dot(dot_hash) => write!(f, "DOT#{:X?}", dot_hash),
+        }
+    }
+}
+
+// Implement deserialization for ChainHashes so we can use them in GenesisConfig / ChainSpec JSON.
+//  i.e. "eth:0x..." <> Eth(0x...)
+impl FromStr for ChainHash {
+    type Err = Reason;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        if let Some((chain_id_str, hash_str)) = String::from(string).split_once(":") {
+            let chain_id = ChainId::from_str(chain_id_str)?;
+            Ok(chain_id.to_hash(hash_str)?)
+        } else {
+            Err(Reason::BadHash)
+        }
+    }
+}
+
+impl From<ChainHash> for String {
+    fn from(hash: ChainHash) -> String {
+        match hash {
+            ChainHash::Eth(eth_hash) => <Ethereum as Chain>::hash_string(&eth_hash),
+            _ => panic!("XXX not implemented"),
         }
     }
 }
@@ -232,6 +264,37 @@ impl ChainSignature {
 pub enum ChainSignatureList {
     Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
+}
+
+impl ChainSignatureList {
+    pub fn has_signer(&self, signer: ChainAccount) -> bool {
+        match (self, signer) {
+            (ChainSignatureList::Eth(eth_signature_pairs), ChainAccount::Eth(eth_account)) => {
+                eth_signature_pairs.iter().any(|(s, _)| *s == eth_account)
+            }
+            _ => false,
+        }
+    }
+
+    pub fn has_validator_signature(&self, chain_id: ChainId, validator: &ValidatorKeys) -> bool {
+        match chain_id {
+            ChainId::Eth => self.has_signer(ChainAccount::Eth(validator.eth_address)),
+            _ => false,
+        }
+    }
+
+    pub fn add_validator_signature(
+        &mut self,
+        signature: &ChainSignature,
+        validator: &ValidatorKeys,
+    ) -> Result<(), Reason> {
+        match (self, signature) {
+            (ChainSignatureList::Eth(eth_sig_list), ChainSignature::Eth(eth_sig)) => {
+                Ok(eth_sig_list.push((validator.eth_address, eth_sig.clone())))
+            }
+            _ => Err(Reason::SignatureMismatch),
+        }
+    }
 }
 
 // Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
@@ -547,6 +610,8 @@ pub trait Chain {
     fn signer_address() -> Result<Self::Address, Reason>;
     fn str_to_address(addr: &str) -> Result<Self::Address, Reason>;
     fn address_string(address: &Self::Address) -> String;
+    fn str_to_hash(hash: &str) -> Result<Self::Hash, Reason>;
+    fn hash_string(hash: &Self::Hash) -> String;
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -637,14 +702,25 @@ impl Chain for Ethereum {
     }
 
     fn str_to_address(addr: &str) -> Result<Self::Address, Reason> {
-        match gateway_crypto::str_to_address(addr) {
+        match gateway_crypto::eth_str_to_address(addr) {
             Some(s) => Ok(s),
             None => Err(Reason::BadAddress),
         }
     }
 
     fn address_string(address: &Self::Address) -> String {
-        gateway_crypto::address_string(address)
+        gateway_crypto::eth_address_string(address)
+    }
+
+    fn str_to_hash(hash: &str) -> Result<Self::Hash, Reason> {
+        match gateway_crypto::eth_str_to_hash(hash) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadHash),
+        }
+    }
+
+    fn hash_string(hash: &Self::Hash) -> String {
+        gateway_crypto::eth_hash_string(hash)
     }
 }
 
@@ -713,6 +789,14 @@ impl Chain for Polkadot {
     }
 
     fn address_string(_address: &Self::Address) -> String {
+        panic!("XXX not implemented");
+    }
+
+    fn str_to_hash(_hash: &str) -> Result<Self::Hash, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn hash_string(_hash: &Self::Hash) -> String {
         panic!("XXX not implemented");
     }
 }

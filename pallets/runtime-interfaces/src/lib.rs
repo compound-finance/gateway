@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 use codec::{Decode, Encode};
+use ethereum_client::EthereumBlock;
 use gateway_crypto::CryptoError;
 use sp_runtime_interface::pass_by::PassByCodec;
 use std::{str, sync::Mutex};
@@ -9,6 +10,7 @@ use std::{str, sync::Mutex};
 #[derive(Clone, Decode, Encode, PassByCodec)]
 pub struct Config {
     pub eth_starport_address: String,
+    pub eth_starport_parent_block: EthereumBlock,
 }
 
 #[derive(Clone)]
@@ -26,16 +28,27 @@ impl Config {
     }
 }
 
-pub fn new_config(eth_starport_address: String) -> Config {
+pub fn new_config(
+    eth_starport_address: String,
+    eth_starport_parent_block: EthereumBlock,
+) -> Config {
     return Config {
         eth_starport_address,
+        eth_starport_parent_block,
     };
 }
 
-type PriceFeedData = (Vec<(Vec<u8>, Vec<u8>)>, u64);
+pub type PriceFeedData = (Vec<(Vec<u8>, Vec<u8>)>, u64);
+
+pub const NULL_ETH_BLOCK: EthereumBlock = EthereumBlock {
+    hash: [0; 32],
+    parent_hash: [0; 32],
+    number: 0,
+    events: vec![],
+};
 
 lazy_static! {
-    static ref CONFIG: Mutex<Config> = Mutex::new(new_config("".into()));
+    static ref CONFIG: Mutex<Config> = Mutex::new(new_config("".into(), NULL_ETH_BLOCK));
     static ref VALIDATOR_CONFIG: Mutex<Option<ValidatorConfig>> = Mutex::new(None);
     static ref PRICE_FEED_DATA: Mutex<Option<PriceFeedData>> = Mutex::new(None);
 }
@@ -266,7 +279,7 @@ mod tests {
         let expected_eth_starport_address =
             String::from("0xbbde1662bC3ED16aA8C618c9833c801F3543B587");
 
-        let config = new_config(given_eth_starport_address.clone());
+        let config = new_config(given_eth_starport_address.clone(), NULL_ETH_BLOCK);
         // set in node
         config_interface::set(config);
         // ...later... in offchain worker context, get the configuration
