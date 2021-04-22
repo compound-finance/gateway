@@ -15,9 +15,7 @@ use codec::Decode;
 use frame_support::traits::UnfilteredDispatchable;
 use frame_support::{
     sp_runtime::traits::Convert,
-    storage::{
-        IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
-    },
+    storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
 };
 
 use pallet_oracle::types::Price;
@@ -28,9 +26,7 @@ use crate::{
         ChainSignature, Ethereum,
     },
     factor::Factor,
-    internal::{self, balance_helpers::*, liquidity},
-    log,
-    params::{MIN_TX_VALUE, TRANSFER_FEE},
+    internal, log,
     pipeline::CashPipeline,
     portfolio::Portfolio,
     rates::APR,
@@ -40,11 +36,10 @@ use crate::{
         CashPrincipal, CashPrincipalAmount, GovernanceResult, NoticeId, Quantity, SignersSet,
         Timestamp, USDQuantity, Units, ValidatorKeys, CASH,
     },
-    AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals, CashYield,
-    CashYieldNext, ChainCashPrincipals, Config, Event, GlobalCashIndex, IngressionQueue,
-    LastBlockTimestamp, LastIndices, LastMinerSharePrincipal, LastYieldCashIndex,
-    LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets, Validators,
+    AssetBalances, BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, Event,
+    GlobalCashIndex, IngressionQueue, LastBlockTimestamp, LastMinerSharePrincipal,
+    LastYieldCashIndex, LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets,
+    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 #[macro_export]
@@ -205,12 +200,7 @@ pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
     let mut info: Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
-        .map(|a| {
-            (
-                a.0.clone(),
-                liquidity::get_liquidity::<T>(a.0).unwrap().value,
-            )
-        })
+        .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
         .collect::<Vec<(ChainAccount, AssetBalance)>>();
     info.sort_by(|(_a_account, a_balance), (_b_account, b_balance)| a_balance.cmp(b_balance));
     Ok(info)
@@ -372,21 +362,6 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
     }
 }
 
-/// Update the index of which assets an account has non-zero balances in.
-pub fn set_asset_balance_internal<T: Config>(
-    asset: ChainAsset,
-    account: ChainAccount,
-    balance: AssetBalance,
-) {
-    if balance == 0 {
-        AssetsWithNonZeroBalance::remove(account, asset);
-    } else {
-        AssetsWithNonZeroBalance::insert(account, asset, ());
-    }
-
-    AssetBalances::insert(asset, account, balance);
-}
-
 pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Result<(), Reason> {
     // Decode a SCALE-encoded set of extrinsics from the event
     // For each extrinsic, dispatch the given extrinsic as Root
@@ -429,192 +404,24 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
     Ok(())
 }
 
-pub fn extract_internal<T: Config>(
-    asset: AssetInfo,
-    holder: ChainAccount,
-    recipient: ChainAccount,
-    amount: AssetQuantity,
-) -> Result<(), Reason> {
-    require_min_tx_value!(get_value::<T>(amount)?);
-    require!(
-        liquidity::has_liquidity_to_reduce_asset::<T>(holder, asset, amount)?,
-        Reason::InsufficientLiquidity
-    );
-
-    let holder_asset = AssetBalances::get(asset.asset, holder);
-    let (holder_withdraw_amount, holder_borrow_amount) =
-        withdraw_and_borrow_amount(holder_asset, amount)?;
-
-    let holder_asset_new = sub_amount_from_balance(holder_asset, amount)?;
-    let total_supply_new = sub_amount_from_raw(
-        TotalSupplyAssets::get(asset.asset),
-        holder_withdraw_amount,
-        Reason::InsufficientTotalFunds,
-    )?;
-    let total_borrow_new =
-        add_amount_to_raw(TotalBorrowAssets::get(asset.asset), holder_borrow_amount)?;
-
-    let (cash_principal_post, last_index_post) = effect_of_asset_interest_internal(
-        asset,
-        holder,
-        holder_asset,
-        holder_asset_new,
-        CashPrincipals::get(holder),
-    )?;
-    require!(
-        total_borrow_new <= total_supply_new,
-        Reason::InsufficientTotalFunds
-    );
-
-    LastIndices::insert(asset.asset, holder, last_index_post);
-    CashPrincipals::insert(holder, cash_principal_post);
-    TotalSupplyAssets::insert(asset.asset, total_supply_new);
-    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
-
-    set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
-
-    internal::notices::dispatch_extraction_notice::<T>(asset.asset, recipient, amount);
-
-    <Module<T>>::deposit_event(Event::Extract(asset.asset, holder, recipient, amount.value));
-
-    Ok(())
-}
-
-pub fn extract_cash_principal_internal<T: Config>(
-    holder: ChainAccount,
-    recipient: ChainAccount,
-    principal: CashPrincipalAmount,
-) -> Result<(), Reason> {
-    let index = GlobalCashIndex::get();
-    let amount = index.cash_quantity(principal)?;
-
-    require_min_tx_value!(get_value::<T>(amount)?);
-    require!(
-        liquidity::has_liquidity_to_reduce_cash::<T>(holder, amount)?,
-        Reason::InsufficientLiquidity
-    );
-
-    let holder_cash_principal = CashPrincipals::get(holder);
-    let (_holder_withdraw_principal, holder_borrow_principal) =
-        withdraw_and_borrow_principal(holder_cash_principal, principal)?;
-
-    let chain_id = recipient.chain_id();
-    let chain_cash_principal_new =
-        add_principal_amounts(ChainCashPrincipals::get(chain_id), principal)?;
-    let total_cash_principal_new =
-        add_principal_amounts(TotalCashPrincipal::get(), holder_borrow_principal)?;
-    let holder_cash_principal_new = holder_cash_principal.sub_amount(principal)?;
-
-    ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
-    CashPrincipals::insert(holder, holder_cash_principal_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
-
-    internal::notices::dispatch_cash_extraction_notice::<T>(recipient, principal);
-
-    <Module<T>>::deposit_event(Event::ExtractCash(holder, recipient, principal, index));
-
-    Ok(())
-}
-
-pub fn transfer_internal<T: Config>(
-    asset: AssetInfo,
-    sender: ChainAccount,
-    recipient: ChainAccount,
-    amount: AssetQuantity,
-) -> Result<(), Reason> {
-    let miner = get_some_miner::<T>();
-    let index = GlobalCashIndex::get();
-    let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
-
-    require_min_tx_value!(get_value::<T>(amount)?);
-
-    CashPipeline::new()
-        .transfer_asset::<T>(sender, recipient, asset.asset, amount)?
-        .transfer_cash::<T>(sender, miner, fee_principal)?
-        .check_collateralized::<T>(sender)?
-        .commit::<T>();
-
-    <Module<T>>::deposit_event(Event::Transfer(
-        asset.asset,
-        sender,
-        recipient,
-        amount.value,
-    ));
-
-    Ok(())
-}
-
-pub fn transfer_cash_principal_internal<T: Config>(
-    sender: ChainAccount,
-    recipient: ChainAccount,
-    principal: CashPrincipalAmount,
-) -> Result<(), Reason> {
-    let miner = get_some_miner::<T>();
-    let index = GlobalCashIndex::get();
-    let fee_principal = index.cash_principal_amount(TRANSFER_FEE)?;
-    let amount = index.cash_quantity(principal)?;
-
-    require_min_tx_value!(get_value::<T>(amount)?);
-
-    CashPipeline::new()
-        .transfer_cash::<T>(sender, recipient, principal)?
-        .transfer_cash::<T>(sender, miner, fee_principal)?
-        .check_collateralized::<T>(sender)?
-        .commit::<T>();
-
-    <Module<T>>::deposit_event(Event::TransferCash(sender, recipient, principal, index));
-
-    Ok(())
-}
-
-/// Calculates the current CASH principal of the account, including all interest from non-CASH markets.
-pub fn get_cash_principal_with_asset_interest<T: Config>(
-    account: ChainAccount,
-) -> Result<CashPrincipal, Reason> {
-    let mut principal = CashPrincipals::get(account);
-    for (asset, _) in AssetsWithNonZeroBalance::iter_prefix(account) {
-        let asset_info = get_asset::<T>(asset)?;
-        let balance = AssetBalances::get(asset, account);
-        (principal, _) =
-            effect_of_asset_interest_internal(asset_info, account, balance, balance, principal)?;
-    }
-    Ok(principal)
-}
-
 /// Calculates the current total CASH value of the account, including all interest from non-CASH markets.
 pub fn get_cash_balance_with_asset_interest<T: Config>(
     account: ChainAccount,
 ) -> Result<Balance, Reason> {
-    Ok(GlobalCashIndex::get()
-        .cash_balance(get_cash_principal_with_asset_interest::<T>(account)?)?)
+    let cash_index = GlobalCashIndex::get();
+    let cash_principal: Balance = CashPipeline::new()
+        .state
+        .build_portfolio::<T>(account)?
+        .cash;
+
+    cash_index
+        .cash_balance(CashPrincipal(cash_principal.value))
+        .map_err(Reason::MathError)
 }
 
-// Asset Interest //
-
-/// Return CASH Principal post asset interest, and updated asset index, for a given account.
-pub fn effect_of_asset_interest_internal(
-    asset_info: AssetInfo,
-    account: ChainAccount,
-    asset_balance_old: AssetBalance,
-    asset_balance_new: AssetBalance,
-    cash_principal_pre: CashPrincipal,
-) -> Result<(CashPrincipal, AssetIndex), MathError> {
-    let asset = asset_info.asset;
-    let last_index = LastIndices::get(asset, account);
-    let cash_index = if asset_balance_old >= 0 {
-        SupplyIndices::get(asset)
-    } else {
-        BorrowIndices::get(asset)
-    };
-    let balance_old = asset_info.as_balance(asset_balance_old);
-    let cash_principal_delta = cash_index.cash_principal_since(last_index, balance_old)?;
-    let cash_principal_post = cash_principal_pre.add(cash_principal_delta)?;
-    let last_index_post = if asset_balance_new >= 0 {
-        SupplyIndices::get(asset)
-    } else {
-        BorrowIndices::get(asset)
-    };
-    Ok((cash_principal_post, last_index_post))
+/// Calculates the current liquidity value for an account.
+pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
+    Ok(Portfolio::from_storage::<T>(account)?.get_liquidity::<T>()?)
 }
 
 // Dispatch Extrinsic Lifecycle //
@@ -1102,53 +909,6 @@ mod tests {
             <pallet_timestamp::Module<Test>>::set_timestamp(expected);
             let actual = get_now::<Test>();
             assert_eq!(actual, expected);
-        });
-    }
-
-    #[test]
-    fn test_set_asset_balance_internal() {
-        new_test_ext().execute_with(|| {
-            let asset1 = ChainAsset::Eth([1; 20]);
-            let asset2 = ChainAsset::Eth([2; 20]);
-            let asset3 = ChainAsset::Eth([3; 20]);
-            let account = ChainAccount::Eth([20; 20]);
-
-            let nonzero_balance = 1;
-            let zero_balance = 0;
-            // asset1 and asset2 both have nonzero balances
-            AssetBalances::insert(asset1, account, nonzero_balance);
-            AssetBalances::insert(asset2, account, nonzero_balance);
-            AssetsWithNonZeroBalance::insert(account, asset1, ());
-            AssetsWithNonZeroBalance::insert(account, asset2, ());
-
-            set_asset_balance_internal::<Test>(asset1, account, zero_balance);
-            assert!(
-                !AssetsWithNonZeroBalance::contains_key(account, asset1),
-                "set to zero should be zeroed out"
-            );
-            assert!(
-                AssetsWithNonZeroBalance::contains_key(account, asset2),
-                "should not be zeroed out"
-            );
-            assert_eq!(AssetBalances::get(asset1, account), zero_balance);
-            assert_eq!(AssetBalances::get(asset2, account), nonzero_balance);
-
-            set_asset_balance_internal::<Test>(asset3, account, nonzero_balance);
-            assert!(
-                !AssetsWithNonZeroBalance::contains_key(account, asset1),
-                "set to zero should be zeroed out"
-            );
-            assert!(
-                AssetsWithNonZeroBalance::contains_key(account, asset2),
-                "should not be zeroed out"
-            );
-            assert!(
-                AssetsWithNonZeroBalance::contains_key(account, asset3),
-                "should not be zeroed out"
-            );
-            assert_eq!(AssetBalances::get(asset1, account), zero_balance);
-            assert_eq!(AssetBalances::get(asset2, account), nonzero_balance);
-            assert_eq!(AssetBalances::get(asset3, account), nonzero_balance);
         });
     }
 }

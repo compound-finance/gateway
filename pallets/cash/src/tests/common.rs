@@ -59,7 +59,16 @@ pub fn init_cash(account: ChainAccount, amount: CashPrincipal) {
         init_cash(ChainAccount::Eth([0; 20]), amount.negate());
     }
     let pre: CashPrincipal = TotalCashPrincipal::get().try_into().unwrap();
+    let chain_pre: CashPrincipal = ChainCashPrincipals::get(account.chain_id())
+        .try_into()
+        .unwrap();
+    let chain_cash_post: CashPrincipalAmount = chain_pre
+        .add(amount)
+        .expect("cash setup overflow")
+        .try_into()
+        .unwrap();
 
+    ChainCashPrincipals::insert(account.chain_id(), chain_cash_post);
     TotalCashPrincipal::set(
         pre.add(amount)
             .expect("cash setup overflow")
