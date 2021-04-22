@@ -26,8 +26,7 @@ use crate::{
         ChainId, ChainSignature, Ethereum,
     },
     factor::Factor,
-    internal, log,
-    pipeline::CashPipeline,
+    internal, log, pipeline,
     portfolio::Portfolio,
     rates::APR,
     reason::{MathError, Reason},
@@ -216,7 +215,7 @@ pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBal
 
 /// Return the portfolio of the chain account
 pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
-    Ok(Portfolio::from_storage::<T>(account)?)
+    Ok(pipeline::load_portfolio::<T>(account)?)
 }
 
 pub fn get_validator_set<T: Config>() -> Result<SignersSet, Reason> {
@@ -417,10 +416,7 @@ pub fn get_cash_balance_with_asset_interest<T: Config>(
     account: ChainAccount,
 ) -> Result<Balance, Reason> {
     let cash_index = GlobalCashIndex::get();
-    let cash_principal: Balance = CashPipeline::new()
-        .state
-        .build_portfolio::<T>(account)?
-        .cash;
+    let cash_principal: Balance = pipeline::load_portfolio::<T>(account)?.cash;
 
     cash_index
         .cash_balance(CashPrincipal(cash_principal.value))
@@ -429,7 +425,7 @@ pub fn get_cash_balance_with_asset_interest<T: Config>(
 
 /// Calculates the current liquidity value for an account.
 pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
-    Ok(Portfolio::from_storage::<T>(account)?.get_liquidity::<T>()?)
+    Ok(pipeline::load_portfolio::<T>(account)?.get_liquidity::<T>()?)
 }
 
 // Dispatch Extrinsic Lifecycle //

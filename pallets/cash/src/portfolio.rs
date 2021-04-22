@@ -1,14 +1,13 @@
 use codec::{Decode, Encode};
-use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap};
+use frame_support::storage::StorageDoubleMap;
 use our_std::RuntimeDebug;
 
 use crate::{
-    chains::ChainAccount,
-    core::{get_asset, get_cash_balance_with_asset_interest, get_price},
+    core::get_price,
     reason::Reason,
     symbol::CASH,
     types::{AssetInfo, Balance},
-    AssetBalances, AssetsWithNonZeroBalance, Config,
+    Config,
 };
 
 use types_derive::Types;
@@ -21,18 +20,6 @@ pub struct Portfolio {
 }
 
 impl Portfolio {
-    /// Read a portfolio from storage.
-    pub fn from_storage<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
-        let cash = get_cash_balance_with_asset_interest::<T>(account)?;
-        let mut positions = Vec::new();
-        for (asset, _) in AssetsWithNonZeroBalance::iter_prefix(&account) {
-            let asset_info = get_asset::<T>(asset)?;
-            let asset_balance = AssetBalances::get(&asset, account);
-            positions.push((asset_info, asset_info.as_balance(asset_balance)));
-        }
-        Ok(Portfolio { cash, positions })
-    }
-
     /// Get the hypothetical liquidity value.
     pub fn get_liquidity<T: Config>(&self) -> Result<Balance, Reason> {
         let mut liquidity = self.cash.mul_price(get_price::<T>(CASH)?)?;
@@ -52,7 +39,7 @@ impl Portfolio {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{pipeline, tests::*};
 
     struct TestAsset {
         asset: u8,
@@ -113,7 +100,7 @@ pub mod tests {
                 CashPrincipals::insert(&account, CashPrincipal::from_nominal(cash_principal));
             }
 
-            let actual = Portfolio::from_storage::<Test>(account)
+            let actual = pipeline::load_portfolio::<Test>(account)
                 .unwrap()
                 .get_liquidity::<Test>();
             let expected = match case.expected_liquidity {
