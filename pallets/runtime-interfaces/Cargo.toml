@@ -15,6 +15,7 @@ sp-runtime-interface = { default-features = false, git = 'https://github.com/com
 sp-externalities = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-io = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
+ethereum-client = { path = '../../ethereum-client', default-features = false }
 gateway-crypto = { path = "../../gateway-crypto", default-features = false }
 our-std = { path = "../../our-std", default-features = false }
 
