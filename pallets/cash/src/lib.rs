@@ -487,7 +487,11 @@ fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::
         Ok(trx_request::TrxRequest::Transfer(_max_amount, _asset, _account)) => {
             <T as Config>::WeightInfo::exec_trx_request_transfer()
         }
-        // todo: liquidate
+
+        Ok(trx_request::TrxRequest::Liquidate(_max_amount, _borrowed, _collat, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_liquidate()
+        }
+
         _ => 0,
     }
 }
