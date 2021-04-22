@@ -5,12 +5,13 @@ const { readContractsFile, deployContract, getContractAt } = require('../ethereu
 const { genPort } = require('../util');
 
 class Eth {
-  constructor(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx) {
+  constructor(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx) {
     this.ethInfo = ethInfo;
     this.web3 = web3;
     this.web3Url = web3Url;
     this.accounts = accounts;
     this.defaultFrom = accounts[0];
+    this.blockInfo = blockInfo;
     this.ganacheServer = ganacheServer;
     this.version = version;
     this.ctx = ctx;
@@ -193,7 +194,14 @@ async function buildEth(ethInfo, ctx) {
 
   let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
 
-  return new Eth(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx);
+  let block = await web3.eth.getBlock('latest');
+  let blockInfo = {
+    hash: block.hash,
+    parent_hash: block.parentHash,
+    number: block.number,
+  };
+
+  return new Eth(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
 }
 
 module.exports = {
