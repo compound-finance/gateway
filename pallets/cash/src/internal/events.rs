@@ -16,8 +16,8 @@ use crate::{
         ChainSignature,
     },
     core::{
-        self, get_cash_quantity, get_event_queue, get_quantity, get_validator_set, get_value,
-        recover_validator, validator_sign,
+        self, get_cash_quantity, get_event_queue, get_last_block, get_quantity, get_validator_set,
+        get_value, recover_validator, validator_sign,
     },
     debug, error,
     events::{fetch_chain_block, fetch_chain_blocks},
@@ -97,7 +97,7 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
 /// Perform the next step of tracking events from an underlying chain.
 pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
     let me = sp_core::crypto::AccountId32::new([0u8; 32]); // XXX self worker identity
-    let last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
+    let last_block = get_last_block::<T>(chain_id)?;
     let true_block = fetch_chain_block(chain_id, last_block.number())?;
     if last_block.hash() == true_block.hash() {
         debug!("Worker sees same fork as chain: {:?}", true_block);
@@ -306,7 +306,7 @@ pub fn receive_chain_blocks<T: Config>(
     let validator = recover_validator::<T>(&blocks.encode(), signature)?;
     let chain_id = blocks.chain_id();
     let mut event_queue = get_event_queue::<T>(chain_id)?;
-    let mut last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
+    let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
     for block in blocks.blocks() {
         if block.number() >= last_block.number() + 1 {
@@ -407,7 +407,7 @@ pub fn receive_chain_reorg<T: Config>(
     let validator = recover_validator::<T>(&reorg.encode(), signature)?;
     let chain_id = reorg.chain_id();
     let mut event_queue = get_event_queue::<T>(chain_id)?;
-    let mut last_block = LastProcessedBlock::get(chain_id).ok_or(Reason::NoSuchBlock)?;
+    let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_reorgs = PendingChainReorgs::get(chain_id);
 
     // Note: can reject / stop propagating once this check fails

@@ -68,6 +68,15 @@ impl ChainId {
         }
     }
 
+    pub fn starport_parent_block(self) -> ChainBlock {
+        match self {
+            ChainId::Eth => ChainBlock::Eth(
+                runtime_interfaces::config_interface::get_eth_starport_parent_block(),
+            ),
+            _ => panic!("XXX not implemented"),
+        }
+    }
+
     pub fn zero_hash(self) -> ChainHash {
         match self {
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),

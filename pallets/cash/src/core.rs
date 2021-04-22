@@ -22,8 +22,8 @@ use pallet_oracle::types::Price;
 
 use crate::{
     chains::{
-        Chain, ChainAccount, ChainAsset, ChainBlockEvent, ChainBlockEvents, ChainHash, ChainId,
-        ChainSignature, Ethereum,
+        Chain, ChainAccount, ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents, ChainHash,
+        ChainId, ChainSignature, Ethereum,
     },
     factor::Factor,
     internal, log,
@@ -38,8 +38,8 @@ use crate::{
     },
     AssetBalances, BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, Event,
     GlobalCashIndex, IngressionQueue, LastBlockTimestamp, LastMinerSharePrincipal,
-    LastYieldCashIndex, LastYieldTimestamp, Miner, Module, SupplyIndices, SupportedAssets,
-    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
+    LastProcessedBlock, LastYieldCashIndex, LastYieldTimestamp, Miner, Module, SupplyIndices,
+    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 #[macro_export]
@@ -163,6 +163,14 @@ pub fn get_assets<T: Config>() -> Result<Vec<AssetInfo>, Reason> {
 /// Return the event ingression queue for the underlying chain.
 pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents, Reason> {
     Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
+}
+
+/// Return the last processed block for the underlying chain.
+pub fn get_last_block<T: Config>(chain_id: ChainId) -> Result<ChainBlock, Reason> {
+    match LastProcessedBlock::get(chain_id) {
+        Some(block) => Ok(block),
+        None => Ok(chain_id.starport_parent_block()),
+    }
 }
 
 /// Return the current total borrow and total supply balances for the asset.
