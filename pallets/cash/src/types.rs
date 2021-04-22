@@ -295,6 +295,15 @@ impl Quantity {
         let value = self.value.checked_shr(nbits).unwrap_or(0);
         Ok(Quantity::new(value, self.units))
     }
+
+    pub fn negate(self) -> Result<Balance, MathError> {
+        let signed_value: i128 = self.value.try_into().map_err(|_| MathError::Overflow)?;
+        let negative_value = signed_value.checked_neg().ok_or(MathError::Underflow)?;
+        Ok(Balance {
+            value: negative_value,
+            units: self.units,
+        })
+    }
 }
 
 /// Type for representing a signed balance of an asset, bound to its ticker and number of decimals.
@@ -404,6 +413,20 @@ impl Balance {
     }
 }
 
+impl TryInto<Balance> for Quantity {
+    type Error = Reason;
+
+    fn try_into(self) -> Result<Balance, Reason> {
+        match i128::try_from(self.value) {
+            Ok(v) => Ok(Balance {
+                value: v,
+                units: self.units,
+            }),
+            Err(_) => Err(Reason::MathError(MathError::Overflow)),
+        }
+    }
+}
+
 /// Type for representing a balance of CASH Principal.
 #[derive(
     Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug, Types,
@@ -461,6 +484,11 @@ impl CashPrincipal {
 
     pub fn negate(self) -> Self {
         Self(-self.0)
+    }
+
+    /// Returns true if the principal is equals value
+    pub fn eq(self: &Self, v: i128) -> bool {
+        self.0 == v
     }
 
     /// Returns true if the principal is greater than or equal to given value
