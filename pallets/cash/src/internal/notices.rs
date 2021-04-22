@@ -240,7 +240,9 @@ pub fn publish_signature<T: Config>(
     match NoticeStates::get(chain_id, notice_id) {
         NoticeState::Missing => Ok(()),
 
-        NoticeState::Pending { mut signature_pairs } => {
+        NoticeState::Pending {
+            mut signature_pairs,
+        } => {
             let notice = Notices::get(chain_id, notice_id)
                 .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
             let validator = recover_validator::<T>(&notice.encode_notice(), signature)?;
