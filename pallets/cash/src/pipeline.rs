@@ -381,7 +381,7 @@ fn prepare_augment_cash<T: Config>(
     let chain_cash_principal_post = st
         .get_chain_cash_principal::<T>(chain_id)
         .sub(principal)
-        .map_err(|_| Reason::InsufficientChainCash)?;
+        .map_err(|_| Reason::RepayTooMuch)?;
 
     let total_cash_post = st
         .get_total_cash_principal::<T>()
