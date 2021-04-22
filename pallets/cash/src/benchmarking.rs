@@ -30,6 +30,7 @@ const ETH_BYTES: [u8; 20] = hex!("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE");
 
 const ALICE_ADDRESS: &str = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const BOB_ADDRESS: &str = "0x59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e";
+const BOB_ADDRESS_BYTES: [u8; 20] = hex!("59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e");
 
 const MIN_TX_VALUE: u128 = params::MIN_TX_VALUE.value;
 
@@ -310,9 +311,8 @@ benchmarks! {
     let transfer_amt: i128 = MIN_TX_VALUE.try_into().unwrap();
 
     // bob supply tkn, transfer eth
-    let bob_address_bytes: [u8;20] = ethereum_client::hex::decode_address(&BOB_ADDRESS.to_string()).unwrap();
-    endow_tkn::<T>(bob_address_bytes, transfer_amt * 5, TKN_ADDR_BYTES);
-    endow_tkn::<T>(bob_address_bytes, -transfer_amt * 5, ETH_BYTES);
+    endow_tkn::<T>(BOB_ADDRESS_BYTES, transfer_amt * 5, TKN_ADDR_BYTES);
+    endow_tkn::<T>(BOB_ADDRESS_BYTES, -transfer_amt * 5, ETH_BYTES);
 
     // alice supply some collateral, liquidate
     endow_tkn::<T>(signer_vec, transfer_amt * 5, [2; 20]);
