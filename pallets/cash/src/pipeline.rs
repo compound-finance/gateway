@@ -250,55 +250,31 @@ impl State {
     }
 }
 
-fn prepare_transfer_asset<T: Config>(
+fn prepare_augment_asset<T: Config>(
     mut st: State,
-    sender: ChainAccount,
     recipient: ChainAccount,
     asset: ChainAsset,
     quantity: Quantity,
 ) -> Result<State, Reason> {
-    if sender == recipient {
-        Err(Reason::SelfTransfer)?
-    }
-
     let asset_info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
     let supply_index = SupplyIndices::get(asset);
     let borrow_index = BorrowIndices::get(asset);
     let total_supply_pre = st.get_total_supply_asset::<T>(asset_info);
     let total_borrow_pre = st.get_total_borrow_asset::<T>(asset_info);
-    let sender_balance_pre = st.get_asset_balance::<T>(asset_info, sender);
     let recipient_balance_pre = st.get_asset_balance::<T>(asset_info, recipient);
-    let sender_last_index_pre = st.get_last_index::<T>(asset_info, sender);
     let recipient_last_index_pre = st.get_last_index::<T>(asset_info, recipient);
-    let sender_cash_principal_pre = st.get_cash_principal::<T>(sender);
     let recipient_cash_principal_pre = st.get_cash_principal::<T>(recipient);
 
-    let (sender_withdraw_amount, sender_borrow_amount) =
-        withdraw_and_borrow_amount(sender_balance_pre.value, quantity)?;
     let (recipient_repay_amount, recipient_supply_amount) =
         repay_and_supply_amount(recipient_balance_pre.value, quantity)?;
 
-    let total_supply_new = total_supply_pre
-        .add(recipient_supply_amount)?
-        .sub(sender_withdraw_amount)
-        .map_err(|_| Reason::InsufficientTotalFunds)?;
+    let total_supply_new = total_supply_pre.add(recipient_supply_amount)?;
 
     let total_borrow_new = total_borrow_pre
-        .add(sender_borrow_amount)?
         .sub(recipient_repay_amount)
         .map_err(|_| Reason::TotalBorrowUnderflow)?;
 
-    let sender_balance_post = sender_balance_pre.sub_quantity(quantity)?;
     let recipient_balance_post = recipient_balance_pre.add_quantity(quantity)?;
-
-    let (sender_cash_principal_post, sender_last_index_post) = effect_of_asset_interest_internal(
-        sender_balance_pre,
-        sender_balance_post,
-        sender_cash_principal_pre,
-        sender_last_index_pre,
-        supply_index,
-        borrow_index,
-    )?;
 
     let (recipient_cash_principal_post, recipient_last_index_post) =
         effect_of_asset_interest_internal(
@@ -312,41 +288,97 @@ fn prepare_transfer_asset<T: Config>(
 
     st.set_total_supply_asset::<T>(asset_info, total_supply_new);
     st.set_total_borrow_asset::<T>(asset_info, total_borrow_new);
-    st.set_asset_balance::<T>(asset_info, sender, sender_balance_post);
     st.set_asset_balance::<T>(asset_info, recipient, recipient_balance_post);
-    st.set_last_index::<T>(asset_info, sender, sender_last_index_post);
     st.set_last_index::<T>(asset_info, recipient, recipient_last_index_post);
-    st.set_cash_principal::<T>(sender, sender_cash_principal_post);
     st.set_cash_principal::<T>(recipient, recipient_cash_principal_post);
 
     Ok(st)
 }
 
-fn prepare_transfer_cash<T: Config>(
+fn prepare_reduce_asset<T: Config>(
     mut st: State,
     sender: ChainAccount,
+    asset: ChainAsset,
+    quantity: Quantity,
+) -> Result<State, Reason> {
+    let asset_info = SupportedAssets::get(asset).ok_or(Reason::AssetNotSupported)?;
+    let supply_index = SupplyIndices::get(asset);
+    let borrow_index = BorrowIndices::get(asset);
+    let total_supply_pre = st.get_total_supply_asset::<T>(asset_info);
+    let total_borrow_pre = st.get_total_borrow_asset::<T>(asset_info);
+    let sender_balance_pre = st.get_asset_balance::<T>(asset_info, sender);
+    let sender_last_index_pre = st.get_last_index::<T>(asset_info, sender);
+    let sender_cash_principal_pre = st.get_cash_principal::<T>(sender);
+
+    let (sender_withdraw_amount, sender_borrow_amount) =
+        withdraw_and_borrow_amount(sender_balance_pre.value, quantity)?;
+
+    let total_supply_new = total_supply_pre
+        .sub(sender_withdraw_amount)
+        .map_err(|_| Reason::InsufficientTotalFunds)?;
+
+    let total_borrow_new = total_borrow_pre.add(sender_borrow_amount)?;
+
+    let sender_balance_post = sender_balance_pre.sub_quantity(quantity)?;
+
+    let (sender_cash_principal_post, sender_last_index_post) = effect_of_asset_interest_internal(
+        sender_balance_pre,
+        sender_balance_post,
+        sender_cash_principal_pre,
+        sender_last_index_pre,
+        supply_index,
+        borrow_index,
+    )?;
+
+    st.set_total_supply_asset::<T>(asset_info, total_supply_new);
+    st.set_total_borrow_asset::<T>(asset_info, total_borrow_new);
+    st.set_asset_balance::<T>(asset_info, sender, sender_balance_post);
+    st.set_last_index::<T>(asset_info, sender, sender_last_index_post);
+    st.set_cash_principal::<T>(sender, sender_cash_principal_post);
+
+    Ok(st)
+}
+
+fn prepare_augment_cash<T: Config>(
+    mut st: State,
     recipient: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<State, Reason> {
-    let sender_cash_pre = st.get_cash_principal::<T>(sender);
     let recipient_cash_pre = st.get_cash_principal::<T>(recipient);
 
-    let (_sender_withdraw_principal, sender_borrow_principal) =
-        withdraw_and_borrow_principal(sender_cash_pre, principal)?;
     let (recipient_repay_principal, _recipient_supply_principal) =
         repay_and_supply_principal(recipient_cash_pre, principal)?;
 
-    let sender_cash_post = sender_cash_pre.sub_amount(principal)?;
     let recipient_cash_post = recipient_cash_pre.add_amount(principal)?;
 
     let total_cash_post = st
         .get_total_cash_principal::<T>()
-        .add(sender_borrow_principal)?
         .sub(recipient_repay_principal)
         .map_err(|_| Reason::InsufficientChainCash)?;
 
-    st.set_cash_principal::<T>(sender, sender_cash_post);
     st.set_cash_principal::<T>(recipient, recipient_cash_post);
+    st.set_total_cash_principal::<T>(total_cash_post);
+
+    Ok(st)
+}
+
+fn prepare_reduce_cash<T: Config>(
+    mut st: State,
+    sender: ChainAccount,
+    principal: CashPrincipalAmount,
+) -> Result<State, Reason> {
+    let sender_cash_pre = st.get_cash_principal::<T>(sender);
+
+    let (_sender_withdraw_principal, sender_borrow_principal) =
+        withdraw_and_borrow_principal(sender_cash_pre, principal)?;
+
+    let sender_cash_post = sender_cash_pre.sub_amount(principal)?;
+
+    let total_cash_post = st
+        .get_total_cash_principal::<T>()
+        .add(sender_borrow_principal)?;
+
+    st.set_cash_principal::<T>(sender, sender_cash_post);
     st.set_total_cash_principal::<T>(total_cash_post);
 
     Ok(st)
@@ -354,15 +386,22 @@ fn prepare_transfer_cash<T: Config>(
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 pub enum Effect {
-    TransferAsset {
-        sender: ChainAccount,
+    AugmentAsset {
         recipient: ChainAccount,
         asset: ChainAsset,
         quantity: Quantity,
     },
-    TransferCash {
+    ReduceAsset {
         sender: ChainAccount,
+        asset: ChainAsset,
+        quantity: Quantity,
+    },
+    AugmentCash {
         recipient: ChainAccount,
+        principal: CashPrincipalAmount,
+    },
+    ReduceCash {
+        sender: ChainAccount,
         principal: CashPrincipalAmount,
     },
 }
@@ -370,17 +409,23 @@ pub enum Effect {
 impl Apply for Effect {
     fn apply<T: Config>(self: Self, state: State) -> Result<State, Reason> {
         match self {
-            Effect::TransferAsset {
-                sender,
+            Effect::AugmentAsset {
                 recipient,
                 asset,
                 quantity,
-            } => prepare_transfer_asset::<T>(state, sender, recipient, asset, quantity),
-            Effect::TransferCash {
+            } => prepare_augment_asset::<T>(state, recipient, asset, quantity),
+            Effect::ReduceAsset {
                 sender,
+                asset,
+                quantity,
+            } => prepare_reduce_asset::<T>(state, sender, asset, quantity),
+            Effect::AugmentCash {
                 recipient,
                 principal,
-            } => prepare_transfer_cash::<T>(state, sender, recipient, principal),
+            } => prepare_augment_cash::<T>(state, recipient, principal),
+            Effect::ReduceCash { sender, principal } => {
+                prepare_reduce_cash::<T>(state, sender, principal)
+            }
         }
     }
 }
@@ -413,9 +458,16 @@ impl CashPipeline {
         asset: ChainAsset,
         quantity: Quantity,
     ) -> Result<Self, Reason> {
-        self.apply_effect::<T>(Effect::TransferAsset {
-            sender,
+        if sender == recipient {
+            Err(Reason::SelfTransfer)?
+        }
+        self.apply_effect::<T>(Effect::AugmentAsset {
             recipient,
+            asset,
+            quantity,
+        })?
+        .apply_effect::<T>(Effect::ReduceAsset {
+            sender,
             asset,
             quantity,
         })
@@ -427,11 +479,14 @@ impl CashPipeline {
         recipient: ChainAccount,
         principal: CashPrincipalAmount,
     ) -> Result<Self, Reason> {
-        self.apply_effect::<T>(Effect::TransferCash {
-            sender,
-            recipient,
-            principal,
-        })
+        if sender == recipient {
+            Err(Reason::SelfTransfer)?
+        }
+        self.apply_effect::<T>(Effect::ReduceCash { sender, principal })?
+            .apply_effect::<T>(Effect::AugmentCash {
+                recipient,
+                principal,
+            })
     }
 
     pub fn check_collateralized<T: Config>(
@@ -493,7 +548,6 @@ impl CashPipeline {
     }
 }
 
-// TODO: Maybe share a purified version with core.rs?
 /// Return CASH Principal post asset interest, and updated asset index
 fn effect_of_asset_interest_internal(
     balance_old: Balance,
