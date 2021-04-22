@@ -473,10 +473,9 @@ impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumbe
     }
 }
 
-// weight is 0 if request is invalid
 fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::Weight {
     let request_str = match str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8) {
-        Err(_) => return 0,
+        Err(_) => return params::ERROR_WEIGHT,
         Ok(f) => f,
     };
     match trx_request::parse_request(request_str) {
@@ -492,7 +491,7 @@ fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::
             <T as Config>::WeightInfo::exec_trx_request_liquidate()
         }
 
-        _ => 0,
+        _ => params::ERROR_WEIGHT,
     }
 }
 
@@ -565,7 +564,11 @@ decl_module! {
         }
 
         /// Sets the allowed next code hash to the given hash. [User] [Free]
-        #[weight = (<T as Config>::WeightInfo::set_next_code_via_hash(code.len().try_into().unwrap()), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (
+            <T as Config>::WeightInfo::set_next_code_via_hash(code.len().try_into().unwrap_or(u32::MAX)),
+            DispatchClass::Operational,
+            Pays::No
+        )]
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
