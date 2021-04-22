@@ -461,6 +461,33 @@ impl CashPipeline {
         }
     }
 
+    pub fn check_asset_balance<T: Config, F>(
+        self: Self,
+        account: ChainAccount,
+        asset: AssetInfo,
+        check_fn: F,
+    ) -> Result<Self, Reason>
+    where
+        F: FnOnce(Balance) -> Result<(), Reason>,
+    {
+        let balance = self.state.get_asset_balance::<T>(asset, account);
+        check_fn(balance)?;
+        Ok(self)
+    }
+
+    pub fn check_cash_principal<T: Config, F>(
+        self: Self,
+        account: ChainAccount,
+        check_fn: F,
+    ) -> Result<Self, Reason>
+    where
+        F: FnOnce(CashPrincipal) -> Result<(), Reason>,
+    {
+        let principal = self.state.get_cash_principal::<T>(account);
+        check_fn(principal)?;
+        Ok(self)
+    }
+
     pub fn commit<T: Config>(self: Self) {
         self.state.commit::<T>();
     }
@@ -499,6 +526,7 @@ mod tests {
         tests::{assert_ok, assets::*, common::*, mock::*},
         types::*,
     };
+    use our_std::convert::TryInto;
 
     #[allow(non_upper_case_globals)]
     const account_a: ChainAccount = ChainAccount::Eth([1u8; 20]);
@@ -682,6 +710,113 @@ mod tests {
                 .check_collateralized::<Test>(account_b);
 
             assert_eq!(res, Err(Reason::InsufficientLiquidity));
+        })
+    }
+
+    #[test]
+    fn test_check_underwater() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(init_eth_asset());
+            assert_ok!(init_wbtc_asset());
+
+            CashPrincipals::insert(account_a, CashPrincipal(100000000000)); // 100,000 CASH
+            AssetsWithNonZeroBalance::insert(account_a, Wbtc, ());
+
+            let eth_quantity = eth.as_quantity_nominal("1");
+            let wbtc_quantity = wbtc.as_quantity_nominal("0.02");
+
+            let res = CashPipeline::new()
+                .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
+                .expect("transfer_asset(eth) failed")
+                .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
+                .expect("transfer_asset(wbtc) failed")
+                .check_underwater::<Test>(account_b)
+                .expect("account_b should be underwater")
+                .check_underwater::<Test>(account_a);
+
+            assert_eq!(res, Err(Reason::SufficientLiquidity));
+        })
+    }
+
+    #[test]
+    fn test_check_asset_balance() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(init_eth_asset());
+            assert_ok!(init_wbtc_asset());
+
+            let eth_quantity = eth.as_quantity_nominal("1");
+            let wbtc_quantity = wbtc.as_quantity_nominal("0.02");
+
+            let res = CashPipeline::new()
+                .transfer_asset::<Test>(account_a, account_b, Eth, eth_quantity)
+                .expect("transfer_asset(eth) failed")
+                .transfer_asset::<Test>(account_b, account_a, Wbtc, wbtc_quantity)
+                .expect("transfer_asset(wbtc) failed")
+                .check_asset_balance::<Test, _>(account_a, eth, |balance| {
+                    if balance == eth_quantity.negate().unwrap() {
+                        Ok(())
+                    } else {
+                        Err(Reason::None)
+                    }
+                })
+                .expect("account_a balance should be -eth_quantity")
+                .check_asset_balance::<Test, _>(account_b, eth, |balance| {
+                    if balance == eth_quantity.try_into().unwrap() {
+                        Ok(())
+                    } else {
+                        Err(Reason::None)
+                    }
+                })
+                .expect("account_b balance should be eth_quantity")
+                .check_asset_balance::<Test, _>(account_a, wbtc, |balance| {
+                    if balance == wbtc_quantity.try_into().unwrap() {
+                        Ok(())
+                    } else {
+                        Err(Reason::None)
+                    }
+                })
+                .expect("account_a balance should be wbtc_quantity")
+                .check_asset_balance::<Test, _>(account_b, wbtc, |balance| {
+                    if balance == wbtc_quantity.negate().unwrap() {
+                        Ok(())
+                    } else {
+                        Err(Reason::None)
+                    }
+                })
+                .expect("account_b balance should be -wbtc_quantity")
+                .check_asset_balance::<Test, _>(account_a, wbtc, |_| Err(Reason::None));
+
+            assert_eq!(res, Err(Reason::None));
+        })
+    }
+
+    #[test]
+    fn test_check_cash_principal() {
+        new_test_ext().execute_with(|| {
+            let quantity = CashPrincipalAmount::from_nominal("1");
+
+            let res = CashPipeline::new()
+                .transfer_cash::<Test>(account_a, account_b, quantity)
+                .expect("transfer_cash failed")
+                .check_cash_principal::<Test, _>(account_a, |principal| {
+                    if principal.eq(-1000000) {
+                        Ok(())
+                    } else {
+                        Err(Reason::None)
+                    }
+                })
+                .expect("account_a principal should be -1 CASH")
+                .check_cash_principal::<Test, _>(account_b, |principal| {
+                    if principal.eq(1000000) {
+                        Ok(())
+                    } else {
+                        Err(Reason::None)
+                    }
+                })
+                .expect("account_b principal should be 1 CASH")
+                .check_cash_principal::<Test, _>(account_a, |_| Err(Reason::None));
+
+            assert_eq!(res, Err(Reason::None));
         })
     }
 

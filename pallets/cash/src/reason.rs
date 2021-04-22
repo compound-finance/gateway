@@ -71,6 +71,7 @@ pub enum Reason {
     AssetQuantityMismatch,
     Unreachable,
     TotalBorrowUnderflow,
+    InsufficientCollateral,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -136,6 +137,11 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::AssetQuantityMismatch => (34, 0, "asset does not match quantity"),
             Reason::Unreachable => (35, 0, "unreachable state should be impossible"),
             Reason::TotalBorrowUnderflow => (36, 0, "total borrows underlflow"),
+            Reason::InsufficientCollateral => (
+                37,
+                0,
+                "borrower did not have sufficient collateral for seize",
+            ),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

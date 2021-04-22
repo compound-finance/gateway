@@ -28,17 +28,27 @@ pub fn init_wbtc_asset() -> Result<ChainAsset, Reason> {
     Ok(Wbtc)
 }
 
+pub fn init_usdc_asset() -> Result<ChainAsset, Reason> {
+    SupportedAssets::insert(&Usdc, usdc);
+
+    Ok(Usdc)
+}
+
 pub fn init_asset_balance(asset: ChainAsset, account: ChainAccount, balance: AssetBalance) {
     AssetBalances::insert(asset, account, balance);
     if balance >= 0 {
         TotalSupplyAssets::insert(
             asset,
-            (TotalSupplyAssets::get(asset) as i128 + balance) as u128,
+            (TotalSupplyAssets::get(asset) as i128)
+                .checked_add(balance)
+                .unwrap() as u128,
         );
     } else {
         TotalBorrowAssets::insert(
             asset,
-            (TotalBorrowAssets::get(asset) as i128 + balance) as u128,
+            (TotalBorrowAssets::get(asset) as i128)
+                .checked_sub(balance)
+                .unwrap() as u128,
         );
     }
     AssetsWithNonZeroBalance::insert(account, asset, ());
