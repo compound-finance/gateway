@@ -1,5 +1,6 @@
 use super::test;
 use super::*;
+use crate::internal::extract;
 use pallet_oracle::{types::Price, Prices};
 
 #[test]
@@ -45,7 +46,7 @@ fn upload_transfer_download() -> Result<(), Reason> {
 
         // Download
 
-        assert_ok!(core::extract_internal::<Test>(
+        assert_ok!(extract::extract_internal::<Test>(
             uni,
             geoff,
             jared,
@@ -60,11 +61,11 @@ fn upload_transfer_download() -> Result<(), Reason> {
         assert_eq!(AssetBalances::get(&Uni, &geoff), 0);
 
         assert_err!(
-            core::extract_internal::<Test>(uni, jared, geoff, qty!("2", UNI)),
+            extract::extract_internal::<Test>(uni, jared, geoff, qty!("2", UNI)),
             Reason::InsufficientLiquidity
         );
 
-        assert_ok!(core::extract_internal::<Test>(
+        assert_ok!(extract::extract_internal::<Test>(
             uni,
             jared,
             jared,
@@ -79,7 +80,7 @@ fn upload_transfer_download() -> Result<(), Reason> {
         assert_eq!(AssetBalances::get(&Uni, &geoff), 0);
 
         assert_err!(
-            core::extract_internal::<Test>(uni, jared, jared, qty!("1", UNI)),
+            extract::extract_internal::<Test>(uni, jared, jared, qty!("1", UNI)),
             Reason::MinTxValueNotMet
         );
 

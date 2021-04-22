@@ -381,7 +381,7 @@ fn prepare_augment_cash<T: Config>(
     let chain_cash_principal_post = st
         .get_chain_cash_principal::<T>(chain_id)
         .sub(principal)
-        .map_err(|_| Reason::RepayTooMuch)?;
+        .map_err(|_| Reason::NegativeChainCash)?;
 
     let total_cash_post = st
         .get_total_cash_principal::<T>()
@@ -523,6 +523,19 @@ impl CashPipeline {
         })
     }
 
+    pub fn extract_asset<T: Config>(
+        self: Self,
+        sender: ChainAccount,
+        asset: ChainAsset,
+        quantity: Quantity,
+    ) -> Result<Self, Reason> {
+        self.apply_effect::<T>(Effect::ReduceAsset {
+            sender,
+            asset,
+            quantity,
+        })
+    }
+
     pub fn transfer_cash<T: Config>(
         self: Self,
         sender: ChainAccount,
@@ -548,6 +561,14 @@ impl CashPipeline {
             recipient,
             principal,
         })
+    }
+
+    pub fn extract_cash<T: Config>(
+        self: Self,
+        sender: ChainAccount,
+        principal: CashPrincipalAmount,
+    ) -> Result<Self, Reason> {
+        self.apply_effect::<T>(Effect::ReduceCash { sender, principal })
     }
 
     pub fn check_collateralized<T: Config>(
@@ -601,6 +622,19 @@ impl CashPipeline {
     {
         let principal = self.state.get_cash_principal::<T>(account);
         check_fn(principal)?;
+        Ok(self)
+    }
+
+    // TODO: Do we need this check on other functions?
+    pub fn check_sufficient_total_funds<T: Config>(
+        self: Self,
+        asset_info: AssetInfo,
+    ) -> Result<Self, Reason> {
+        let total_supply_asset = self.state.get_total_supply_asset::<T>(asset_info);
+        let total_borrow_asset = self.state.get_total_borrow_asset::<T>(asset_info);
+        if total_borrow_asset > total_supply_asset {
+            Err(Reason::InsufficientTotalFunds)?
+        }
         Ok(self)
     }
 
@@ -695,6 +729,76 @@ mod tests {
     }
 
     #[test]
+    fn test_lock_asset_success_state() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(init_eth_asset());
+
+            let quantity = eth.as_quantity_nominal("1");
+            let amount = quantity.value as i128;
+
+            let state = CashPipeline::new()
+                .lock_asset::<Test>(account_a, Eth, quantity)
+                .expect("lock_asset failed")
+                .state;
+
+            assert_eq!(
+                state,
+                State {
+                    total_supply_asset: vec![(Eth, quantity.value)].into_iter().collect(),
+                    total_borrow_asset: vec![(Eth, 0)].into_iter().collect(),
+                    asset_balances: vec![((Eth, account_a), amount)].into_iter().collect(),
+                    assets_with_non_zero_balance: vec![((Eth, account_a), true)]
+                        .into_iter()
+                        .collect(),
+                    last_indices: vec![((Eth, account_a), AssetIndex::from_nominal("0"))]
+                        .into_iter()
+                        .collect(),
+                    cash_principals: vec![(account_a, CashPrincipal::from_nominal("0")),]
+                        .into_iter()
+                        .collect(),
+                    total_cash_principal: None,
+                    chain_cash_principals: vec![].into_iter().collect(),
+                }
+            );
+        })
+    }
+
+    #[test]
+    fn test_extract_asset_success_state() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(init_eth_asset());
+
+            let quantity = eth.as_quantity_nominal("1");
+            let amount = quantity.value as i128;
+
+            let state = CashPipeline::new()
+                .extract_asset::<Test>(account_a, Eth, quantity)
+                .expect("extract_asset failed")
+                .state;
+
+            assert_eq!(
+                state,
+                State {
+                    total_supply_asset: vec![(Eth, 0)].into_iter().collect(),
+                    total_borrow_asset: vec![(Eth, quantity.value)].into_iter().collect(),
+                    asset_balances: vec![((Eth, account_a), -amount)].into_iter().collect(),
+                    assets_with_non_zero_balance: vec![((Eth, account_a), true)]
+                        .into_iter()
+                        .collect(),
+                    last_indices: vec![((Eth, account_a), AssetIndex::from_nominal("0"))]
+                        .into_iter()
+                        .collect(),
+                    cash_principals: vec![(account_a, CashPrincipal::from_nominal("0")),]
+                        .into_iter()
+                        .collect(),
+                    total_cash_principal: None,
+                    chain_cash_principals: vec![].into_iter().collect(),
+                }
+            );
+        })
+    }
+
+    #[test]
     fn test_transfer_cash_success_state() {
         new_test_ext().execute_with(|| {
             let quantity = CashPrincipalAmount::from_nominal("1");
@@ -719,7 +823,80 @@ mod tests {
                     .into_iter()
                     .collect(),
                     total_cash_principal: Some(quantity),
-                    chain_cash_principals: vec![].into_iter().collect(),
+                    chain_cash_principals: vec![(
+                        ChainId::Eth,
+                        CashPrincipalAmount::from_nominal("0")
+                    )]
+                    .into_iter()
+                    .collect(),
+                }
+            );
+        })
+    }
+
+    #[test]
+    fn test_lock_cash_success_state() {
+        new_test_ext().execute_with(|| {
+            ChainCashPrincipals::insert(ChainId::Eth, CashPrincipalAmount::from_nominal("3"));
+            let quantity = CashPrincipalAmount::from_nominal("1");
+
+            let state = CashPipeline::new()
+                .lock_cash::<Test>(account_a, quantity)
+                .expect("lock_cash failed")
+                .state;
+
+            assert_eq!(
+                state,
+                State {
+                    total_supply_asset: vec![].into_iter().collect(),
+                    total_borrow_asset: vec![].into_iter().collect(),
+                    asset_balances: vec![].into_iter().collect(),
+                    assets_with_non_zero_balance: vec![].into_iter().collect(),
+                    last_indices: vec![].into_iter().collect(),
+                    cash_principals: vec![(account_a, CashPrincipal::from_nominal("1")),]
+                        .into_iter()
+                        .collect(),
+                    total_cash_principal: Some(CashPrincipalAmount::from_nominal("0")),
+                    chain_cash_principals: vec![(
+                        ChainId::Eth,
+                        CashPrincipalAmount::from_nominal("2")
+                    )]
+                    .into_iter()
+                    .collect(),
+                }
+            );
+        })
+    }
+
+    #[test]
+    fn test_extract_cash_success_state() {
+        new_test_ext().execute_with(|| {
+            ChainCashPrincipals::insert(ChainId::Eth, CashPrincipalAmount::from_nominal("3"));
+            let quantity = CashPrincipalAmount::from_nominal("1");
+
+            let state = CashPipeline::new()
+                .extract_cash::<Test>(account_a, quantity)
+                .expect("extract_cash failed")
+                .state;
+
+            assert_eq!(
+                state,
+                State {
+                    total_supply_asset: vec![].into_iter().collect(),
+                    total_borrow_asset: vec![].into_iter().collect(),
+                    asset_balances: vec![].into_iter().collect(),
+                    assets_with_non_zero_balance: vec![].into_iter().collect(),
+                    last_indices: vec![].into_iter().collect(),
+                    cash_principals: vec![(account_a, CashPrincipal::from_nominal("-1")),]
+                        .into_iter()
+                        .collect(),
+                    total_cash_principal: Some(CashPrincipalAmount::from_nominal("1")),
+                    chain_cash_principals: vec![(
+                        ChainId::Eth,
+                        CashPrincipalAmount::from_nominal("4")
+                    )]
+                    .into_iter()
+                    .collect(),
                 }
             );
         })
@@ -1057,6 +1234,10 @@ mod tests {
                 CashPrincipals::get(account_b),
                 CashPrincipal::from_nominal("0")
             );
+            assert_eq!(
+                ChainCashPrincipals::get(ChainId::Eth),
+                CashPrincipalAmount::from_nominal("0")
+            );
         })
     }
 
@@ -1119,6 +1300,10 @@ mod tests {
                 CashPrincipals::get(account_b),
                 CashPrincipal::from_nominal("0")
             );
+            assert_eq!(
+                ChainCashPrincipals::get(ChainId::Eth),
+                CashPrincipalAmount::from_nominal("0")
+            );
         })
     }
 
@@ -1162,7 +1347,12 @@ mod tests {
                 .into_iter()
                 .collect(),
                 total_cash_principal: Some(CashPrincipalAmount::from_nominal("15000")),
-                chain_cash_principals: vec![].into_iter().collect(),
+                chain_cash_principals: vec![
+                    (ChainId::Eth, CashPrincipalAmount::from_nominal("16000")),
+                    (ChainId::Dot, CashPrincipalAmount::from_nominal("17000")),
+                ]
+                .into_iter()
+                .collect(),
             };
 
             state.commit::<Test>();
@@ -1210,6 +1400,14 @@ mod tests {
             assert_eq!(
                 TotalCashPrincipal::get(),
                 CashPrincipalAmount::from_nominal("15000")
+            );
+            assert_eq!(
+                ChainCashPrincipals::get(ChainId::Eth),
+                CashPrincipalAmount::from_nominal("16000")
+            );
+            assert_eq!(
+                ChainCashPrincipals::get(ChainId::Dot),
+                CashPrincipalAmount::from_nominal("17000")
             );
         })
     }
