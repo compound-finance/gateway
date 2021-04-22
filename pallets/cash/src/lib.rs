@@ -35,7 +35,10 @@ use frame_support::{
 };
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{collections::btree_set::BTreeSet, debug, error, log, str, vec::Vec, Debuggable};
+use our_std::{
+    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec,
+    Debuggable,
+};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity,
@@ -479,6 +482,28 @@ impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumbe
     }
 }
 
+fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::Weight {
+    let request_str = match str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8) {
+        Err(_) => return params::ERROR_WEIGHT,
+        Ok(f) => f,
+    };
+    match trx_request::parse_request(request_str) {
+        Ok(trx_request::TrxRequest::Extract(_max_amount, _asset, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_extract()
+        }
+
+        Ok(trx_request::TrxRequest::Transfer(_max_amount, _asset, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_transfer()
+        }
+
+        Ok(trx_request::TrxRequest::Liquidate(_max_amount, _borrowed, _collat, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_liquidate()
+        }
+
+        _ => params::ERROR_WEIGHT,
+    }
+}
+
 /* ::MODULE:: */
 /* ::EXTRINSICS:: */
 
@@ -494,7 +519,7 @@ decl_module! {
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
             match core::on_initialize::<T>() {
-                Ok(weight) => weight,
+                Ok(()) => <T as Config>::WeightInfo::on_initialize(SupportedAssets::iter().count().try_into().unwrap()),
                 Err(err) => {
                     // This should never happen...
                     error!("Could not initialize block!!! {:#?} {:#?}", block, err);
@@ -534,21 +559,25 @@ decl_module! {
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::change_validators(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn change_validators(origin, validators: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::change_validators::change_validators::<T>(validators))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::allow_next_code_with_hash(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn allow_next_code_with_hash(origin, hash: CodeHash) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::next_code::allow_next_code_with_hash::<T>(hash))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [User] [Free]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (
+            <T as Config>::WeightInfo::set_next_code_via_hash(code.len().try_into().unwrap_or(u32::MAX)),
+            DispatchClass::Operational,
+            Pays::No
+        )]
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             let res = check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code));
@@ -573,21 +602,21 @@ decl_module! {
         }
 
         /// Sets the supply cap for a given chain asset [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::supply_cap::set_supply_cap::<T>(asset, amount))?)
         }
 
         /// Set the liquidity factor for an asset [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_liquidity_factor(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_liquidity_factor::<T>(asset, factor))?)
         }
 
         /// Update the interest rate model for a given asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_rate_model(), DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
@@ -601,14 +630,14 @@ decl_module! {
         }
 
         /// Adds the asset to the runtime by defining it as a supported asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn support_asset(origin, asset: ChainAsset, asset_info: AssetInfo) -> dispatch::DispatchResult {
+        #[weight = (<T as Config>::WeightInfo::support_asset(), DispatchClass::Operational, Pays::No)]
+        pub fn support_asset(origin, asset_info: AssetInfo) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset, asset_info))?)
+            Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset_info))?)
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (<T as Config>::WeightInfo::receive_chain_blocks(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (0, DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
             log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature); // XXX ?
             ensure_none(origin)?;
@@ -616,7 +645,7 @@ decl_module! {
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (<T as Config>::WeightInfo::receive_chain_reorg(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (0, DispatchClass::Operational, Pays::No)] // XXX
         pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
             log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature); // XXX ?
             ensure_none(origin)?;
@@ -630,7 +659,7 @@ decl_module! {
         }
 
         /// Execute a transaction request on behalf of a user
-        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
+        #[weight = (get_exec_req_weights::<T>(request.to_vec()), DispatchClass::Normal, Pays::No)] // XXX
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)

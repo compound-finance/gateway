@@ -39,9 +39,8 @@ pub fn set_rate_model<T: Config>(
     Ok(())
 }
 
-pub fn support_asset<T: Config>(asset: ChainAsset, asset_info: AssetInfo) -> Result<(), Reason> {
-    // TODO: Should we perform sanity checks here?
-    SupportedAssets::insert(&asset, asset_info);
+pub fn support_asset<T: Config>(asset_info: AssetInfo) -> Result<(), Reason> {
+    SupportedAssets::insert(&asset_info.asset, asset_info);
     Ok(())
 }
 
