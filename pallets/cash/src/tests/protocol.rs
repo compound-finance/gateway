@@ -1,6 +1,6 @@
 use super::test;
 use super::*;
-use crate::internal::extract;
+use crate::internal::{extract, transfer};
 use pallet_oracle::{types::Price, Prices};
 
 #[test]
@@ -27,10 +27,10 @@ fn upload_transfer_download() -> Result<(), Reason> {
         // Transfer
 
         assert_err!(
-            core::transfer_internal::<Test>(uni, jared, geoff, lock_amount),
+            transfer::transfer_internal::<Test>(uni, jared, geoff, lock_amount),
             Reason::InsufficientLiquidity // transfer fee
         );
-        assert_ok!(core::transfer_internal::<Test>(
+        assert_ok!(transfer::transfer_internal::<Test>(
             uni,
             jared,
             geoff,
