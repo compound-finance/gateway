@@ -1,5 +1,3 @@
-use frame_support::{dispatch::DispatchResultWithPostInfo, storage::StorageValue};
-
 use crate::{
     chains::{Chain, Ethereum},
     reason::Reason,
@@ -7,6 +5,7 @@ use crate::{
     types::CodeHash,
     AllowedNextCodeHash, Config, Event, Module,
 };
+use frame_support::{dispatch::DispatchResultWithPostInfo, storage::StorageValue};
 
 pub fn allow_next_code_with_hash<T: Config>(hash: CodeHash) -> Result<(), Reason> {
     AllowedNextCodeHash::put(hash);

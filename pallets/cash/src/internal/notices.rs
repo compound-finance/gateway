@@ -1,8 +1,5 @@
-use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
-use frame_system::offchain::SubmitTransaction;
-
 use crate::{
-    chains::{ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature, ChainSignatureList},
+    chains::{ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature},
     core::recover_validator,
     log,
     notices::{
@@ -17,6 +14,8 @@ use crate::{
     AccountNotices, Call, Config, Event, LatestNotice, Module, NoticeHashes, NoticeHolds,
     NoticeStates, Notices,
 };
+use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
+use frame_system::offchain::SubmitTransaction;
 
 pub fn dispatch_extraction_notice<T: Config>(
     asset: ChainAsset,
