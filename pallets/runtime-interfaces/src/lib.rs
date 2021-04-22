@@ -7,13 +7,13 @@ use gateway_crypto::CryptoError;
 use sp_runtime_interface::pass_by::PassByCodec;
 use std::{str, sync::Mutex};
 
-#[derive(Clone, Decode, Encode, PassByCodec)]
+#[derive(Clone, Decode, Encode, PassByCodec, Debug)]
 pub struct Config {
     pub eth_starport_address: String,
     pub eth_starport_parent_block: EthereumBlock,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ValidatorConfig {
     pub eth_key_id: String,
     pub eth_rpc_url: String,
@@ -21,10 +21,10 @@ pub struct ValidatorConfig {
     pub opf_url: String,
 }
 
-/// XXX Possible sanity checks for config fields here
 impl Config {
     pub fn update(&mut self, new: Config) {
         self.eth_starport_address = new.eth_starport_address;
+        self.eth_starport_parent_block = new.eth_starport_parent_block;
     }
 }
 

@@ -58,7 +58,7 @@ pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents,
     Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
 }
 
-/// Return the last processed block for the underlying chain.
+/// Return the last processed block for the underlying chain, or the initial one for the starport.
 pub fn get_last_block<T: Config>(chain_id: ChainId) -> Result<ChainBlock, Reason> {
     match LastProcessedBlock::get(chain_id) {
         Some(block) => Ok(block),
