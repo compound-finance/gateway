@@ -102,6 +102,14 @@ pub trait ConfigInterface {
         }
         return None;
     }
+
+    /// Get the Ethereum Starport parent block.
+    fn get_eth_starport_parent_block() -> EthereumBlock {
+        if let Ok(config) = CONFIG.lock() {
+            return config.eth_starport_parent_block.clone();
+        }
+        return NULL_ETH_BLOCK;
+    }
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
