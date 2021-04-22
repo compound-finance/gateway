@@ -510,6 +510,7 @@ mod tests {
             let eth_asset = init_eth_asset().unwrap();
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_cash(borrower_account, CashPrincipal::from_nominal("2160"));
             init_asset_balance(
                 eth_asset,
                 borrower_account,
@@ -547,7 +548,7 @@ mod tests {
             );
             assert_eq!(
                 CashPrincipals::get(borrower_account),
-                CashPrincipal::from_nominal("-2160")
+                CashPrincipal::from_nominal("0")
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);
@@ -585,6 +586,11 @@ mod tests {
             let eth_asset = init_eth_asset().unwrap();
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                eth_asset,
+                borrower_account,
+                Balance::from_nominal("0.54", ETH).value,
+            );
             init_cash(borrower_account, CashPrincipal::from_nominal("-10000"));
             init_cash(liquidator_account, CashPrincipal::from_nominal("4000"));
 
@@ -606,7 +612,7 @@ mod tests {
             );
             assert_eq!(
                 AssetBalances::get(eth_asset, borrower_account),
-                Balance::from_nominal("-0.54", ETH).value
+                Balance::from_nominal("0", ETH).value
             );
             assert_eq!(
                 CashPrincipals::get(liquidator_account),
@@ -707,6 +713,11 @@ mod tests {
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
             init_asset_balance(
+                eth_asset,
+                borrower_account,
+                Balance::from_nominal("32.4", ETH).value,
+            );
+            init_asset_balance(
                 wbtc_asset,
                 borrower_account,
                 Balance::from_nominal("-5", WBTC).value,
@@ -735,7 +746,7 @@ mod tests {
             );
             assert_eq!(
                 AssetBalances::get(eth_asset, borrower_account),
-                Balance::from_nominal("-32.4", ETH).value
+                Balance::from_nominal("0", ETH).value
             );
             assert_eq!(
                 AssetBalances::get(wbtc_asset, liquidator_account),
