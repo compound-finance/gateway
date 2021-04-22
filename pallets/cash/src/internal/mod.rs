@@ -4,6 +4,7 @@ pub mod change_validators;
 pub mod events;
 pub mod exec_trx_request;
 pub mod extract;
+pub mod initialize;
 pub mod liquidate;
 pub mod lock;
 pub mod miner;

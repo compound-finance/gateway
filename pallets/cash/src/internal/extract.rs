@@ -1,6 +1,5 @@
 use crate::{
     chains::ChainAccount,
-    core::get_value,
     internal,
     params::MIN_TX_VALUE,
     pipeline::CashPipeline,
@@ -17,7 +16,7 @@ pub fn extract_internal<T: Config>(
     recipient: ChainAccount,
     quantity: AssetQuantity,
 ) -> Result<(), Reason> {
-    require_min_tx_value!(get_value::<T>(quantity)?);
+    require_min_tx_value!(internal::assets::get_value::<T>(quantity)?);
 
     CashPipeline::new()
         .extract_asset::<T>(sender, asset.asset, quantity)?
@@ -44,7 +43,7 @@ pub fn extract_cash_principal_internal<T: Config>(
 ) -> Result<(), Reason> {
     let index: CashIndex = GlobalCashIndex::get();
     let amount = index.cash_quantity(principal)?;
-    require_min_tx_value!(get_value::<T>(amount)?);
+    require_min_tx_value!(internal::assets::get_value::<T>(amount)?);
 
     CashPipeline::new()
         .extract_cash::<T>(sender, principal)?
@@ -60,7 +59,7 @@ pub fn extract_cash_principal_internal<T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::*;
+    use crate::{internal::assets::*, tests::*};
     use pallet_oracle::{types::Price, Prices};
 
     #[test]

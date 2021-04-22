@@ -1,15 +1,12 @@
-use codec::{Decode, Encode};
-use frame_support::storage::StorageDoubleMap;
-use our_std::RuntimeDebug;
-
 use crate::{
-    core::get_price,
+    internal::assets::get_price,
     reason::Reason,
     symbol::CASH,
     types::{AssetInfo, Balance},
     Config,
 };
-
+use codec::{Decode, Encode};
+use our_std::RuntimeDebug;
 use types_derive::Types;
 
 /// Type for representing a set of positions for an account.
@@ -38,7 +35,6 @@ impl Portfolio {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use crate::{pipeline, tests::*};
 
     struct TestAsset {

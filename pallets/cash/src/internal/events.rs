@@ -1,14 +1,3 @@
-use codec::Encode;
-use frame_support::storage::StorageMap;
-use frame_system::offchain::SubmitTransaction;
-use sp_runtime::offchain::{
-    storage::StorageValueRef,
-    storage_lock::{StorageLock, Time},
-};
-
-use ethereum_client::EthereumEvent;
-use our_std::collections::btree_set::BTreeSet;
-
 use crate::{
     chains::{
         ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents, ChainBlockNumber,
@@ -16,11 +5,11 @@ use crate::{
         ChainSignature,
     },
     core::{
-        self, get_cash_quantity, get_event_queue, get_last_block, get_quantity, get_validator_set,
-        get_value, recover_validator, validator_sign,
+        self, get_event_queue, get_last_block, get_validator_set, recover_validator, validator_sign,
     },
     debug, error,
     events::{fetch_chain_block, fetch_chain_blocks},
+    internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
     params::{INGRESS_LARGE, INGRESS_QUOTA},
     reason::Reason,
@@ -28,6 +17,15 @@ use crate::{
     types::{CashPrincipalAmount, Quantity, USDQuantity, ValidatorIdentity, USD},
     Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module, PendingChainBlocks,
     PendingChainReorgs,
+};
+use codec::Encode;
+use ethereum_client::EthereumEvent;
+use frame_support::storage::StorageMap;
+use frame_system::offchain::SubmitTransaction;
+use our_std::collections::btree_set::BTreeSet;
+use sp_runtime::offchain::{
+    storage::StorageValueRef,
+    storage_lock::{StorageLock, Time},
 };
 
 trait CollectRev: Iterator {
@@ -262,7 +260,6 @@ pub fn formulate_reorg<T: Config>(
                 .take_while(|b| b.parent_hash() != common_ancestor)
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
-                    _ => None,
                 })
                 .collect(),
             forward_blocks: drawrof_blocks
@@ -270,7 +267,6 @@ pub fn formulate_reorg<T: Config>(
                 .take_while(|b| b.parent_hash() != common_ancestor)
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
-                    _ => None,
                 })
                 .collect_rev(),
         }),
