@@ -17,8 +17,8 @@ use types_derive::{type_alias, Types};
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainId {
-    Eth,
     Dot,
+    Eth,
 }
 
 impl ChainId {
@@ -72,8 +72,8 @@ impl ChainId {
 /// Type for an account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccount {
-    Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
+    Eth(<Ethereum as Chain>::Address),
 }
 
 impl ChainAccount {
@@ -113,8 +113,8 @@ impl From<ChainAccount> for String {
 /// Type for an asset tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAsset {
-    Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
+    Eth(<Ethereum as Chain>::Address),
 }
 
 // For serialize (which we don't really use, but are required to implement)
@@ -154,8 +154,8 @@ impl From<ChainAsset> for String {
 /// Type for a signature and account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccountSignature {
-    Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature),
+    Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
 }
 
 impl ChainAccountSignature {
@@ -188,8 +188,8 @@ pub type ChainBlockNumber = u64;
 /// Type for an hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
-    Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
+    Eth(<Ethereum as Chain>::Hash),
 }
 
 impl our_std::fmt::Display for ChainHash {
@@ -204,8 +204,8 @@ impl our_std::fmt::Display for ChainHash {
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignature {
-    Eth(<Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Signature),
+    Eth(<Ethereum as Chain>::Signature),
 }
 
 impl ChainSignature {
@@ -230,8 +230,8 @@ impl ChainSignature {
 /// Type for a list of chain signatures.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignatureList {
-    Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
+    Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
 }
 
 // Implement deserialization for ChainIds so we can use them in GenesisConfig / ChainSpec JSON.
