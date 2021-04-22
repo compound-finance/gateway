@@ -5,7 +5,7 @@ use our_std::collections::btree_map::BTreeMap;
 use our_std::RuntimeDebug;
 
 use crate::{
-    chains::ChainAccount,
+    chains::{ChainAccount, ChainId},
     internal::balance_helpers::*,
     portfolio::Portfolio,
     reason::Reason,
@@ -13,8 +13,8 @@ use crate::{
         AssetBalance, AssetIndex, AssetInfo, Balance, CashPrincipal, CashPrincipalAmount, Quantity,
     },
     AssetAmount, AssetBalances, AssetsWithNonZeroBalance, BorrowIndices, CashPrincipals,
-    ChainAsset, Config, GlobalCashIndex, LastIndices, SupplyIndices, SupportedAssets,
-    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    ChainAsset, ChainCashPrincipals, Config, GlobalCashIndex, LastIndices, SupplyIndices,
+    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
 };
 
 trait Apply {
@@ -30,6 +30,7 @@ pub struct State {
     last_indices: BTreeMap<(ChainAsset, ChainAccount), AssetIndex>,
     cash_principals: BTreeMap<ChainAccount, CashPrincipal>,
     total_cash_principal: Option<CashPrincipalAmount>,
+    chain_cash_principals: BTreeMap<ChainId, CashPrincipalAmount>,
 }
 
 impl State {
@@ -42,6 +43,7 @@ impl State {
             last_indices: BTreeMap::new(),
             cash_principals: BTreeMap::new(),
             total_cash_principal: None,
+            chain_cash_principals: BTreeMap::new(),
         }
     }
 
@@ -209,6 +211,25 @@ impl State {
         self.total_cash_principal = Some(total_cash_principal);
     }
 
+    pub fn get_chain_cash_principal<T: Config>(
+        self: &Self,
+        chain_id: ChainId,
+    ) -> CashPrincipalAmount {
+        self.chain_cash_principals
+            .get(&chain_id)
+            .map(|x| *x)
+            .unwrap_or_else(|| ChainCashPrincipals::get(chain_id))
+    }
+
+    pub fn set_chain_cash_principal<T: Config>(
+        self: &mut Self,
+        chain_id: ChainId,
+        chain_cash_principal: CashPrincipalAmount,
+    ) {
+        self.chain_cash_principals
+            .insert(chain_id, chain_cash_principal);
+    }
+
     pub fn commit<T: Config>(self: &Self) {
         self.total_supply_asset
             .iter()
@@ -247,6 +268,11 @@ impl State {
         if let Some(total_cash_principal_new) = self.total_cash_principal {
             TotalCashPrincipal::put(total_cash_principal_new);
         }
+        self.chain_cash_principals
+            .iter()
+            .for_each(|(chain_id, chain_cash_principal)| {
+                ChainCashPrincipals::insert(chain_id, chain_cash_principal);
+            });
     }
 }
 
@@ -351,6 +377,12 @@ fn prepare_augment_cash<T: Config>(
 
     let recipient_cash_post = recipient_cash_pre.add_amount(principal)?;
 
+    let chain_id = recipient.chain_id();
+    let chain_cash_principal_post = st
+        .get_chain_cash_principal::<T>(chain_id)
+        .sub(principal)
+        .map_err(|_| Reason::InsufficientChainCash)?;
+
     let total_cash_post = st
         .get_total_cash_principal::<T>()
         .sub(recipient_repay_principal)
@@ -358,6 +390,7 @@ fn prepare_augment_cash<T: Config>(
 
     st.set_cash_principal::<T>(recipient, recipient_cash_post);
     st.set_total_cash_principal::<T>(total_cash_post);
+    st.set_chain_cash_principal::<T>(chain_id, chain_cash_principal_post);
 
     Ok(st)
 }
@@ -374,12 +407,16 @@ fn prepare_reduce_cash<T: Config>(
 
     let sender_cash_post = sender_cash_pre.sub_amount(principal)?;
 
+    let chain_id = sender.chain_id();
+    let chain_cash_principal_post = st.get_chain_cash_principal::<T>(chain_id).add(principal)?;
+
     let total_cash_post = st
         .get_total_cash_principal::<T>()
         .add(sender_borrow_principal)?;
 
     st.set_cash_principal::<T>(sender, sender_cash_post);
     st.set_total_cash_principal::<T>(total_cash_post);
+    st.set_chain_cash_principal::<T>(chain_id, chain_cash_principal_post);
 
     Ok(st)
 }
@@ -473,6 +510,19 @@ impl CashPipeline {
         })
     }
 
+    pub fn lock_asset<T: Config>(
+        self: Self,
+        recipient: ChainAccount,
+        asset: ChainAsset,
+        quantity: Quantity,
+    ) -> Result<Self, Reason> {
+        self.apply_effect::<T>(Effect::AugmentAsset {
+            recipient,
+            asset,
+            quantity,
+        })
+    }
+
     pub fn transfer_cash<T: Config>(
         self: Self,
         sender: ChainAccount,
@@ -487,6 +537,17 @@ impl CashPipeline {
                 recipient,
                 principal,
             })
+    }
+
+    pub fn lock_cash<T: Config>(
+        self: Self,
+        recipient: ChainAccount,
+        principal: CashPrincipalAmount,
+    ) -> Result<Self, Reason> {
+        self.apply_effect::<T>(Effect::AugmentCash {
+            recipient,
+            principal,
+        })
     }
 
     pub fn check_collateralized<T: Config>(
@@ -626,7 +687,8 @@ mod tests {
                     ]
                     .into_iter()
                     .collect(),
-                    total_cash_principal: None
+                    total_cash_principal: None,
+                    chain_cash_principals: vec![].into_iter().collect(),
                 }
             );
         })
@@ -656,7 +718,8 @@ mod tests {
                     ]
                     .into_iter()
                     .collect(),
-                    total_cash_principal: Some(quantity)
+                    total_cash_principal: Some(quantity),
+                    chain_cash_principals: vec![].into_iter().collect(),
                 }
             );
         })
@@ -938,7 +1001,8 @@ mod tests {
                     ]
                     .into_iter()
                     .collect(),
-                    total_cash_principal: None
+                    total_cash_principal: None,
+                    chain_cash_principals: vec![].into_iter().collect(),
                 }
             );
         })
@@ -1098,6 +1162,7 @@ mod tests {
                 .into_iter()
                 .collect(),
                 total_cash_principal: Some(CashPrincipalAmount::from_nominal("15000")),
+                chain_cash_principals: vec![].into_iter().collect(),
             };
 
             state.commit::<Test>();
