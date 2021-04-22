@@ -1,5 +1,3 @@
-use frame_support::storage::StorageMap;
-
 use crate::{
     internal,
     reason::Reason,
@@ -7,6 +5,7 @@ use crate::{
     types::{AssetAmount, ChainAsset},
     Config, Event, Module, SupportedAssets,
 };
+use frame_support::storage::StorageMap;
 
 pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> Result<(), Reason> {
     require!(

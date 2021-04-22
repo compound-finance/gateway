@@ -1,9 +1,8 @@
-use frame_support::storage::{IterableStorageMap, StorageMap};
-
 use crate::{
     internal, reason::Reason, require, types::ValidatorKeys, Config, Event, Module, NextValidators,
     NoticeHolds, SessionInterface,
 };
+use frame_support::storage::{IterableStorageMap, StorageMap};
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
     require!(NoticeHolds::iter().count() == 0, Reason::PendingAuthNotice);
@@ -43,7 +42,7 @@ mod tests {
     use mock::opaque::MockSessionKeys;
 
     #[test]
-    fn test_change_val() {
+    fn test_change_validators() {
         new_test_ext().execute_with(|| {
             let prev_substrate_id: AccountId32 = [8; 32].into();
             let prev_keys = ValidatorKeys {
@@ -110,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn test_keys_unset() {
+    fn test_change_validators_with_unset_keys() {
         new_test_ext().execute_with(|| {
             let substrate_id: AccountId32 = [2; 32].into();
             let vals = vec![ValidatorKeys {
