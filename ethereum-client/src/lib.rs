@@ -5,6 +5,7 @@ use codec::{Decode, Encode};
 use frame_support::debug;
 use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
+use sp_runtime_interface::pass_by::PassByCodec;
 
 use our_std::RuntimeDebug;
 use types_derive::Types;
@@ -18,7 +19,7 @@ pub use crate::hex::{parse_u64, parse_word};
 pub type EthereumBlockNumber = u64;
 pub type EthereumHash = [u8; 32];
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 pub struct EthereumBlock {
     pub hash: EthereumHash,
     pub parent_hash: EthereumHash,

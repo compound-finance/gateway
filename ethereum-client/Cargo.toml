@@ -18,6 +18,7 @@ frame-support = { default-features = false, git = 'https://github.com/compound-f
 sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'master'}
 sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+sp-runtime-interface = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
 our-std = { path = '../our-std', default-features = false }
@@ -33,6 +34,7 @@ std = [
     'sp-core/std',
     'sp-io/std',
     'sp-runtime/std',
+    'sp-runtime-interface/std',
     'sp-std/std',
     'frame-support/std',
     'our-std/std',
