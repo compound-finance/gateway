@@ -1522,6 +1522,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-runtime-interface",
  "sp-std",
  "types-derive",
 ]
@@ -2158,8 +2159,10 @@ dependencies = [
 name = "gateway"
 version = "1.0.0"
 dependencies = [
+ "ethereum-client",
  "frame-benchmarking",
  "frame-benchmarking-cli",
+ "frame-support",
  "frame-system",
  "futures 0.3.13",
  "gateway-crypto",
@@ -5694,6 +5697,7 @@ dependencies = [
 name = "runtime-interfaces"
 version = "1.0.0"
 dependencies = [
+ "ethereum-client",
  "gateway-crypto",
  "lazy_static",
  "our-std",

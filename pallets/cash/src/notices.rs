@@ -333,15 +333,6 @@ impl Default for NoticeState {
     }
 }
 
-pub fn has_signer(signature_pairs: &ChainSignatureList, signer: ChainAccount) -> bool {
-    match (signature_pairs, signer) {
-        (ChainSignatureList::Eth(eth_signature_pairs), ChainAccount::Eth(eth_account)) => {
-            eth_signature_pairs.iter().any(|(s, _)| s == &eth_account)
-        }
-        _ => false,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

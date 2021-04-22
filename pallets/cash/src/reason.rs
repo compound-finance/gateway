@@ -22,6 +22,7 @@ pub enum Reason {
     BadAsset,
     BadChainId,
     BadFactor,
+    BadHash,
     BadSymbol,
     BadTicker,
     BadUnits,
@@ -49,7 +50,6 @@ pub enum Reason {
     None,
     NoPrice,
     NoSuchAsset,
-    NoSuchBlock,
     NoticeMissing(ChainId, NoticeId),
     NotImplemented,
     OracleError(OracleError),
@@ -71,6 +71,8 @@ pub enum Reason {
     AssetQuantityMismatch,
     Unreachable,
     TotalBorrowUnderflow,
+    InsufficientCollateral,
+    NegativeChainCash,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -87,9 +89,10 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::BadAsset => (1, 2, "bad asset"),
             Reason::BadChainId => (1, 3, "bad chain id"),
             Reason::BadFactor => (1, 4, "bad factor"),
-            Reason::BadSymbol => (1, 5, "bad symbol"),
-            Reason::BadTicker => (1, 6, "bad ticker"),
-            Reason::BadUnits => (1, 7, "bad units"),
+            Reason::BadHash => (1, 5, "bad hash"),
+            Reason::BadSymbol => (1, 6, "bad symbol"),
+            Reason::BadTicker => (1, 7, "bad ticker"),
+            Reason::BadUnits => (1, 8, "bad units"),
             Reason::ChainMismatch => (2, 0, "chain mismatch"),
             Reason::HashMismatch => (2, 1, "hash mismatch"),
             Reason::CryptoError(_) => (3, 0, "crypto error"),
@@ -114,7 +117,6 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::None => (15, 0, "none"),
             Reason::NoPrice => (16, 0, "no price"),
             Reason::NoSuchAsset => (16, 1, "no such asset"),
-            Reason::NoSuchBlock => (16, 2, "no such block"),
             Reason::NoticeMissing(_, _) => (17, 0, "notice missing"),
             Reason::NotImplemented => (18, 0, "not implemented"),
             Reason::OracleError(_) => (19, 0, "oracle error"),
@@ -136,6 +138,12 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::AssetQuantityMismatch => (34, 0, "asset does not match quantity"),
             Reason::Unreachable => (35, 0, "unreachable state should be impossible"),
             Reason::TotalBorrowUnderflow => (36, 0, "total borrows underlflow"),
+            Reason::InsufficientCollateral => (
+                37,
+                0,
+                "borrower did not have sufficient collateral for seize",
+            ),
+            Reason::NegativeChainCash => (38, 0, "chain cash underflow"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

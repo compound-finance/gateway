@@ -60,8 +60,9 @@ impl<'a> TryFrom<Vec<&'a str>> for ReporterSet {
     fn try_from(strings: Vec<&'a str>) -> Result<ReporterSet, Self::Error> {
         let mut reporters = Vec::with_capacity(strings.len());
         for string in strings {
-            reporters
-                .push(gateway_crypto::str_to_address(string).ok_or(OracleError::InvalidReporter)?)
+            reporters.push(
+                gateway_crypto::eth_str_to_address(string).ok_or(OracleError::InvalidReporter)?,
+            )
         }
         Ok(ReporterSet(reporters))
     }

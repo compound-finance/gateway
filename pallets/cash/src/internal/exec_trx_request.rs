@@ -1,13 +1,13 @@
-use frame_support::storage::{StorageMap, StorageValue};
-
-use crate::core::{
-    extract_cash_principal_internal, extract_internal, get_asset, transfer_cash_principal_internal,
-    transfer_internal,
-};
+use crate::core::get_asset;
 use crate::{
     chains::{ChainAccount, ChainAccountSignature},
-    internal::liquidate::{
-        liquidate_cash_collateral_internal, liquidate_cash_principal_internal, liquidate_internal,
+    internal::{
+        extract::{extract_cash_principal_internal, extract_internal},
+        liquidate::{
+            liquidate_cash_collateral_internal, liquidate_cash_principal_internal,
+            liquidate_internal,
+        },
+        transfer::{transfer_cash_principal_internal, transfer_internal},
     },
     log,
     params::TRANSFER_FEE,
@@ -17,6 +17,7 @@ use crate::{
     types::{CashIndex, CashOrChainAsset, CashPrincipalAmount, Nonce, Quantity},
     CashPrincipals, Config, GlobalCashIndex, Nonces,
 };
+use frame_support::storage::{StorageMap, StorageValue};
 use our_std::{convert::TryInto, str};
 
 pub fn prepend_nonce(payload: &Vec<u8>, nonce: Nonce) -> Vec<u8> {
@@ -170,7 +171,8 @@ pub fn exec_trx_request<T: Config>(
             CashOrChainAsset::from(trx_borrowed_asset),
             CashOrChainAsset::from(trx_collateral_asset),
         ) {
-            (x, y) if x == y => Err(Reason::InKindLiquidation),
+            (x, y) if x == y => return Err(Reason::InKindLiquidation),
+
             (CashOrChainAsset::Cash, CashOrChainAsset::ChainAsset(collateral)) => {
                 let collateral_asset = get_asset::<T>(collateral)?;
                 let cash_principal_amount = match max_amount {
@@ -186,8 +188,9 @@ pub fn exec_trx_request<T: Config>(
                     sender,
                     borrower.into(),
                     cash_principal_amount,
-                )
+                )?;
             }
+
             (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::Cash) => {
                 let borrowed_asset = get_asset::<T>(borrowed)?;
                 let borrowed_asset_amount = match max_amount {
@@ -202,7 +205,7 @@ pub fn exec_trx_request<T: Config>(
                     sender,
                     borrower.into(),
                     borrowed_asset_amount,
-                )
+                )?;
             }
 
             (CashOrChainAsset::ChainAsset(borrowed), CashOrChainAsset::ChainAsset(collateral)) => {
@@ -221,10 +224,11 @@ pub fn exec_trx_request<T: Config>(
                     sender,
                     borrower.into(),
                     borrowed_asset_amount,
-                )
+                )?;
             }
-            _ => Err(Reason::InvalidLiquidation), // Probably isn't possible
-        }?,
+
+            _ => return Err(Reason::InvalidLiquidation), // Probably isn't possible
+        },
     }
 
     if let Some(nonce) = nonce_opt {
@@ -507,6 +511,7 @@ mod tests {
             let eth_asset = init_eth_asset().unwrap();
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_cash(borrower_account, CashPrincipal::from_nominal("2160"));
             init_asset_balance(
                 eth_asset,
                 borrower_account,
@@ -544,7 +549,7 @@ mod tests {
             );
             assert_eq!(
                 CashPrincipals::get(borrower_account),
-                CashPrincipal::from_nominal("-2160")
+                CashPrincipal::from_nominal("0")
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);
@@ -582,6 +587,11 @@ mod tests {
             let eth_asset = init_eth_asset().unwrap();
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
+            init_asset_balance(
+                eth_asset,
+                borrower_account,
+                Balance::from_nominal("0.54", ETH).value,
+            );
             init_cash(borrower_account, CashPrincipal::from_nominal("-10000"));
             init_cash(liquidator_account, CashPrincipal::from_nominal("4000"));
 
@@ -603,7 +613,7 @@ mod tests {
             );
             assert_eq!(
                 AssetBalances::get(eth_asset, borrower_account),
-                Balance::from_nominal("-0.54", ETH).value
+                Balance::from_nominal("0", ETH).value
             );
             assert_eq!(
                 CashPrincipals::get(liquidator_account),
@@ -704,6 +714,11 @@ mod tests {
             let borrower_account = ChainAccount::Eth([1; 20]);
             let liquidator_account = ChainAccount::Eth([2; 20]);
             init_asset_balance(
+                eth_asset,
+                borrower_account,
+                Balance::from_nominal("32.4", ETH).value,
+            );
+            init_asset_balance(
                 wbtc_asset,
                 borrower_account,
                 Balance::from_nominal("-5", WBTC).value,
@@ -732,7 +747,7 @@ mod tests {
             );
             assert_eq!(
                 AssetBalances::get(eth_asset, borrower_account),
-                Balance::from_nominal("-32.4", ETH).value
+                Balance::from_nominal("0", ETH).value
             );
             assert_eq!(
                 AssetBalances::get(wbtc_asset, liquidator_account),

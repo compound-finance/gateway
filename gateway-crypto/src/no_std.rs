@@ -169,19 +169,34 @@ pub fn eth_decode_hex_ascii(message: &[u8]) -> Result<Vec<u8>, CryptoError> {
     }
 }
 
-pub fn str_to_address(addr: &str) -> Option<[u8; 20]> {
-    if addr.len() == 42 && &addr[0..2] == "0x" {
-        if let Ok(bytes) = hex::decode(&addr[2..42]) {
-            if let Ok(address) = bytes.try_into() {
-                return Some(address);
+pub fn eth_str_to_address(address_str: &str) -> Option<[u8; 20]> {
+    if address_str.len() == 42 && &address_str[0..2] == "0x" {
+        if let Ok(bytes) = hex::decode(&address_str[2..42]) {
+            if let Ok(eth_address) = bytes.try_into() {
+                return Some(eth_address);
             }
         }
     }
     return None;
 }
 
-pub fn address_string(address: &[u8; 20]) -> String {
-    format!("0x{}", hex::encode(address))
+pub fn eth_address_string(eth_address: &[u8; 20]) -> String {
+    format!("0x{}", hex::encode(eth_address))
+}
+
+pub fn eth_str_to_hash(hash_str: &str) -> Option<[u8; 32]> {
+    if hash_str.len() == 66 && &hash_str[0..2] == "0x" {
+        if let Ok(bytes) = hex::decode(&hash_str[2..66]) {
+            if let Ok(eth_hash) = bytes.try_into() {
+                return Some(eth_hash);
+            }
+        }
+    }
+    return None;
+}
+
+pub fn eth_hash_string(eth_hash: &[u8; 32]) -> String {
+    format!("0x{}", hex::encode(eth_hash))
 }
 
 #[cfg(test)]

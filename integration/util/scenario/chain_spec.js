@@ -76,7 +76,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     name: 'Integration Test Network',
     properties: {
       eth_starport_address: ctx.starport.ethAddress(),
-      eth_lock_event_topic: ctx.starport.topics()['Lock']
+      eth_starport_parent_block: ctx.eth.blockInfo
     },
     genesis: {
       runtime: {

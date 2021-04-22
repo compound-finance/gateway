@@ -246,8 +246,14 @@ decl_event!(
         /// An account has locked an asset. [asset, sender, recipient, amount]
         Locked(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
 
+        /// Revert a lock event while handling a chain re-organization. [asset, sender, recipient, amount]
+        ReorgRevertLocked(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
+
         /// An account has locked CASH. [sender, recipient, principal, index]
         LockedCash(ChainAccount, ChainAccount, CashPrincipalAmount, CashIndex),
+
+        /// Revert a lock cash event while handling a chain re-organization. [sender, recipient, principal, index]
+        ReorgRevertLockedCash(ChainAccount, ChainAccount, CashPrincipalAmount, CashIndex),
 
         /// An account has extracted an asset. [asset, sender, recipient, amount]
         Extract(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
@@ -715,7 +721,7 @@ impl<T: Config> Module<T> {
 
     /// Get the liquidity for the given account.
     pub fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason> {
-        Ok(internal::liquidity::get_liquidity::<T>(account)?.value)
+        Ok(core::get_liquidity::<T>(account)?.value)
     }
 
     /// Get the total supply for the given asset.

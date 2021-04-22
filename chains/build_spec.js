@@ -97,6 +97,7 @@ async function setAuthorities(chainSpec, chainConfig, opts) {
 async function setStarport(chainSpec, chainConfig, opts) {
   let chainDeployment = await fetchChainDeployment(chainConfig.eth_network);
   let starportAddress = must(chainDeployment.Contracts, 'Starport');
+  // TODO: Set other properties
   chainSpec.properties.eth_starport_address = starportAddress;
 }
 

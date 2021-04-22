@@ -424,6 +424,7 @@
       "BadAsset": "",
       "BadChainId": "",
       "BadFactor": "",
+      "BadHash": "",
       "BadSymbol": "",
       "BadTicker": "",
       "BadUnits": "",
@@ -451,7 +452,6 @@
       "None": "",
       "NoPrice": "",
       "NoSuchAsset": "",
-      "NoSuchBlock": "",
       "NoticeMissing": "ReasonNoticeMissing",
       "NotImplemented": "",
       "OracleError": "OracleError",
@@ -471,7 +471,10 @@
       "InsufficientCashForMaxTransfer": "",
       "SufficientLiquidity": "",
       "AssetQuantityMismatch": "",
-      "Unreachable": ""
+      "Unreachable": "",
+      "TotalBorrowUnderflow": "",
+      "InsufficientCollateral": "",
+      "NegativeChainCash": ""
     }
   },
   "ReasonIncorrectNonce": "(Nonce,Nonce)",

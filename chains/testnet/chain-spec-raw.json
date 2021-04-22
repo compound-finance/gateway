@@ -6,7 +6,12 @@
   "telemetryEndpoints": null,
   "protocolId": "local",
   "properties": {
-    "eth_starport_address": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613"
+    "eth_starport_address": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613",
+    "eth_starport_parent_block": {
+        "hash": "0x4b7a5a7b804bd6f0f0c0aa50392d701b1ff230770d27d50d0e240e1946fe8765",
+        "parent_hash": "0xaf32de64c56ebe28c25b809adf29e5b44eda0d90a5853ed7939e48fca2f1d8da",
+        "number": 9853195
+    }
   },
   "consensusEngine": null,
   "lightSyncState": null,
