@@ -55,7 +55,6 @@ pub const wbtc: AssetInfo = AssetInfo {
 };
 
 pub const Usdc: ChainAsset = ChainAsset::Eth(hex!("cccccccccccccccccccccccccccccccccccccccc"));
-#[allow(dead_code)]
 pub const usdc: AssetInfo = AssetInfo {
     asset: Usdc,
     decimals: USD.decimals,
