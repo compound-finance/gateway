@@ -432,7 +432,7 @@ pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason
 
 /// Block initialization wrapper.
 // XXX we need to be able to mock Now (then get rid of this?)
-pub fn on_initialize<T: Config>() -> Result<frame_support::weights::Weight, Reason> {
+pub fn on_initialize<T: Config>() -> Result<(), Reason> {
     on_initialize_internal::<T>(
         get_now::<T>(),
         LastYieldTimestamp::get(),
@@ -454,7 +454,7 @@ pub fn on_initialize_internal<T: Config>(
     now: Timestamp,
     last_yield_timestamp: Timestamp,
     last_block_timestamp: Timestamp,
-) -> Result<frame_support::weights::Weight, Reason> {
+) -> Result<(), Reason> {
     // XXX re-evaluate how we do time, we don't really want this to be zero but there may
     // not actually be any good way to do "current" time per-se so what we have here is more like
     // the last block's time and the block before
@@ -472,7 +472,7 @@ pub fn on_initialize_internal<T: Config>(
         }
 
         // All dt will be 0 so bail out here, no interest accrued in this block.
-        return Ok(0);
+        return Ok(());
     }
 
     // Iterate through listed assets, summing the CASH principal they generated/paid last block
@@ -567,7 +567,7 @@ pub fn on_initialize_internal<T: Config>(
         }
     }
 
-    Ok(0) // XXX weight
+    Ok(())
 }
 
 #[cfg(test)]
@@ -738,9 +738,10 @@ mod tests {
                 1450_000000 as pallet_oracle::types::AssetPrice,
             ); // $1450 eth
 
-            let result =
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp);
-            assert_eq!(result, Ok(0u64));
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp),
+                ()
+            );
 
             assert_eq!(
                 SupplyIndices::get(&asset),
@@ -766,9 +767,9 @@ mod tests {
                 CashPrincipal::from_nominal("1.000000")
             );
             // Run again to set miner true principal
-            assert_eq!(
+            assert_ok!(
                 on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp),
-                Ok(0)
+                ()
             );
             assert_eq!(
                 CashPrincipals::get(&miner),
@@ -795,9 +796,10 @@ mod tests {
             LastYieldCashIndex::put(last_yield_cash_index_initial);
             LastYieldTimestamp::put(last_yield_timestamp);
 
-            let result =
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp);
-            assert_eq!(result, Ok(0u64));
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp),
+                ()
+            );
 
             let increment_expected = cash_yield_initial
                 .compound(now - last_yield_timestamp)
@@ -835,9 +837,10 @@ mod tests {
             let last_block_timestamp = now;
             let now = next_yield_timestamp;
 
-            let result =
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp);
-            assert_eq!(result, Ok(0u64));
+            assert_ok!(
+                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp),
+                ()
+            );
 
             let increment_expected = cash_yield_initial
                 .compound(now - last_yield_timestamp)
@@ -872,9 +875,10 @@ mod tests {
             let now = now + 6 * 1000;
             let new_cash_index_baseline = new_index_actual;
 
-            let result =
-                on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp);
-            assert_eq!(result, Ok(0u64));
+            assert_ok!(
+                on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp),
+                ()
+            );
 
             let increment_expected = cash_yield_next
                 .compound(now - next_yield_timestamp)

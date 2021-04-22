@@ -31,3 +31,6 @@ pub const UNSIGNED_TXS_PRIORITY: u64 = 100;
 /// Standard longevity for all unsigned transactions
 /// More an be found here https://substrate.dev/docs/en/knowledgebase/learn-substrate/tx-pool
 pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
+
+// Weight given to extrinsics that will exit early, to avoid spam
+pub const ERROR_WEIGHT: u64 = 100_000_000;
