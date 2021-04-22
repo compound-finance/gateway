@@ -1,167 +1,86 @@
 // Note: The substrate build requires these be re-exported.
-use frame_support::storage::{StorageDoubleMap, StorageMap, StorageValue};
+use frame_support::storage::StorageValue;
 
 // Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::ChainAccount,
-    core, debug,
-    internal::balance_helpers::{
-        add_amount_to_balance, add_amount_to_raw, repay_and_supply_amount,
-        repay_and_supply_principal, sub_amount_from_raw, sub_principal_amounts,
-    },
+    pipeline::CashPipeline,
     reason::Reason,
     types::{AssetInfo, AssetQuantity, CashIndex, CashPrincipalAmount},
-    AssetBalances, CashPrincipals, ChainCashPrincipals, Config, Event, GlobalCashIndex,
-    LastIndices, Module, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    Config, Event, GlobalCashIndex, Module,
 };
 
 pub fn lock_internal<T: Config>(
     asset: AssetInfo,
     sender: ChainAccount,
-    holder: ChainAccount,
-    amount: AssetQuantity,
+    recipient: ChainAccount,
+    quantity: AssetQuantity,
 ) -> Result<(), Reason> {
-    debug!(
-        "Locking {:?} {:?} from {:?} to {:?}",
-        amount, asset, sender, holder
-    );
-    let holder_asset = AssetBalances::get(asset.asset, holder);
-    let (holder_repay_amount, holder_supply_amount) =
-        repay_and_supply_amount(holder_asset, amount)?;
+    CashPipeline::new()
+        .lock_asset::<T>(recipient, asset.asset, quantity)?
+        .commit::<T>();
 
-    let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
-    let total_supply_new =
-        add_amount_to_raw(TotalSupplyAssets::get(asset.asset), holder_supply_amount)?;
-    let total_borrow_new = sub_amount_from_raw(
-        TotalBorrowAssets::get(asset.asset),
-        holder_repay_amount,
-        Reason::RepayTooMuch,
-    )?;
-
-    let (cash_principal_post, last_index_post) = core::effect_of_asset_interest_internal(
-        asset,
-        holder,
-        holder_asset,
-        holder_asset_new,
-        CashPrincipals::get(holder),
-    )?;
-
-    LastIndices::insert(asset.asset, holder, last_index_post);
-    CashPrincipals::insert(holder, cash_principal_post);
-    TotalSupplyAssets::insert(asset.asset, total_supply_new);
-    TotalBorrowAssets::insert(asset.asset, total_borrow_new);
-
-    core::set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
-
-    <Module<T>>::deposit_event(Event::Locked(asset.asset, sender, holder, amount.value));
+    <Module<T>>::deposit_event(Event::Locked(
+        asset.asset,
+        sender,
+        recipient,
+        quantity.value,
+    ));
 
     Ok(())
 }
 
 pub fn lock_cash_principal_internal<T: Config>(
     sender: ChainAccount,
-    holder: ChainAccount,
+    recipient: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<(), Reason> {
-    debug!(
-        "Locking {:?} CASH principal from {:?} to {:?}",
-        principal, sender, holder
-    );
-    let holder_cash_principal = CashPrincipals::get(holder);
-    let (holder_repay_principal, _holder_supply_principal) =
-        repay_and_supply_principal(holder_cash_principal, principal)?;
-
-    let chain_id = holder.chain_id();
-    let chain_cash_principal_new = sub_principal_amounts(
-        ChainCashPrincipals::get(chain_id),
-        principal,
-        Reason::InsufficientChainCash,
-    )?;
-    let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
-    let total_cash_principal_new = sub_principal_amounts(
-        TotalCashPrincipal::get(),
-        holder_repay_principal,
-        Reason::RepayTooMuch,
-    )?;
+    CashPipeline::new()
+        .lock_cash::<T>(recipient, principal)?
+        .commit::<T>();
 
     let index: CashIndex = GlobalCashIndex::get(); // Grab cash index just for event
-    ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
-    CashPrincipals::insert(holder, holder_cash_principal_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
-
-    <Module<T>>::deposit_event(Event::LockedCash(sender, holder, principal, index));
+    <Module<T>>::deposit_event(Event::LockedCash(sender, recipient, principal, index));
 
     Ok(())
 }
 
+// TODO: Test
 pub fn undo_lock_internal<T: Config>(
     asset: AssetInfo,
     sender: ChainAccount,
-    holder: ChainAccount,
-    amount: AssetQuantity,
+    recipient: ChainAccount,
+    quantity: AssetQuantity,
 ) -> Result<(), Reason> {
-    // XXX undo effects as best as possible...
-    // let holder_asset = AssetBalances::get(asset.asset, holder);
-    // let (holder_repay_amount, holder_supply_amount) = repay_and_supply_amount(holder_asset, amount);
+    // Note: we don't check liquidity here since who knows
+    CashPipeline::new()
+        .extract_asset::<T>(recipient, asset.asset, quantity)?
+        .commit::<T>();
 
-    // let holder_asset_new = add_amount_to_balance(holder_asset, amount)?;
-    // let total_supply_new =
-    //     add_amount_to_raw(TotalSupplyAssets::get(asset.asset), holder_supply_amount)?;
-    // let total_borrow_new = sub_amount_from_raw(
-    //     TotalBorrowAssets::get(asset.asset),
-    //     holder_repay_amount,
-    //     Reason::RepayTooMuch,
-    // )?;
-
-    // let (cash_principal_post, last_index_post) = core::effect_of_asset_interest_internal(
-    //     asset,
-    //     holder,
-    //     holder_asset,
-    //     holder_asset_new,
-    //     CashPrincipals::get(holder),
-    // )?;
-
-    // LastIndices::insert(asset.asset, holder, last_index_post);
-    // CashPrincipals::insert(holder, cash_principal_post);
-    // TotalSupplyAssets::insert(asset.asset, total_supply_new);
-    // TotalBorrowAssets::insert(asset.asset, total_borrow_new);
-
-    // core::set_asset_balance_internal::<T>(asset.asset, holder, holder_asset_new);
-
-    // <Module<T>>::deposit_event(Event::UnLocked(asset.asset, sender, holder, amount.value));
+    <Module<T>>::deposit_event(Event::ReorgRevertLocked(
+        asset.asset,
+        sender,
+        recipient,
+        quantity.value,
+    ));
 
     Ok(())
 }
 
+// TODO: Test
 pub fn undo_lock_cash_principal_internal<T: Config>(
     sender: ChainAccount,
-    holder: ChainAccount,
+    recipient: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<(), Reason> {
-    // XXX undo effects as best as possible...
-    // let holder_cash_principal = CashPrincipals::get(holder);
-    // let (holder_repay_principal, _holder_supply_principal) =
-    //     repay_and_supply_principal(holder_cash_principal, principal);
+    CashPipeline::new()
+        .extract_cash::<T>(recipient, principal)?
+        .commit::<T>();
 
-    // let chain_id = holder.chain_id();
-    // let chain_cash_principal_new = sub_principal_amounts(
-    //     ChainCashPrincipals::get(chain_id),
-    //     principal,
-    //     Reason::InsufficientChainCash,
-    // )?;
-    // let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
-    // let total_cash_principal_new = sub_principal_amounts(
-    //     TotalCashPrincipal::get(),
-    //     holder_repay_principal,
-    //     Reason::RepayTooMuch,
-    // )?;
-
-    // let index: CashIndex = GlobalCashIndex::get(); // Grab cash index just for event
-    // ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
-    // CashPrincipals::insert(holder, holder_cash_principal_new);
-    // TotalCashPrincipal::put(total_cash_principal_new);
-
-    // <Module<T>>::deposit_event(Event::UnLockedCash(sender, holder, principal, index));
+    let index: CashIndex = GlobalCashIndex::get(); // Grab cash index just for event
+    <Module<T>>::deposit_event(Event::ReorgRevertLockedCash(
+        sender, recipient, principal, index,
+    ));
 
     Ok(())
 }
@@ -193,7 +112,7 @@ mod tests {
                     GEOFF,
                     CashPrincipalAmount::from_nominal("1.0")
                 ),
-                Err(Reason::InsufficientChainCash)
+                Err(Reason::NegativeChainCash)
             );
         });
     }
@@ -213,7 +132,7 @@ mod tests {
 
             assert_eq!(
                 lock_cash_principal_internal::<Test>(GEOFF, JARED, twice_principal_amount),
-                Err(Reason::RepayTooMuch)
+                Err(Reason::InsufficientChainCash)
             );
         });
     }
@@ -289,7 +208,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             assert_err!(
                 lock_cash_principal_internal::<Test>(jared, jared, lock_principal),
-                Reason::InsufficientChainCash
+                Reason::NegativeChainCash
             );
             ChainCashPrincipals::insert(ChainId::Eth, lock_principal);
             assert_ok!(lock_cash_principal_internal::<Test>(
@@ -306,7 +225,7 @@ mod tests {
             CashPrincipals::insert(&geoff, CashPrincipal::from_nominal("-1"));
             assert_err!(
                 lock_cash_principal_internal::<Test>(geoff, geoff, lock_principal),
-                Reason::RepayTooMuch
+                Reason::InsufficientChainCash
             );
             TotalCashPrincipal::put(CashPrincipalAmount::from_nominal("1"));
             assert_ok!(lock_cash_principal_internal::<Test>(

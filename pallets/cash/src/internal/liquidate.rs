@@ -21,7 +21,7 @@ use crate::{
     require, require_min_tx_value,
     symbol::Units,
     types::{AssetInfo, AssetQuantity, CashPrincipalAmount, Quantity, CASH},
-    Config, Event, GlobalCashIndex, Module, TotalBorrowAssets, TotalSupplyAssets,
+    Config, Event, GlobalCashIndex, Module,
 };
 
 fn calculate_seize_quantity<T: Config>(

@@ -33,36 +33,6 @@ impl Portfolio {
         Ok(Portfolio { cash, positions })
     }
 
-    /// Modify an asset balance to see what it does to account liquidity.
-    pub fn asset_change(&self, asset_info: AssetInfo, delta: Balance) -> Result<Portfolio, Reason> {
-        let mut positions = Vec::new();
-        let mut seen: bool = false;
-        for (info, balance) in &self.positions {
-            if info.asset == asset_info.asset {
-                seen = true;
-                positions.push((*info, (*balance).add(delta)?))
-            } else {
-                positions.push((*info, (*balance)))
-            };
-        }
-        if !seen {
-            positions.push((asset_info, delta));
-        }
-        Ok(Portfolio {
-            cash: self.cash,
-            positions,
-        })
-    }
-
-    /// Modify the cash principal to see what it does to account liquidity.
-    pub fn cash_change(&self, delta: Balance) -> Result<Portfolio, Reason> {
-        let cash = self.cash.add(delta)?;
-        Ok(Portfolio {
-            cash,
-            positions: self.positions.clone(), // XXX
-        })
-    }
-
     /// Get the hypothetical liquidity value.
     pub fn get_liquidity<T: Config>(&self) -> Result<Balance, Reason> {
         let mut liquidity = self.cash.mul_price(get_price::<T>(CASH)?)?;

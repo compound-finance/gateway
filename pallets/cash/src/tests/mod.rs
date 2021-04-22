@@ -10,7 +10,6 @@ pub use our_std::{iter::FromIterator, str::FromStr};
 
 pub mod assets;
 pub mod common;
-pub mod extract;
 pub mod mock;
 pub mod protocol;
 pub mod testdata;

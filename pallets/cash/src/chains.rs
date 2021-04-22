@@ -15,7 +15,7 @@ use types_derive::{type_alias, Types};
 
 /// Type for representing the selection of an underlying chain.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainId {
     Eth,
     Dot,

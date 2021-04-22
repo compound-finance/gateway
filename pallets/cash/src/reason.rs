@@ -73,6 +73,7 @@ pub enum Reason {
     Unreachable,
     TotalBorrowUnderflow,
     InsufficientCollateral,
+    NegativeChainCash,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -144,6 +145,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
                 0,
                 "borrower did not have sufficient collateral for seize",
             ),
+            Reason::NegativeChainCash => (38, 0, "chain cash underflow"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
