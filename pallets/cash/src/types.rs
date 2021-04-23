@@ -642,6 +642,12 @@ impl Default for CashIndex {
     }
 }
 
+impl From<Factor> for CashIndex {
+    fn from(factor: Factor) -> Self {
+        CashIndex(factor.0)
+    }
+}
+
 impl<T> From<T> for CashIndex
 where
     T: Into<Uint>,

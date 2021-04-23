@@ -413,7 +413,7 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     match notice_state {
         NoticeState::Pending { signature_pairs } => match signature_pairs {
             ChainSignatureList::Eth(signature_pairs) => {
-                /// XXX inefficient
+                // Note: inefficient, probably best to store as sorted lists / zip compare
                 type EthAddrType = <chains::Ethereum as chains::Chain>::Address;
                 let signature_set =
                     vec_to_set::<EthAddrType>(signature_pairs.iter().map(|p| p.0).collect());
@@ -655,23 +655,6 @@ decl_module! {
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)
-        }
-
-        // XXX do we still need this?
-        /// Remove any notice holds if they have been executed
-        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
-        pub fn cull_notices(_origin) -> dispatch::DispatchResult {
-            log!("Culling executed notices");
-            NoticeHolds::iter().for_each(|(chain_id, notice_id)| {
-                match NoticeStates::get(chain_id, notice_id) {
-                    NoticeState::Executed => {
-                        NoticeHolds::take(chain_id);
-                        log!("Removed notice hold {:?}:{:?} as it was already executed", chain_id, notice_id);
-                    },
-                    _ => ()
-                }
-            });
-            Ok(())
         }
     }
 }
