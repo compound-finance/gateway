@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_support_asset() {
         new_test_ext().execute_with(|| {
-            assert_ok!(support_asset::<Test>(Eth, eth));
+            assert_ok!(support_asset::<Test>(eth));
             assert_eq!(SupportedAssets::get(Eth), Some(eth));
         })
     }
@@ -124,8 +124,8 @@ mod tests {
     #[test]
     fn test_support_asset_again() {
         new_test_ext().execute_with(|| {
-            assert_ok!(support_asset::<Test>(Eth, eth));
-            assert_ok!(support_asset::<Test>(Eth, eth));
+            assert_ok!(support_asset::<Test>(eth));
+            assert_ok!(support_asset::<Test>(eth));
             assert_eq!(SupportedAssets::get(Eth), Some(eth));
         })
     }
