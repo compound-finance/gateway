@@ -65,6 +65,7 @@ pub mod pipeline;
 pub mod portfolio;
 pub mod rates;
 pub mod reason;
+pub mod require;
 pub mod serdes;
 pub mod symbol;
 pub mod trx_req;
@@ -550,9 +551,7 @@ decl_module! {
         #[weight = (0, DispatchClass::Operational)]
         fn set_miner(origin, miner: ChainAccount) {
             ensure_none(origin)?;
-
-            log!("set_miner({:?})", miner);
-            Miner::put(miner);
+            internal::miner::set_miner::<T>(miner);
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
@@ -706,7 +705,7 @@ impl<T: Config> Module<T> {
 
     /// Get the asset info for the given asset.
     pub fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason> {
-        Ok(core::get_asset::<T>(asset)?)
+        Ok(internal::assets::get_asset::<T>(asset)?)
     }
 
     /// Get the cash yield.
@@ -731,12 +730,12 @@ impl<T: Config> Module<T> {
 
     /// Get the rates for the given asset.
     pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
-        Ok(core::get_rates::<T>(asset)?)
+        Ok(internal::assets::get_rates::<T>(asset)?)
     }
 
     /// Get the list of assets
     pub fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
-        Ok(core::get_assets::<T>()?)
+        Ok(internal::assets::get_assets::<T>()?)
     }
     /// Get the rates for the given asset.
     pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {

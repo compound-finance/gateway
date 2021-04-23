@@ -1,7 +1,8 @@
-use crate::{chains::ChainAccount, Call, Config, Module};
+use crate::{chains::ChainAccount, Call, Config, Miner, Module};
 #[cfg(feature = "std")]
 use codec::Decode;
 use codec::Encode;
+use frame_support::storage::StorageValue;
 #[cfg(feature = "std")]
 use sp_inherents::ProvideInherentData;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError, ProvideInherent};
@@ -112,5 +113,36 @@ impl<T: Config> ProvideInherent for Module<T> {
 
         // We don't actually have any qualms with the miner's choice, so long as it decodes
         Ok(())
+    }
+}
+
+// Miner might not be set (e.g. in the first block mined), but for accouting
+// purposes, we want some address to make sure all numbers tie out. As such,
+// let's just give the initial rewards to some burn account.
+pub fn get_some_miner<T: Config>() -> ChainAccount {
+    Miner::get().unwrap_or(ChainAccount::Eth([0; 20]))
+}
+
+pub fn set_miner<T: Config>(miner: ChainAccount) {
+    Miner::put(miner);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        tests::{mock::*, *},
+        *,
+    };
+
+    #[test]
+    fn test_set_miner_and_get_some_miner() {
+        new_test_ext().execute_with(|| {
+            assert_eq!(Miner::get(), None);
+            assert_eq!(get_some_miner::<Test>(), ChainAccount::Eth([0; 20]));
+            set_miner::<Test>(ChainAccount::Eth([1; 20]));
+            assert_eq!(Miner::get(), Some(ChainAccount::Eth([1; 20])));
+            assert_eq!(get_some_miner::<Test>(), ChainAccount::Eth([1; 20]));
+        });
     }
 }

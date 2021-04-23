@@ -1,7 +1,7 @@
-use crate::core::get_asset;
 use crate::{
     chains::{ChainAccount, ChainAccountSignature},
     internal::{
+        assets::get_asset,
         extract::{extract_cash_principal_internal, extract_internal},
         liquidate::{
             liquidate_cash_collateral_internal, liquidate_cash_principal_internal,

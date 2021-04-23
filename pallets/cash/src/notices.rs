@@ -1,7 +1,5 @@
 use crate::{
-    chains::{
-        Chain, ChainAccount, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum,
-    },
+    chains::{Chain, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum},
     reason::Reason,
 };
 use codec::{Decode, Encode};

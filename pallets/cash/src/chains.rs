@@ -1,16 +1,12 @@
-// Note: The substrate build requires these be imported
-pub use our_std::vec::Vec;
-
 use crate::rates::APR;
 use crate::reason::Reason;
 use crate::types::{AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorKeys};
-
 use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
+use our_std::vec::Vec;
 use our_std::{
     iter::Iterator, str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serialize,
 };
-
 use types_derive::{type_alias, Types};
 
 /// Type for representing the selection of an underlying chain.
@@ -578,8 +574,6 @@ impl ChainBlockEvents {
                 ChainBlockEvent::Eth(block_num, eth_block) => eth_block_events
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *eth_block),
-
-                _ => None,
             },
         }
     }
@@ -807,6 +801,18 @@ impl Chain for Polkadot {
 
     fn hash_string(_hash: &Self::Hash) -> String {
         panic!("XXX not implemented");
+    }
+}
+
+pub fn get_chain_account(chain: String, recipient: [u8; 32]) -> Result<ChainAccount, Reason> {
+    match &chain.to_ascii_uppercase()[..] {
+        "ETH" => {
+            let mut eth_recipient: [u8; 20] = [0; 20];
+            eth_recipient[..].clone_from_slice(&recipient[0..20]);
+
+            Ok(ChainAccount::Eth(eth_recipient))
+        }
+        _ => Err(Reason::InvalidChain),
     }
 }
 

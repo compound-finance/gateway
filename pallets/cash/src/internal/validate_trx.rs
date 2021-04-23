@@ -1,6 +1,6 @@
 use crate::{
     chains::{Chain, Ethereum},
-    core::{recover_validator, validator_sign},
+    core::recover_validator,
     internal,
     notices::EncodeNotice,
     params::{UNSIGNED_TXS_LONGEVITY, UNSIGNED_TXS_PRIORITY},
@@ -151,7 +151,7 @@ pub fn validate_unsigned<T: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{tests::*, Call};
+    use crate::{core::validator_sign, tests::*, Call};
 
     #[test]
     fn test_set_miner_external() {

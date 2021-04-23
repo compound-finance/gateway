@@ -1,7 +1,8 @@
 use crate::{
     chains::ChainAccount,
-    core::{self, get_price, get_value},
+    core,
     factor::Factor,
+    internal::assets::{get_price, get_value},
     must,
     params::MIN_TX_VALUE,
     pipeline::CashPipeline,
@@ -11,7 +12,7 @@ use crate::{
     types::{AssetInfo, AssetQuantity, CashPrincipalAmount, Quantity, CASH},
     Config, Event, GlobalCashIndex, Module,
 };
-use frame_support::storage::{StorageMap, StorageValue};
+use frame_support::storage::StorageValue;
 use our_std::result::Result;
 
 fn calculate_seize_quantity<T: Config>(

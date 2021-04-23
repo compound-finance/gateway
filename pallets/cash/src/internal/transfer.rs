@@ -1,6 +1,6 @@
 use crate::{
     chains::ChainAccount,
-    core::{get_some_miner, get_value},
+    internal::{assets::get_value, miner::get_some_miner},
     params::{MIN_TX_VALUE, TRANSFER_FEE},
     pipeline::CashPipeline,
     reason::Reason,
