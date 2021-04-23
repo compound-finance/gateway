@@ -5,7 +5,8 @@ use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
-    iter::Iterator, str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serialize,
+    collections::btree_set::BTreeSet, iter::Iterator, str::FromStr, vec, Debuggable, Deserialize,
+    RuntimeDebug, Serialize,
 };
 use types_derive::{type_alias, Types};
 
@@ -439,7 +440,7 @@ impl ChainReorg {
 }
 
 /// Calculate whether the signers have a super majority of the given validator set.
-pub fn has_super_majority(signers: &SignersSet, validator_set: &SignersSet) -> bool {
+pub fn has_super_majority<T: Ord>(signers: &BTreeSet<T>, validator_set: &BTreeSet<T>) -> bool {
     // using ⌈j/m⌉ = ⌊(j+m-1)/m⌋
     let valid_signers: Vec<_> = validator_set.intersection(&signers).collect();
     valid_signers.len() >= (2 * validator_set.len() + 3 - 1) / 3

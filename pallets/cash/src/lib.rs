@@ -398,31 +398,25 @@ changeAuth extrinsic, nextValidators set, hold is set, rotate_session is called
 
 */
 
-fn intersection_count<T: Ord + Debuggable>(a: Vec<T>, b: Vec<T>) -> usize {
+fn vec_to_set<T: Ord + Debuggable>(a: Vec<T>) -> BTreeSet<T> {
     let mut a_set = BTreeSet::<T>::new();
     for v in a {
         a_set.insert(v);
     }
-
-    let mut b_set = BTreeSet::<T>::new();
-    for v in b {
-        b_set.insert(v);
-    }
-
-    a_set.intersection(&b_set).into_iter().count()
+    return a_set;
 }
 
 fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<ValidatorKeys>) -> bool {
-    let validator_count = validators.iter().count();
-    let quorum_count = validator_count; // TODO: Add a real quorum count
-
     match notice_state {
         NoticeState::Pending { signature_pairs } => match signature_pairs {
             ChainSignatureList::Eth(signature_pairs) => {
-                intersection_count(
-                    signature_pairs.iter().map(|p| p.0).collect(),
-                    validators.iter().map(|v| v.eth_address).collect(),
-                ) >= quorum_count
+                /// XXX inefficient
+                type EthAddrType = <chains::Ethereum as chains::Chain>::Address;
+                let signature_set =
+                    vec_to_set::<EthAddrType>(signature_pairs.iter().map(|p| p.0).collect());
+                let validator_set =
+                    vec_to_set::<EthAddrType>(validators.iter().map(|v| v.eth_address).collect());
+                chains::has_super_majority::<EthAddrType>(&signature_set, &validator_set)
             }
             _ => false,
         },
