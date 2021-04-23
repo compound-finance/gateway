@@ -25,6 +25,7 @@ pub struct ValidatorConfig {
 impl Config {
     pub fn update(&mut self, new: Config) {
         self.eth_starport_address = new.eth_starport_address;
+        self.eth_starport_parent_block = new.eth_starport_parent_block;
     }
 }
 

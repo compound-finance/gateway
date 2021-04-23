@@ -48,7 +48,7 @@ fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
         .ok_or(EventError::NoRpcUrl)?;
     let eth_fetch_deadline =
         runtime_interfaces::validator_config_interface::get_eth_fetch_deadline()
-            .ok_or(EventError::NoRpcUrl)?;
+            .ok_or(EventError::NoDeadline)?;
     let eth_chain_block = ethereum_client::get_block(
         &eth_rpc_url,
         &eth_starport_address,

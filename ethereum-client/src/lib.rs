@@ -161,8 +161,6 @@ pub fn send_rpc(
     params: Vec<serde_json::Value>,
     deadline: u64,
 ) -> Result<String, EthereumClientError> {
-    // TODO - move 2_000 to config???
-    // let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(deadline));
     let data = serde_json::json!({
         "jsonrpc": "2.0",
