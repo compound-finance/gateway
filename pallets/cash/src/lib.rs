@@ -219,7 +219,6 @@ decl_storage! {
         /// The mapping of ingression queue events, by chain.
         IngressionQueue get(fn ingression_queue): map hasher(blake2_128_concat) ChainId => Option<ChainBlockEvents>;
 
-        // XXX must be initialized for each chain...where to start fetching events from
         /// The mapping of last block number for which validators added events to the ingression queue, by chain.
         LastProcessedBlock get(fn last_processed_block): map hasher(blake2_128_concat) ChainId => Option<ChainBlock>;
 

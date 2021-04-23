@@ -129,6 +129,7 @@
       "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>"
     }
   },
+  "ChainBlockNumber": "u64",
   "ChainBlockTally": {
     "block": "ChainBlock",
     "support": "SignersSet",
@@ -208,13 +209,15 @@
   "EncodedNotice": "Vec<u8>",
   "EraId": "u32",
   "EraIndex": "u32",
-  "EthereumBlock": {
-    "hash": "EthereumHash",
-    "parent_hash": "EthereumHash",
-    "number": "EthereumBlockNumber",
-    "events": "Vec<EthereumEvent>"
+  "ethereum_client__EthereumHash": "[u8; 32]",
+  "ethereum_client__EthereumBlockNumber": "u64",
+  "ethereum_client__EthereumBlock": {
+    "hash": "ethereum_client__EthereumHash",
+    "parent_hash": "ethereum_client__EthereumHash",
+    "number": "ethereum_client__EthereumBlockNumber",
+    "events": "Vec<ethereum_client__EthereumEvent>"
   },
-  "EthereumClientError": {
+  "ethereum_client__EthereumClientError": {
     "_enum": {
       "DecodeError": "",
       "HttpIoError": "",
@@ -224,38 +227,38 @@
       "JsonParseError": ""
     }
   },
-  "EthereumEvent": {
+  "ethereum_client__EthereumEvent": {
     "_enum": {
-      "Lock": "EthereumEventLock",
-      "LockCash": "EthereumEventLockCash",
-      "ExecTrxRequest": "EthereumEventExecTrxRequest",
-      "ExecuteProposal": "EthereumEventExecuteProposal",
-      "NoticeInvoked": "EthereumEventNoticeInvoked"
+      "Lock": "ethereum_client__EthereumEventLock",
+      "LockCash": "ethereum_client__EthereumEventLockCash",
+      "ExecTrxRequest": "ethereum_client__EthereumEventExecTrxRequest",
+      "ExecuteProposal": "ethereum_client__EthereumEventExecuteProposal",
+      "NoticeInvoked": "ethereum_client__EthereumEventNoticeInvoked"
     }
   },
-  "EthereumEventExecTrxRequest": {
+  "ethereum_client__EthereumEventExecTrxRequest": {
     "account": "[u8; 20]",
     "trx_request": "String"
   },
-  "EthereumEventExecuteProposal": {
+  "ethereum_client__EthereumEventExecuteProposal": {
     "title": "String",
     "extrinsics": "Vec<Vec<u8>>"
   },
-  "EthereumEventLock": {
+  "ethereum_client__EthereumEventLock": {
     "asset": "[u8; 20]",
     "sender": "[u8; 20]",
     "chain": "String",
     "recipient": "[u8; 32]",
     "amount": "u128"
   },
-  "EthereumEventLockCash": {
+  "ethereum_client__EthereumEventLockCash": {
     "sender": "[u8; 20]",
     "chain": "String",
     "recipient": "[u8; 32]",
     "amount": "u128",
     "principal": "u128"
   },
-  "EthereumEventNoticeInvoked": {
+  "ethereum_client__EthereumEventNoticeInvoked": {
     "era_id": "u32",
     "era_index": "u32",
     "notice_hash": "[u8; 32]",

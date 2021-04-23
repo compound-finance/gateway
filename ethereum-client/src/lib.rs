@@ -8,7 +8,7 @@ use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
 use our_std::RuntimeDebug;
-use types_derive::Types;
+use types_derive::{type_alias, Types};
 
 pub mod events;
 pub mod hex;
@@ -16,7 +16,10 @@ pub mod hex;
 pub use crate::events::EthereumEvent;
 pub use crate::hex::{parse_u64, parse_word};
 
+#[type_alias]
 pub type EthereumBlockNumber = u64;
+
+#[type_alias]
 pub type EthereumHash = [u8; 32];
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
@@ -218,28 +221,35 @@ pub fn get_block(
         .ok_or(EthereumClientError::JsonParseError)?;
 
     if event_objects.len() > 0 {
-        debug::native::info!(
+        debug::info!(
             "Found {} events @ Eth Starport {}",
             event_objects.len(),
             eth_starport_address
         );
     }
 
-    let events_result: Result<Vec<EthereumEvent>, EthereumClientError> = event_objects
-        .into_iter()
-        .map(|event| {
-            let topics = event.topics.ok_or(EthereumClientError::JsonParseError)?;
-            let data = event.data.ok_or(EthereumClientError::JsonParseError)?;
-            events::decode_event(topics, data).map_err(|_| EthereumClientError::DecodeError)
-        })
-        .collect();
+    let mut events = Vec::with_capacity(event_objects.len());
+    for evobj in event_objects {
+        let topics = evobj.topics.ok_or(EthereumClientError::JsonParseError)?;
+        let data = evobj.data.ok_or(EthereumClientError::JsonParseError)?;
+        match events::decode_event(topics, data) {
+            Ok(event) => events.push(event),
+            Err(events::EventError::UnknownEventTopic(topic)) => {
+                debug::warn!("Skipping unrecognized topic {:?}", topic)
+            }
+            Err(err) => {
+                debug::error!("Failed to decode {:?}", err);
+                return Err(EthereumClientError::DecodeError);
+            }
+        }
+    }
 
     Ok(EthereumBlock {
         hash: parse_word(block_object.hash).ok_or(EthereumClientError::JsonParseError)?,
         parent_hash: parse_word(block_object.parentHash)
             .ok_or(EthereumClientError::JsonParseError)?,
         number: parse_u64(block_object.number).ok_or(EthereumClientError::JsonParseError)?,
-        events: events_result?,
+        events,
     })
 }
 
