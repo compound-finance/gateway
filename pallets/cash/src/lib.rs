@@ -411,12 +411,12 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     match notice_state {
         NoticeState::Pending { signature_pairs } => match signature_pairs {
             ChainSignatureList::Eth(signature_pairs) => {
-                type ETH_ADDR_TYPE = <chains::Ethereum as chains::Chain>::Address;
+                type EthAddrType = <chains::Ethereum as chains::Chain>::Address;
                 let signature_set =
-                    vec_to_set::<ETH_ADDR_TYPE>(signature_pairs.iter().map(|p| p.0).collect());
+                    vec_to_set::<EthAddrType>(signature_pairs.iter().map(|p| p.0).collect());
                 let validator_set =
-                    vec_to_set::<ETH_ADDR_TYPE>(validators.iter().map(|v| v.eth_address).collect());
-                chains::has_super_majority::<ETH_ADDR_TYPE>(&signature_set, &validator_set)
+                    vec_to_set::<EthAddrType>(validators.iter().map(|v| v.eth_address).collect());
+                chains::has_super_majority::<EthAddrType>(&signature_set, &validator_set)
             }
             _ => false,
         },
