@@ -116,11 +116,14 @@ const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
 const MINER_ENV_VAR: &str = "MINER";
 const OPF_URL_ENV_VAR: &str = "OPF_URL";
+const ETH_FETCH_DEADLINE_ENV_VAR: &str = "ETH_FETCH_DEADLINE";
 
 const ETH_KEY_ID_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
 const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
 const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
+/// Default value of ethereum client fetching deadline = 10s
+const ETH_FETCH_DEADLINE_DEFAULT: u64 = 10000;
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set
@@ -207,6 +210,16 @@ pub trait ValidatorConfigInterface {
         }
         // not set
         return Some(MINER_DEFAULT.into());
+    }
+
+    /// Get ethereum client fetch events deadline in milliseconds
+    fn get_eth_fetch_deadline() -> Option<u64> {
+        // check env override
+        if let Ok(deadline) = std::env::var(ETH_FETCH_DEADLINE_ENV_VAR) {
+            return Some(deadline.parse::<u64>().unwrap());
+        }
+        // not set
+        return Some(ETH_FETCH_DEADLINE_DEFAULT);
     }
 }
 

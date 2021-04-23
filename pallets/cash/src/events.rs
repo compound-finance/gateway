@@ -14,6 +14,7 @@ pub enum EventError {
     NoStarportAddress,
     EthereumClientError(EthereumClientError),
     ErrorDecodingHex,
+    NoDeadline,
 }
 
 /// Fetch a block from the underlying chain.
@@ -45,8 +46,16 @@ fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
         .ok_or(EventError::NoStarportAddress)?;
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
         .ok_or(EventError::NoRpcUrl)?;
-    let eth_chain_block = ethereum_client::get_block(&eth_rpc_url, &eth_starport_address, number)
-        .map_err(EventError::EthereumClientError)?;
+    let eth_fetch_deadline =
+        runtime_interfaces::validator_config_interface::get_eth_fetch_deadline()
+            .ok_or(EventError::NoRpcUrl)?;
+    let eth_chain_block = ethereum_client::get_block(
+        &eth_rpc_url,
+        &eth_starport_address,
+        number,
+        eth_fetch_deadline,
+    )
+    .map_err(EventError::EthereumClientError)?;
     Ok(ChainBlock::Eth(eth_chain_block))
 }
 

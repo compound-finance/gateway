@@ -159,9 +159,11 @@ pub fn send_rpc(
     server: &str,
     method: serde_json::Value,
     params: Vec<serde_json::Value>,
+    deadline: u64,
 ) -> Result<String, EthereumClientError> {
     // TODO - move 2_000 to config???
-    let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
+    // let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
+    let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(deadline));
     let data = serde_json::json!({
         "jsonrpc": "2.0",
         "method": method,
@@ -203,15 +205,17 @@ pub fn get_block(
     server: &str,
     eth_starport_address: &str,
     block_num: EthereumBlockNumber,
+    deadline: u64,
 ) -> Result<EthereumBlock, EthereumClientError> {
     let block_str = encode_block_hex(block_num);
-    let block_object = get_block_object(server, &block_str)?;
+    let block_object = get_block_object(server, &block_str, deadline)?;
     let get_logs_params = vec![serde_json::json!({
         "address": eth_starport_address,
         "fromBlock": &block_str,
         "toBlock": &block_str,
     })];
-    let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
+    let get_logs_response_str: String =
+        send_rpc(server, "eth_getLogs".into(), get_logs_params, deadline)?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
     let event_objects = get_logs_response
         .result
@@ -243,15 +247,19 @@ pub fn get_block(
     })
 }
 
-pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, EthereumClientError> {
+pub fn get_block_object(
+    server: &str,
+    block_num: &str,
+    deadline: u64,
+) -> Result<BlockObject, EthereumClientError> {
     let params = vec![block_num.into(), true.into()];
-    let response_str: String = send_rpc(server, "eth_getBlockByNumber".into(), params)?;
+    let response_str: String = send_rpc(server, "eth_getBlockByNumber".into(), params, deadline)?;
     let response = deserialize_get_block_by_number_response(&response_str)?;
     response.result.ok_or(EthereumClientError::JsonParseError)
 }
 
-pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError> {
-    let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
+pub fn get_latest_block_number(server: &str, deadline: u64) -> Result<u64, EthereumClientError> {
+    let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![], deadline)?;
     let response = deserialize_block_number_response(&response_str)?;
     parse_u64(Some(
         response.result.ok_or(EthereumClientError::JsonParseError)?,
@@ -298,6 +306,7 @@ mod tests {
                 "https://mainnet-eth.compound.finance",
                 "0x3a275655586a049fe860be867d10cdae2ffc0f33",
                 1286,
+                10000,
             );
             let block = result.unwrap();
             assert_eq!(
@@ -356,7 +365,7 @@ mod tests {
             });
         }
         t.execute_with(|| {
-            let result = get_latest_block_number("https://mainnet-eth.compound.finance");
+            let result = get_latest_block_number("https://mainnet-eth.compound.finance", 10000);
             assert_eq!(result, Ok(291));
         });
     }
@@ -380,7 +389,7 @@ mod tests {
                 });
         }
         t.execute_with(|| {
-            let result = get_block_object("https://mainnet-eth.compound.finance", "0x506");
+            let result = get_block_object("https://mainnet-eth.compound.finance", "0x506", 10000);
             let block = result.unwrap();
             assert_eq!(block.difficulty, Some("0xb9e274f7969f5".into()));
             assert_eq!(block.number, Some("0x506".into()));
