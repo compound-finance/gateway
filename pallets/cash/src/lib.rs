@@ -411,6 +411,7 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     match notice_state {
         NoticeState::Pending { signature_pairs } => match signature_pairs {
             ChainSignatureList::Eth(signature_pairs) => {
+                /// XXX inefficient
                 type EthAddrType = <chains::Ethereum as chains::Chain>::Address;
                 let signature_set =
                     vec_to_set::<EthAddrType>(signature_pairs.iter().map(|p| p.0).collect());
