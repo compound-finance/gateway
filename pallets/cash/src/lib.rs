@@ -399,12 +399,12 @@ changeAuth extrinsic, nextValidators set, hold is set, rotate_session is called
 
 */
 
-fn vec_to_set<T: Ord + Debuggable>(a: Vec<T>) -> BTreeSet::<T> {
+fn vec_to_set<T: Ord + Debuggable>(a: Vec<T>) -> BTreeSet<T> {
     let mut a_set = BTreeSet::<T>::new();
     for v in a {
         a_set.insert(v);
     }
-    return a_set
+    return a_set;
 }
 
 fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<ValidatorKeys>) -> bool {
@@ -412,8 +412,10 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
         NoticeState::Pending { signature_pairs } => match signature_pairs {
             ChainSignatureList::Eth(signature_pairs) => {
                 type ETH_ADDR_TYPE = <chains::Ethereum as chains::Chain>::Address;
-                let signature_set = vec_to_set::<ETH_ADDR_TYPE>(signature_pairs.iter().map(|p| p.0).collect());
-                let validator_set = vec_to_set::<ETH_ADDR_TYPE>(validators.iter().map(|v| v.eth_address).collect());
+                let signature_set =
+                    vec_to_set::<ETH_ADDR_TYPE>(signature_pairs.iter().map(|p| p.0).collect());
+                let validator_set =
+                    vec_to_set::<ETH_ADDR_TYPE>(validators.iter().map(|v| v.eth_address).collect());
                 chains::has_super_majority::<ETH_ADDR_TYPE>(&signature_set, &validator_set)
             }
             _ => false,
