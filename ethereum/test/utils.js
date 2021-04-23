@@ -1,6 +1,7 @@
 const RLP = require('rlp');
 const { ethers } = require('ethers');
 const { Wallet } = require("@ethersproject/wallet");
+const Web3Utils = require('web3-utils');
 
 const bigInt = num => {
   return BigInt(num);
@@ -19,7 +20,7 @@ const toPrincipal = (n, index = 1e18) => {
 };
 
 const getNextContractAddress = (acct, nonce) => {
-  return '0x' + web3.utils.sha3(RLP.encode([acct, nonce])).slice(12).substring(14);
+  return '0x' + Web3Utils.sha3(RLP.encode([acct, nonce])).slice(12).substring(14);
 };
 
 const randomAddress = () =>  Wallet.createRandom().address;
@@ -89,11 +90,31 @@ const ETH_HEADER = "0x4554483a";
 const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const ETH_ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
+async function call(contract, fn, args = [], callArgs = {}) {
+  return await contract[fn](...args, callArgs);
+}
+
+async function deploy(ethers, contract, args = [], deployArgs = {}) {
+  let {
+    from,
+    ...restArgs
+  } = deployArgs;
+  const factory = await ethers.getContractFactory(contract, from);
+  return await factory.deploy(...args, restArgs);
+}
+
+async function getContractAt(ethers, contract, address, signer) {
+  return await ethers.getContractAt(contract, address, signer);
+}
+
 module.exports = {
   bigInt,
+  call,
+  deploy,
   e18,
   e6,
   fromNow,
+  getContractAt,
   getNextContractAddress,
   nRandomWallets,
   nRandomAuthorities,
