@@ -1,13 +1,12 @@
-use codec::{Decode, Encode};
-use num_bigint::{BigInt as BigI, BigUint as BigU};
-use num_traits::{CheckedDiv, ToPrimitive};
-use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
-
 use crate::{
     reason::{MathError, Reason},
     types::{Decimals, Int, Uint},
 };
-
+use codec::{Decode, Encode};
+use num_bigint::{BigInt as BigI, BigUint as BigU};
+use num_traits::{CheckedDiv, ToPrimitive};
+use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
+use pallet_oracle::types::Price;
 use types_derive::Types;
 
 /// Type for wrapping intermediate signed calculations.
@@ -127,6 +126,15 @@ impl Factor {
 
     pub fn mul_uint(self, number: Uint) -> BigUint {
         BigUint::from_uint(self.0).mul_uint(number)
+    }
+
+    /// Take a ratio of prices.
+    // If we generalized prices over the quote type, this would probably be:
+    //  Price<A, Q> / P<B, Q> -> Price<A, B>
+    // But we don't need generalize prices, just enough Decimals, so we have:
+    //  Price<A, { USD }> / Price<B, { USD }> -> Factor(B per A)
+    pub fn ratio(num: Price, denom: Price) -> Result<Factor, MathError> {
+        Factor::from_fraction(num.value, denom.value)
     }
 }
 

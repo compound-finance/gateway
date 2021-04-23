@@ -1,13 +1,11 @@
-use codec::{alloc::string::String, Decode, Encode};
-
-use ethereum_client::EthereumClientError;
-use our_std::RuntimeDebug;
-use types_derive::Types;
-
 use crate::{
     chains::{ChainBlock, ChainBlockNumber, ChainBlocks, ChainId},
     reason::Reason,
 };
+use codec::{Decode, Encode};
+use ethereum_client::EthereumClientError;
+use our_std::RuntimeDebug;
+use types_derive::Types;
 
 /// Type for errors coming from event ingression.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
