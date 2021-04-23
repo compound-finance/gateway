@@ -3,13 +3,11 @@ use codec::{Decode, Encode};
 use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
 
 use crate::{
-    factor::Factor,
+    factor::{BigUint, Factor},
     params::MILLISECONDS_PER_YEAR,
     reason::{MathError, Reason},
-    types::{AssetAmount, CashIndex, MinerShares, Timestamp, Uint},
+    types::{AssetAmount, MinerShares, Timestamp, Uint},
 };
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 
 use types_derive::Types;
 
@@ -44,27 +42,22 @@ impl APR {
         APR(uint_from_string_with_decimals(Self::DECIMALS, s))
     }
 
-    /// exp{r * dt} where dt is change in time in milliseconds
-    // XXX why is this an index, should it be a CashIndexDelta or something?
-    //  actually why is this even related to CASH?
-    // XXX this should return a Factor
-    pub fn compound(self, dt: Timestamp) -> Result<CashIndex, MathError> {
-        let index_scale = &BigInt::from(CashIndex::ONE.0);
-        let scaled_rate: &BigInt =
-            &(index_scale * self.0 * dt / MILLISECONDS_PER_YEAR / APR::ONE.0);
-        let t1 = index_scale * index_scale * index_scale; //     1
-        let t2 = scaled_rate * index_scale * index_scale; //     x
-        let t3 = scaled_rate * scaled_rate * index_scale / 2; // x^2 / 2
-        let t4 = scaled_rate * scaled_rate * scaled_rate / 6; // x^3 / 6
-        let unscaled = t1 + t2 + t3 + t4;
-        let scaled: BigInt = unscaled / index_scale / index_scale;
-        if let Some(raw) = scaled.to_u128() {
-            Ok(CashIndex(raw))
-        } else {
-            Err(MathError::Overflow)
-        }
+    /// Official approximation of e^(r*dt) using e^x = 1 + x + x^2/2 + x^3/6 + ...
+    pub fn compound(self, dt: Timestamp) -> Result<Factor, MathError> {
+        let one = Factor::ONE;
+        let x_1 = self.simple(dt)?;
+        let x_2 = x_1.mul_uint(x_1.0);
+        let x_3 = x_1.mul_uint(x_1.0).mul_uint(x_1.0);
+        Ok(Factor(
+            BigUint::from_uint(one.0)
+                .add(x_1.mul_uint(1))
+                .add(x_2.div_uint(2)?.div_uint(one.0)?)
+                .add(x_3.div_uint(6)?.div_uint(one.0)?.div_uint(one.0)?)
+                .to_uint()?,
+        ))
     }
 
+    /// Calculate r*dt as a factor to be applied.
     pub fn simple(self, dt: Timestamp) -> Result<Factor, MathError> {
         let years_accrued = Factor::from_fraction(dt, MILLISECONDS_PER_YEAR)?;
         Ok(Factor(
@@ -622,8 +615,7 @@ mod test {
                 let float_rate_over_time =
                     float_rate * (dt as f64) / (MILLISECONDS_PER_YEAR as f64);
                 let float_exact_reference = float_rate_over_time.exp();
-                let float_exact_as_uint =
-                    (float_exact_reference * (CashIndex::ONE.0 as f64)) as u128;
+                let float_exact_as_uint = (float_exact_reference * (Factor::ONE.0 as f64)) as u128;
                 let error_wei = if float_exact_as_uint > actual.0 {
                     float_exact_as_uint - actual.0
                 } else {
