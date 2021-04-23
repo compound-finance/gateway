@@ -4,7 +4,7 @@ use crate::{
     internal, log,
     rates::APR,
     reason::Reason,
-    types::{AssetIndex, CashIndex, CashPrincipalAmount, Quantity, Timestamp, CASH},
+    types::{AssetIndex, CashPrincipalAmount, Quantity, Timestamp, CASH},
     BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, GlobalCashIndex,
     LastBlockTimestamp, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp,
     SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
@@ -86,10 +86,10 @@ pub fn on_initialize_internal<T: Config>(
     let total_cash_principal = TotalCashPrincipal::get();
 
     let increment = cash_yield.compound(dt_since_last_yield)?;
-    if increment == CashIndex::ONE {
+    if increment == Factor::ONE {
         log!("Index increment = 1. No interest on cash earned in this block!")
     }
-    let cash_index_new = last_yield_cash_index.increment(increment)?; // XXX
+    let cash_index_new = last_yield_cash_index.increment(increment.into())?;
     let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
     let miner_share_principal =
         cash_principal_borrow_increase.sub(cash_principal_supply_increase)?;
@@ -232,7 +232,7 @@ mod tests {
                 .compound(now - last_yield_timestamp)
                 .expect("could not compound interest during expected calc");
             let new_index_expected = last_yield_cash_index_initial
-                .increment(increment_expected)
+                .increment(increment_expected.into())
                 .expect("could not increment index value during expected calc");
             let new_index_actual = GlobalCashIndex::get();
             assert_eq!(
@@ -272,7 +272,7 @@ mod tests {
                 .compound(now - last_yield_timestamp)
                 .expect("could not compound interest during expected calc");
             let new_index_expected = last_yield_cash_index_initial
-                .increment(increment_expected)
+                .increment(increment_expected.into())
                 .expect("could not increment index value during expected calc");
             let new_index_actual = GlobalCashIndex::get();
             assert_eq!(
@@ -309,7 +309,7 @@ mod tests {
                 .compound(now - next_yield_timestamp)
                 .expect("could not compound interest during expected calc");
             let new_index_expected = new_cash_index_baseline
-                .increment(increment_expected)
+                .increment(increment_expected.into())
                 .expect("could not increment index value during expected calc");
             let new_index_actual = GlobalCashIndex::get();
             assert_eq!(

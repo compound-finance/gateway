@@ -134,10 +134,8 @@ pub fn recover_validator<T: Config>(
         }
 
         _ => {
-            // XXX should we even be having other branches for signatures now?
-            //  we should probably delete all variants of ChainSignature except Eth
-            //   generally minimal since we dont want validators to have to add new keys
-            //    can be separate from ChainAccountSignature
+            // this is a placeholder for future variants, which should be kept minimal
+            //  since generally we dont want validators to have to add new types of keys
             return Err(Reason::NotImplemented); // XXX
         }
     }
@@ -313,7 +311,6 @@ pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason
 // Dispatch Extrinsic Lifecycle //
 
 /// Block initialization wrapper.
-// XXX we need to be able to mock Now (then get rid of this?)
 pub fn on_initialize<T: Config>() -> Result<(), Reason> {
     internal::initialize::on_initialize_internal::<T>(
         get_now::<T>(),

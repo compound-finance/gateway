@@ -24,7 +24,7 @@ fn get_cash_yield_index_after<T: Config>(change_in_time: Timestamp) -> Result<Ca
     let cash_index_old = GlobalCashIndex::get();
     let increment = cash_yield.compound(change_in_time)?;
     cash_index_old
-        .increment(increment)
+        .increment(increment.into())
         .map_err(Reason::MathError)
 }
 

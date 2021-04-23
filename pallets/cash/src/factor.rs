@@ -78,6 +78,10 @@ impl BigUint {
         ))
     }
 
+    pub fn add(self, other: Self) -> Self {
+        BigUint(self.0 + other.0)
+    }
+
     pub fn convert(self, from_decimals: Decimals, to_decimals: Decimals) -> Self {
         if from_decimals > to_decimals {
             BigUint(self.0 / 10u128.pow((from_decimals - to_decimals) as u32))
