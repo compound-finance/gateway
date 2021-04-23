@@ -11,9 +11,9 @@ use crate::{
         AssetAmount, AssetBalance, Balance, CashPrincipal, CashPrincipalAmount, GovernanceResult,
         NoticeId, SignersSet, Timestamp, ValidatorKeys,
     },
-    AssetBalances, CashPrincipals, CashYield, Config, Event, GlobalCashIndex, IngressionQueue,
-    LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module, SupportedAssets,
-    TotalBorrowAssets, TotalSupplyAssets, Validators,
+    AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
+    IngressionQueue, LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module,
+    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 use codec::Decode;
 use frame_support::traits::UnfilteredDispatchable;
