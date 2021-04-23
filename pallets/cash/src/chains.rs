@@ -550,6 +550,13 @@ impl ChainBlockEvents {
         }
     }
 
+    /// Determine the number of events in this queue.
+    pub fn len(&self) -> usize {
+        match self {
+            ChainBlockEvents::Eth(blocks) => blocks.len(),
+        }
+    }
+
     /// Push the events from block onto this queue of events.
     pub fn push(&mut self, block: &ChainBlock) {
         match self {
