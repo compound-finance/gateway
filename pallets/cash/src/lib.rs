@@ -36,7 +36,7 @@ use frame_support::{
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{
-    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec,
+    collections::btree_set::BTreeSet, convert::TryInto, error, log, str, vec::Vec,
     Debuggable,
 };
 use sp_core::crypto::AccountId32;

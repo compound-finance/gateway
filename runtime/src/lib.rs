@@ -247,16 +247,6 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 500;
-    pub const MaxLocks: u32 = 50;
-}
-
-parameter_types! {
-    pub const TransactionByteFee: u128 = 10_000_000; // XXX how are we doing weights/fees for substrate?
-    pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
-}
-
-parameter_types! {
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
 }
 
