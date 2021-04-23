@@ -195,6 +195,7 @@ impl ChainAccountSignature {
 }
 
 /// Type for a block number tied on an underlying chain.
+#[type_alias]
 pub type ChainBlockNumber = u64;
 
 /// Type for a hash tied to a chain.
@@ -379,6 +380,12 @@ impl ChainBlocks {
         match self {
             ChainBlocks::Eth(blocks) => blocks.iter().map(|b| ChainBlock::Eth(b.clone())),
         }
+    }
+
+    pub fn filter_already_signed(self, pending_blocks: Vec<ChainBlockTally>) -> Self {
+        // XXX we are just submitting the blocks since last number every time
+        //  we should filter out the ones we've already signed
+        self // XXX
     }
 }
 

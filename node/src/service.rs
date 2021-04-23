@@ -2,7 +2,7 @@
 
 use crate::rpc;
 use gateway_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
-use our_std::error;
+use our_std::{debug, error};
 use pallet_cash;
 use pallet_oracle;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
@@ -208,6 +208,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     // Setup our custom config/communication between node <> OCW
     let properties = config.chain_spec.properties();
     if let Some(runtime_config) = crate::chain_spec::extract_properties(&properties) {
+        debug!("Parsed runtime config {:?}", runtime_config);
         runtime_interfaces::config_interface::set(runtime_config);
     } else {
         error!("☢️ Could not parse properties from {:?}", properties);
