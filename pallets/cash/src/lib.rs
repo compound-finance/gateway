@@ -19,7 +19,7 @@ use crate::{
     notices::{Notice, NoticeId, NoticeState},
     portfolio::Portfolio,
     types::{
-        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Balance, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
         LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, APR,
     },
@@ -704,6 +704,14 @@ impl<T: Config> Module<T> {
     /// Get the cash yield.
     pub fn get_cash_yield() -> Result<APR, Reason> {
         Ok(core::get_cash_yield::<T>()?)
+    }
+
+    /// Get the cash data.
+    pub fn get_cash_data() -> Result<(CashIndex, CashPrincipal, Balance), Reason> {
+        let (cash_index, cash_principal_amount) = core::get_cash_data::<T>()?;
+        let cash_principal: CashPrincipal = cash_principal_amount.try_into()?;
+        let total_cash = cash_index.cash_balance(cash_principal)?;
+        Ok((cash_index, cash_principal, total_cash))
     }
 
     /// Get the full cash balance for the given account.

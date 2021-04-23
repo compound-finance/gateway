@@ -74,6 +74,9 @@ pub struct ApiCashData {
     balance: String,
     cash_yield: String,
     price: String,
+    cash_principal: String,
+    cash_index: String,
+    total_cash: String,
 }
 
 #[derive(Deserialize, Serialize, Types)]
@@ -233,10 +236,18 @@ where
             .map_err(runtime_err)?
             .map_err(chain_err)?;
 
+        let (cash_index, total_principal, total_cash) = api
+            .get_cash_data(&at)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
         Ok(ApiCashData {
             balance: format!("{}", balance),
             cash_yield: format!("{}", cash_yield.0),
             price: format!("{}", price),
+            cash_principal: format!("{}", total_principal.0),
+            cash_index: format!("{}", cash_index.0),
+            total_cash: format!("{}", total_cash.value),
         })
     }
 
