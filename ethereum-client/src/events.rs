@@ -37,6 +37,18 @@ pub enum EthereumEvent {
     },
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum EventError {
+    UnknownEventTopic([u8; 32]),
+    ErrorParsingLog,
+    InvalidHex,
+    InvalidTopic,
+    Overflow,
+    InvalidHash,
+    InvalidLogParams,
+    InvalidRecipient,
+}
+
 lazy_static! {
     static ref LOCK_EVENT: ethabi::Event = ethabi::Event {
         name: String::from("Lock"),
@@ -293,18 +305,6 @@ fn parse_notice_invoked_log(log: ethabi::Log) -> Result<EthereumEvent, EventErro
         }),
         _ => Err(EventError::InvalidLogParams),
     }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum EventError {
-    UnknownEventTopic([u8; 32]),
-    ErrorParsingLog,
-    InvalidHex,
-    InvalidTopic,
-    Overflow,
-    InvalidHash,
-    InvalidLogParams,
-    InvalidRecipient,
 }
 
 pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, EventError> {

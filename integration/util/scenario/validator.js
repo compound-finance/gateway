@@ -219,7 +219,7 @@ class Validator {
       '--eth-key-id', "my_eth_key_id",
       '--miner', `Eth:${this.ethAccount}`,
       '--opf-url', this.ctx.__opfUrl(),
-      '-lruntime=debug,gateway=debug,pallet_cash=debug',
+      '-lruntime=debug,gateway=debug,pallet_cash=debug,ethereum_client=debug',
       '--reserved-only',
       ...versioning,
       ...executionArgs,

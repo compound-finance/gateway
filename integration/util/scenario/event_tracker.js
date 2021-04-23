@@ -60,7 +60,7 @@ class EventTracker {
     opts = {
       failureEvent: null,
       trackLastEvent: true,
-      timeout: 30000,
+      timeout: 600000,
       ...opts
     };
 

@@ -101,7 +101,8 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
         debug!("Worker sees same fork as chain: {:?}", true_block);
         let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue);
-        let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?;
+        let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?
+            .filter_already_signed(PendingChainBlocks::get(chain_id));
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
@@ -305,6 +306,7 @@ pub fn receive_chain_blocks<T: Config>(
     let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
     for block in blocks.blocks() {
+        debug!("Event queue: {:?}", event_queue);
         if block.number() >= last_block.number() + 1 {
             let offset = (block.number() - last_block.number() - 1) as usize;
             if let Some(prior) = pending_blocks.get_mut(offset) {
