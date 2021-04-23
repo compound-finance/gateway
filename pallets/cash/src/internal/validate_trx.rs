@@ -106,6 +106,7 @@ pub fn validate_unsigned<T: Config>(
                                 .priority(UNSIGNED_TXS_PRIORITY)
                                 .longevity(UNSIGNED_TXS_LONGEVITY)
                                 .and_provides((sender, nonce))
+                                .and_provides(request)
                                 .propagate(true)
                                 .build(),
                         )
@@ -116,6 +117,7 @@ pub fn validate_unsigned<T: Config>(
                                 .longevity(UNSIGNED_TXS_LONGEVITY)
                                 .and_requires((sender, nonce - 1))
                                 .and_provides((sender, nonce))
+                                .and_provides(request)
                                 .propagate(true)
                                 .build(),
                         )
@@ -336,6 +338,7 @@ mod tests {
                 .priority(100)
                 .longevity(32)
                 .and_provides((ChainAccount::Eth(eth_address), 0))
+                .and_provides(request.clone())
                 .propagate(true)
                 .build();
 
@@ -375,6 +378,7 @@ mod tests {
                 .priority(UNSIGNED_TXS_PRIORITY)
                 .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_provides((ChainAccount::Eth(eth_address), 5))
+                .and_provides(request.clone())
                 .propagate(true)
                 .build();
 
@@ -414,6 +418,7 @@ mod tests {
                 .longevity(UNSIGNED_TXS_LONGEVITY)
                 .and_requires((ChainAccount::Eth(eth_address), nonce - 1))
                 .and_provides((ChainAccount::Eth(eth_address), nonce))
+                .and_provides(request.clone())
                 .propagate(true)
                 .build();
 
