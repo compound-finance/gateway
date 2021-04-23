@@ -11,9 +11,9 @@ use crate::{
         AssetAmount, AssetBalance, Balance, CashPrincipal, CashPrincipalAmount, GovernanceResult,
         NoticeId, SignersSet, Timestamp, ValidatorKeys,
     },
-    AssetBalances, CashPrincipals, CashYield, Config, Event, GlobalCashIndex, IngressionQueue,
-    LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module, SupportedAssets,
-    TotalBorrowAssets, TotalSupplyAssets, Validators,
+    AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
+    IngressionQueue, LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module,
+    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 use codec::Decode;
 use frame_support::traits::UnfilteredDispatchable;
@@ -88,6 +88,11 @@ pub fn get_account_balance<T: Config>(
 /// Return the current cash yield.
 pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
+}
+
+/// Return the cash total supply data.
+pub fn get_cash_data<T: Config>() -> Result<(CashIndex, CashPrincipalAmount), Reason> {
+    Ok((GlobalCashIndex::get(), TotalCashPrincipal::get()))
 }
 
 /// Return the current borrow and supply rates for the asset.

@@ -2,13 +2,12 @@
 use super::{Module as Cash, *};
 use crate::{
     chains::{Chain, ChainAsset, ChainSignatureList, Ethereum},
-    core::*,
     notices::{ExtractionNotice, Notice},
     rates::APR,
     types::*,
     types::{AssetInfo, Factor, ValidatorKeys},
 };
-use codec::{Encode, EncodeLike};
+use codec::EncodeLike;
 use frame_benchmarking::benchmarks;
 pub use frame_support::{assert_err, assert_ok, traits::OnInitialize, StorageValue};
 use frame_system::RawOrigin;

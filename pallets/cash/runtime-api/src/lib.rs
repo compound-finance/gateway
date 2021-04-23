@@ -3,7 +3,7 @@ use pallet_cash::{
     portfolio::Portfolio,
     rates::APR,
     reason::Reason,
-    types::{AssetAmount, AssetBalance, AssetInfo},
+    types::{AssetAmount, AssetBalance, AssetInfo, Balance, CashIndex, CashPrincipal},
 };
 use pallet_oracle::{ticker::Ticker, types::AssetPrice};
 
@@ -12,6 +12,7 @@ sp_api::decl_runtime_apis! {
         fn get_account_balance(account: ChainAccount, asset: ChainAsset) -> Result<AssetBalance, Reason>;
         fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason>;
         fn get_cash_yield() -> Result<APR, Reason>;
+        fn get_cash_data() -> Result<(CashIndex, CashPrincipal, Balance), Reason>;
         fn get_full_cash_balance(account: ChainAccount) -> Result<AssetBalance, Reason>;
         fn get_liquidity(account: ChainAccount) -> Result<AssetBalance, Reason>;
         fn get_market_totals(asset: ChainAsset) -> Result<(AssetAmount, AssetAmount), Reason>;
