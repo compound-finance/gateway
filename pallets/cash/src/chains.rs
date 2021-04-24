@@ -4,6 +4,7 @@ use crate::types::{
     AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity, ValidatorKeys,
 };
 use codec::{Decode, Encode};
+use ethereum_client::{EthereumBlock, EthereumEvent};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
@@ -385,6 +386,12 @@ impl ChainBlocks {
         }
     }
 
+    pub fn block_numbers(&self) -> impl Iterator<Item = u64> + '_ {
+        match self {
+            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| b.number),
+        }
+    }
+
     pub fn filter_already_signed(
         self,
         signer: &ValidatorIdentity,
@@ -570,7 +577,7 @@ impl ChainBlockEvents {
     /// Determine the number of events in this queue.
     pub fn len(&self) -> usize {
         match self {
-            ChainBlockEvents::Eth(blocks) => blocks.len(),
+            ChainBlockEvents::Eth(events) => events.len(),
         }
     }
 
@@ -683,10 +690,10 @@ impl Chain for Ethereum {
     type Signature = [u8; 65];
 
     #[type_alias("Ethereum__Chain__")]
-    type Event = ethereum_client::EthereumEvent;
+    type Event = EthereumEvent;
 
     #[type_alias("Ethereum__Chain__")]
-    type Block = ethereum_client::EthereumBlock;
+    type Block = EthereumBlock;
 
     fn zero_hash() -> Self::Hash {
         [0u8; 32]

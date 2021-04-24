@@ -6,7 +6,7 @@ let lock_scen_info = {
   tokens: [
     { token: 'usdc', balances: { ashley: 1000 } }
   ],
-  validators: ['alice']
+  validators: ['alice', 'bob']
 };
 
 async function getCash({ ashley, usdc, cash, chain, starport }) {

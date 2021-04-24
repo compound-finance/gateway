@@ -12,7 +12,7 @@ use crate::{
     events::{fetch_chain_block, fetch_chain_blocks},
     internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
-    params::{INGRESS_LARGE, INGRESS_QUOTA, MIN_EVENT_BLOCKS},
+    params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MIN_EVENT_BLOCKS},
     reason::Reason,
     require,
     types::{CashPrincipalAmount, Quantity, USDQuantity, ValidatorIdentity, USD},
@@ -23,7 +23,7 @@ use codec::Encode;
 use ethereum_client::EthereumEvent;
 use frame_support::storage::StorageMap;
 use frame_system::offchain::SubmitTransaction;
-use our_std::collections::btree_set::BTreeSet;
+use our_std::{cmp::max, collections::btree_set::BTreeSet, convert::TryInto};
 use sp_runtime::offchain::{
     storage::StorageValueRef,
     storage_lock::{StorageLock, Time},
@@ -43,8 +43,10 @@ trait CollectRev: Iterator {
 impl<I: Iterator> CollectRev for I {}
 
 /// Determine the number of blocks which can still fit on an ingression queue.
-pub fn queue_slack(_event_queue: &ChainBlockEvents) -> u32 {
-    1 // TODO: look at ingression queue, how backed up is the queue?
+pub fn queue_slack(event_queue: &ChainBlockEvents) -> u32 {
+    let queue_len: u32 = event_queue.len().try_into().unwrap_or(u32::MAX);
+
+    max(INGRESS_SLACK.saturating_sub(queue_len), 1)
 }
 
 /// Determine the risk-adjusted value of a particular event, given the current block number.
@@ -99,11 +101,14 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     let last_block = get_last_block::<T>(chain_id)?;
     let true_block = fetch_chain_block(chain_id, last_block.number())?;
     if last_block.hash() == true_block.hash() {
-        debug!("Worker sees same fork as chain: {:?}", true_block);
         let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue);
         let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?
             .filter_already_signed(&me.substrate_id, PendingChainBlocks::get(chain_id));
+        debug!(
+            "Worker sees same fork as chain: {:?}, got new blocks: {:?}",
+            true_block, blocks
+        );
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
