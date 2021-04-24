@@ -11,7 +11,7 @@ use crate::{
     events::{fetch_chain_block, fetch_chain_blocks},
     internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
-    params::{INGRESS_LARGE, INGRESS_QUOTA},
+    params::{INGRESS_LARGE, INGRESS_QUOTA, MIN_EVENT_BLOCKS},
     reason::Reason,
     require,
     types::{CashPrincipalAmount, Quantity, USDQuantity, ValidatorIdentity, USD},
@@ -130,47 +130,54 @@ pub fn ingress_queue<T: Config>(
     let mut available = INGRESS_QUOTA;
     let block_num = last_block.number();
     event_queue.retain(|event| {
-        match risk_adjusted_value::<T>(event, block_num) {
-            Ok(value) => {
-                debug!(
-                    "Computed risk adjusted value ({:?} / {:?} @ {}) of {:?}",
-                    value, available, block_num, event
-                );
-                if value <= available {
-                    available = available.sub(value).unwrap();
-                    match core::apply_chain_event_internal::<T>(event) {
-                        Ok(()) => {
-                            <Module<T>>::deposit_event(EventT::ProcessedChainBlockEvent(
-                                event.clone(),
-                            ));
-                        }
+        if block_num >= event.block_number() + MIN_EVENT_BLOCKS {
+            match risk_adjusted_value::<T>(event, block_num) {
+                Ok(value) => {
+                    debug!(
+                        "Computed risk adjusted value ({:?} / {:?} @ {}) of {:?}",
+                        value, available, block_num, event
+                    );
+                    if value <= available {
+                        available = available.sub(value).unwrap();
+                        match core::apply_chain_event_internal::<T>(event) {
+                            Ok(()) => {
+                                <Module<T>>::deposit_event(EventT::ProcessedChainBlockEvent(
+                                    event.clone(),
+                                ));
+                            }
 
-                        Err(reason) => {
-                            <Module<T>>::deposit_event(EventT::FailedProcessingChainBlockEvent(
-                                event.clone(),
-                                reason,
-                            ));
+                            Err(reason) => {
+                                <Module<T>>::deposit_event(
+                                    EventT::FailedProcessingChainBlockEvent(event.clone(), reason),
+                                );
+                            }
                         }
+                        return false; // remove from queue
+                    } else {
+                        return true; // retain on queue
                     }
-                    return false; // remove from queue
-                } else {
+                }
+
+                Err(err) => {
+                    error!(
+                        "Could not compute risk adjusted value ({}) of {:?}",
+                        err, event
+                    );
+                    // note that we keep the event if we cannot compute the risk adjusted value,
+                    //  there's not an obviously more reasonable thing to do right now
+                    // there's no reason this should fail normally but it can
+                    //  e.g. if somehow someone locks an unsupported asset in the starport
+                    // we need to take separate measures to forcefully limit the queue size
+                    //  e.g. reject new blocks once the event queue reaches a certain size
                     return true; // retain on queue
                 }
             }
-
-            Err(err) => {
-                error!(
-                    "Could not compute risk adjusted value ({}) of {:?}",
-                    err, event
-                );
-                // note that we keep the event if we cannot compute the risk adjusted value,
-                //  there's not an obviously more reasonable thing to do right now
-                // there's no reason this should fail normally but it can
-                //  e.g. if somehow someone locks an unsupported asset in the starport
-                // we need to take separate measures to forcefully limit the queue size
-                //  e.g. reject new blocks once the event queue reaches a certain size
-                return true; // retain on queue
-            }
+        } else {
+            debug!(
+                "Event not old enough to process (@ {:?}) {:?}",
+                block_num, event
+            );
+            return true; // retain on queue
         }
     });
     Ok(())
@@ -527,7 +534,7 @@ mod tests {
                 sender: [3; 20],
                 chain: String::from("ETH"),
                 recipient: [2; 32],
-                amount: qty!("10", ETH).value,
+                amount: qty!("75", ETH).value,
             };
             let blocks_2 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
                 hash: [2; 32],
@@ -538,10 +545,30 @@ mod tests {
                 number: 2,
                 events: vec![event.clone()],
             }]);
-            let blocks_3 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
-                hash: [3; 32],
-                parent_hash: [2; 32],
-                number: 3,
+            let blocks_3 = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: [2; 32],
+                    number: 3,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [4; 32],
+                    parent_hash: [3; 32],
+                    number: 4,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [5; 32],
+                    parent_hash: [4; 32],
+                    number: 5,
+                    events: vec![],
+                },
+            ]);
+            let blocks_4 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
+                hash: [6; 32],
+                parent_hash: [5; 32],
+                number: 6,
                 events: vec![],
             }]);
 
@@ -553,6 +580,7 @@ mod tests {
             // Sign and dispatch from first validator
             assert_ok!(a_receive_chain_blocks(&blocks_2));
 
+            // Block should be pending, nothing in event queue yet
             let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
             assert_eq!(pending_blocks.len(), 1);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
@@ -561,24 +589,34 @@ mod tests {
             // Sign and dispatch from second validator
             assert_ok!(b_receive_chain_blocks(&blocks_2));
 
-            // First round should be over quota - not yet processed
+            // First round is too new - not yet processed
             let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
             assert_eq!(pending_blocks.len(), 0);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
             assert_eq!(event_queue, ChainBlockEvents::Eth(vec![(2, event)]));
 
-            // Receive another block to ingress another round
+            // Receive enough blocks to ingress another round
             assert_ok!(all_receive_chain_blocks(&blocks_3));
 
-            // Second round should fit
+            // Second round should still be over quota - not yet processed
             let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
             assert_eq!(pending_blocks.len(), 0);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
-            assert_eq!(event_queue, ChainBlockEvents::Eth(vec![]));
+            assert_eq!(event_queue.len(), 1);
 
+            // Receive enough blocks to ingress another round
+            assert_ok!(all_receive_chain_blocks(&blocks_4));
+
+            // Third round should process
+            let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
+            assert_eq!(pending_blocks.len(), 0);
+            let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
+            assert_eq!(event_queue.len(), 0);
+
+            // Check the final balance
             assert_eq!(
                 AssetBalances::get(&Eth, ChainAccount::Eth([2; 20])),
-                bal!("10", ETH).value
+                bal!("75", ETH).value
             );
 
             Ok(())

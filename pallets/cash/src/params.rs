@@ -1,5 +1,8 @@
-use crate::symbol::{CASH, USD};
-use crate::types::{Quantity, Timestamp};
+use crate::{
+    chains::ChainBlockNumber,
+    symbol::{CASH, USD},
+    types::{Quantity, Timestamp},
+};
 
 /// The large value (USD) used for ingesting gov events.
 pub const INGRESS_LARGE: Quantity = Quantity::from_nominal("1000000000000", USD);
@@ -10,6 +13,9 @@ pub const INGRESS_QUOTA: Quantity = Quantity::from_nominal("10000", USD);
 
 /// Number of milliseconds in a year.
 pub const MILLISECONDS_PER_YEAR: Timestamp = 365 * 24 * 60 * 60 * 1000;
+
+/// Minimum number of underlying chain blocks to wait before ingesting any event, due to reorg risk.
+pub const MIN_EVENT_BLOCKS: ChainBlockNumber = 3;
 
 /// Minimum amount of time (milliseconds) into the future that a synchronized change may be scheduled for.
 /// Must be sufficient time to propagate changes to L1s before they occur.
