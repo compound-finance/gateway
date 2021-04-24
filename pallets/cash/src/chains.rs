@@ -1,6 +1,8 @@
 use crate::rates::APR;
 use crate::reason::Reason;
-use crate::types::{AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorKeys};
+use crate::types::{
+    AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity, ValidatorKeys,
+};
 use codec::{Decode, Encode};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
@@ -383,10 +385,24 @@ impl ChainBlocks {
         }
     }
 
-    pub fn filter_already_signed(self, pending_blocks: Vec<ChainBlockTally>) -> Self {
-        // XXX we are just submitting the blocks since last number every time
-        //  we should filter out the ones we've already signed
-        self // XXX
+    pub fn filter_already_signed(
+        self,
+        signer: &ValidatorIdentity,
+        pending_blocks: Vec<ChainBlockTally>,
+    ) -> Self {
+        // note that this is an inefficient way to check what's been signed
+        match self {
+            ChainBlocks::Eth(blocks) => ChainBlocks::Eth(
+                blocks
+                    .into_iter()
+                    .filter(|block| {
+                        !pending_blocks.iter().any(|t| {
+                            t.has_signer(signer) && t.block.hash() == ChainHash::Eth(block.hash)
+                        })
+                    })
+                    .collect(),
+            ),
+        }
     }
 }
 
@@ -455,15 +471,11 @@ pub struct ChainBlockTally {
 }
 
 impl ChainBlockTally {
-    pub fn new(chain_id: ChainId, block: ChainBlock, validator: &ValidatorKeys) -> ChainBlockTally {
-        match chain_id {
-            ChainId::Eth => ChainBlockTally {
-                block,
-                support: [validator.substrate_id.clone()].iter().cloned().collect(),
-                dissent: SignersSet::new(),
-            },
-
-            _ => panic!("xxx not implemented"),
+    pub fn new(block: ChainBlock, validator: &ValidatorKeys) -> ChainBlockTally {
+        ChainBlockTally {
+            block,
+            support: [validator.substrate_id.clone()].iter().cloned().collect(),
+            dissent: SignersSet::new(),
         }
     }
 
@@ -481,6 +493,11 @@ impl ChainBlockTally {
 
     pub fn has_enough_dissent(&self, validator_set: &SignersSet) -> bool {
         has_super_majority(&self.dissent, validator_set)
+    }
+
+    pub fn has_signer(&self, validator_id: &ValidatorIdentity) -> bool {
+        // note that these set types are not optimized and inefficient
+        self.support.contains(&validator_id) || self.dissent.contains(&validator_id)
     }
 }
 
@@ -871,5 +888,46 @@ mod tests {
                 }
             )])
         );
+    }
+
+    #[test]
+    fn test_chain_blocks_filter_already_signed() {
+        let signer = sp_core::crypto::AccountId32::new([7u8; 32]);
+        let blocks = ChainBlocks::Eth(vec![
+            EthereumBlock {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            },
+            EthereumBlock {
+                hash: [2u8; 32],
+                parent_hash: [1u8; 32],
+                number: 2,
+                events: vec![],
+            },
+        ]);
+
+        let pending_blocks = vec![ChainBlockTally {
+            block: ChainBlock::Eth(EthereumBlock {
+                hash: [2u8; 32],
+                // dont matter:
+                parent_hash: [0u8; 32],
+                number: 0,
+                events: vec![],
+            }),
+            support: [signer.clone()].iter().cloned().collect(),
+            dissent: SignersSet::new(),
+        }];
+
+        assert_eq!(
+            blocks.filter_already_signed(&signer, pending_blocks),
+            ChainBlocks::Eth(vec![EthereumBlock {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            }])
+        )
     }
 }

@@ -102,7 +102,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
         let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue);
         let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?
-            .filter_already_signed(PendingChainBlocks::get(chain_id));
+            .filter_already_signed(&me, PendingChainBlocks::get(chain_id));
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
@@ -111,7 +111,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             true_block, last_block
         );
         let reorg = formulate_reorg::<T>(&last_block, &true_block)?;
-        if !already_submitted_reorg::<T>(me, &reorg) {
+        if !already_submitted_reorg::<T>(&me, &reorg) {
             submit_chain_reorg::<T>(&reorg)
         } else {
             debug!("Worker already submitted...waiting");
@@ -284,7 +284,7 @@ pub fn formulate_reorg<T: Config>(
 }
 
 /// Check whether the given validator already submitted the given reorg.
-pub fn already_submitted_reorg<T: Config>(id: ValidatorIdentity, reorg: &ChainReorg) -> bool {
+pub fn already_submitted_reorg<T: Config>(id: &ValidatorIdentity, reorg: &ChainReorg) -> bool {
     // XXX dont resubmit for same thing
     false
 }
@@ -342,7 +342,7 @@ pub fn receive_chain_blocks<T: Config>(
                     debug!("Received valid first next pending block: {:?}", block);
                     // write to pending_blocks[offset]
                     //  we already checked offset doesn't exist, this is the first element
-                    pending_blocks.push(ChainBlockTally::new(chain_id, block, &validator));
+                    pending_blocks.push(ChainBlockTally::new(block, &validator));
                 }
             } else if let Some(parent) = pending_blocks.get(offset - 1) {
                 if block.parent_hash() != parent.block.hash() {
@@ -360,7 +360,7 @@ pub fn receive_chain_blocks<T: Config>(
                     debug!("Received valid pending block: {:?}", block);
                     // write to pending_blocks[offset]
                     //  we already checked offset doesn't exist, but offset - 1 does
-                    pending_blocks.push(ChainBlockTally::new(chain_id, block, &validator));
+                    pending_blocks.push(ChainBlockTally::new(block, &validator));
                 }
             } else {
                 debug!("Received disconnected block: {:?} ({:?})", block, offset);
