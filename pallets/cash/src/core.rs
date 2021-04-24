@@ -112,14 +112,42 @@ pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBal
     Ok(info)
 }
 
-/// Return the portfolio of the chain account
+/// Return the portfolio of the chain account.
 pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
     Ok(pipeline::load_portfolio::<T>(account)?)
 }
 
+/// Return the set of validator identities to compare with others.
 pub fn get_validator_set<T: Config>() -> Result<SignersSet, Reason> {
     // Note: inefficient, probably manage reading validators from storage better
     Ok(Validators::iter().map(|(_, v)| v.substrate_id).collect())
+}
+
+/// Return the validator associated with the given signer account.
+pub fn get_validator<T: Config>(signer: ChainAccount) -> Result<ValidatorKeys, Reason> {
+    // Note: inefficient, we should index
+    match signer {
+        ChainAccount::Eth(eth_address) => {
+            for (_, validator) in Validators::iter() {
+                if validator.eth_address == eth_address {
+                    return Ok(validator);
+                }
+            }
+            return Err(Reason::UnknownValidator);
+        }
+
+        _ => {
+            // this is a placeholder for future variants, which should be kept minimal
+            //  since generally we dont want validators to have to add new types of keys
+            return Err(Reason::NotImplemented); // XXX
+        }
+    }
+}
+
+/// Return the validator as seen to be itself by the current worker.
+pub fn get_current_validator<T: Config>() -> Result<ValidatorKeys, Reason> {
+    // Note: we can lookup *any* signer, may as well choose the first and only option (Eth)
+    get_validator::<T>(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
 }
 
 /// Return the validator which signed the given data, given signature.
@@ -130,9 +158,9 @@ pub fn recover_validator<T: Config>(
     // Note: inefficient, we should index by every key we want to query by
     match signature {
         ChainSignature::Eth(eth_sig) => {
-            let signer = <Ethereum as Chain>::recover_address(data, eth_sig)?;
+            let eth_address = <Ethereum as Chain>::recover_address(data, eth_sig)?;
             for (_, validator) in Validators::iter() {
-                if validator.eth_address == signer {
+                if validator.eth_address == eth_address {
                     return Ok(validator);
                 }
             }
@@ -391,5 +419,17 @@ mod tests {
             let actual = get_now::<Test>();
             assert_eq!(actual, expected);
         });
+    }
+
+    #[test]
+    fn test_get_current_validator() {
+        new_test_ext().execute_with(|| {
+            let validator = ValidatorKeys {
+                substrate_id: AccountId32::new([0u8; 32]),
+                eth_address: <Ethereum as Chain>::signer_address().unwrap(),
+            };
+            Validators::insert(validator.substrate_id.clone(), &validator);
+            assert_eq!(get_current_validator::<Test>().unwrap(), validator);
+        })
     }
 }
