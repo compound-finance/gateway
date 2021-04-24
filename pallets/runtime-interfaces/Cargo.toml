@@ -11,6 +11,7 @@ version = '1.0.0'
 codec = { package = 'parity-scale-codec', version = '1.3.4', default-features = false, features = ['derive'] }
 lazy_static = '1.4.0'
 
+frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-runtime-interface = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-externalities = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-io = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -23,6 +24,7 @@ our-std = { path = "../../our-std", default-features = false }
 default = ['std']
 std = [
     'codec/std',
+    'frame-support/std',
     'sp-externalities/std',
     'sp-io/std',
     'sp-runtime-interface/std',
