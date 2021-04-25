@@ -1,4 +1,10 @@
 pub mod json_responses {
+    pub const NO_RESULT: &[u8] = br#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result": null
+    }"#;
+
     pub const GET_BLOCK_BY_NUMBER_1: &[u8] = br#"{
         "jsonrpc":"2.0",
         "id":1,
