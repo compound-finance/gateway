@@ -11,6 +11,9 @@ pub const INGRESS_LARGE: Quantity = Quantity::from_nominal("1000000000000", USD)
 /// Could become a per-chain quota in the future.
 pub const INGRESS_QUOTA: Quantity = Quantity::from_nominal("10000", USD);
 
+/// Maximum size of the block queue before we back-off sending new blocks.
+pub const INGRESS_SLACK: u32 = 50;
+
 /// Number of milliseconds in a year.
 pub const MILLISECONDS_PER_YEAR: Timestamp = 365 * 24 * 60 * 60 * 1000;
 

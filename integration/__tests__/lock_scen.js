@@ -6,7 +6,7 @@ let lock_scen_info = {
   tokens: [
     { token: 'usdc', balances: { ashley: 1000 } }
   ],
-  validators: ['alice']
+  validators: ['alice', 'bob']
 };
 
 async function getCash({ ashley, usdc, cash, chain, starport }) {
@@ -114,7 +114,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Not Lock Collateral with Insufficient Balance',
     scenario: async ({ ashley, usdc }) => {
-      await expect(ashley.lock(2000, usdc)).rejects.toEthRevert('revert');
+      await expect(ashley.lock(2000, usdc)).rejects.toEthRevert();
       expect(await ashley.tokenBalance(usdc)).toEqual(1000);
       expect(await ashley.chainBalance(usdc)).toEqual(0);
     }
@@ -122,7 +122,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Not Lock Cash with Insufficient Balance',
     scenario: async ({ ashley, cash }) => {
-      await expect(ashley.lock(2000, cash)).rejects.toEthRevert('revert');
+      await expect(ashley.lock(2000, cash)).rejects.toEthRevert();
       expect(await ashley.tokenBalance(cash)).toEqual(0);
       expect(await ashley.chainBalance(cash)).toEqual(0);
     }

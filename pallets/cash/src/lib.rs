@@ -527,7 +527,7 @@ decl_module! {
             match internal::events::track_chain_events::<T>() {
                 Ok(()) => (),
                 Err(err) => {
-                    log!("offchain_worker error during track_chain_events: {:?}", err);
+                    error!("offchain_worker error during track_chain_events: {:?}", err);
                 }
             }
 
@@ -537,7 +537,7 @@ decl_module! {
                         log!("offchain_worker process_notices: {} successful, {} skipped", succ, skip);
                     }
                     if failures.len() > 0 {
-                        log!("offchain_worker error(s) during process notices: {:?}", failures);
+                        error!("offchain_worker error(s) during process notices: {:?}", failures);
                     }
                 }
             }
