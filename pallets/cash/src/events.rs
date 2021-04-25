@@ -22,7 +22,7 @@ pub fn fetch_chain_block(
     number: ChainBlockNumber,
 ) -> Result<ChainBlock, Reason> {
     match chain_id {
-        ChainId::Eth => fetch_eth_block(number).map(ChainBlock::Eth),
+        ChainId::Eth => Ok(fetch_eth_block(number).map(ChainBlock::Eth)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }
 }
@@ -34,13 +34,13 @@ pub fn fetch_chain_blocks(
     nblocks: u32,
 ) -> Result<ChainBlocks, Reason> {
     match chain_id {
-        ChainId::Eth => fetch_eth_blocks(number, nblocks),
+        ChainId::Eth => Ok(fetch_eth_blocks(number, nblocks)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }
 }
 
 /// Fetch a single block from the Etherum Starport.
-fn fetch_eth_block(number: ChainBlockNumber) -> Result<EthereumBlock, Reason> {
+fn fetch_eth_block(number: ChainBlockNumber) -> Result<EthereumBlock, EventError> {
     let eth_starport_address = runtime_interfaces::config_interface::get_eth_starport_address()
         .ok_or(EventError::NoStarportAddress)?;
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
@@ -51,7 +51,7 @@ fn fetch_eth_block(number: ChainBlockNumber) -> Result<EthereumBlock, Reason> {
 }
 
 /// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
-fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks, Reason> {
+fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks, EventError> {
     let max_block_number = number + (slack as u64);
     let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
     for block_number in number..max_block_number {
@@ -59,9 +59,11 @@ fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks,
             Ok(block) => {
                 acc.push(block);
             }
+            Err(EventError::EthereumClientError(EthereumClientError::NoResult)) => {
+                break; // done
+            }
             Err(err) => {
-                crate::log!("Error fetching block: {:?}", err);
-                break; // Don't bother fetching more if we had an issue
+                return Err(err);
             }
         }
     }

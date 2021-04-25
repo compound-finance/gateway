@@ -88,6 +88,7 @@ pub fn validate_unsigned<T: Config>(
                 ValidTransaction::with_tag_prefix("Gateway::receive_chain_reorg")
                     .priority(100)
                     .longevity(32)
+                    .and_provides(reorg)
                     .propagate(true)
                     .build(),
             )

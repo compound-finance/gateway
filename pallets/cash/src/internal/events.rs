@@ -45,7 +45,6 @@ impl<I: Iterator> CollectRev for I {}
 /// Determine the number of blocks which can still fit on an ingression queue.
 pub fn queue_slack(event_queue: &ChainBlockEvents) -> u32 {
     let queue_len: u32 = event_queue.len().try_into().unwrap_or(u32::MAX);
-
     max(INGRESS_SLACK.saturating_sub(queue_len), 1)
 }
 
@@ -318,6 +317,9 @@ pub fn receive_chain_blocks<T: Config>(
     let mut event_queue = get_event_queue::<T>(chain_id)?;
     let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
+
+    debug!("Pending blocks: {:?}", pending_blocks);
+
     for block in blocks.blocks() {
         debug!("Event queue: {:?}", event_queue);
         if block.number() >= last_block.number() + 1 {
@@ -423,6 +425,8 @@ pub fn receive_chain_reorg<T: Config>(
 
     // Note: can reject / stop propagating once this check fails
     require!(reorg.from_hash() == last_block.hash(), Reason::HashMismatch);
+
+    debug!("Pending reorgs: {:?}", pending_reorgs);
 
     let tally = if let Some(prior) = pending_reorgs.iter_mut().find(|r| r.reorg == reorg) {
         prior.add_support(&validator);

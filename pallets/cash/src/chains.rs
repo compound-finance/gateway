@@ -577,7 +577,7 @@ impl ChainBlockEvents {
     /// Determine the number of events in this queue.
     pub fn len(&self) -> usize {
         match self {
-            ChainBlockEvents::Eth(events) => events.len(),
+            ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
         }
     }
 

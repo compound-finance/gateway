@@ -38,6 +38,7 @@ pub enum EthereumClientError {
     HttpErrorCode(u16),
     InvalidUTF8,
     JsonParseError,
+    NoResult,
 }
 
 #[derive(Deserialize, RuntimeDebug, PartialEq)]
@@ -46,7 +47,7 @@ pub struct ResponseError {
     pub code: Option<i64>,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LogObject {
     /// true when the log was removed, due to a chain reorganization. false if it's a valid log.
@@ -77,7 +78,7 @@ pub struct GetLogsResponse {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
 pub struct TransactionObject {
     pub blockHash: Option<String>,
     pub blockNumber: Option<String>,
@@ -97,7 +98,7 @@ pub struct TransactionObject {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
 pub struct BlockObject {
     pub difficulty: Option<String>,
     pub extraData: Option<String>,
@@ -208,7 +209,7 @@ pub fn get_block(
     block_num: EthereumBlockNumber,
 ) -> Result<EthereumBlock, EthereumClientError> {
     let block_str = encode_block_hex(block_num);
-    let block_object = get_block_object(server, &block_str)?;
+    let block_obj = get_block_object(server, &block_str)?;
     let get_logs_params = vec![serde_json::json!({
         "address": eth_starport_address,
         "fromBlock": &block_str,
@@ -229,9 +230,9 @@ pub fn get_block(
     }
 
     let mut events = Vec::with_capacity(event_objects.len());
-    for evobj in event_objects {
-        let topics = evobj.topics.ok_or(EthereumClientError::JsonParseError)?;
-        let data = evobj.data.ok_or(EthereumClientError::JsonParseError)?;
+    for ev_obj in event_objects {
+        let topics = ev_obj.topics.ok_or(EthereumClientError::JsonParseError)?;
+        let data = ev_obj.data.ok_or(EthereumClientError::JsonParseError)?;
         match events::decode_event(topics, data) {
             Ok(event) => events.push(event),
             Err(events::EventError::UnknownEventTopic(topic)) => {
@@ -245,10 +246,9 @@ pub fn get_block(
     }
 
     Ok(EthereumBlock {
-        hash: parse_word(block_object.hash).ok_or(EthereumClientError::JsonParseError)?,
-        parent_hash: parse_word(block_object.parentHash)
-            .ok_or(EthereumClientError::JsonParseError)?,
-        number: parse_u64(block_object.number).ok_or(EthereumClientError::JsonParseError)?,
+        hash: parse_word(block_obj.hash).ok_or(EthereumClientError::JsonParseError)?,
+        parent_hash: parse_word(block_obj.parentHash).ok_or(EthereumClientError::JsonParseError)?,
+        number: parse_u64(block_obj.number).ok_or(EthereumClientError::JsonParseError)?,
         events,
     })
 }
@@ -257,16 +257,14 @@ pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, Et
     let params = vec![block_num.into(), true.into()];
     let response_str: String = send_rpc(server, "eth_getBlockByNumber".into(), params)?;
     let response = deserialize_get_block_by_number_response(&response_str)?;
-    response.result.ok_or(EthereumClientError::JsonParseError)
+    response.result.ok_or(EthereumClientError::NoResult)
 }
 
 pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError> {
     let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
     let response = deserialize_block_number_response(&response_str)?;
-    parse_u64(Some(
-        response.result.ok_or(EthereumClientError::JsonParseError)?,
-    ))
-    .ok_or(EthereumClientError::JsonParseError)
+    parse_u64(Some(response.result.ok_or(EthereumClientError::NoResult)?))
+        .ok_or(EthereumClientError::JsonParseError)
 }
 
 #[cfg(test)]
