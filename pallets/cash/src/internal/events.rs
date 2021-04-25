@@ -15,7 +15,7 @@ use crate::{
     params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MIN_EVENT_BLOCKS},
     reason::Reason,
     require,
-    types::{CashPrincipalAmount, Quantity, USDQuantity, ValidatorIdentity, USD},
+    types::{CashPrincipalAmount, Quantity, USDQuantity, USD},
     Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module, PendingChainBlocks,
     PendingChainReorgs,
 };
@@ -100,10 +100,11 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     let last_block = get_last_block::<T>(chain_id)?;
     let true_block = fetch_chain_block(chain_id, last_block.number())?;
     if last_block.hash() == true_block.hash() {
+        let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue);
         let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?
-            .filter_already_signed(&me.substrate_id, PendingChainBlocks::get(chain_id));
+            .filter_already_signed(&me.substrate_id, pending_blocks);
         debug!(
             "Worker sees same fork as chain: {:?}, got new blocks: {:?}",
             true_block, blocks
@@ -115,8 +116,9 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             "Worker sees a different fork: {:?} {:?}",
             true_block, last_block
         );
+        let pending_reorgs = PendingChainReorgs::get(chain_id);
         let reorg = formulate_reorg::<T>(&last_block, &true_block)?;
-        if !already_submitted_reorg::<T>(&me.substrate_id, &reorg) {
+        if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
             submit_chain_reorg::<T>(&reorg)
         } else {
             debug!("Worker already submitted...waiting");
@@ -286,12 +288,6 @@ pub fn formulate_reorg<T: Config>(
 
         _ => panic!("XXX not implemented"),
     }
-}
-
-/// Check whether the given validator already submitted the given reorg.
-pub fn already_submitted_reorg<T: Config>(id: &ValidatorIdentity, reorg: &ChainReorg) -> bool {
-    // XXX dont resubmit for same thing
-    false
 }
 
 /// Submit a reorg message from a worker to the chain.
