@@ -3,7 +3,9 @@ const baseScenInfo = {
   eth_opts: {
     provider: 'ganache', // [env=PROVIDER]
     ganache: {
-      opts: {},
+      opts: {
+        blockTime: 1
+      },
       web3_port: null
     },
   },

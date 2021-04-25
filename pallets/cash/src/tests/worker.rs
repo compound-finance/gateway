@@ -48,6 +48,15 @@ fn test_offchain_worker() {
             sent: true,
             ..Default::default()
         },
+        testing::PendingRequest {
+            method: "POST".into(),
+            uri: "https://ropsten-eth.compound.finance".to_string(),
+            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3",true],"id":1}"#.to_vec(),
+            response: Some(tests::testdata::json_responses::NO_RESULT.to_vec()),
+            sent: true,
+            ..Default::default()
+        },
     ];
 
     let (mut t, pool_state, _offchain_state) = new_test_ext_with_http_calls(calls);

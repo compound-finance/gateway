@@ -1,9 +1,9 @@
 use crate::{
-    chains::{ChainBlock, ChainBlockNumber, ChainBlocks, ChainId},
+    chains::{Chain, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId, Ethereum},
     reason::Reason,
 };
 use codec::{Decode, Encode};
-use ethereum_client::EthereumClientError;
+use ethereum_client::{EthereumBlock, EthereumClientError};
 use our_std::RuntimeDebug;
 use types_derive::Types;
 
@@ -22,7 +22,7 @@ pub fn fetch_chain_block(
     number: ChainBlockNumber,
 ) -> Result<ChainBlock, Reason> {
     match chain_id {
-        ChainId::Eth => fetch_eth_block(number),
+        ChainId::Eth => Ok(fetch_eth_block(number).map(ChainBlock::Eth)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }
 }
@@ -34,29 +34,38 @@ pub fn fetch_chain_blocks(
     nblocks: u32,
 ) -> Result<ChainBlocks, Reason> {
     match chain_id {
-        ChainId::Eth => fetch_eth_blocks(number, nblocks),
+        ChainId::Eth => Ok(fetch_eth_blocks(number, nblocks)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }
 }
 
 /// Fetch a single block from the Etherum Starport.
-fn fetch_eth_block(number: ChainBlockNumber) -> Result<ChainBlock, Reason> {
+fn fetch_eth_block(number: ChainBlockNumber) -> Result<EthereumBlock, EventError> {
     let eth_starport_address = runtime_interfaces::config_interface::get_eth_starport_address()
         .ok_or(EventError::NoStarportAddress)?;
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
         .ok_or(EventError::NoRpcUrl)?;
-    let eth_chain_block = ethereum_client::get_block(&eth_rpc_url, &eth_starport_address, number)
+    let eth_block = ethereum_client::get_block(&eth_rpc_url, &eth_starport_address, number)
         .map_err(EventError::EthereumClientError)?;
-    Ok(ChainBlock::Eth(eth_chain_block))
+    Ok(eth_block)
 }
 
 /// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
-fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks, Reason> {
-    match slack {
-        0 => Ok(ChainBlocks::Eth(vec![])),
-        _ => {
-            // Note: can be optimized to return up to `slack` blocks, for now just one
-            Ok(fetch_eth_block(number)?.into())
+fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks, EventError> {
+    let max_block_number = number + (slack as u64);
+    let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
+    for block_number in number..max_block_number {
+        match fetch_eth_block(block_number) {
+            Ok(block) => {
+                acc.push(block);
+            }
+            Err(EventError::EthereumClientError(EthereumClientError::NoResult)) => {
+                break; // done
+            }
+            Err(err) => {
+                return Err(err);
+            }
         }
     }
+    Ok(ChainBlocks::Eth(acc))
 }

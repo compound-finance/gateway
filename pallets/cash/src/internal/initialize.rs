@@ -1,8 +1,7 @@
 use crate::{
     chains::ChainAsset,
     factor::Factor,
-    internal, log,
-    rates::APR,
+    internal,
     reason::Reason,
     types::{AssetIndex, CashPrincipalAmount, Quantity, Timestamp, CASH},
     BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, GlobalCashIndex,
@@ -79,16 +78,9 @@ pub fn on_initialize_internal<T: Config>(
     }
 
     // Pay miners and update the CASH interest index on CASH itself
-    if cash_yield == APR::ZERO {
-        log!("Cash yield is zero. No interest earned on cash in this block.");
-    }
-
     let total_cash_principal = TotalCashPrincipal::get();
 
     let increment = cash_yield.compound(dt_since_last_yield)?;
-    if increment == Factor::ONE {
-        log!("Index increment = 1. No interest on cash earned in this block!")
-    }
     let cash_index_new = last_yield_cash_index.increment(increment.into())?;
     let total_cash_principal_new = total_cash_principal.add(cash_principal_borrow_increase)?;
     let miner_share_principal =
@@ -103,11 +95,6 @@ pub fn on_initialize_internal<T: Config>(
     // * BEGIN STORAGE ALL CHECKS AND FAILURES MUST HAPPEN ABOVE * //
 
     CashPrincipals::insert(last_miner, miner_cash_principal_new);
-    log!(
-        "Miner={:?} received {:?} principal for mining last block",
-        String::from(last_miner),
-        last_miner_share_principal
-    );
 
     for (asset, new_supply_index, new_borrow_index) in asset_updates.drain(..) {
         SupplyIndices::insert(asset.clone(), new_supply_index);

@@ -4,6 +4,7 @@ use crate::types::{
     AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity, ValidatorKeys,
 };
 use codec::{Decode, Encode};
+use ethereum_client::{EthereumBlock, EthereumEvent};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
@@ -385,6 +386,12 @@ impl ChainBlocks {
         }
     }
 
+    pub fn block_numbers(&self) -> impl Iterator<Item = u64> + '_ {
+        match self {
+            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| b.number),
+        }
+    }
+
     pub fn filter_already_signed(
         self,
         signer: &ValidatorIdentity,
@@ -397,7 +404,7 @@ impl ChainBlocks {
                     .into_iter()
                     .filter(|block| {
                         !pending_blocks.iter().any(|t| {
-                            t.has_signer(signer) && t.block.hash() == ChainHash::Eth(block.hash)
+                            t.block.hash() == ChainHash::Eth(block.hash) && t.has_signer(signer)
                         })
                     })
                     .collect(),
@@ -438,6 +445,12 @@ impl ChainReorg {
         }
     }
 
+    pub fn to_hash(&self) -> ChainHash {
+        match self {
+            ChainReorg::Eth { to_hash, .. } => ChainHash::Eth(*to_hash),
+        }
+    }
+
     pub fn reverse_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
         match self {
             ChainReorg::Eth { reverse_blocks, .. } => {
@@ -450,6 +463,22 @@ impl ChainReorg {
         match self {
             ChainReorg::Eth { forward_blocks, .. } => {
                 forward_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
+            }
+        }
+    }
+
+    /// Check whether the given validator already submitted the given reorg.
+    pub fn is_already_signed(
+        &self,
+        signer: &ValidatorIdentity,
+        pending_reorgs: Vec<ChainReorgTally>,
+    ) -> bool {
+        match self {
+            ChainReorg::Eth { .. } => {
+                let to_hash = self.to_hash();
+                pending_reorgs
+                    .iter()
+                    .any(|tally| tally.reorg.to_hash() == to_hash && tally.has_signer(signer))
             }
         }
     }
@@ -527,6 +556,11 @@ impl ChainReorgTally {
     pub fn has_enough_support(&self, validator_set: &SignersSet) -> bool {
         has_super_majority(&self.support, validator_set)
     }
+
+    pub fn has_signer(&self, validator_id: &ValidatorIdentity) -> bool {
+        // note that this set types is not optimized and inefficient
+        self.support.contains(&validator_id)
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
@@ -570,7 +604,7 @@ impl ChainBlockEvents {
     /// Determine the number of events in this queue.
     pub fn len(&self) -> usize {
         match self {
-            ChainBlockEvents::Eth(blocks) => blocks.len(),
+            ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
         }
     }
 
@@ -683,10 +717,10 @@ impl Chain for Ethereum {
     type Signature = [u8; 65];
 
     #[type_alias("Ethereum__Chain__")]
-    type Event = ethereum_client::EthereumEvent;
+    type Event = EthereumEvent;
 
     #[type_alias("Ethereum__Chain__")]
-    type Block = ethereum_client::EthereumBlock;
+    type Block = EthereumBlock;
 
     fn zero_hash() -> Self::Hash {
         [0u8; 32]
@@ -929,5 +963,30 @@ mod tests {
                 events: vec![],
             }])
         )
+    }
+
+    #[test]
+    fn test_chain_reorg_is_already_signed() {
+        let signer = sp_core::crypto::AccountId32::new([7u8; 32]);
+        let reorg = ChainReorg::Eth {
+            from_hash: [1u8; 32],
+            to_hash: [2u8; 32],
+            forward_blocks: vec![],
+            reverse_blocks: vec![],
+        };
+
+        let pending_reorgs = vec![ChainReorgTally {
+            reorg: ChainReorg::Eth {
+                to_hash: [2u8; 32],
+                // dont matter:
+                from_hash: [0u8; 32],
+                forward_blocks: vec![],
+                reverse_blocks: vec![],
+            },
+            support: [signer.clone()].iter().cloned().collect(),
+        }];
+
+        assert_eq!(reorg.is_already_signed(&signer, vec![]), false);
+        assert_eq!(reorg.is_already_signed(&signer, pending_reorgs), true);
     }
 }

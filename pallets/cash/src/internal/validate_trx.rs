@@ -66,15 +66,19 @@ pub fn validate_unsigned<T: Config>(
         }
 
         Call::receive_chain_blocks(blocks, signature) => {
-            let _validator = recover_validator::<T>(&blocks.encode(), *signature)
+            let validator = recover_validator::<T>(&blocks.encode(), *signature)
                 .map_err(|_| ValidationError::InvalidValidator)?;
-            Ok(
-                ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
-                    .priority(UNSIGNED_TXS_PRIORITY)
-                    .longevity(UNSIGNED_TXS_LONGEVITY)
-                    .propagate(true)
-                    .build(),
-            )
+
+            let mut validity = ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
+                .propagate(true);
+
+            for block_number in blocks.block_numbers() {
+                validity = validity.and_provides((validator.substrate_id.clone(), block_number));
+            }
+
+            Ok(validity.build())
         }
 
         Call::receive_chain_reorg(reorg, signature) => {
@@ -84,6 +88,7 @@ pub fn validate_unsigned<T: Config>(
                 ValidTransaction::with_tag_prefix("Gateway::receive_chain_reorg")
                     .priority(100)
                     .longevity(32)
+                    .and_provides(reorg)
                     .propagate(true)
                     .build(),
             )
@@ -154,6 +159,7 @@ pub fn validate_unsigned<T: Config>(
 mod tests {
     use super::*;
     use crate::{core::validator_sign, tests::*, Call};
+    use ethereum_client::EthereumBlock;
 
     #[test]
     fn test_set_miner_external() {
@@ -280,17 +286,39 @@ mod tests {
             Validators::insert(
                 substrate_id.clone(),
                 ValidatorKeys {
-                    substrate_id,
+                    substrate_id: substrate_id.clone(),
                     eth_address,
                 },
             );
 
-            let blocks = ChainBlocks::Eth(vec![]);
+            let blocks = ChainBlocks::Eth(vec![
+                EthereumBlock {
+                    hash: [1; 32],
+                    parent_hash: [0; 32],
+                    number: 1,
+                    events: vec![],
+                },
+                EthereumBlock {
+                    hash: [2; 32],
+                    parent_hash: [1; 32],
+                    number: 2,
+                    events: vec![],
+                },
+                EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: [2; 32],
+                    number: 3,
+                    events: vec![],
+                },
+            ]);
             let signature = validator_sign::<Test>(&blocks.encode()).unwrap();
-            let exp = ValidTransaction::with_tag_prefix("Gateway::receive_event")
+            let exp = ValidTransaction::with_tag_prefix("Gateway::receive_chain_blocks")
                 .priority(100)
                 .longevity(32)
                 .propagate(true)
+                .and_provides((substrate_id.clone(), 1u64))
+                .and_provides((substrate_id.clone(), 2u64))
+                .and_provides((substrate_id.clone(), 3u64))
                 .build();
 
             assert_eq!(
