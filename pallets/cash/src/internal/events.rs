@@ -102,13 +102,13 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     if last_block.hash() == true_block.hash() {
         let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = get_event_queue::<T>(chain_id)?;
-        let slack = queue_slack(&event_queue);
-        let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?
-            .filter_already_signed(&me.substrate_id, pending_blocks);
-        debug!(
-            "Worker sees same fork as chain: {:?}, got new blocks: {:?}",
-            true_block, blocks
-        );
+        let slack = queue_slack(&event_queue) as u64;
+        let blocks = fetch_chain_blocks(
+            chain_id,
+            last_block.number() + 1,
+            last_block.number() + 1 + slack,
+        )?
+        .filter_already_signed(&me.substrate_id, pending_blocks);
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
@@ -136,6 +136,7 @@ pub fn ingress_queue<T: Config>(
 ) -> Result<(), Reason> {
     let mut available = INGRESS_QUOTA;
     let block_num = last_block.number();
+
     event_queue.retain(|event| {
         if block_num >= event.block_number() + MIN_EVENT_BLOCKS {
             match risk_adjusted_value::<T>(event, block_num) {
@@ -246,12 +247,28 @@ pub fn formulate_reorg<T: Config>(
     let mut reverse_blocks: Vec<ChainBlock> = vec![];
     let mut drawrof_blocks: Vec<ChainBlock> = vec![];
     let mut reverse_hashes = BTreeSet::<ChainHash>::new();
+    let mut last_block_hash = Some(last_block.hash());
+    let mut true_block_number = Some(true_block.number());
     let common_ancestor = 'search: loop {
-        let reverse_blocks_next = recall_chain_blocks::<T>(last_block.hash(), CHUNK)?;
-        let drawrof_blocks_next = recall_chain_blocks::<T>(true_block.hash(), CHUNK)?;
+        let reverse_blocks_next = match last_block_hash {
+            Some(hash) => recall_chain_blocks::<T>(hash, CHUNK)?,
+            None => Vec::new(),
+        };
+        let drawrof_blocks_next = match true_block_number {
+            Some(number) => fetch_chain_blocks(
+                true_block.chain_id(),
+                number.saturating_sub(CHUNK as u64),
+                number,
+            )?
+            .blocks()
+            .collect_rev(),
+            None => Vec::new(),
+        };
         if reverse_blocks_next.len() == 0 && drawrof_blocks_next.len() == 0 {
             return Err(Reason::CannotFormulateReorg);
         }
+        last_block_hash = reverse_blocks_next.last().map(|b| b.parent_hash());
+        true_block_number = drawrof_blocks_next.last().map(|b| b.number());
         for block in reverse_blocks_next {
             reverse_blocks.push(block.clone());
             reverse_hashes.insert(block.hash());
@@ -314,10 +331,7 @@ pub fn receive_chain_blocks<T: Config>(
     let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
 
-    debug!("Pending blocks: {:?}", pending_blocks);
-
     for block in blocks.blocks() {
-        debug!("Event queue: {:?}", event_queue);
         if block.number() >= last_block.number() + 1 {
             let offset = (block.number() - last_block.number() - 1) as usize;
             if let Some(prior) = pending_blocks.get_mut(offset) {
@@ -421,8 +435,6 @@ pub fn receive_chain_reorg<T: Config>(
 
     // Note: can reject / stop propagating once this check fails
     require!(reorg.from_hash() == last_block.hash(), Reason::HashMismatch);
-
-    debug!("Pending reorgs: {:?}", pending_reorgs);
 
     let tally = if let Some(prior) = pending_reorgs.iter_mut().find(|r| r.reorg == reorg) {
         prior.add_support(&validator);
