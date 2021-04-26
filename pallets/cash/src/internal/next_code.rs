@@ -21,7 +21,6 @@ fn dispatch_call<T: Config>(code: Vec<u8>) -> DispatchResultWithPostInfo {
 }
 
 pub fn set_next_code_via_hash<T: Config>(code: Vec<u8>) -> Result<(), Reason> {
-    // XXX what Hash type to use?
     let hash = <Ethereum as Chain>::hash_bytes(&code);
     require!(
         Some(hash) == AllowedNextCodeHash::get(),

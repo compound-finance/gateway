@@ -1,6 +1,4 @@
-const {
-  buildScenarios
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
 let set_future_yield_scen_info = {

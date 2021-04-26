@@ -1,7 +1,4 @@
-const {
-  years,
-  buildScenarios,
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
 let transfer_scen_info = {

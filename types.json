@@ -26,7 +26,10 @@
   "ApiCashData": {
     "balance": "String",
     "cash_yield": "String",
-    "price": "String"
+    "price": "String",
+    "cash_principal": "String",
+    "cash_index": "String",
+    "total_cash": "String"
   },
   "ApiInterestRateModel": {
     "_enum": {
@@ -209,66 +212,67 @@
   "EncodedNotice": "Vec<u8>",
   "EraId": "u32",
   "EraIndex": "u32",
-  "ethereum_client__EthereumHash": "[u8; 32]",
-  "ethereum_client__EthereumBlockNumber": "u64",
-  "ethereum_client__EthereumBlock": {
-    "hash": "ethereum_client__EthereumHash",
-    "parent_hash": "ethereum_client__EthereumHash",
-    "number": "ethereum_client__EthereumBlockNumber",
-    "events": "Vec<ethereum_client__EthereumEvent>"
+  "EthereumBlock": {
+    "hash": "EthereumHash",
+    "parent_hash": "EthereumHash",
+    "number": "EthereumBlockNumber",
+    "events": "Vec<EthereumEvent>"
   },
-  "ethereum_client__EthereumClientError": {
+  "EthereumBlockNumber": "u64",
+  "EthereumClientError": {
     "_enum": {
       "DecodeError": "",
       "HttpIoError": "",
       "HttpTimeout": "",
       "HttpErrorCode": "u16",
       "InvalidUTF8": "",
-      "JsonParseError": ""
+      "JsonParseError": "",
+      "NoResult": ""
     }
   },
-  "ethereum_client__EthereumEvent": {
+  "EthereumEvent": {
     "_enum": {
-      "Lock": "ethereum_client__EthereumEventLock",
-      "LockCash": "ethereum_client__EthereumEventLockCash",
-      "ExecTrxRequest": "ethereum_client__EthereumEventExecTrxRequest",
-      "ExecuteProposal": "ethereum_client__EthereumEventExecuteProposal",
-      "NoticeInvoked": "ethereum_client__EthereumEventNoticeInvoked"
+      "Lock": "EthereumEventLock",
+      "LockCash": "EthereumEventLockCash",
+      "ExecTrxRequest": "EthereumEventExecTrxRequest",
+      "ExecuteProposal": "EthereumEventExecuteProposal",
+      "NoticeInvoked": "EthereumEventNoticeInvoked"
     }
   },
-  "ethereum_client__EthereumEventExecTrxRequest": {
+  "EthereumEventExecTrxRequest": {
     "account": "[u8; 20]",
     "trx_request": "String"
   },
-  "ethereum_client__EthereumEventExecuteProposal": {
+  "EthereumEventExecuteProposal": {
     "title": "String",
     "extrinsics": "Vec<Vec<u8>>"
   },
-  "ethereum_client__EthereumEventLock": {
+  "EthereumEventLock": {
     "asset": "[u8; 20]",
     "sender": "[u8; 20]",
     "chain": "String",
     "recipient": "[u8; 32]",
     "amount": "u128"
   },
-  "ethereum_client__EthereumEventLockCash": {
+  "EthereumEventLockCash": {
     "sender": "[u8; 20]",
     "chain": "String",
     "recipient": "[u8; 32]",
     "amount": "u128",
     "principal": "u128"
   },
-  "ethereum_client__EthereumEventNoticeInvoked": {
+  "EthereumEventNoticeInvoked": {
     "era_id": "u32",
     "era_index": "u32",
     "notice_hash": "[u8; 32]",
     "result": "Vec<u8>"
   },
+  "EthereumHash": "[u8; 32]",
   "Ethereum__Chain__Address": "[u8; 20]",
   "Ethereum__Chain__Amount": "u128",
-  "Ethereum__Chain__Block": "ethereum_client__EthereumBlock",
+  "Ethereum__Chain__Block": "EthereumBlock",
   "Ethereum__Chain__CashIndex": "u128",
-  "Ethereum__Chain__Event": "ethereum_client__EthereumEvent",
+  "Ethereum__Chain__Event": "EthereumEvent",
   "Ethereum__Chain__Hash": "[u8; 32]",
   "Ethereum__Chain__PublicKey": "[u8; 64]",
   "Ethereum__Chain__Rate": "u128",

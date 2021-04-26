@@ -220,7 +220,7 @@ impl pallet_grandpa::Config for Runtime {
     type Event = Event;
     type Call = Call;
 
-    type KeyOwnerProofSystem = (); // XXX we prob want one?
+    type KeyOwnerProofSystem = ();
 
     type KeyOwnerProof =
         <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
@@ -269,7 +269,7 @@ impl pallet_session::Config for Runtime {
     type ValidatorIdOf = IdConverter<Self>;
     type ShouldEndSession = Cash;
     type NextSessionRotation = Cash;
-    type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
+    type SessionManager = Cash;
     type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: aura and grandpa
     type Keys = opaque::SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;

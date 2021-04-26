@@ -20,6 +20,9 @@ pub const MILLISECONDS_PER_YEAR: Timestamp = 365 * 24 * 60 * 60 * 1000;
 /// Minimum number of underlying chain blocks to wait before ingesting any event, due to reorg risk.
 pub const MIN_EVENT_BLOCKS: ChainBlockNumber = 3;
 
+/// Maximum number of underlying chain blocks to wait before just ingesting any event.
+pub const MAX_EVENT_BLOCKS: ChainBlockNumber = 60;
+
 /// Minimum amount of time (milliseconds) into the future that a synchronized change may be scheduled for.
 /// Must be sufficient time to propagate changes to L1s before they occur.
 pub const MIN_NEXT_SYNC_TIME: Timestamp = 24 * 60 * 60 * 1000; // XXX confirm

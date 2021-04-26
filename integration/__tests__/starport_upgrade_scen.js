@@ -1,8 +1,6 @@
-const {
-  buildScenarios
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 
-buildScenarios('Upgrade Scenarios', { validators: [], tokens: [] }, [
+buildScenarios('Starport Upgrade Scenarios', { validators: [], tokens: [] }, [
   {
     name: 'Upgrade Starport to StarportHarness without Initialize',
     scenario: async ({ cashToken, starport, eth, log }) => {
