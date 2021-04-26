@@ -1,5 +1,6 @@
 use crate::{
     chains::{Chain, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId, Ethereum},
+    debug,
     reason::Reason,
 };
 use codec::{Decode, Encode};
@@ -30,11 +31,11 @@ pub fn fetch_chain_block(
 /// Fetch more blocks from the underlying chain.
 pub fn fetch_chain_blocks(
     chain_id: ChainId,
-    number: ChainBlockNumber,
-    nblocks: u32,
+    from: ChainBlockNumber,
+    to: ChainBlockNumber,
 ) -> Result<ChainBlocks, Reason> {
     match chain_id {
-        ChainId::Eth => Ok(fetch_eth_blocks(number, nblocks)?),
+        ChainId::Eth => Ok(fetch_eth_blocks(from, to)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }
 }
@@ -51,10 +52,13 @@ fn fetch_eth_block(number: ChainBlockNumber) -> Result<EthereumBlock, EventError
 }
 
 /// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
-fn fetch_eth_blocks(number: ChainBlockNumber, slack: u32) -> Result<ChainBlocks, EventError> {
-    let max_block_number = number + (slack as u64);
+fn fetch_eth_blocks(
+    from: ChainBlockNumber,
+    to: ChainBlockNumber,
+) -> Result<ChainBlocks, EventError> {
+    debug!("Fetching Eth Blocks [{}-{}]", from, to);
     let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
-    for block_number in number..max_block_number {
+    for block_number in from..to {
         match fetch_eth_block(block_number) {
             Ok(block) => {
                 acc.push(block);
