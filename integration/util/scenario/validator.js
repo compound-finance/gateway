@@ -9,8 +9,8 @@ const os = require('os');
 const path = require('path');
 const chalk = require('chalk');
 
-async function loadTypes(ctx) {
-  let contents = await fs.readFile(ctx.__typesFile());
+async function loadTypes(ctx, version) {
+  let contents = await fs.readFile(ctx.__typesFile(version));
   try {
     return {
       ...JSON.parse(contents),
@@ -35,6 +35,7 @@ async function loadTypes(ctx) {
 }
 
 async function loadRpc(ctx) {
+  // TODO: Handle versioning
   let contents = await fs.readFile(ctx.__rpcFile());
   try {
     return JSON.parse(contents);
@@ -219,7 +220,7 @@ class Validator {
       '--eth-key-id', "my_eth_key_id",
       '--miner', `Eth:${this.ethAccount}`,
       '--opf-url', this.ctx.__opfUrl(),
-      '-lruntime=debug',
+      '-lruntime=debug,gateway=debug,pallet_cash=debug,ethereum_client=debug',
       '--reserved-only',
       ...versioning,
       ...executionArgs,
@@ -255,7 +256,7 @@ class Validator {
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
     const api = await ApiPromise.create({
       provider: wsProvider,
-      types: await loadTypes(this.ctx),
+      types: await loadTypes(this.ctx, this.version),
       rpc: await loadRpc(this.ctx)
     });
 

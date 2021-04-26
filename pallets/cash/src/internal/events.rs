@@ -5,16 +5,17 @@ use crate::{
         ChainSignature,
     },
     core::{
-        self, get_event_queue, get_last_block, get_validator_set, recover_validator, validator_sign,
+        self, get_current_validator, get_event_queue, get_last_block, get_validator_set,
+        recover_validator, validator_sign,
     },
     debug, error,
     events::{fetch_chain_block, fetch_chain_blocks},
     internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
-    params::{INGRESS_LARGE, INGRESS_QUOTA},
+    params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MAX_EVENT_BLOCKS, MIN_EVENT_BLOCKS},
     reason::Reason,
     require,
-    types::{CashPrincipalAmount, Quantity, USDQuantity, ValidatorIdentity, USD},
+    types::{CashPrincipalAmount, Quantity, USDQuantity, USD},
     Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module, PendingChainBlocks,
     PendingChainReorgs,
 };
@@ -22,7 +23,7 @@ use codec::Encode;
 use ethereum_client::EthereumEvent;
 use frame_support::storage::StorageMap;
 use frame_system::offchain::SubmitTransaction;
-use our_std::collections::btree_set::BTreeSet;
+use our_std::{cmp::max, collections::btree_set::BTreeSet, convert::TryInto};
 use sp_runtime::offchain::{
     storage::StorageValueRef,
     storage_lock::{StorageLock, Time},
@@ -42,8 +43,9 @@ trait CollectRev: Iterator {
 impl<I: Iterator> CollectRev for I {}
 
 /// Determine the number of blocks which can still fit on an ingression queue.
-pub fn queue_slack(_event_queue: &ChainBlockEvents) -> u32 {
-    1 // TODO: look at ingression queue, how backed up is the queue?
+pub fn queue_slack(event_queue: &ChainBlockEvents) -> u32 {
+    let queue_len: u32 = event_queue.len().try_into().unwrap_or(u32::MAX);
+    max(INGRESS_SLACK.saturating_sub(queue_len), 1)
 }
 
 /// Determine the risk-adjusted value of a particular event, given the current block number.
@@ -94,14 +96,19 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
 
 /// Perform the next step of tracking events from an underlying chain.
 pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
-    let me = sp_core::crypto::AccountId32::new([0u8; 32]); // XXX self worker identity
+    let me = get_current_validator::<T>()?;
     let last_block = get_last_block::<T>(chain_id)?;
     let true_block = fetch_chain_block(chain_id, last_block.number())?;
     if last_block.hash() == true_block.hash() {
-        debug!("Worker sees same fork as chain: {:?}", true_block);
+        let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = get_event_queue::<T>(chain_id)?;
-        let slack = queue_slack(&event_queue);
-        let blocks = fetch_chain_blocks(chain_id, last_block.number() + 1, slack)?;
+        let slack = queue_slack(&event_queue) as u64;
+        let blocks = fetch_chain_blocks(
+            chain_id,
+            last_block.number() + 1,
+            last_block.number() + 1 + slack,
+        )?
+        .filter_already_signed(&me.substrate_id, pending_blocks);
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
@@ -109,8 +116,9 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             "Worker sees a different fork: {:?} {:?}",
             true_block, last_block
         );
+        let pending_reorgs = PendingChainReorgs::get(chain_id);
         let reorg = formulate_reorg::<T>(&last_block, &true_block)?;
-        if !already_submitted_reorg::<T>(me, &reorg) {
+        if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
             submit_chain_reorg::<T>(&reorg)
         } else {
             debug!("Worker already submitted...waiting");
@@ -128,48 +136,65 @@ pub fn ingress_queue<T: Config>(
 ) -> Result<(), Reason> {
     let mut available = INGRESS_QUOTA;
     let block_num = last_block.number();
-    event_queue.retain(|event| {
-        match risk_adjusted_value::<T>(event, block_num) {
-            Ok(value) => {
-                debug!(
-                    "Computed risk adjusted value ({:?} / {:?} @ {}) of {:?}",
-                    value, available, block_num, event
-                );
-                if value <= available {
-                    available = available.sub(value).unwrap();
-                    match core::apply_chain_event_internal::<T>(event) {
-                        Ok(()) => {
-                            <Module<T>>::deposit_event(EventT::ProcessedChainBlockEvent(
-                                event.clone(),
-                            ));
-                        }
 
-                        Err(reason) => {
-                            <Module<T>>::deposit_event(EventT::FailedProcessingChainBlockEvent(
-                                event.clone(),
-                                reason,
-                            ));
+    event_queue.retain(|event| {
+        let delta_blocks = block_num.saturating_sub(event.block_number());
+
+        if delta_blocks >= MIN_EVENT_BLOCKS {
+            // If we're beyond max risk block, then simply accept event
+            let risk_result = if delta_blocks > MAX_EVENT_BLOCKS {
+                Ok(Quantity::new(0, USD))
+            } else {
+                risk_adjusted_value::<T>(event, block_num)
+            };
+
+            match risk_result {
+                Ok(value) => {
+                    debug!(
+                        "Computed risk adjusted value ({:?} / {:?} @ {}) of {:?}",
+                        value, available, block_num, event
+                    );
+                    if value <= available {
+                        available = available.sub(value).unwrap();
+                        match core::apply_chain_event_internal::<T>(event) {
+                            Ok(()) => {
+                                <Module<T>>::deposit_event(EventT::ProcessedChainBlockEvent(
+                                    event.clone(),
+                                ));
+                            }
+
+                            Err(reason) => {
+                                <Module<T>>::deposit_event(
+                                    EventT::FailedProcessingChainBlockEvent(event.clone(), reason),
+                                );
+                            }
                         }
+                        return false; // remove from queue
+                    } else {
+                        return true; // retain on queue
                     }
-                    return false; // remove from queue
-                } else {
+                }
+
+                Err(err) => {
+                    error!(
+                        "Could not compute risk adjusted value ({}) of {:?}",
+                        err, event
+                    );
+                    // note that we keep the event if we cannot compute the risk adjusted value,
+                    //  there's not an obviously more reasonable thing to do right now
+                    // there's no reason this should fail normally but it can
+                    //  e.g. if somehow someone locks an unsupported asset in the starport
+                    // we need to take separate measures to forcefully limit the queue size
+                    //  e.g. reject new blocks once the event queue reaches a certain size
                     return true; // retain on queue
                 }
             }
-
-            Err(err) => {
-                error!(
-                    "Could not compute risk adjusted value ({}) of {:?}",
-                    err, event
-                );
-                // note that we keep the event if we cannot compute the risk adjusted value,
-                //  there's not an obviously more reasonable thing to do right now
-                // there's no reason this should fail normally but it can
-                //  e.g. if somehow someone locks an unsupported asset in the starport
-                // we need to take separate measures to forcefully limit the queue size
-                //  e.g. reject new blocks once the event queue reaches a certain size
-                return true; // retain on queue
-            }
+        } else {
+            debug!(
+                "Event not old enough to process (@ {:?}) {:?}",
+                block_num, event
+            );
+            return true; // retain on queue
         }
     });
     Ok(())
@@ -231,16 +256,37 @@ pub fn formulate_reorg<T: Config>(
     let mut reverse_blocks: Vec<ChainBlock> = vec![];
     let mut drawrof_blocks: Vec<ChainBlock> = vec![];
     let mut reverse_hashes = BTreeSet::<ChainHash>::new();
+    let mut last_block_hash = Some(last_block.hash());
+    let mut true_block_number = Some(true_block.number());
     let common_ancestor = 'search: loop {
-        let reverse_blocks_next = recall_chain_blocks::<T>(last_block.hash(), CHUNK)?;
-        let drawrof_blocks_next = recall_chain_blocks::<T>(true_block.hash(), CHUNK)?;
+        // note that `drawrof_blocks_next` could be built directly in reverse order
+        let reverse_blocks_next = match last_block_hash {
+            Some(hash) => recall_chain_blocks::<T>(hash, CHUNK)?,
+            None => Vec::new(),
+        };
+        let drawrof_blocks_next = match true_block_number {
+            Some(number) => fetch_chain_blocks(
+                true_block.chain_id(),
+                number.saturating_sub(CHUNK as u64),
+                number,
+            )?
+            .blocks()
+            .collect_rev(),
+            None => Vec::new(),
+        };
         if reverse_blocks_next.len() == 0 && drawrof_blocks_next.len() == 0 {
             return Err(Reason::CannotFormulateReorg);
         }
+        last_block_hash = reverse_blocks_next.last().map(|b| b.parent_hash());
+        true_block_number = drawrof_blocks_next.last().map(|b| b.number());
         for block in reverse_blocks_next {
             reverse_blocks.push(block.clone());
             reverse_hashes.insert(block.hash());
         }
+        // note that the following is correct if the original blocks are at the same height
+        //  however that fact also makes this entire algorithm obsolete / inefficient
+        //   we can simply compare parents at the same height one at a time
+        //  but for this to be generally correct, we would need to recheck all `drawrof_blocks`
         for block in drawrof_blocks_next {
             let parent_hash = block.parent_hash();
             if reverse_hashes.contains(&parent_hash) {
@@ -275,12 +321,6 @@ pub fn formulate_reorg<T: Config>(
     }
 }
 
-/// Check whether the given validator already submitted the given reorg.
-pub fn already_submitted_reorg<T: Config>(id: ValidatorIdentity, reorg: &ChainReorg) -> bool {
-    // XXX dont resubmit for same thing
-    false
-}
-
 /// Submit a reorg message from a worker to the chain.
 pub fn submit_chain_reorg<T: Config>(reorg: &ChainReorg) -> Result<(), Reason> {
     log!("Submitting chain reorg extrinsic: {:?}", reorg);
@@ -304,6 +344,10 @@ pub fn receive_chain_blocks<T: Config>(
     let mut event_queue = get_event_queue::<T>(chain_id)?;
     let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
+
+    debug!("Pending blocks: {:?}", pending_blocks);
+    debug!("Event queue: {:?}", event_queue);
+
     for block in blocks.blocks() {
         if block.number() >= last_block.number() + 1 {
             let offset = (block.number() - last_block.number() - 1) as usize;
@@ -333,7 +377,7 @@ pub fn receive_chain_blocks<T: Config>(
                     debug!("Received valid first next pending block: {:?}", block);
                     // write to pending_blocks[offset]
                     //  we already checked offset doesn't exist, this is the first element
-                    pending_blocks.push(ChainBlockTally::new(chain_id, block, &validator));
+                    pending_blocks.push(ChainBlockTally::new(block, &validator));
                 }
             } else if let Some(parent) = pending_blocks.get(offset - 1) {
                 if block.parent_hash() != parent.block.hash() {
@@ -351,7 +395,7 @@ pub fn receive_chain_blocks<T: Config>(
                     debug!("Received valid pending block: {:?}", block);
                     // write to pending_blocks[offset]
                     //  we already checked offset doesn't exist, but offset - 1 does
-                    pending_blocks.push(ChainBlockTally::new(chain_id, block, &validator));
+                    pending_blocks.push(ChainBlockTally::new(block, &validator));
                 }
             } else {
                 debug!("Received disconnected block: {:?} ({:?})", block, offset);
@@ -378,6 +422,7 @@ pub fn receive_chain_blocks<T: Config>(
             event_queue.push(&tally.block);
             last_block = tally.block.clone();
             ingress_queue::<T>(&last_block, &mut event_queue)?;
+            continue;
         } else if tally.has_enough_dissent(&validator_set) {
             // remove tally and everything after from queue
             pending_blocks = vec![];
@@ -525,7 +570,7 @@ mod tests {
                 sender: [3; 20],
                 chain: String::from("ETH"),
                 recipient: [2; 32],
-                amount: qty!("10", ETH).value,
+                amount: qty!("75", ETH).value,
             };
             let blocks_2 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
                 hash: [2; 32],
@@ -536,10 +581,30 @@ mod tests {
                 number: 2,
                 events: vec![event.clone()],
             }]);
-            let blocks_3 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
-                hash: [3; 32],
-                parent_hash: [2; 32],
-                number: 3,
+            let blocks_3 = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: [2; 32],
+                    number: 3,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [4; 32],
+                    parent_hash: [3; 32],
+                    number: 4,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [5; 32],
+                    parent_hash: [4; 32],
+                    number: 5,
+                    events: vec![],
+                },
+            ]);
+            let blocks_4 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
+                hash: [6; 32],
+                parent_hash: [5; 32],
+                number: 6,
                 events: vec![],
             }]);
 
@@ -551,6 +616,7 @@ mod tests {
             // Sign and dispatch from first validator
             assert_ok!(a_receive_chain_blocks(&blocks_2));
 
+            // Block should be pending, nothing in event queue yet
             let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
             assert_eq!(pending_blocks.len(), 1);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
@@ -559,24 +625,34 @@ mod tests {
             // Sign and dispatch from second validator
             assert_ok!(b_receive_chain_blocks(&blocks_2));
 
-            // First round should be over quota - not yet processed
+            // First round is too new - not yet processed
             let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
             assert_eq!(pending_blocks.len(), 0);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
             assert_eq!(event_queue, ChainBlockEvents::Eth(vec![(2, event)]));
 
-            // Receive another block to ingress another round
+            // Receive enough blocks to ingress another round
             assert_ok!(all_receive_chain_blocks(&blocks_3));
 
-            // Second round should fit
+            // Second round should still be over quota - not yet processed
             let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
             assert_eq!(pending_blocks.len(), 0);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
-            assert_eq!(event_queue, ChainBlockEvents::Eth(vec![]));
+            assert_eq!(event_queue.len(), 1);
 
+            // Receive enough blocks to ingress another round
+            assert_ok!(all_receive_chain_blocks(&blocks_4));
+
+            // Third round should process
+            let pending_blocks = PendingChainBlocks::get(ChainId::Eth);
+            assert_eq!(pending_blocks.len(), 0);
+            let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
+            assert_eq!(event_queue.len(), 0);
+
+            // Check the final balance
             assert_eq!(
                 AssetBalances::get(&Eth, ChainAccount::Eth([2; 20])),
-                bal!("10", ETH).value
+                bal!("75", ETH).value
             );
 
             Ok(())

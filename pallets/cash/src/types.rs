@@ -85,7 +85,7 @@ pub type MinerShares = Factor;
 
 /// Type for a code hash.
 #[type_alias]
-pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
+pub type CodeHash = <Ethereum as Chain>::Hash;
 
 /// Governance Result type
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
@@ -639,6 +639,12 @@ impl CashIndex {
 impl Default for CashIndex {
     fn default() -> Self {
         CashIndex::ONE
+    }
+}
+
+impl From<Factor> for CashIndex {
+    fn from(factor: Factor) -> Self {
+        CashIndex(factor.0)
     }
 }
 

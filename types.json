@@ -26,7 +26,10 @@
   "ApiCashData": {
     "balance": "String",
     "cash_yield": "String",
-    "price": "String"
+    "price": "String",
+    "cash_principal": "String",
+    "cash_index": "String",
+    "total_cash": "String"
   },
   "ApiInterestRateModel": {
     "_enum": {
@@ -129,6 +132,7 @@
       "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>"
     }
   },
+  "ChainBlockNumber": "u64",
   "ChainBlockTally": {
     "block": "ChainBlock",
     "support": "SignersSet",
@@ -214,6 +218,7 @@
     "number": "EthereumBlockNumber",
     "events": "Vec<EthereumEvent>"
   },
+  "EthereumBlockNumber": "u64",
   "EthereumClientError": {
     "_enum": {
       "DecodeError": "",
@@ -221,7 +226,8 @@
       "HttpTimeout": "",
       "HttpErrorCode": "u16",
       "InvalidUTF8": "",
-      "JsonParseError": ""
+      "JsonParseError": "",
+      "NoResult": ""
     }
   },
   "EthereumEvent": {
@@ -261,11 +267,12 @@
     "notice_hash": "[u8; 32]",
     "result": "Vec<u8>"
   },
+  "EthereumHash": "[u8; 32]",
   "Ethereum__Chain__Address": "[u8; 20]",
   "Ethereum__Chain__Amount": "u128",
-  "Ethereum__Chain__Block": "ethereum_client__EthereumBlock",
+  "Ethereum__Chain__Block": "EthereumBlock",
   "Ethereum__Chain__CashIndex": "u128",
-  "Ethereum__Chain__Event": "ethereum_client__EthereumEvent",
+  "Ethereum__Chain__Event": "EthereumEvent",
   "Ethereum__Chain__Hash": "[u8; 32]",
   "Ethereum__Chain__PublicKey": "[u8; 64]",
   "Ethereum__Chain__Rate": "u128",

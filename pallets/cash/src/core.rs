@@ -8,12 +8,12 @@ use crate::{
     rates::APR,
     reason::Reason,
     types::{
-        AssetAmount, AssetBalance, Balance, CashPrincipal, CashPrincipalAmount, GovernanceResult,
-        NoticeId, SignersSet, Timestamp, ValidatorKeys,
+        AssetAmount, AssetBalance, Balance, CashPrincipalAmount, GovernanceResult, NoticeId,
+        SignersSet, Timestamp, ValidatorKeys,
     },
-    AssetBalances, CashPrincipals, CashYield, Config, Event, GlobalCashIndex, IngressionQueue,
-    LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module, SupportedAssets,
-    TotalBorrowAssets, TotalSupplyAssets, Validators,
+    AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
+    IngressionQueue, LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module,
+    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 use codec::Decode;
 use frame_support::traits::UnfilteredDispatchable;
@@ -21,8 +21,9 @@ use frame_support::{
     sp_runtime::traits::Convert,
     storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
 };
+#[cfg(feature = "freeze-time")]
+use our_std::if_std;
 pub use our_std::{fmt, result};
-
 #[cfg(feature = "freeze-time")]
 use std::{env, fs};
 
@@ -58,7 +59,7 @@ pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents,
     Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
 }
 
-/// Return the last processed block for the underlying chain.
+/// Return the last processed block for the underlying chain, or the initial one for the starport.
 pub fn get_last_block<T: Config>(chain_id: ChainId) -> Result<ChainBlock, Reason> {
     match LastProcessedBlock::get(chain_id) {
         Some(block) => Ok(block),
@@ -90,6 +91,11 @@ pub fn get_cash_yield<T: Config>() -> Result<APR, Reason> {
     Ok(CashYield::get())
 }
 
+/// Return the cash total supply data.
+pub fn get_cash_data<T: Config>() -> Result<(CashIndex, CashPrincipalAmount), Reason> {
+    Ok((GlobalCashIndex::get(), TotalCashPrincipal::get()))
+}
+
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
     let info: Vec<ChainAccount> = CashPrincipals::iter()
@@ -107,14 +113,42 @@ pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBal
     Ok(info)
 }
 
-/// Return the portfolio of the chain account
+/// Return the portfolio of the chain account.
 pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
     Ok(pipeline::load_portfolio::<T>(account)?)
 }
 
+/// Return the set of validator identities to compare with others.
 pub fn get_validator_set<T: Config>() -> Result<SignersSet, Reason> {
     // Note: inefficient, probably manage reading validators from storage better
     Ok(Validators::iter().map(|(_, v)| v.substrate_id).collect())
+}
+
+/// Return the validator associated with the given signer account.
+pub fn get_validator<T: Config>(signer: ChainAccount) -> Result<ValidatorKeys, Reason> {
+    // Note: inefficient, we should index
+    match signer {
+        ChainAccount::Eth(eth_address) => {
+            for (_, validator) in Validators::iter() {
+                if validator.eth_address == eth_address {
+                    return Ok(validator);
+                }
+            }
+            return Err(Reason::UnknownValidator);
+        }
+
+        _ => {
+            // this is a placeholder for future variants, which should be kept minimal
+            //  since generally we dont want validators to have to add new types of keys
+            return Err(Reason::NotImplemented); // XXX
+        }
+    }
+}
+
+/// Return the validator as seen to be itself by the current worker.
+pub fn get_current_validator<T: Config>() -> Result<ValidatorKeys, Reason> {
+    // Note: we can lookup *any* signer, may as well choose the first and only option (Eth)
+    get_validator::<T>(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
 }
 
 /// Return the validator which signed the given data, given signature.
@@ -125,19 +159,17 @@ pub fn recover_validator<T: Config>(
     // Note: inefficient, we should index by every key we want to query by
     match signature {
         ChainSignature::Eth(eth_sig) => {
-            let signer = <Ethereum as Chain>::recover_address(data, eth_sig)?;
+            let eth_address = <Ethereum as Chain>::recover_address(data, eth_sig)?;
             for (_, validator) in Validators::iter() {
-                if validator.eth_address == signer {
+                if validator.eth_address == eth_address {
                     return Ok(validator);
                 }
             }
         }
 
         _ => {
-            // XXX should we even be having other branches for signatures now?
-            //  we should probably delete all variants of ChainSignature except Eth
-            //   generally minimal since we dont want validators to have to add new keys
-            //    can be separate from ChainAccountSignature
+            // this is a placeholder for future variants, which should be kept minimal
+            //  since generally we dont want validators to have to add new types of keys
             return Err(Reason::NotImplemented); // XXX
         }
     }
@@ -297,12 +329,7 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
 pub fn get_cash_balance_with_asset_interest<T: Config>(
     account: ChainAccount,
 ) -> Result<Balance, Reason> {
-    let cash_index = GlobalCashIndex::get();
-    let cash_principal: Balance = pipeline::load_portfolio::<T>(account)?.cash;
-
-    cash_index
-        .cash_balance(CashPrincipal(cash_principal.value))
-        .map_err(Reason::MathError)
+    Ok(pipeline::load_portfolio::<T>(account)?.cash)
 }
 
 /// Calculates the current liquidity value for an account.
@@ -313,7 +340,6 @@ pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason
 // Dispatch Extrinsic Lifecycle //
 
 /// Block initialization wrapper.
-// XXX we need to be able to mock Now (then get rid of this?)
 pub fn on_initialize<T: Config>() -> Result<(), Reason> {
     internal::initialize::on_initialize_internal::<T>(
         get_now::<T>(),
@@ -389,5 +415,17 @@ mod tests {
             let actual = get_now::<Test>();
             assert_eq!(actual, expected);
         });
+    }
+
+    #[test]
+    fn test_get_current_validator() {
+        new_test_ext().execute_with(|| {
+            let validator = ValidatorKeys {
+                substrate_id: AccountId32::new([0u8; 32]),
+                eth_address: <Ethereum as Chain>::signer_address().unwrap(),
+            };
+            Validators::insert(validator.substrate_id.clone(), &validator);
+            assert_eq!(get_current_validator::<Test>().unwrap(), validator);
+        })
     }
 }

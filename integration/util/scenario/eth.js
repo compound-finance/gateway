@@ -173,7 +173,12 @@ async function buildEth(ethInfo, ctx) {
   let web3Url;
 
   if (provider === 'ganache') {
-    ganacheServer = ganache.server(ethInfo.ganache.opts);
+    let ganacheOpts = ethInfo.ganache.opts;
+    if (ctx.__blockTime() !== null) {
+      ganacheOpts.blockTime = ctx.__blockTime();
+    }
+
+    ganacheServer = ganache.server(ganacheOpts);
     let ganacheProvider = ganacheServer.provider;
 
     web3Port = ethInfo.ganache.web3_port || genPort();

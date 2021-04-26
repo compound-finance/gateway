@@ -1,6 +1,5 @@
-const {
-  buildScenarios,
-} = require('../util/scenario');
+// TODO
+const { buildScenarios, } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
 let liquidate_scen_info = {
@@ -201,9 +200,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     name: "Fails when liquidator tries to close more than total borrow",
     notes:
       `A simple replay of the collateral-for-collateral scenario, but Bert goes
-       for the gusto and tries to liquidate more COMP than Ashley had even borrowed.
-
-       Note: This test is a counter-factual and should *not* pass`,
+       for the gusto and tries to liquidate more COMP than Ashley had even borrowed.`,
     before: supplyUSDC_BorrowCOMP_ChangePrice,
     scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
       await bert.lock(4000, bat);
@@ -212,18 +209,12 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      // Liquidate 2.0 COMP. Bert should receive [2 * 472.07 / 1.00 * 1.08]=1019.6712 USDC
-      await bert.liquidate(2.0, comp, usdc, ashley); // TODO: This should probably fail
+      await expect(bert.liquidate(2.0, comp, usdc, ashley)).rejects.toThrow(/RepayTooMuch/);
 
-      let ashleyLiquidityAfter = await ashley.liquidity();
-      let bertLiquidityAfter = await bert.liquidity();
-
-      expect(await ashley.chainBalance(usdc)).toBeCloseTo(-419.6712); // 600 Received - 1019.6712 Liquidated
-      expect(await ashley.chainBalance(comp)).toBeCloseTo(1.0, 2); // -1 Borrowed + 2 COMP De-Liquidated
-      expect(await bert.chainBalance(usdc)).toBeCloseTo(1019.6712, 2); // 1019.6712 Seized in Liquidation
-      expect(await bert.chainBalance(comp)).toBeCloseTo(-2, 2); // -2 COMP Debt Assumed in Liquidation
-
-      // Skip liquidity checks since this is not the expected long-term behavior
+      expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
+      expect(await bert.chainBalance(usdc)).toBeCloseTo(0, 2);
+      expect(await bert.chainBalance(comp)).toBeCloseTo(0, 2);
     }
   },
   {
@@ -263,18 +254,12 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      // Liquidate 0.5 COMP. Bert should receive [0.5 * ( 472.07 / 1277.15 ) * 1.08]=0.1995989507888658 Ether
-      await bert.liquidate(0.5, comp, ether, ashley); // TODO: This should probably fail
+      await expect(bert.liquidate(0.5, comp, ether, ashley)).rejects.toThrow(/InsufficientCollateral/);
 
-      let ashleyLiquidityAfter = await ashley.liquidity();
-      let bertLiquidityAfter = await bert.liquidity();
-
-      expect(await ashley.chainBalance(ether)).toBeCloseTo(-0.189599); // 0.01 Supplied - 0.1995989507888658 Seized
-      expect(await ashley.chainBalance(comp)).toBeCloseTo(-0.5, 2); // -1 Borrowed + 0.5 COMP De-Liquidated
-      expect(await bert.chainBalance(ether)).toBeCloseTo(0.199599, 2); // Seized in Liquidation
-      expect(await bert.chainBalance(comp)).toBeCloseTo(-0.5, 2); // -0.5 COMP Debt Assumed in Liquidation
-
-      // Skip liquidity checks since this is not the expected long-term behavior
+      expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
+      expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
+      expect(await bert.chainBalance(usdc)).toBeCloseTo(0, 2);
+      expect(await bert.chainBalance(comp)).toBeCloseTo(0, 2);
     }
   },
   {
@@ -342,9 +327,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       await ashley.lock(1, zrx);
       await bert.lock(4000, bat);
       expect(await bert.chainBalance(comp)).toEqual(0);
-
       await expect(bert.liquidate(0.5, comp, zrx, ashley)).rejects.toThrow(/NoPrice/);
-
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
       expect(await ashley.chainBalance(zrx)).toBeCloseTo(1);
       expect(await bert.chainBalance(comp)).toBeCloseTo(0);

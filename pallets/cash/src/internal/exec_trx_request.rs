@@ -28,7 +28,6 @@ pub fn prepend_nonce(payload: &Vec<u8>, nonce: Nonce) -> Vec<u8> {
     result
 }
 
-// XXX 2 entry points?
 pub fn exec<T: Config>(
     request: Vec<u8>,
     signature: ChainAccountSignature,
@@ -75,11 +74,6 @@ pub fn exec_trx_request<T: Config>(
         );
     }
 
-    // XXX still controversial as we read from storage sometimes redundantly,
-    //  and calculate amount from principal provided
-    //  I think its ok as we should be able to cache things extremely well,
-    //   effectively avoiding redundant reads
-    //   and its safer to use the principal -> amount than the user amount
     match trx_request {
         trx_request::TrxRequest::Extract(max_amount, asset, account) => {
             match CashOrChainAsset::from(asset) {

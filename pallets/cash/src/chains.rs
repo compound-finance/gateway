@@ -1,11 +1,15 @@
 use crate::rates::APR;
 use crate::reason::Reason;
-use crate::types::{AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorKeys};
+use crate::types::{
+    AssetAmount, CashIndex, SignersSet, Timestamp, ValidatorIdentity, ValidatorKeys,
+};
 use codec::{Decode, Encode};
+use ethereum_client::{EthereumBlock, EthereumEvent};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
-    iter::Iterator, str::FromStr, vec, Debuggable, Deserialize, RuntimeDebug, Serialize,
+    collections::btree_set::BTreeSet, iter::Iterator, str::FromStr, vec, Debuggable, Deserialize,
+    RuntimeDebug, Serialize,
 };
 use types_derive::{type_alias, Types};
 
@@ -195,6 +199,7 @@ impl ChainAccountSignature {
 }
 
 /// Type for a block number tied on an underlying chain.
+#[type_alias]
 pub type ChainBlockNumber = u64;
 
 /// Type for a hash tied to a chain.
@@ -380,6 +385,32 @@ impl ChainBlocks {
             ChainBlocks::Eth(blocks) => blocks.iter().map(|b| ChainBlock::Eth(b.clone())),
         }
     }
+
+    pub fn block_numbers(&self) -> impl Iterator<Item = u64> + '_ {
+        match self {
+            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| b.number),
+        }
+    }
+
+    pub fn filter_already_signed(
+        self,
+        signer: &ValidatorIdentity,
+        pending_blocks: Vec<ChainBlockTally>,
+    ) -> Self {
+        // note that this is an inefficient way to check what's been signed
+        match self {
+            ChainBlocks::Eth(blocks) => ChainBlocks::Eth(
+                blocks
+                    .into_iter()
+                    .filter(|block| {
+                        !pending_blocks.iter().any(|t| {
+                            t.block.hash() == ChainHash::Eth(block.hash) && t.has_signer(signer)
+                        })
+                    })
+                    .collect(),
+            ),
+        }
+    }
 }
 
 impl From<ChainBlock> for ChainBlocks {
@@ -414,6 +445,12 @@ impl ChainReorg {
         }
     }
 
+    pub fn to_hash(&self) -> ChainHash {
+        match self {
+            ChainReorg::Eth { to_hash, .. } => ChainHash::Eth(*to_hash),
+        }
+    }
+
     pub fn reverse_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
         match self {
             ChainReorg::Eth { reverse_blocks, .. } => {
@@ -429,10 +466,26 @@ impl ChainReorg {
             }
         }
     }
+
+    /// Check whether the given validator already submitted the given reorg.
+    pub fn is_already_signed(
+        &self,
+        signer: &ValidatorIdentity,
+        pending_reorgs: Vec<ChainReorgTally>,
+    ) -> bool {
+        match self {
+            ChainReorg::Eth { .. } => {
+                let to_hash = self.to_hash();
+                pending_reorgs
+                    .iter()
+                    .any(|tally| tally.reorg.to_hash() == to_hash && tally.has_signer(signer))
+            }
+        }
+    }
 }
 
 /// Calculate whether the signers have a super majority of the given validator set.
-pub fn has_super_majority(signers: &SignersSet, validator_set: &SignersSet) -> bool {
+pub fn has_super_majority<T: Ord>(signers: &BTreeSet<T>, validator_set: &BTreeSet<T>) -> bool {
     // using ⌈j/m⌉ = ⌊(j+m-1)/m⌋
     let valid_signers: Vec<_> = validator_set.intersection(&signers).collect();
     valid_signers.len() >= (2 * validator_set.len() + 3 - 1) / 3
@@ -447,15 +500,11 @@ pub struct ChainBlockTally {
 }
 
 impl ChainBlockTally {
-    pub fn new(chain_id: ChainId, block: ChainBlock, validator: &ValidatorKeys) -> ChainBlockTally {
-        match chain_id {
-            ChainId::Eth => ChainBlockTally {
-                block,
-                support: [validator.substrate_id.clone()].iter().cloned().collect(),
-                dissent: SignersSet::new(),
-            },
-
-            _ => panic!("xxx not implemented"),
+    pub fn new(block: ChainBlock, validator: &ValidatorKeys) -> ChainBlockTally {
+        ChainBlockTally {
+            block,
+            support: [validator.substrate_id.clone()].iter().cloned().collect(),
+            dissent: SignersSet::new(),
         }
     }
 
@@ -473,6 +522,11 @@ impl ChainBlockTally {
 
     pub fn has_enough_dissent(&self, validator_set: &SignersSet) -> bool {
         has_super_majority(&self.dissent, validator_set)
+    }
+
+    pub fn has_signer(&self, validator_id: &ValidatorIdentity) -> bool {
+        // note that these set types are not optimized and inefficient
+        self.support.contains(&validator_id) || self.dissent.contains(&validator_id)
     }
 }
 
@@ -501,6 +555,11 @@ impl ChainReorgTally {
 
     pub fn has_enough_support(&self, validator_set: &SignersSet) -> bool {
         has_super_majority(&self.support, validator_set)
+    }
+
+    pub fn has_signer(&self, validator_id: &ValidatorIdentity) -> bool {
+        // note that this set types is not optimized and inefficient
+        self.support.contains(&validator_id)
     }
 }
 
@@ -539,6 +598,13 @@ impl ChainBlockEvents {
         match chain_id {
             ChainId::Eth => ChainBlockEvents::Eth(vec![]),
             _ => panic!("XXX not implemented"),
+        }
+    }
+
+    /// Determine the number of events in this queue.
+    pub fn len(&self) -> usize {
+        match self {
+            ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
         }
     }
 
@@ -651,10 +717,10 @@ impl Chain for Ethereum {
     type Signature = [u8; 65];
 
     #[type_alias("Ethereum__Chain__")]
-    type Event = ethereum_client::EthereumEvent;
+    type Event = EthereumEvent;
 
     #[type_alias("Ethereum__Chain__")]
-    type Block = ethereum_client::EthereumBlock;
+    type Block = EthereumBlock;
 
     fn zero_hash() -> Self::Hash {
         [0u8; 32]
@@ -856,5 +922,71 @@ mod tests {
                 }
             )])
         );
+    }
+
+    #[test]
+    fn test_chain_blocks_filter_already_signed() {
+        let signer = sp_core::crypto::AccountId32::new([7u8; 32]);
+        let blocks = ChainBlocks::Eth(vec![
+            EthereumBlock {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            },
+            EthereumBlock {
+                hash: [2u8; 32],
+                parent_hash: [1u8; 32],
+                number: 2,
+                events: vec![],
+            },
+        ]);
+
+        let pending_blocks = vec![ChainBlockTally {
+            block: ChainBlock::Eth(EthereumBlock {
+                hash: [2u8; 32],
+                // dont matter:
+                parent_hash: [0u8; 32],
+                number: 0,
+                events: vec![],
+            }),
+            support: [signer.clone()].iter().cloned().collect(),
+            dissent: SignersSet::new(),
+        }];
+
+        assert_eq!(
+            blocks.filter_already_signed(&signer, pending_blocks),
+            ChainBlocks::Eth(vec![EthereumBlock {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            }])
+        )
+    }
+
+    #[test]
+    fn test_chain_reorg_is_already_signed() {
+        let signer = sp_core::crypto::AccountId32::new([7u8; 32]);
+        let reorg = ChainReorg::Eth {
+            from_hash: [1u8; 32],
+            to_hash: [2u8; 32],
+            forward_blocks: vec![],
+            reverse_blocks: vec![],
+        };
+
+        let pending_reorgs = vec![ChainReorgTally {
+            reorg: ChainReorg::Eth {
+                to_hash: [2u8; 32],
+                // dont matter:
+                from_hash: [0u8; 32],
+                forward_blocks: vec![],
+                reverse_blocks: vec![],
+            },
+            support: [signer.clone()].iter().cloned().collect(),
+        }];
+
+        assert_eq!(reorg.is_already_signed(&signer, vec![]), false);
+        assert_eq!(reorg.is_already_signed(&signer, pending_reorgs), true);
     }
 }

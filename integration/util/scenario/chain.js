@@ -42,7 +42,10 @@ class Chain {
   }
 
   // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingChainBlockEvent` event
-  async waitForEthProcessEvent(pallet, eventName, onFinalize = true) {
+  async waitForEthProcessEvent(pallet, eventName, onFinalize = true, autoMine = true) {
+    if (autoMine && this.ctx.__blockTime() === null) {
+      await this.ctx.eth.mine(100); // Just mine some blocks if we're waiting on an eth event to make things move
+    }
     return this.waitForEvent(pallet, eventName, { failureEvent: ['cash', 'FailedProcessingChainBlockEvent'] });
   }
 
@@ -124,7 +127,7 @@ class Chain {
   async getNoticeSignatures(notice, opts = {}) {
     opts = {
       sleep: 3000,
-      retries: 10,
+      retries: 20,
       signatures: await this.ctx.validators.quorum(),
       ...opts
     };

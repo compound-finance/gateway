@@ -48,7 +48,7 @@ use pallet_cash::{
     portfolio::Portfolio,
     rates::APR,
     reason::Reason,
-    types::{AssetAmount, AssetBalance, AssetInfo},
+    types::{AssetAmount, AssetBalance, AssetInfo, Balance, CashIndex, CashPrincipal},
 };
 use pallet_oracle::{ticker::Ticker, types::AssetPrice};
 
@@ -81,9 +81,6 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 /// The type for looking up accounts. We don't expect more than 4 billion of them, but you
 /// never know...
 pub type AccountIndex = u32;
-
-/// Balance of an account.
-pub type Balance = u128;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
@@ -223,7 +220,7 @@ impl pallet_grandpa::Config for Runtime {
     type Event = Event;
     type Call = Call;
 
-    type KeyOwnerProofSystem = (); // XXX we prob want one?
+    type KeyOwnerProofSystem = ();
 
     type KeyOwnerProof =
         <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
@@ -250,16 +247,6 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 500;
-    pub const MaxLocks: u32 = 50;
-}
-
-parameter_types! {
-    pub const TransactionByteFee: Balance = 10_000_000; // XXX how are we doing weights/fees for substrate?
-    pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
-}
-
-parameter_types! {
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
 }
 
@@ -282,7 +269,7 @@ impl pallet_session::Config for Runtime {
     type ValidatorIdOf = IdConverter<Self>;
     type ShouldEndSession = Cash;
     type NextSessionRotation = Cash;
-    type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
+    type SessionManager = Cash;
     type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: aura and grandpa
     type Keys = opaque::SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
@@ -548,6 +535,10 @@ impl_runtime_apis! {
 
         fn get_cash_yield() -> Result<APR, Reason> {
             Cash::get_cash_yield()
+        }
+
+        fn get_cash_data() -> Result<(CashIndex, CashPrincipal, Balance), Reason> {
+            Cash::get_cash_data()
         }
 
         fn get_full_cash_balance(account: ChainAccount) -> Result<AssetBalance, Reason> {
