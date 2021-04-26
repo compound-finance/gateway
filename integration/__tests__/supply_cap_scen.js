@@ -1,6 +1,4 @@
-const {
-  buildScenarios
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
 let supply_cap_scen_info = {

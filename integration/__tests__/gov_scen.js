@@ -25,6 +25,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
+    skip: true,
     name: "Upgrade Chain WASM [Allow Next Code]",
     info: {
       versions: ['m7'],
