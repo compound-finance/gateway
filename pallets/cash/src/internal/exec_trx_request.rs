@@ -456,7 +456,7 @@ mod tests {
             );
 
             // Check emitted `Extract` event
-            let extract_cash_event = events_iter.next().unwrap();
+            let extract_event = events_iter.next().unwrap();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::Extract(
                     asset,
@@ -464,7 +464,7 @@ mod tests {
                     ChainAccount::Eth([1; 20]),
                     1000000000000000000
                 )),
-                extract_cash_event.event
+                extract_event.event
             );
         });
     }
@@ -498,6 +498,18 @@ mod tests {
                 CashPrincipal::from_nominal("-0.01")
             );
             assert_eq!(Nonces::get(account), nonce + 1);
+
+            // Check emitted `Transfer` event
+            let transfer_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Transfer(
+                    asset,
+                    account,
+                    ChainAccount::Eth([1; 20]),
+                    2000000000000000000
+                )),
+                transfer_event.event
+            );
         });
     }
 
@@ -522,6 +534,21 @@ mod tests {
                 CashPrincipal::from_nominal("3")
             );
             assert_eq!(Nonces::get(account), 1);
+
+            // Check emitted `TransferCash` event
+            let index = GlobalCashIndex::get();
+            let transfer_cash_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::TransferCash(
+                    account,
+                    ChainAccount::Eth([1; 20]),
+                    index
+                        .cash_principal_amount(Quantity::from_nominal("3", CASH))
+                        .unwrap(),
+                    index
+                )),
+                transfer_cash_event.event
+            );
         });
     }
 
@@ -546,6 +573,21 @@ mod tests {
                 CashPrincipal::from_nominal("3.99")
             );
             assert_eq!(Nonces::get(account), 1);
+
+            // Check emitted `TransferCash` event
+            let index = GlobalCashIndex::get();
+            let transfer_cash_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::TransferCash(
+                    account,
+                    ChainAccount::Eth([1; 20]),
+                    index
+                        .cash_principal_amount(Quantity::from_nominal("3.99", CASH))
+                        .unwrap(),
+                    index
+                )),
+                transfer_cash_event.event
+            );
         });
     }
 
