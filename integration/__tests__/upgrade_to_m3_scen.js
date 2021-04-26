@@ -1,6 +1,4 @@
-const {
-  buildScenarios
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 const { decodeCall, getEventData } = require('../util/substrate');
 const { bytes32 } = require('../util/util');
 
@@ -12,6 +10,7 @@ let scen_info = {
 
 buildScenarios('Upgrade to m3', scen_info, [
   {
+    skip: true,
     name: "Upgrade from m2 to m3 with Live Events",
     info: {
       versions: ['m2', 'm3'],

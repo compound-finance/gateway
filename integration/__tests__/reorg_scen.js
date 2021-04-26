@@ -9,6 +9,7 @@ let lock_scen_info = {
 
 buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
   {
+    block_time: 1,
     name: 'Re-org Lock Collateral and Lock Different Amount',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth, logger }) => {
       let snapshotId = await eth.snapshot();
@@ -32,6 +33,7 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
     }
   },
   {
+    block_time: 1,
     name: 'Re-org Lock Collateral but Send Away Elsewhere',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth, logger }) => {
       let snapshotId = await eth.snapshot();
@@ -57,15 +59,6 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
     }
   },
   {
-    info: {
-      eth_opts: {
-        ganache: {
-          opts: {
-            blockTime: null
-          }
-        }
-      }
-    },
     name: 'Re-org with Identical Tx',
     scenario: async ({ ashley, bert, ether, chain, snapshot, starport, eth, sleep }) => {
       let crazyLock = await eth.__deploy('CrazyLock', [starport.ethAddress()]);

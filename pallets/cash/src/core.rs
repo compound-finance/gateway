@@ -8,8 +8,8 @@ use crate::{
     rates::APR,
     reason::Reason,
     types::{
-        AssetAmount, AssetBalance, Balance, CashPrincipal, CashPrincipalAmount, GovernanceResult,
-        NoticeId, SignersSet, Timestamp, ValidatorKeys,
+        AssetAmount, AssetBalance, Balance, CashPrincipalAmount, GovernanceResult, NoticeId,
+        SignersSet, Timestamp, ValidatorKeys,
     },
     AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
     IngressionQueue, LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module,
@@ -21,8 +21,9 @@ use frame_support::{
     sp_runtime::traits::Convert,
     storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
 };
+#[cfg(feature = "freeze-time")]
+use our_std::if_std;
 pub use our_std::{fmt, result};
-
 #[cfg(feature = "freeze-time")]
 use std::{env, fs};
 
@@ -328,12 +329,7 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
 pub fn get_cash_balance_with_asset_interest<T: Config>(
     account: ChainAccount,
 ) -> Result<Balance, Reason> {
-    let cash_index = GlobalCashIndex::get();
-    let cash_principal: Balance = pipeline::load_portfolio::<T>(account)?.cash;
-
-    cash_index
-        .cash_balance(CashPrincipal(cash_principal.value))
-        .map_err(Reason::MathError)
+    Ok(pipeline::load_portfolio::<T>(account)?.cash)
 }
 
 /// Calculates the current liquidity value for an account.

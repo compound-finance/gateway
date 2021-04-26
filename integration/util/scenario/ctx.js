@@ -113,7 +113,15 @@ class Ctx {
     return process.env['GENESIS_VERSION'] || this.scenInfo['genesis_version'];
   }
 
-  __typesFile() {
+  __blockTime() {
+    return process.env['BLOCK_TIME'] || this.scenInfo['block_time'];
+  }
+
+  __typesFile(version) {
+    if (version) {
+      return version.typesJson();
+    }
+
     return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json');
   }
 

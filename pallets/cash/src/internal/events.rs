@@ -12,7 +12,7 @@ use crate::{
     events::{fetch_chain_block, fetch_chain_blocks},
     internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
-    params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MIN_EVENT_BLOCKS},
+    params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MAX_EVENT_BLOCKS, MIN_EVENT_BLOCKS},
     reason::Reason,
     require,
     types::{CashPrincipalAmount, Quantity, USDQuantity, USD},
@@ -138,8 +138,17 @@ pub fn ingress_queue<T: Config>(
     let block_num = last_block.number();
 
     event_queue.retain(|event| {
-        if block_num >= event.block_number() + MIN_EVENT_BLOCKS {
-            match risk_adjusted_value::<T>(event, block_num) {
+        let delta_blocks = block_num.saturating_sub(event.block_number());
+
+        if delta_blocks >= MIN_EVENT_BLOCKS {
+            // If we're beyond max risk block, then simply accept event
+            let risk_result = if delta_blocks > MAX_EVENT_BLOCKS {
+                Ok(Quantity::new(0, USD))
+            } else {
+                risk_adjusted_value::<T>(event, block_num)
+            };
+
+            match risk_result {
                 Ok(value) => {
                     debug!(
                         "Computed risk adjusted value ({:?} / {:?} @ {}) of {:?}",

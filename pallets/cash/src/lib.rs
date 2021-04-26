@@ -427,7 +427,6 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     }
 }
 
-// XXX should this have all these printlns?
 // periodic except when new authorities are pending and when an era notice has just been completed
 impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
     fn should_end_session(now: T::BlockNumber) -> bool {
@@ -442,10 +441,10 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
                 for (chain_id, _) in NoticeHolds::iter() {
                     NoticeHolds::take(chain_id);
                 }
-                println!("should_end_session=true[next_validators]");
+                log!("should_end_session=true[next_validators]");
                 true
             } else {
-                println!("should_end_session=false[pending_notice_held]");
+                log!("should_end_session=false[pending_notice_held]");
                 false
             }
         } else {
@@ -454,9 +453,11 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
             let is_new_period = (now % period) == <T>::BlockNumber::from(0 as u32);
 
             if is_new_period {
-                println!(
+                log!(
                     "should_end_session={}[periodic {:?}%{:?}]",
-                    is_new_period, now, period
+                    is_new_period,
+                    now,
+                    period
                 );
             }
             is_new_period
@@ -551,14 +552,14 @@ decl_module! {
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
-        #[weight = (<T as Config>::WeightInfo::change_validators(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::change_validators(), DispatchClass::Operational, Pays::No)]
         pub fn change_validators(origin, validators: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::change_validators::change_validators::<T>(validators))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [Root]
-        #[weight = (<T as Config>::WeightInfo::allow_next_code_with_hash(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::allow_next_code_with_hash(), DispatchClass::Operational, Pays::No)]
         pub fn allow_next_code_with_hash(origin, hash: CodeHash) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::next_code::allow_next_code_with_hash::<T>(hash))?)
@@ -594,28 +595,28 @@ decl_module! {
         }
 
         /// Sets the supply cap for a given chain asset [Root]
-        #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)]
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::supply_cap::set_supply_cap::<T>(asset, amount))?)
         }
 
         /// Set the liquidity factor for an asset [Root]
-        #[weight = (<T as Config>::WeightInfo::set_liquidity_factor(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_liquidity_factor(), DispatchClass::Operational, Pays::No)]
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_liquidity_factor::<T>(asset, factor))?)
         }
 
         /// Update the interest rate model for a given asset. [Root]
-        #[weight = (<T as Config>::WeightInfo::set_rate_model(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_rate_model(), DispatchClass::Operational, Pays::No)]
         pub fn set_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
         }
 
         /// Set the cash yield rate at some point in the future. [Root]
-        #[weight = (<T as Config>::WeightInfo::set_yield_next(), DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_yield_next(), DispatchClass::Operational, Pays::No)]
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start))?)
@@ -629,17 +630,17 @@ decl_module! {
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (0, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature); // XXX ?
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult {
+            log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature);
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_chain_blocks::<T>(blocks, signature))?)
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (0, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature); // XXX ?
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult {
+            log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature);
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::events::receive_chain_reorg::<T>(reorg, signature))?)
         }
@@ -651,7 +652,7 @@ decl_module! {
         }
 
         /// Execute a transaction request on behalf of a user
-        #[weight = (get_exec_req_weights::<T>(request.to_vec()), DispatchClass::Normal, Pays::No)] // XXX
+        #[weight = (get_exec_req_weights::<T>(request.to_vec()), DispatchClass::Normal, Pays::No)]
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)

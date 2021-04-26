@@ -6,8 +6,6 @@ use crate::{
 };
 use our_std::{cmp::min, convert::TryFrom};
 
-// XXX use Balances instead of raw balances everywhere and put all fns on types?
-
 /// Adds an asset quantity to a given unsigned amount
 pub fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
     Ok(a.checked_add(b.value).ok_or(MathError::Overflow)?)
