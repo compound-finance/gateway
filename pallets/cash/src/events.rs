@@ -47,16 +47,11 @@ fn fetch_eth_block(number: ChainBlockNumber) -> Result<EthereumBlock, EventError
         .ok_or(EventError::NoStarportAddress)?;
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
         .ok_or(EventError::NoRpcUrl)?;
-    let eth_fetch_deadline =
-        runtime_interfaces::validator_config_interface::get_eth_fetch_deadline()
-            .ok_or(EventError::NoDeadline)?;
-    let eth_block = ethereum_client::get_block(
-        &eth_rpc_url,
-        &eth_starport_address,
-        number,
-        eth_fetch_deadline,
-    )
-    .map_err(EventError::EthereumClientError)?;
+    let deadline = runtime_interfaces::validator_config_interface::get_eth_fetch_deadline()
+        .ok_or(EventError::NoDeadline)?;
+    let eth_block =
+        ethereum_client::get_block(&eth_rpc_url, &eth_starport_address, number, deadline)
+            .map_err(EventError::EthereumClientError)?;
     Ok(eth_block)
 }
 
