@@ -330,12 +330,66 @@ mod tests {
             let res = exec_trx_request::<Test>(req_str, account, nonce);
             assert_eq!(res, Ok(()));
 
-            // TODO: Check for Notice
             assert_eq!(
                 CashPrincipals::get(account),
                 CashPrincipal::from_nominal("0")
             );
             assert_eq!(Nonces::get(account), 1);
+
+            let expected_notice_id = NoticeId(0, 1);
+            let expected_notice = Notice::CashExtractionNotice(CashExtractionNotice::Eth {
+                id: expected_notice_id,
+                parent: [0u8; 32],
+                account: [1; 20],
+                principal: 4000000,
+            });
+
+            // Check Notice
+            let (actual_notice_id, actual_notice) =
+                Notices::iter_prefix(ChainId::Eth).next().unwrap();
+            assert_eq!(actual_notice, expected_notice);
+            assert_eq!(actual_notice_id, expected_notice_id);
+            let (_, state_actual_notice_id, notice_state) = NoticeStates::iter().next().unwrap();
+            assert_eq!(state_actual_notice_id, expected_notice_id);
+            assert_eq!(
+                notice_state,
+                NoticeState::Pending {
+                    signature_pairs: ChainSignatureList::Eth([].to_vec())
+                }
+            );
+            let (hash_notice_id, _) = LatestNotice::get(ChainId::Eth).unwrap();
+            assert_eq!(hash_notice_id, expected_notice_id);
+            let (actual_chain_account, actual_notices) = AccountNotices::iter().next().unwrap();
+            assert_eq!(actual_chain_account, ChainAccount::Eth([1; 20]));
+            assert_eq!(actual_notices, [expected_notice_id]);
+
+            // Check emitted `Notice` event
+            let mut events_iter = System::events().into_iter();
+            let notice_event = events_iter.next().unwrap();
+            let expected_notice_encoded = expected_notice.encode_notice();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Notice(
+                    expected_notice_id,
+                    expected_notice.clone(),
+                    expected_notice_encoded
+                )),
+                notice_event.event
+            );
+
+            // Check emitted `ExtractCash` event
+            let extract_cash_event = events_iter.next().unwrap();
+            let index = GlobalCashIndex::get();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::ExtractCash(
+                    account,
+                    ChainAccount::Eth([1; 20]),
+                    index
+                        .cash_principal_amount(Quantity::from_nominal("4", CASH))
+                        .unwrap(),
+                    index
+                )),
+                extract_cash_event.event
+            );
         });
     }
 
@@ -353,12 +407,65 @@ mod tests {
             let res = exec_trx_request::<Test>(req_str, account, nonce);
             assert_eq!(res, Ok(()));
 
-            // TODO: Check for Notice
             assert_eq!(
                 AssetBalances::get(asset, account),
                 Balance::from_nominal("2", ETH).value
             );
             assert_eq!(Nonces::get(account), 1);
+
+            let eth_asset = [238; 20];
+            let expected_notice_id = NoticeId(0, 1);
+            let expected_notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
+                id: expected_notice_id,
+                parent: [0u8; 32],
+                asset: eth_asset,
+                account: [1; 20],
+                amount: 1000000000000000000,
+            });
+
+            // Check Notice
+            let (actual_notice_id, actual_notice) =
+                Notices::iter_prefix(ChainId::Eth).next().unwrap();
+            assert_eq!(actual_notice, expected_notice);
+            assert_eq!(actual_notice_id, expected_notice_id);
+            let (_, state_actual_notice_id, notice_state) = NoticeStates::iter().next().unwrap();
+            assert_eq!(state_actual_notice_id, expected_notice_id);
+            assert_eq!(
+                notice_state,
+                NoticeState::Pending {
+                    signature_pairs: ChainSignatureList::Eth([].to_vec())
+                }
+            );
+            let (hash_notice_id, _) = LatestNotice::get(ChainId::Eth).unwrap();
+            assert_eq!(hash_notice_id, expected_notice_id);
+            let (actual_chain_account, actual_notices) = AccountNotices::iter().next().unwrap();
+            assert_eq!(actual_chain_account, ChainAccount::Eth([1; 20]));
+            assert_eq!(actual_notices, [expected_notice_id]);
+
+            // Check emitted `Notice` event
+            let mut events_iter = System::events().into_iter();
+            let notice_event = events_iter.next().unwrap();
+            let expected_notice_encoded = expected_notice.encode_notice();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Notice(
+                    expected_notice_id,
+                    expected_notice.clone(),
+                    expected_notice_encoded
+                )),
+                notice_event.event
+            );
+
+            // Check emitted `Extract` event
+            let extract_cash_event = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Extract(
+                    asset,
+                    account,
+                    ChainAccount::Eth([1; 20]),
+                    1000000000000000000
+                )),
+                extract_cash_event.event
+            );
         });
     }
 
