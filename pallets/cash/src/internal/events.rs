@@ -250,6 +250,7 @@ pub fn formulate_reorg<T: Config>(
     let mut last_block_hash = Some(last_block.hash());
     let mut true_block_number = Some(true_block.number());
     let common_ancestor = 'search: loop {
+        // note that `drawrof_blocks_next` could be built directly in reverse order
         let reverse_blocks_next = match last_block_hash {
             Some(hash) => recall_chain_blocks::<T>(hash, CHUNK)?,
             None => Vec::new(),
@@ -273,6 +274,10 @@ pub fn formulate_reorg<T: Config>(
             reverse_blocks.push(block.clone());
             reverse_hashes.insert(block.hash());
         }
+        // note that the following is correct if the original blocks are at the same height
+        //  however that fact also makes this entire algorithm obsolete / inefficient
+        //   we can simply compare parents at the same height one at a time
+        //  but for this to be generally correct, we would need to recheck all `drawrof_blocks`
         for block in drawrof_blocks_next {
             let parent_hash = block.parent_hash();
             if reverse_hashes.contains(&parent_hash) {
@@ -330,6 +335,9 @@ pub fn receive_chain_blocks<T: Config>(
     let mut event_queue = get_event_queue::<T>(chain_id)?;
     let mut last_block = get_last_block::<T>(chain_id)?;
     let mut pending_blocks = PendingChainBlocks::get(chain_id);
+
+    debug!("Pending blocks: {:?}", pending_blocks);
+    debug!("Event queue: {:?}", event_queue);
 
     for block in blocks.blocks() {
         if block.number() >= last_block.number() + 1 {
@@ -405,6 +413,7 @@ pub fn receive_chain_blocks<T: Config>(
             event_queue.push(&tally.block);
             last_block = tally.block.clone();
             ingress_queue::<T>(&last_block, &mut event_queue)?;
+            continue;
         } else if tally.has_enough_dissent(&validator_set) {
             // remove tally and everything after from queue
             pending_blocks = vec![];
