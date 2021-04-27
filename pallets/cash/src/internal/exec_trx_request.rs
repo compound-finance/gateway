@@ -522,7 +522,7 @@ mod tests {
             );
             // Check emitted `TransferCash` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCashFee(
+                mock::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap(),
@@ -580,7 +580,7 @@ mod tests {
             );
             // Check emitted `TransferCash` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCashFee(
+                mock::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap(),
@@ -638,7 +638,7 @@ mod tests {
             );
             // Check emitted `TransferCash` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCashFee(
+                mock::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap(),
