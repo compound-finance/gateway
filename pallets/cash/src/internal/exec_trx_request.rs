@@ -481,6 +481,9 @@ mod tests {
             let to_account = ChainAccount::Eth([1; 20]);
             let nonce = 0;
 
+            let miner = ChainAccount::Eth([3; 20]);
+            Miner::put(miner);
+
             let res = exec_trx_request::<Test>(req_str, account, Some(nonce));
             assert_eq!(res, Ok(()));
 
@@ -497,10 +500,17 @@ mod tests {
                 CashPrincipals::get(account),
                 CashPrincipal::from_nominal("-0.01")
             );
+            assert_eq!(
+                CashPrincipals::get(miner),
+                CashPrincipal::from_nominal("0.01")
+            );
             assert_eq!(Nonces::get(account), nonce + 1);
 
             // Check emitted `Transfer` event
-            let transfer_event = System::events().into_iter().next().unwrap();
+            let mut events_iter = System::events().into_iter();
+            let transfer_event = events_iter.next().unwrap();
+            let transfer_fee_event = events_iter.next().unwrap();
+            let index = GlobalCashIndex::get();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::Transfer(
                     asset,
@@ -509,6 +519,16 @@ mod tests {
                     2000000000000000000
                 )),
                 transfer_event.event
+            );
+            // Check emitted `TransferCash` event
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::TransferCashFee(
+                    account,
+                    miner,
+                    index.cash_principal_amount(TRANSFER_FEE).unwrap(),
+                    index
+                )),
+                transfer_fee_event.event
             );
         });
     }
@@ -522,6 +542,9 @@ mod tests {
             init_cash(account, CashPrincipal::from_nominal("4"));
             let nonce = Some(0);
 
+            let miner = ChainAccount::Eth([3; 20]);
+            Miner::put(miner);
+
             let res = exec_trx_request::<Test>(req_str, account, nonce);
             assert_eq!(res, Ok(()));
 
@@ -533,11 +556,17 @@ mod tests {
                 CashPrincipals::get(to_account),
                 CashPrincipal::from_nominal("3")
             );
+            assert_eq!(
+                CashPrincipals::get(miner),
+                CashPrincipal::from_nominal("0.01")
+            );
             assert_eq!(Nonces::get(account), 1);
 
             // Check emitted `TransferCash` event
+            let mut events_iter = System::events().into_iter();
+            let transfer_cash_event = events_iter.next().unwrap();
+            let transfer_cash_fee_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
-            let transfer_cash_event = System::events().into_iter().next().unwrap();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::TransferCash(
                     account,
@@ -548,6 +577,16 @@ mod tests {
                     index
                 )),
                 transfer_cash_event.event
+            );
+            // Check emitted `TransferCash` event
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::TransferCashFee(
+                    account,
+                    miner,
+                    index.cash_principal_amount(TRANSFER_FEE).unwrap(),
+                    index
+                )),
+                transfer_cash_fee_event.event
             );
         });
     }
@@ -561,6 +600,9 @@ mod tests {
             init_cash(account, CashPrincipal::from_nominal("4"));
             let nonce = Some(0);
 
+            let miner = ChainAccount::Eth([3; 20]);
+            Miner::put(miner);
+
             let res = exec_trx_request::<Test>(req_str, account, nonce);
             assert_eq!(res, Ok(()));
 
@@ -572,11 +614,17 @@ mod tests {
                 CashPrincipals::get(to_account),
                 CashPrincipal::from_nominal("3.99")
             );
+            assert_eq!(
+                CashPrincipals::get(miner),
+                CashPrincipal::from_nominal("0.01")
+            );
             assert_eq!(Nonces::get(account), 1);
 
             // Check emitted `TransferCash` event
+            let mut events_iter = System::events().into_iter();
+            let transfer_cash_event = events_iter.next().unwrap();
+            let transfer_cash_fee_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
-            let transfer_cash_event = System::events().into_iter().next().unwrap();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::TransferCash(
                     account,
@@ -587,6 +635,16 @@ mod tests {
                     index
                 )),
                 transfer_cash_event.event
+            );
+            // Check emitted `TransferCash` event
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::TransferCashFee(
+                    account,
+                    miner,
+                    index.cash_principal_amount(TRANSFER_FEE).unwrap(),
+                    index
+                )),
+                transfer_cash_fee_event.event
             );
         });
     }

@@ -267,6 +267,9 @@ decl_event!(
         /// An account has transferred CASH. [sender, recipient, principal, index]
         TransferCash(ChainAccount, ChainAccount, CashPrincipalAmount, CashIndex),
 
+        /// An account has transferred CASH fee to the miner. [sender, miner, fee_principal, index]
+        TransferCashFee(ChainAccount, ChainAccount, CashPrincipalAmount, CashIndex),
+
         /// An account has been liquidated. [asset, collateral_asset, liquidator, borrower, amount]
         Liquidate(
             ChainAsset,

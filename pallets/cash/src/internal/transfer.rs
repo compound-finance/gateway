@@ -34,6 +34,7 @@ pub fn transfer_internal<T: Config>(
         recipient,
         amount.value,
     ));
+    <Module<T>>::deposit_event(Event::TransferCashFee(sender, miner, fee_principal, index));
 
     Ok(())
 }
@@ -57,6 +58,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
         .commit::<T>();
 
     <Module<T>>::deposit_event(Event::TransferCash(sender, recipient, principal, index));
+    <Module<T>>::deposit_event(Event::TransferCashFee(sender, miner, fee_principal, index));
 
     Ok(())
 }
