@@ -98,12 +98,14 @@
   "CashQuantity": "Quantity",
   "ChainAccount": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Ethereum__Chain__Address",
       "Dot": "Polkadot__Chain__Address"
     }
   },
   "ChainAccountSignature": {
     "_enum": {
+      "Reserved": "",
       "Eth": "ChainAccountSignatureEth",
       "Dot": "ChainAccountSignatureDot"
     }
@@ -112,23 +114,27 @@
   "ChainAccountSignatureEth": "(Ethereum__Chain__Address,Ethereum__Chain__Signature)",
   "ChainAsset": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Ethereum__Chain__Address",
       "Dot": "Polkadot__Chain__Address"
     }
   },
   "ChainBlock": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Ethereum__Chain__Block"
     }
   },
   "ChainBlockEvent": {
     "_enum": {
+      "Reserved": "",
       "Eth": "ChainBlockEventEth"
     }
   },
   "ChainBlockEventEth": "(ChainBlockNumber,Ethereum__Chain__Event)",
   "ChainBlockEvents": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>"
     }
   },
@@ -140,23 +146,27 @@
   },
   "ChainBlocks": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Vec<Ethereum__Chain__Block>"
     }
   },
   "ChainHash": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Ethereum__Chain__Hash",
       "Dot": "Polkadot__Chain__Hash"
     }
   },
   "ChainId": {
     "_enum": {
+      "Reserved": "",
       "Eth": "",
       "Dot": ""
     }
   },
   "ChainReorg": {
     "_enum": {
+      "Reserved": "",
       "Eth": "ChainReorgEth"
     }
   },
@@ -172,12 +182,14 @@
   },
   "ChainSignature": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Ethereum__Chain__Signature",
       "Dot": "Polkadot__Chain__Signature"
     }
   },
   "ChainSignatureList": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Vec<(Ethereum__Chain__Address,Ethereum__Chain__Signature)>",
       "Dot": "Vec<(Polkadot__Chain__Address,Polkadot__Chain__Signature)>"
     }

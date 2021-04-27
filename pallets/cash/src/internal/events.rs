@@ -77,6 +77,7 @@ pub fn risk_adjusted_value<T: Config>(
 
             _ => Ok(Quantity::new(0, USD)),
         },
+        _ => Err(Reason::Unreachable),
     }
 }
 
@@ -113,7 +114,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
         submit_chain_blocks::<T>(&blocks)
     } else {
         debug!(
-            "Worker sees a different fork: {:?} {:?}",
+            "Worker sees a different fork: true={:?} last={:?}",
             true_block, last_block
         );
         let pending_reorgs = PendingChainReorgs::get(chain_id);
@@ -121,7 +122,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
         if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
             submit_chain_reorg::<T>(&reorg)
         } else {
-            debug!("Worker already submitted...waiting");
+            debug!("Worker already submitted... waiting");
             // just wait for the reorg to succeed or fail,
             //  or we change our minds in another pass (noop)
             Ok(())
@@ -306,6 +307,7 @@ pub fn formulate_reorg<T: Config>(
                 .take_while(|b| b.parent_hash() != common_ancestor)
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
+                    _ => None,
                 })
                 .collect(),
             forward_blocks: drawrof_blocks
@@ -313,6 +315,7 @@ pub fn formulate_reorg<T: Config>(
                 .take_while(|b| b.parent_hash() != common_ancestor)
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
+                    _ => None,
                 })
                 .collect_rev(),
         }),
