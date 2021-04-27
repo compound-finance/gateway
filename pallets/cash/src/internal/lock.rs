@@ -158,6 +158,19 @@ mod tests {
             );
             assert_eq!(CashPrincipals::get(JARED), twice_principal.negate());
             assert_eq!(TotalCashPrincipal::get(), twice_principal_amount);
+
+            // Check emitted `LockedCash` event
+            let index = GlobalCashIndex::get();
+            let locked_cash_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LockedCash(
+                    GEOFF,
+                    JARED,
+                    once_principal_amount,
+                    index
+                )),
+                locked_cash_event.event
+            );
         });
     }
 
@@ -218,6 +231,20 @@ mod tests {
                 CashPrincipalAmount(0)
             );
 
+            // Check emitted `LockedCash` event
+            let index = GlobalCashIndex::get();
+            let mut events_iter = System::events().into_iter();
+            let jared_locked_cash_event = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LockedCash(
+                    jared,
+                    jared,
+                    lock_principal,
+                    index
+                )),
+                jared_locked_cash_event.event
+            );
+
             ChainCashPrincipals::insert(ChainId::Eth, lock_principal);
             CashPrincipals::insert(&geoff, CashPrincipal::from_nominal("-1"));
             assert_err!(
@@ -231,6 +258,18 @@ mod tests {
                 lock_principal
             ));
             assert_eq!(TotalCashPrincipal::get(), CashPrincipalAmount(0));
+
+            // Check emitted `LockedCash` event
+            let geoff_locked_cash_event = System::events().into_iter().last().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LockedCash(
+                    geoff,
+                    geoff,
+                    lock_principal,
+                    index
+                )),
+                geoff_locked_cash_event.event
+            );
 
             Ok(())
         })
