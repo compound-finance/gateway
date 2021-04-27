@@ -808,6 +808,19 @@ mod tests {
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);
+
+            // Check emitted `LiquidateCashCollateral` event
+            let liquidate_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                //[asset, liquidator, borrower, amount]
+                mock::Event::pallet_cash(crate::Event::LiquidateCashCollateral(
+                    eth_asset,
+                    liquidator_account,
+                    borrower_account,
+                    1000000000000000000
+                )),
+                liquidate_event.event
+            );
         });
     }
 
@@ -880,6 +893,22 @@ mod tests {
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);
+
+            // Check emitted `LiquidateCash` event
+            let index = GlobalCashIndex::get();
+            let liquidate_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LiquidateCash(
+                    eth_asset,
+                    liquidator_account,
+                    borrower_account,
+                    index
+                        .cash_principal_amount(Quantity::from_nominal("1000", CASH))
+                        .unwrap(),
+                    index
+                )),
+                liquidate_event.event
+            );
         });
     }
 
@@ -1014,6 +1043,19 @@ mod tests {
             );
             assert_eq!(Nonces::get(liquidator_account), nonce + 1);
             assert_eq!(Nonces::get(borrower_account), 0);
+
+            // Check emitted `Liquidate` event
+            let liquidate_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Liquidate(
+                    wbtc_asset,
+                    eth_asset,
+                    liquidator_account,
+                    borrower_account,
+                    100000000
+                )),
+                liquidate_event.event
+            );
         });
     }
 
