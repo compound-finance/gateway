@@ -106,6 +106,13 @@ mod tests {
             let events_post: Vec<_> = System::events().into_iter().collect();
             assert_eq!(events_pre.len() + 1, events_post.len());
             assert_eq!(AllowedNextCodeHash::get(), None);
+
+            // Check emitted `AttemptedSetCodeByHash` event
+            let attempted_set_code_event = events_post.into_iter().last().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::AttemptedSetCodeByHash(hash, Ok(()))),
+                attempted_set_code_event.event
+            );
         });
     }
 }
