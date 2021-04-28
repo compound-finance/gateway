@@ -107,7 +107,7 @@ async function buildChainSpec(chainSpecInfo, validatorsInfoHash, tokenInfoHash, 
   let chainSpecFile = chainSpecInfo.use_temp ?
     await tmpFile('chainSpec.json') : path.join(__dirname, '..', '..', 'chainSpec.json');
   let target = ctx.__target();
-  ctx.log('Building chain spec from ' + target + ' to temp file ' + chainSpecFile);
+  ctx.log('[CHAINSPEC] Scenario chain_spec.json: ' + chainSpecFile);
   let chainSpecJson;
   try {
     let { error, stdout, stderr } =
