@@ -600,6 +600,7 @@ mod tests {
                 account: [2; 20],
             });
             let signature = notice.sign_notice().unwrap();
+            let signer = <Ethereum as Chain>::signer_address().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
                 _ => panic!("absurd"),
@@ -610,17 +611,16 @@ mod tests {
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
             let substrate_id = AccountId32::new([0u8; 32]);
-            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
             Validators::insert(
                 substrate_id.clone(),
                 ValidatorKeys {
                     substrate_id,
-                    eth_address,
+                    eth_address: signer,
                 },
             );
 
             let expected_notice_state = NoticeState::Pending {
-                signature_pairs: ChainSignatureList::Eth(vec![(eth_address, eth_signature)]),
+                signature_pairs: ChainSignatureList::Eth(vec![(signer, eth_signature)]),
             };
 
             assert_eq!(
@@ -683,12 +683,11 @@ mod tests {
             Notices::insert(chain_id, notice_id, notice);
 
             let substrate_id = AccountId32::new([0u8; 32]);
-            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
             Validators::insert(
                 substrate_id.clone(),
                 ValidatorKeys {
                     substrate_id,
-                    eth_address,
+                    eth_address: signer,
                 },
             );
 
@@ -724,12 +723,12 @@ mod tests {
             Notices::insert(chain_id, notice_id, notice);
 
             let substrate_id = AccountId32::new([0u8; 32]);
-            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+
             Validators::insert(
                 substrate_id.clone(),
                 ValidatorKeys {
                     substrate_id,
-                    eth_address,
+                    eth_address: signer,
                 },
             );
 
