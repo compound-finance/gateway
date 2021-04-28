@@ -17,6 +17,7 @@ use types_derive::{type_alias, Types};
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainId {
+    Reserved,
     Eth,
     Dot,
 }
@@ -24,6 +25,7 @@ pub enum ChainId {
 impl ChainId {
     pub fn to_account(self, addr: &str) -> Result<ChainAccount, Reason> {
         match self {
+            ChainId::Reserved => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::str_to_address(addr)?)),
         }
@@ -31,6 +33,7 @@ impl ChainId {
 
     pub fn to_asset(self, addr: &str) -> Result<ChainAsset, Reason> {
         match self {
+            ChainId::Reserved => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAsset::Dot(Polkadot::str_to_address(addr)?)),
         }
@@ -38,6 +41,7 @@ impl ChainId {
 
     pub fn to_hash(self, hash: &str) -> Result<ChainHash, Reason> {
         match self {
+            ChainId::Reserved => Ok(ChainHash::Reserved),
             ChainId::Eth => Ok(ChainHash::Eth(Ethereum::str_to_hash(hash)?)),
             ChainId::Dot => Ok(ChainHash::Dot(Polkadot::str_to_hash(hash)?)),
         }
@@ -45,6 +49,7 @@ impl ChainId {
 
     pub fn signer_address(self) -> Result<ChainAccount, Reason> {
         match self {
+            ChainId::Reserved => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
             ChainId::Dot => Ok(ChainAccount::Dot(<Polkadot as Chain>::signer_address()?)),
         }
@@ -52,6 +57,7 @@ impl ChainId {
 
     pub fn hash_bytes(self, data: &[u8]) -> ChainHash {
         match self {
+            ChainId::Reserved => ChainHash::Reserved,
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::hash_bytes(data)),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::hash_bytes(data)),
         }
@@ -59,6 +65,7 @@ impl ChainId {
 
     pub fn sign(self, message: &[u8]) -> Result<ChainSignature, Reason> {
         match self {
+            ChainId::Reserved => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainSignature::Eth(<Ethereum as Chain>::sign_message(
                 message,
             )?)),
@@ -73,12 +80,13 @@ impl ChainId {
             ChainId::Eth => ChainBlock::Eth(
                 runtime_interfaces::config_interface::get_eth_starport_parent_block(),
             ),
-            _ => panic!("XXX not implemented"),
+            ChainId::Reserved | ChainId::Dot => panic!("xxx not supported"),
         }
     }
 
     pub fn zero_hash(self) -> ChainHash {
         match self {
+            ChainId::Reserved => ChainHash::Reserved,
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
         }
@@ -88,6 +96,7 @@ impl ChainId {
 /// Type for an account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccount {
+    Reserved,
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
 }
@@ -95,6 +104,7 @@ pub enum ChainAccount {
 impl ChainAccount {
     pub fn chain_id(&self) -> ChainId {
         match *self {
+            ChainAccount::Reserved => ChainId::Reserved,
             ChainAccount::Eth(_) => ChainId::Eth,
             ChainAccount::Dot(_) => ChainId::Dot,
         }
@@ -120,8 +130,9 @@ impl FromStr for ChainAccount {
 impl From<ChainAccount> for String {
     fn from(asset: ChainAccount) -> String {
         match asset {
+            ChainAccount::Reserved => String::from("RESERVED"),
             ChainAccount::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
-            _ => panic!("XXX not implemented"),
+            ChainAccount::Dot(_) => String::from("DOT"),
         }
     }
 }
@@ -129,6 +140,7 @@ impl From<ChainAccount> for String {
 /// Type for an asset tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAsset {
+    Reserved,
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
 }
@@ -137,6 +149,7 @@ pub enum ChainAsset {
 impl ChainAsset {
     pub fn chain_id(&self) -> ChainId {
         match *self {
+            ChainAsset::Reserved => ChainId::Reserved,
             ChainAsset::Eth(_) => ChainId::Eth,
             ChainAsset::Dot(_) => ChainId::Dot,
         }
@@ -161,8 +174,9 @@ impl FromStr for ChainAsset {
 impl From<ChainAsset> for String {
     fn from(asset: ChainAsset) -> String {
         match asset {
+            ChainAsset::Reserved => String::from("RESERVED"),
             ChainAsset::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
-            _ => panic!("XXX not implemented"),
+            ChainAsset::Dot(_) => String::from("DOT"),
         }
     }
 }
@@ -170,6 +184,7 @@ impl From<ChainAsset> for String {
 /// Type for a signature and account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccountSignature {
+    Reserved,
     Eth(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature),
 }
@@ -177,6 +192,7 @@ pub enum ChainAccountSignature {
 impl ChainAccountSignature {
     pub fn to_chain_signature(self) -> ChainSignature {
         match self {
+            ChainAccountSignature::Reserved => ChainSignature::Reserved,
             ChainAccountSignature::Eth(_, sig) => ChainSignature::Eth(sig),
             ChainAccountSignature::Dot(_, sig) => ChainSignature::Dot(sig),
         }
@@ -184,6 +200,7 @@ impl ChainAccountSignature {
 
     pub fn recover_account(self, message: &[u8]) -> Result<ChainAccount, Reason> {
         match self {
+            ChainAccountSignature::Reserved => Err(Reason::Unreachable),
             ChainAccountSignature::Eth(eth_account, eth_sig) => {
                 let recovered = <Ethereum as Chain>::recover_user_address(message, eth_sig)?;
                 if eth_account == recovered {
@@ -192,8 +209,7 @@ impl ChainAccountSignature {
                     Err(Reason::SignatureAccountMismatch)
                 }
             }
-
-            _ => panic!("XXX not implemented"),
+            ChainAccountSignature::Dot(_, _) => Err(Reason::Unreachable),
         }
     }
 }
@@ -205,6 +221,7 @@ pub type ChainBlockNumber = u64;
 /// Type for a hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainHash {
+    Reserved,
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
 }
@@ -213,6 +230,7 @@ pub enum ChainHash {
 impl our_std::fmt::Display for ChainHash {
     fn fmt(&self, f: &mut our_std::fmt::Formatter<'_>) -> our_std::fmt::Result {
         match self {
+            ChainHash::Reserved => write!(f, "RESERVED"),
             ChainHash::Eth(eth_hash) => write!(f, "ETH#{:X?}", eth_hash),
             ChainHash::Dot(dot_hash) => write!(f, "DOT#{:X?}", dot_hash),
         }
@@ -237,8 +255,9 @@ impl FromStr for ChainHash {
 impl From<ChainHash> for String {
     fn from(hash: ChainHash) -> String {
         match hash {
+            ChainHash::Reserved => format!("RESERVED"),
             ChainHash::Eth(eth_hash) => <Ethereum as Chain>::hash_string(&eth_hash),
-            _ => panic!("XXX not implemented"),
+            ChainHash::Dot(_) => format!("DOT"),
         }
     }
 }
@@ -246,6 +265,7 @@ impl From<ChainHash> for String {
 /// Type for a signature tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignature {
+    Reserved,
     Eth(<Ethereum as Chain>::Signature),
     Dot(<Polkadot as Chain>::Signature),
 }
@@ -253,6 +273,7 @@ pub enum ChainSignature {
 impl ChainSignature {
     pub fn chain_id(&self) -> ChainId {
         match self {
+            ChainSignature::Reserved => ChainId::Reserved,
             ChainSignature::Eth(_) => ChainId::Eth,
             ChainSignature::Dot(_) => ChainId::Dot,
         }
@@ -260,11 +281,11 @@ impl ChainSignature {
 
     pub fn recover(&self, message: &[u8]) -> Result<ChainAccount, Reason> {
         match self {
+            ChainSignature::Reserved => Err(Reason::Unreachable),
             ChainSignature::Eth(eth_sig) => Ok(ChainAccount::Eth(
                 <Ethereum as Chain>::recover_address(message, *eth_sig)?,
             )),
-
-            _ => panic!("XXX not implemented"),
+            ChainSignature::Dot(_) => Err(Reason::Unreachable),
         }
     }
 }
@@ -272,6 +293,7 @@ impl ChainSignature {
 /// Type for a list of chain signatures.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainSignatureList {
+    Reserved,
     Eth(Vec<(<Ethereum as Chain>::Address, <Ethereum as Chain>::Signature)>),
     Dot(Vec<(<Polkadot as Chain>::Address, <Polkadot as Chain>::Signature)>),
 }
@@ -323,36 +345,42 @@ impl FromStr for ChainId {
 /// Type for describing a block coming from an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlock {
+    Reserved,
     Eth(<Ethereum as Chain>::Block),
 }
 
 impl ChainBlock {
     pub fn chain_id(&self) -> ChainId {
         match self {
+            ChainBlock::Reserved => ChainId::Reserved,
             ChainBlock::Eth(_) => ChainId::Eth,
         }
     }
 
     pub fn hash(&self) -> ChainHash {
         match self {
+            ChainBlock::Reserved => ChainHash::Reserved,
             ChainBlock::Eth(block) => ChainHash::Eth(block.hash),
         }
     }
 
     pub fn parent_hash(&self) -> ChainHash {
         match self {
+            ChainBlock::Reserved => ChainHash::Reserved,
             ChainBlock::Eth(block) => ChainHash::Eth(block.parent_hash),
         }
     }
 
     pub fn number(&self) -> ChainBlockNumber {
         match self {
+            ChainBlock::Reserved => 0,
             ChainBlock::Eth(block) => block.number,
         }
     }
 
     pub fn events(&self) -> impl Iterator<Item = ChainBlockEvent> + '_ {
         match self {
+            ChainBlock::Reserved => panic!("xxx not implemented"),
             ChainBlock::Eth(block) => block
                 .events
                 .iter()
@@ -364,30 +392,35 @@ impl ChainBlock {
 /// Type for describing a set of blocks coming from an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlocks {
+    Reserved,
     Eth(Vec<<Ethereum as Chain>::Block>),
 }
 
 impl ChainBlocks {
     pub fn chain_id(&self) -> ChainId {
         match self {
+            ChainBlocks::Reserved => ChainId::Reserved,
             ChainBlocks::Eth(_) => ChainId::Eth,
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
+            ChainBlocks::Reserved => 0,
             ChainBlocks::Eth(blocks) => blocks.len(),
         }
     }
 
     pub fn blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
         match self {
+            ChainBlocks::Reserved => panic!("xxx not implemented"),
             ChainBlocks::Eth(blocks) => blocks.iter().map(|b| ChainBlock::Eth(b.clone())),
         }
     }
 
     pub fn block_numbers(&self) -> impl Iterator<Item = u64> + '_ {
         match self {
+            ChainBlocks::Reserved => panic!("xxx not implemented"),
             ChainBlocks::Eth(blocks) => blocks.iter().map(|b| b.number),
         }
     }
@@ -399,6 +432,7 @@ impl ChainBlocks {
     ) -> Self {
         // note that this is an inefficient way to check what's been signed
         match self {
+            ChainBlocks::Reserved => self,
             ChainBlocks::Eth(blocks) => ChainBlocks::Eth(
                 blocks
                     .into_iter()
@@ -416,6 +450,7 @@ impl ChainBlocks {
 impl From<ChainBlock> for ChainBlocks {
     fn from(block: ChainBlock) -> Self {
         match block {
+            ChainBlock::Reserved => ChainBlocks::Reserved,
             ChainBlock::Eth(block) => ChainBlocks::Eth(vec![block]),
         }
     }
@@ -424,6 +459,7 @@ impl From<ChainBlock> for ChainBlocks {
 /// Type for describing a reorg of an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainReorg {
+    Reserved,
     Eth {
         from_hash: <Ethereum as Chain>::Hash,
         to_hash: <Ethereum as Chain>::Hash,
@@ -435,24 +471,28 @@ pub enum ChainReorg {
 impl ChainReorg {
     pub fn chain_id(&self) -> ChainId {
         match self {
+            ChainReorg::Reserved => ChainId::Reserved,
             ChainReorg::Eth { .. } => ChainId::Eth,
         }
     }
 
     pub fn from_hash(&self) -> ChainHash {
         match self {
+            ChainReorg::Reserved => ChainHash::Reserved,
             ChainReorg::Eth { from_hash, .. } => ChainHash::Eth(*from_hash),
         }
     }
 
     pub fn to_hash(&self) -> ChainHash {
         match self {
+            ChainReorg::Reserved => ChainHash::Reserved,
             ChainReorg::Eth { to_hash, .. } => ChainHash::Eth(*to_hash),
         }
     }
 
     pub fn reverse_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
         match self {
+            ChainReorg::Reserved => panic!("xxx not implemented"),
             ChainReorg::Eth { reverse_blocks, .. } => {
                 reverse_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
             }
@@ -461,6 +501,7 @@ impl ChainReorg {
 
     pub fn forward_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
         match self {
+            ChainReorg::Reserved => panic!("xxx not implemented"),
             ChainReorg::Eth { forward_blocks, .. } => {
                 forward_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
             }
@@ -474,6 +515,7 @@ impl ChainReorg {
         pending_reorgs: Vec<ChainReorgTally>,
     ) -> bool {
         match self {
+            ChainReorg::Reserved => false,
             ChainReorg::Eth { .. } => {
                 let to_hash = self.to_hash();
                 pending_reorgs
@@ -565,18 +607,21 @@ impl ChainReorgTally {
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlockEvent {
+    Reserved,
     Eth(ChainBlockNumber, <Ethereum as Chain>::Event),
 }
 
 impl ChainBlockEvent {
     pub fn chain_id(&self) -> ChainId {
         match self {
+            ChainBlockEvent::Reserved => ChainId::Reserved,
             ChainBlockEvent::Eth(..) => ChainId::Eth,
         }
     }
 
     pub fn block_number(&self) -> ChainBlockNumber {
         match self {
+            ChainBlockEvent::Reserved => 0,
             ChainBlockEvent::Eth(block_num, _) => *block_num,
         }
     }
@@ -589,6 +634,7 @@ impl ChainBlockEvent {
 /// Type for describing a set of events coming from an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlockEvents {
+    Reserved,
     Eth(Vec<(ChainBlockNumber, <Ethereum as Chain>::Event)>),
 }
 
@@ -596,14 +642,16 @@ impl ChainBlockEvents {
     /// Return an empty queue for the given chain.
     pub fn empty(chain_id: ChainId) -> ChainBlockEvents {
         match chain_id {
+            ChainId::Reserved => ChainBlockEvents::Reserved,
             ChainId::Eth => ChainBlockEvents::Eth(vec![]),
-            _ => panic!("XXX not implemented"),
+            ChainId::Dot => panic!("xxx not implemented"),
         }
     }
 
     /// Determine the number of events in this queue.
     pub fn len(&self) -> usize {
         match self {
+            ChainBlockEvents::Reserved => 0,
             ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
         }
     }
@@ -611,12 +659,14 @@ impl ChainBlockEvents {
     /// Push the events from block onto this queue of events.
     pub fn push(&mut self, block: &ChainBlock) {
         match self {
+            ChainBlockEvents::Reserved => (),
             ChainBlockEvents::Eth(eth_block_events) => match block {
                 ChainBlock::Eth(eth_block) => {
                     for event in eth_block.events.iter() {
                         eth_block_events.push((eth_block.number, event.clone()));
                     }
                 }
+                _ => panic!("block type mismatch"),
             },
         }
     }
@@ -627,6 +677,7 @@ impl ChainBlockEvents {
         F: FnMut(&ChainBlockEvent) -> bool,
     {
         match self {
+            ChainBlockEvents::Reserved => (),
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.retain(|(b, e)| f(&ChainBlockEvent::Eth(*b, e.clone())));
             }
@@ -636,10 +687,12 @@ impl ChainBlockEvents {
     /// Find the index of the given event on this queue, or none.
     pub fn position(&self, event: &ChainBlockEvent) -> Option<usize> {
         match self {
+            ChainBlockEvents::Reserved => None,
             ChainBlockEvents::Eth(eth_block_events) => match event {
                 ChainBlockEvent::Eth(block_num, eth_block) => eth_block_events
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *eth_block),
+                _ => None,
             },
         }
     }
@@ -647,6 +700,7 @@ impl ChainBlockEvents {
     /// Remove the event at the given position.
     pub fn remove(&mut self, pos: usize) {
         match self {
+            ChainBlockEvents::Reserved => (),
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.remove(pos);
             }

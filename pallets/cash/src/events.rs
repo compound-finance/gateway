@@ -23,6 +23,7 @@ pub fn fetch_chain_block(
     number: ChainBlockNumber,
 ) -> Result<ChainBlock, Reason> {
     match chain_id {
+        ChainId::Reserved => Err(Reason::Unreachable),
         ChainId::Eth => Ok(fetch_eth_block(number).map(ChainBlock::Eth)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }
@@ -35,6 +36,7 @@ pub fn fetch_chain_blocks(
     to: ChainBlockNumber,
 ) -> Result<ChainBlocks, Reason> {
     match chain_id {
+        ChainId::Reserved => Err(Reason::Unreachable),
         ChainId::Eth => Ok(fetch_eth_blocks(from, to)?),
         ChainId::Dot => Err(Reason::Unreachable),
     }

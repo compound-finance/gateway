@@ -244,6 +244,7 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
                 result.to_vec(),
             ),
         },
+        _ => Err(Reason::Unreachable),
     }
 }
 
@@ -280,6 +281,7 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
 
             _ => Ok(()),
         },
+        _ => Err(Reason::Unreachable),
     }
 }
 
