@@ -1,38 +1,30 @@
 use crate::{
     chains::ChainAsset,
+    core::get_recent_timestamp,
     factor::Factor,
     internal,
     reason::Reason,
     types::{AssetIndex, CashPrincipalAmount, Quantity, Timestamp, CASH},
     BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, GlobalCashIndex,
     LastBlockTimestamp, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp,
-    SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets,
+    MinerCumulative, SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal,
+    TotalSupplyAssets,
 };
 use frame_support::storage::{IterableStorageMap, StorageMap, StorageValue};
 
-/// Block initialization step that can fail.
-pub fn on_initialize_internal<T: Config>(
-    now: Timestamp,
-    last_yield_timestamp: Timestamp,
-    last_block_timestamp: Timestamp,
-) -> Result<(), Reason> {
-    // XXX re-evaluate how we do time, we don't really want this to be zero but there may
-    // not actually be any good way to do "current" time per-se so what we have here is more like
-    // the last block's time and the block before
-    // XXX also we should try to inject Now (and previous) for tests instead of taking different path
-    if now == 0 {
-        return Err(Reason::TimeTravelNotAllowed);
-    }
-    if last_yield_timestamp == 0 || last_block_timestamp == 0 {
-        // this is the first time we have seen a valid time, set it for LastYield and LastBlock
-        if last_yield_timestamp == 0 {
-            LastYieldTimestamp::put(now);
-        }
-        if last_block_timestamp == 0 {
-            LastBlockTimestamp::put(now);
-        }
+/// Block initialization hook
+pub fn on_initialize<T: Config>() -> Result<(), Reason> {
+    initialize_block::<T>(get_recent_timestamp::<T>()?)
+}
 
-        // All dt will be 0 so bail out here, no interest accrued in this block.
+/// Initialize block, given now
+pub fn initialize_block<T: Config>(now: Timestamp) -> Result<(), Reason> {
+    let last_yield_timestamp = LastYieldTimestamp::get();
+    let last_block_timestamp = LastBlockTimestamp::get();
+
+    // If this is the first block, no interest is accrued, just record the timestamp
+    if last_block_timestamp == 0 {
+        LastBlockTimestamp::put(now);
         return Ok(());
     }
 
@@ -92,6 +84,9 @@ pub fn on_initialize_internal<T: Config>(
     let miner_cash_principal_new =
         miner_cash_principal_old.add_amount(last_miner_share_principal)?;
 
+    // Auxiliary cumulative values
+    let miner_cumulative = MinerCumulative::get(&last_miner).add(last_miner_share_principal)?;
+
     // * BEGIN STORAGE ALL CHECKS AND FAILURES MUST HAPPEN ABOVE * //
 
     CashPrincipals::insert(last_miner, miner_cash_principal_new);
@@ -105,6 +100,9 @@ pub fn on_initialize_internal<T: Config>(
     TotalCashPrincipal::put(total_cash_principal_new);
     LastMinerSharePrincipal::put(miner_share_principal);
     LastBlockTimestamp::put(now);
+
+    // Auxiliary cumulative values
+    MinerCumulative::insert(last_miner, miner_cumulative);
 
     // Possibly rotate in any scheduled next CASH rate
     if let Some((next_apr, next_start)) = CashYieldNext::get() {
@@ -127,7 +125,6 @@ mod tests {
     #[test]
     fn test_on_initialize() {
         new_test_ext().execute_with(|| {
-            // XXX how to inject miner?
             let miner = ChainAccount::Eth([0; 20]);
             let asset = Eth;
             let asset_info = AssetInfo {
@@ -135,10 +132,12 @@ mod tests {
                 miner_shares: MinerShares::from_nominal("0.02"),
                 ..AssetInfo::minimal(asset, ETH)
             };
-            // XXX how to inject now / last yield timestamp?
             let last_yield_timestamp = 10;
             let now = last_yield_timestamp + MILLISECONDS_PER_YEAR / 4; // 3 months go by
 
+            Miner::put(miner);
+            LastBlockTimestamp::put(last_yield_timestamp);
+            LastYieldTimestamp::put(last_yield_timestamp);
             SupportedAssets::insert(&asset, asset_info);
             GlobalCashIndex::put(CashIndex::from_nominal("1.123"));
             LastYieldCashIndex::put(CashIndex::from_nominal("1.123"));
@@ -154,8 +153,8 @@ mod tests {
                 1450_000000 as pallet_oracle::types::AssetPrice,
             ); // $1450 eth
 
-            let result =
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp);
+            let result = initialize_block::<Test>(now);
+            let shares = CashPrincipalAmount(242097062);
             assert_eq!(result, Ok(()));
 
             assert_eq!(
@@ -166,6 +165,7 @@ mod tests {
                 BorrowIndices::get(&asset),
                 AssetIndex::from_nominal("1425.699020480854853072")
             );
+
             // note - the cash index number below is quite round due to the polynomial nature of
             // our approximation and the fact that the ratio in this case worked out to be a
             // base 10 number that terminates in that many digits.
@@ -177,19 +177,18 @@ mod tests {
                 TotalCashPrincipal::get(),
                 CashPrincipalAmount::from_nominal("462104.853072")
             );
-            assert_eq!(
-                CashPrincipals::get(&miner),
-                CashPrincipal::from_nominal("1.000000")
-            );
-            // Run again to set miner true principal
-            assert_eq!(
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_yield_timestamp),
-                Ok(())
-            );
+            assert_eq!(CashPrincipals::get(&miner), CashPrincipal::ONE);
+            assert_eq!(LastMinerSharePrincipal::get(), shares);
+            assert_eq!(MinerCumulative::get(&miner), CashPrincipalAmount(0));
+
+            // Run again to give last block principal to miner
+            assert_eq!(initialize_block::<Test>(now), Ok(()));
             assert_eq!(
                 CashPrincipals::get(&miner),
                 CashPrincipal::from_nominal("243.097062")
             );
+            assert_eq!(LastMinerSharePrincipal::get(), CashPrincipalAmount(0));
+            assert_eq!(MinerCumulative::get(&miner), shares);
         });
     }
 
@@ -205,14 +204,15 @@ mod tests {
             let cash_yield_initial = APR::from_nominal("0.24");
             let cash_yield_next = APR::from_nominal("0.32");
 
+            LastBlockTimestamp::put(last_block_timestamp);
+            LastYieldTimestamp::put(last_yield_timestamp);
             CashYield::put(cash_yield_initial);
             CashYieldNext::put((cash_yield_next, next_yield_timestamp));
             GlobalCashIndex::put(global_cash_index_initial);
             LastYieldCashIndex::put(last_yield_cash_index_initial);
             LastYieldTimestamp::put(last_yield_timestamp);
 
-            let result =
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp);
+            let result = initialize_block::<Test>(now);
             assert_eq!(result, Ok(()));
 
             let increment_expected = cash_yield_initial
@@ -250,9 +250,9 @@ mod tests {
             // simulate "a block goes by" in time
             let last_block_timestamp = now;
             let now = next_yield_timestamp;
+            LastBlockTimestamp::put(last_block_timestamp);
 
-            let result =
-                on_initialize_internal::<Test>(now, last_yield_timestamp, last_block_timestamp);
+            let result = initialize_block::<Test>(now);
             assert_eq!(result, Ok(()));
 
             let increment_expected = cash_yield_initial
@@ -287,9 +287,10 @@ mod tests {
             let last_block_timestamp = now;
             let now = now + 6 * 1000;
             let new_cash_index_baseline = new_index_actual;
+            LastBlockTimestamp::put(last_block_timestamp);
+            LastYieldTimestamp::put(next_yield_timestamp);
 
-            let result =
-                on_initialize_internal::<Test>(now, next_yield_timestamp, last_block_timestamp);
+            let result = initialize_block::<Test>(now);
             assert_eq!(result, Ok(()));
 
             let increment_expected = cash_yield_next

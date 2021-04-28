@@ -6,44 +6,40 @@ use crate::{
         AssetAmount, AssetInfo, AssetQuantity, CashPrincipalAmount, Factor, LiquidityFactor,
         Quantity, USDQuantity, Units,
     },
-    Config, GlobalCashIndex, SupportedAssets, TotalBorrowAssets, TotalSupplyAssets,
+    Config, Event, GlobalCashIndex, Module, SupportedAssets, TotalBorrowAssets, TotalSupplyAssets,
 };
 use frame_support::storage::{IterableStorageMap, StorageMap, StorageValue};
 use pallet_oracle::types::Price;
 
+/// Set the liquidity factor for a supported asset.
 pub fn set_liquidity_factor<T: Config>(
     asset: ChainAsset,
     factor: LiquidityFactor,
 ) -> Result<(), Reason> {
     let asset_info = get_asset::<T>(asset)?;
-    SupportedAssets::insert(
-        &asset,
-        AssetInfo {
-            liquidity_factor: factor,
-            ..asset_info
-        },
-    );
-    Ok(())
+    support_asset::<T>(AssetInfo {
+        liquidity_factor: factor,
+        ..asset_info
+    })
 }
 
+/// Set the rate model for a supported asset.
 pub fn set_rate_model<T: Config>(
     asset: ChainAsset,
     model: InterestRateModel,
 ) -> Result<(), Reason> {
     let asset_info = get_asset::<T>(asset)?;
     model.check_parameters()?;
-    SupportedAssets::insert(
-        &asset,
-        AssetInfo {
-            rate_model: model,
-            ..asset_info
-        },
-    );
-    Ok(())
+    support_asset::<T>(AssetInfo {
+        rate_model: model,
+        ..asset_info
+    })
 }
 
+/// Support an asset by defining its metadata.
 pub fn support_asset<T: Config>(asset_info: AssetInfo) -> Result<(), Reason> {
     SupportedAssets::insert(&asset_info.asset, asset_info);
+    <Module<T>>::deposit_event(Event::AssetModified(asset_info));
     Ok(())
 }
 
@@ -177,6 +173,13 @@ mod tests {
         new_test_ext().execute_with(|| {
             assert_ok!(super::support_asset::<Test>(eth));
             assert_eq!(SupportedAssets::get(Eth), Some(eth));
+
+            let events_post: Vec<_> = System::events().into_iter().collect();
+            let asset_modified_event = events_post.into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::AssetModified(eth)),
+                asset_modified_event.event
+            );
         })
     }
 

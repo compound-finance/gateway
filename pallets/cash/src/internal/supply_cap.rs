@@ -1,28 +1,19 @@
 use crate::{
+    chains::ChainAsset,
     internal,
     reason::Reason,
-    require,
-    types::{AssetAmount, ChainAsset},
-    Config, Event, Module, SupportedAssets,
+    types::{AssetAmount, AssetInfo},
+    Config,
 };
-use frame_support::storage::StorageMap;
 
-pub fn set_supply_cap<T: Config>(chain_asset: ChainAsset, cap: AssetAmount) -> Result<(), Reason> {
-    require!(
-        SupportedAssets::contains_key(chain_asset),
-        Reason::AssetNotSupported
-    );
+pub fn set_supply_cap<T: Config>(asset: ChainAsset, cap: AssetAmount) -> Result<(), Reason> {
+    let asset_info = internal::assets::get_asset::<T>(asset)?;
+    internal::assets::support_asset::<T>(AssetInfo {
+        supply_cap: cap,
+        ..asset_info
+    })?;
 
-    SupportedAssets::mutate(chain_asset, |maybe_asset_info| {
-        if let Some(asset_info) = maybe_asset_info {
-            asset_info.supply_cap = cap;
-        }
-        *maybe_asset_info
-    });
-
-    <Module<T>>::deposit_event(Event::SetSupplyCap(chain_asset, cap));
-
-    internal::notices::dispatch_supply_cap_notice::<T>(chain_asset, cap);
+    internal::notices::dispatch_supply_cap_notice::<T>(asset, cap);
 
     Ok(())
 }
@@ -52,17 +43,15 @@ mod tests {
         new_test_ext().execute_with(|| {
             let asset = ChainAsset::Eth([100; 20]);
             let asset_info = AssetInfo::minimal(asset, USD);
+            let new_asset_info = AssetInfo {
+                supply_cap: 1000,
+                ..asset_info
+            };
             let events_pre: Vec<_> = System::events().into_iter().collect();
             SupportedAssets::insert(asset, asset_info);
             assert_eq!(SupportedAssets::get(asset), Some(asset_info));
             assert_eq!(set_supply_cap::<Test>(asset, 1000), Ok(()));
-            assert_eq!(
-                SupportedAssets::get(asset),
-                Some(AssetInfo {
-                    supply_cap: 1000,
-                    ..asset_info
-                })
-            );
+            assert_eq!(SupportedAssets::get(asset), Some(new_asset_info));
             let events_post: Vec<_> = System::events().into_iter().collect();
 
             assert_eq!(events_pre.len() + 2, events_post.len());
@@ -70,7 +59,7 @@ mod tests {
             let set_supply_cap_event = events_post.into_iter().next().unwrap();
 
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::SetSupplyCap(asset, 1000)),
+                mock::Event::pallet_cash(crate::Event::AssetModified(new_asset_info)),
                 set_supply_cap_event.event
             );
 

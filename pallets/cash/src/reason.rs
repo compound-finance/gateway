@@ -1,15 +1,13 @@
-use crate::chains::ChainId;
-use crate::events::EventError;
-use crate::internal::set_yield_next::SetYieldNextError;
-use crate::notices::NoticeId;
-use crate::rates::RatesError;
-use crate::types::Nonce;
+use crate::{
+    chains::ChainId, events::EventError, internal::set_yield_next::SetYieldNextError,
+    notices::NoticeId, rates::RatesError, types::Nonce,
+};
+
 use codec::{Decode, Encode};
 use gateway_crypto::CryptoError;
 use our_std::RuntimeDebug;
 use pallet_oracle::error::OracleError;
 use trx_request;
-
 use types_derive::Types;
 
 /// Type for reporting failures for reasons outside of our control.
@@ -60,6 +58,7 @@ pub enum Reason {
     SetYieldNextError(SetYieldNextError),
     SignatureAccountMismatch,
     SignatureMismatch,
+    TimestampMissing,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
@@ -127,7 +126,8 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::SetYieldNextError(_) => (24, 0, "set yield next error"),
             Reason::SignatureAccountMismatch => (25, 0, "signature account mismatch"),
             Reason::SignatureMismatch => (25, 1, "signature mismatch"),
-            Reason::TimeTravelNotAllowed => (26, 0, "time travel not allowed"),
+            Reason::TimestampMissing => (26, 0, "timestamp missing"),
+            Reason::TimeTravelNotAllowed => (26, 1, "time travel not allowed"),
             Reason::TrxRequestParseError(_) => (27, 0, "trx request parse error"),
             Reason::UnknownValidator => (28, 0, "unknown validator"),
             Reason::InvalidChain => (29, 0, "invalid chain"),
@@ -138,11 +138,9 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::AssetQuantityMismatch => (34, 0, "asset does not match quantity"),
             Reason::Unreachable => (35, 0, "unreachable state should be impossible"),
             Reason::TotalBorrowUnderflow => (36, 0, "total borrows underlflow"),
-            Reason::InsufficientCollateral => (
-                37,
-                0,
-                "borrower did not have sufficient collateral for seize",
-            ),
+            Reason::InsufficientCollateral => {
+                (37, 0, "borrower has insufficient collateral to seize")
+            }
             Reason::NegativeChainCash => (38, 0, "chain cash underflow"),
         };
         frame_support::dispatch::DispatchError::Module {
@@ -180,6 +178,12 @@ impl From<OracleError> for Reason {
 impl From<RatesError> for Reason {
     fn from(err: RatesError) -> Self {
         Reason::RatesError(err)
+    }
+}
+
+impl From<SetYieldNextError> for Reason {
+    fn from(err: SetYieldNextError) -> Self {
+        Reason::SetYieldNextError(err)
     }
 }
 
