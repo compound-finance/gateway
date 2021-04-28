@@ -456,7 +456,7 @@ pub fn receive_chain_reorg<T: Config>(
 
     // Note: can reject / stop propagating once this check fails
     require!(reorg.from_hash() == last_block.hash(), Reason::HashMismatch);
-    
+
     let tally = if let Some(prior) = pending_reorgs.iter_mut().find(|r| r.reorg == reorg) {
         prior.add_support(&validator);
         prior
@@ -464,7 +464,7 @@ pub fn receive_chain_reorg<T: Config>(
         pending_reorgs.push(ChainReorgTally::new(chain_id, reorg, &validator));
         pending_reorgs.last_mut().unwrap()
     };
-    
+
     // Note: whenever there's a race to be the last signer, this will be suboptimal
     //  we don't currently keep a tombstone marking that the reorg was recently processed
     if tally.has_enough_support(&validator_set) {
