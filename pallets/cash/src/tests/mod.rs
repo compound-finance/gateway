@@ -64,64 +64,64 @@ pub fn val_b() -> ValidatorKeys {
 pub fn premined_block() -> ethereum_client::EthereumBlock {
     ethereum_client::EthereumBlock {
         hash: [
-            97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37, 227,
-            236, 104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138,
+            97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37, 227, 236,
+            104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138,
         ],
         parent_hash: [
-            6, 46, 119, 220, 237, 67, 30, 182, 113, 165, 104, 57, 249, 109, 169, 18, 246, 141,
-            132, 16, 36, 102, 87, 72, 211, 140, 211, 214, 121, 89, 97, 234,
+            6, 46, 119, 220, 237, 67, 30, 182, 113, 165, 104, 57, 249, 109, 169, 18, 246, 141, 132,
+            16, 36, 102, 87, 72, 211, 140, 211, 214, 121, 89, 97, 234,
         ],
         number: 1,
         events: vec![
             ethereum_client::EthereumEvent::Lock {
                 asset: [
-                    238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
-                    238, 238, 238, 238, 238,
+                    238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
+                    238, 238, 238, 238,
                 ],
                 sender: [
-                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56,
-                    125, 95, 244, 112, 49,
+                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125,
+                    95, 244, 112, 49,
                 ],
                 chain: String::from("ETH"),
                 recipient: [
-                    81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31,
-                    14, 135, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    81, 60, 31, 244, 53, 236, 206, 221, 15, 218, 94, 221, 42, 213, 229, 70, 31, 14,
+                    135, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 amount: 1000000000000000000,
             },
             ethereum_client::EthereumEvent::Lock {
                 asset: [
-                    216, 123, 167, 165, 11, 46, 126, 102, 15, 103, 138, 137, 94, 75, 114, 231,
-                    203, 76, 205, 156,
+                    216, 123, 167, 165, 11, 46, 126, 102, 15, 103, 138, 137, 94, 75, 114, 231, 203,
+                    76, 205, 156,
                 ],
                 sender: [
-                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56,
-                    125, 95, 244, 112, 49,
+                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125,
+                    95, 244, 112, 49,
                 ],
                 chain: String::from("ETH"),
                 recipient: [
-                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56,
-                    125, 95, 244, 112, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125,
+                    95, 244, 112, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 amount: 1000000000000000000,
             },
             ethereum_client::EthereumEvent::Lock {
                 asset: [
-                    228, 232, 31, 166, 177, 99, 39, 212, 183, 140, 254, 184, 58, 173, 224, 75,
-                    167, 7, 81, 101,
+                    228, 232, 31, 166, 177, 99, 39, 212, 183, 140, 254, 184, 58, 173, 224, 75, 167,
+                    7, 81, 101,
                 ],
                 sender: [
-                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56,
-                    125, 95, 244, 112, 49,
+                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125,
+                    95, 244, 112, 49,
                 ],
                 chain: String::from("ETH"),
                 recipient: [
-                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56,
-                    125, 95, 244, 112, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    254, 177, 234, 39, 248, 136, 195, 132, 241, 176, 220, 20, 253, 107, 56, 125,
+                    95, 244, 112, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 amount: 1000000000000000000,
             },
-        ]
+        ],
     }
 }
 
@@ -155,10 +155,7 @@ pub fn initialize_storage() {
 
     CashModule::initialize_validators(vec![val_a(), val_b()]);
 
-    LastProcessedBlock::insert(
-        ChainId::Eth,
-        ChainBlock::Eth(premined_block()),
-    );
+    LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(premined_block()));
 }
 
 pub fn validator_a_sign(data: &[u8]) -> Result<ChainSignature, Reason> {
@@ -176,7 +173,7 @@ pub fn a_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchError>
 
 pub fn a_receive_chain_reorg(reorg: &ChainReorg) -> Result<(), DispatchError> {
     let signature = validator_a_sign(&reorg.encode())?;
-    CashModule::receive_chain_reorg(Origin::none(), reorg.clone(), signature) 
+    CashModule::receive_chain_reorg(Origin::none(), reorg.clone(), signature)
 }
 
 pub fn validator_b_sign(data: &[u8]) -> Result<ChainSignature, Reason> {
@@ -194,7 +191,7 @@ pub fn b_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchError>
 
 pub fn b_receive_chain_reorg(reorg: &ChainReorg) -> Result<(), DispatchError> {
     let signature = validator_b_sign(&reorg.encode())?;
-    CashModule::receive_chain_reorg(Origin::none(), reorg.clone(), signature) 
+    CashModule::receive_chain_reorg(Origin::none(), reorg.clone(), signature)
 }
 
 pub fn all_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchError> {

@@ -434,6 +434,7 @@ pub fn receive_chain_blocks<T: Config>(
             break;
         }
     }
+
     LastProcessedBlock::insert(chain_id, last_block);
     PendingChainBlocks::insert(chain_id, pending_blocks);
     IngressionQueue::insert(chain_id, event_queue);
@@ -455,6 +456,7 @@ pub fn receive_chain_reorg<T: Config>(
 
     // Note: can reject / stop propagating once this check fails
     require!(reorg.from_hash() == last_block.hash(), Reason::HashMismatch);
+    
     let tally = if let Some(prior) = pending_reorgs.iter_mut().find(|r| r.reorg == reorg) {
         prior.add_support(&validator);
         prior
@@ -462,6 +464,7 @@ pub fn receive_chain_reorg<T: Config>(
         pending_reorgs.push(ChainReorgTally::new(chain_id, reorg, &validator));
         pending_reorgs.last_mut().unwrap()
     };
+    
     // Note: whenever there's a race to be the last signer, this will be suboptimal
     //  we don't currently keep a tombstone marking that the reorg was recently processed
     if tally.has_enough_support(&validator_set) {
@@ -514,22 +517,22 @@ mod tests {
                 ETH.ticker,
                 Price::from_nominal(ETH.ticker, "2000.00").value,
             );
-            
-            let reorg_block_hash = [3;32];
-            let real_block_hash = [5;32];
-            
+
+            let reorg_block_hash = [3; 32];
+            let real_block_hash = [5; 32];
+
             let reorg_event = EthereumEvent::Lock {
-                sender: [3;20],
+                sender: [3; 20],
                 chain: String::from("ETH"),
-                recipient: [4;32],
+                recipient: [4; 32],
                 amount: qty!("10", ETH).value,
                 asset: [238; 20],
             };
-    
+
             let real_event = EthereumEvent::Lock {
-                sender: [3;20],
+                sender: [3; 20],
                 chain: String::from("ETH"),
-                recipient: [5;32],
+                recipient: [5; 32],
                 amount: qty!("10", ETH).value,
                 asset: [238; 20],
             };
@@ -538,21 +541,21 @@ mod tests {
                 hash: reorg_block_hash,
                 parent_hash: premined_block().hash,
                 number: 2,
-                events: vec![reorg_event]
+                events: vec![reorg_event],
             };
-    
+
             let real_block = ethereum_client::EthereumBlock {
                 hash: real_block_hash,
                 parent_hash: premined_block().hash,
                 number: 2,
-                events: vec![real_event.clone()]
+                events: vec![real_event.clone()],
             };
 
             let reorg = ChainReorg::Eth {
                 from_hash: reorg_block_hash,
                 to_hash: real_block_hash,
                 reverse_blocks: vec![reorg_block.clone()],
-                forward_blocks: vec![real_block.clone()]
+                forward_blocks: vec![real_block.clone()],
             };
 
             let reorg_block3 = ethereum_client::EthereumBlock {
@@ -563,8 +566,14 @@ mod tests {
             };
 
             // apply the to-be reorg'd block and a dummy block so that it is ingressed, show that the event was applied
-            assert_ok!(all_receive_chain_blocks(&ChainBlocks::Eth(vec![reorg_block])), ());
-            assert_ok!(all_receive_chain_blocks(&ChainBlocks::Eth(vec![reorg_block3])), ());
+            assert_ok!(
+                all_receive_chain_blocks(&ChainBlocks::Eth(vec![reorg_block])),
+                ()
+            );
+            assert_ok!(
+                all_receive_chain_blocks(&ChainBlocks::Eth(vec![reorg_block3])),
+                ()
+            );
             assert_eq!(
                 AssetBalances::get(&Eth, ChainAccount::Eth([4; 20])),
                 bal!("10", ETH).value
@@ -573,17 +582,26 @@ mod tests {
 
             // val a sends reorg, tally started
             assert_ok!(a_receive_chain_reorg(&reorg), ());
-            assert_eq!(PendingChainReorgs::get(ChainId::Eth), vec![ChainReorgTally::new(ChainId::Eth, reorg.clone(), &val_a())]);
+            assert_eq!(
+                PendingChainReorgs::get(ChainId::Eth),
+                vec![ChainReorgTally::new(ChainId::Eth, reorg.clone(), &val_a())]
+            );
 
             // val b sends reorg and show reorg is executed and the new event is applied and the old one is reverted
             assert_ok!(b_receive_chain_reorg(&reorg), ());
-            assert_eq!(LastProcessedBlock::get(ChainId::Eth), Some(ChainBlock::Eth(real_block)));
-            assert_eq!(PendingChainBlocks::get(ChainId::Eth), Vec::<ChainBlockTally>::new());
+            assert_eq!(
+                LastProcessedBlock::get(ChainId::Eth),
+                Some(ChainBlock::Eth(real_block))
+            );
+            assert_eq!(
+                PendingChainBlocks::get(ChainId::Eth),
+                Vec::<ChainBlockTally>::new()
+            );
             assert_eq!(PendingChainReorgs::get(ChainId::Eth), vec![]);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
             assert_eq!(event_queue, ChainBlockEvents::Eth(vec![(2, real_event)]));
 
-            // mine a block so that block is ingressed 
+            // mine a block so that block is ingressed
             let block3 = ethereum_client::EthereumBlock {
                 hash: [3; 32],
                 parent_hash: real_block_hash,
@@ -591,7 +609,10 @@ mod tests {
                 events: vec![],
             };
 
-            assert_ok!(all_receive_chain_blocks(&ChainBlocks::Eth(vec![block3])), ());
+            assert_ok!(
+                all_receive_chain_blocks(&ChainBlocks::Eth(vec![block3])),
+                ()
+            );
 
             assert_eq!(
                 AssetBalances::get(&Eth, ChainAccount::Eth([5; 20])),
