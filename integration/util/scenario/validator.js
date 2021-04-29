@@ -100,7 +100,7 @@ async function tmpFile(name) {
 }
 
 class Validator {
-  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, chainSpecFile) {
+  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, extraVersions, chainSpecFile) {
     this.ctx = ctx;
     this.name = name;
     this.info = info;
@@ -116,6 +116,7 @@ class Validator {
     this.ethPrivateKey = ethPrivateKey;
     this.ethAccount = ethAccount;
     this.version = version;
+    this.extraVersions = extraVersions;
     this.chainSpecFile = chainSpecFile;
     this.wsProvider = null;
     this.api = null;
@@ -253,25 +254,52 @@ class Validator {
       message: `Awaiting websocket for validator ${this.name} on port ${this.wsPort}...`
     });
 
+    this.ps = ps;
+    await this.buildApi();
+  }
+
+  async buildApi() {
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
+    let types = await loadTypes(this.ctx, this.version);
+    for (let version of this.extraVersions) {
+      types = {
+        ...types,
+        ...await loadTypes(this.ctx, version)
+      };
+    }
     const api = await ApiPromise.create({
       provider: wsProvider,
-      types: await loadTypes(this.ctx, this.version),
+      types,
       rpc: await loadRpc(this.ctx)
     });
 
-    this.ps = ps;
     this.api = api;
     this.wsProvider = wsProvider;
   }
 
-  async teardown() {
+  async setVersion(version) {
+    this.version = version;
+    this.extraVersions = [];
+    await this.teardownApi();
+    await this.buildApi();
+
+    // Note: this was the other approach, which didn't seem to have any effect
+    // this.api.registry.register(await loadTypes(this.ctx, version));
+  }
+
+  async teardownApi() {
     if (this.api) {
       await this.api.disconnect(); // Disconnect from api
+      this.api = null;
     }
+  }
+
+  async teardown() {
+    this.teardownApi();
 
     if (this.ps) {
       this.ps.kill('SIGTERM'); // Kill gateway node
+      this.ps = null;
     }
   }
 }
@@ -381,9 +409,10 @@ function buildValidator(validatorName, validatorInfo, ctx) {
   }
 
   let version = validatorInfo.version ? ctx.versions.mustFind(validatorInfo.version) : null;
+  let extraVersions = validatorInfo.extraVersions ? validatorInfo.extraVersions.map((version) => ctx.versions.mustFind(version)) : [];
   let chainSpecFile = ctx.chainSpec.file();
 
-  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, chainSpecFile);
+  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, extraVersions, chainSpecFile);
 }
 
 async function getValidatorsInfo(validatorsInfoHash, ctx) {

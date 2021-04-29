@@ -197,6 +197,11 @@ async function buildVersion(version, ctx) {
 
 async function buildVersions(versionsInfo, ctx) {
   let versions = await versionsInfo.reduce(async (acc, versionInfo) => {
+    if (versionInfo === 'curr') {
+      // curr is automatically included
+      return acc;
+    }
+
     return [
       ...await acc,
       await buildVersion(versionInfo, ctx)

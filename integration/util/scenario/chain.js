@@ -173,13 +173,7 @@ class Chain {
 
     await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, [extrinsic]);
     expect(await this.nextCodeHash()).toEqual(versionHash);
-    let event = await this.setNextCode(await version.wasm());
-    expect(event).toEqual({
-      CodeHash: versionHash,
-      DispatchResult: {
-        Ok: []
-      }
-    });
+    await this.setNextCode(await version.wasm(), version, false);
     this.ctx.log(chalk.blueBright(`Upgrade to version ${version.version} complete.`));
   }
 
@@ -232,8 +226,17 @@ class Chain {
     return mapToJson(await this.ctx.getApi().query.cash.allowedNextCodeHash());
   }
 
-  async setNextCode(code, onFinalize = true) {
-    let events = await this.ctx.eventTracker.sendAndWaitForEvents(this.api().tx.cash.setNextCodeViaHash(code), { onFinalize });
+  async setNextCode(code, version, onFinalize = true) {
+    await this.ctx.eventTracker.teardown();
+
+    return await this.ctx.eventTracker.send(this.api().tx.cash.setNextCodeViaHash(code), { setUnsubDelay: false, onFinalize: false });
+
+    await Promise.all(this.ctx.validators.all().map((validator) => validator.teardownApi()));
+    await this.ctx.sleep(60000);
+    await Promise.all(this.ctx.validators.all().map((validator) => validator.setVersion(version)));
+
+    await this.ctx.eventTracker.start();
+
     return getEventData(findEvent(events, 'cash', 'AttemptedSetCodeByHash'));
   }
 
