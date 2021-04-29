@@ -99,8 +99,8 @@ default = ['with-parity-db']
 with-parity-db=['sc-client-db/with-parity-db']
 with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
 runtime-benchmarks = [
-	'with-rocks-db',
 	'gateway-runtime/runtime-benchmarks',
 	'frame-benchmarking-cli',
+	'with-rocks-db'
 ]
 runtime-debug = ['our-std/runtime-debug']
