@@ -22,6 +22,8 @@ pub type EthereumBlockNumber = u64;
 #[type_alias]
 pub type EthereumHash = [u8; 32];
 
+const ETH_FETCH_DEADLINE: u64 = 10_000;
+
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 pub struct EthereumBlock {
     pub hash: EthereumHash,
@@ -164,8 +166,7 @@ pub fn send_rpc(
     method: serde_json::Value,
     params: Vec<serde_json::Value>,
 ) -> Result<String, EthereumClientError> {
-    // TODO - move 2_000 to config???
-    let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
+    let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(ETH_FETCH_DEADLINE));
     let data = serde_json::json!({
         "jsonrpc": "2.0",
         "method": method,

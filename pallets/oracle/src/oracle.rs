@@ -33,6 +33,7 @@ fn eth_hex_decode_helper(message: &[u8]) -> Result<Vec<u8>, OracleError> {
 }
 
 const MAXIMUM_TICKER_LENGTH: usize = 5;
+const ORACLE_FETCH_DEADLINE: u64 = 2_000;
 
 /// Parse an open price feed message. Important note, this function merely parses the message
 /// it does not comment on the sanity of the message. All fields should be checked for sanity.
@@ -130,7 +131,7 @@ pub fn open_price_feed_request(url: &str) -> Result<OpenPriceFeedApiResponse, Or
 
 /// Make the open price feed HTTP API request to an unauthenticated endpoint using HTTP GET.
 fn open_price_feed_request_unchecked(url: &str) -> Result<OpenPriceFeedApiResponse, OracleError> {
-    let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
+    let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(ORACLE_FETCH_DEADLINE));
     let request = http::Request::get(url);
     let pending = request
         .deadline(deadline)
