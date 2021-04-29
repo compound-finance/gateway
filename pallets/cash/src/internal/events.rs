@@ -510,6 +510,153 @@ mod tests {
     use crate::tests::*;
 
     #[test]
+    fn test_receive_chain_reorg() -> Result<(), Reason> {
+        new_test_ext().execute_with(|| {
+            initialize_storage();
+            pallet_oracle::Prices::insert(
+                ETH.ticker,
+                Price::from_nominal(ETH.ticker, "2000.00").value,
+            );
+
+            let reorg_block_hash = [3; 32];
+            let real_block_hash = [5; 32];
+
+            let reorg_event = EthereumEvent::Lock {
+                asset: [238; 20],
+                sender: [3; 20],
+                chain: String::from("ETH"),
+                recipient: [4; 32],
+                amount: qty!("10", ETH).value,
+            };
+
+            let real_event = EthereumEvent::Lock {
+                sender: [3; 20],
+                chain: String::from("ETH"),
+                recipient: [5; 32],
+                amount: qty!("9", ETH).value,
+                asset: [238; 20],
+            };
+
+            let reorg_block = ethereum_client::EthereumBlock {
+                hash: reorg_block_hash,
+                parent_hash: premined_block().hash,
+                number: 2,
+                events: vec![reorg_event.clone()],
+            };
+
+            let real_block = ethereum_client::EthereumBlock {
+                hash: real_block_hash,
+                parent_hash: premined_block().hash,
+                number: 2,
+                events: vec![real_event.clone()],
+            };
+
+            let reorg = ChainReorg::Eth {
+                from_hash: [5; 32],
+                to_hash: real_block_hash,
+                reverse_blocks: vec![reorg_block.clone()],
+                forward_blocks: vec![real_block.clone()],
+            };
+
+            // mine dummy blocks to get past limit
+            let blocks_3 = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: reorg_block_hash,
+                    number: 3,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [4; 32],
+                    parent_hash: [3; 32],
+                    number: 4,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [5; 32],
+                    parent_hash: [4; 32],
+                    number: 5,
+                    events: vec![],
+                },
+            ]);
+
+            // apply the to-be reorg'd block and a dummy block so that it is ingressed, show that the event was applied
+            assert_ok!(all_receive_chain_blocks(&ChainBlocks::Eth(vec![
+                reorg_block
+            ])));
+            let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
+            assert_eq!(event_queue, ChainBlockEvents::Eth(vec![(2, reorg_event)]));
+
+            assert_ok!(all_receive_chain_blocks(&blocks_3));
+            assert_eq!(
+                AssetBalances::get(&Eth, ChainAccount::Eth([4; 20])),
+                bal!("10", ETH).value
+            );
+            assert_eq!(PendingChainReorgs::get(ChainId::Eth), vec![]);
+
+            // val a sends reorg, tally started
+            assert_ok!(a_receive_chain_reorg(&reorg), ());
+            assert_eq!(
+                PendingChainReorgs::get(ChainId::Eth),
+                vec![ChainReorgTally::new(ChainId::Eth, reorg.clone(), &val_a())]
+            );
+
+            // val b sends reorg and show reorg is executed and the new event is applied and the old one is reverted
+            assert_ok!(b_receive_chain_reorg(&reorg), ());
+            assert_eq!(
+                LastProcessedBlock::get(ChainId::Eth),
+                Some(ChainBlock::Eth(real_block))
+            );
+            assert_eq!(
+                PendingChainBlocks::get(ChainId::Eth),
+                Vec::<ChainBlockTally>::new()
+            );
+            assert_eq!(PendingChainReorgs::get(ChainId::Eth), vec![]);
+            let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
+            assert_eq!(
+                event_queue,
+                ChainBlockEvents::Eth(vec![(2, real_event.clone())])
+            );
+
+            // mine a block so that block is ingressed
+            // mine dummy blocks to get past limit
+            let blocks_4 = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: real_block_hash,
+                    number: 3,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [4; 32],
+                    parent_hash: [3; 32],
+                    number: 4,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [5; 32],
+                    parent_hash: [4; 32],
+                    number: 5,
+                    events: vec![],
+                },
+            ]);
+            assert_ok!(all_receive_chain_blocks(&blocks_4));
+
+            assert_eq!(
+                AssetBalances::get(&Eth, ChainAccount::Eth([5; 20])),
+                bal!("9", ETH).value
+            );
+
+            assert_eq!(
+                AssetBalances::get(&Eth, ChainAccount::Eth([4; 20])),
+                bal!("0", ETH).value
+            );
+
+            Ok(())
+        })
+    }
+
+    #[test]
     fn test_collect_rev() {
         let x = vec![1, 2, 3];
         let y = x.iter().map(|v| v + 1).collect_rev();
@@ -577,10 +724,7 @@ mod tests {
             };
             let blocks_2 = ChainBlocks::Eth(vec![ethereum_client::EthereumBlock {
                 hash: [2; 32],
-                parent_hash: [
-                    97, 49, 76, 28, 104, 55, 225, 94, 96, 197, 182, 115, 47, 9, 33, 24, 221, 37,
-                    227, 236, 104, 31, 94, 8, 155, 58, 154, 210, 55, 78, 90, 138,
-                ],
+                parent_hash: premined_block().hash,
                 number: 2,
                 events: vec![event.clone()],
             }]);
@@ -661,6 +805,4 @@ mod tests {
             Ok(())
         })
     }
-
-    // XXX test reorg, etc
 }
