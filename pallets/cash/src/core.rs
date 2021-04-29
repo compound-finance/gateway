@@ -12,46 +12,47 @@ use crate::{
         SignersSet, Timestamp, ValidatorKeys,
     },
     AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
-    IngressionQueue, LastBlockTimestamp, LastProcessedBlock, LastYieldTimestamp, Module,
-    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
+    IngressionQueue, LastProcessedBlock, Module, SupportedAssets, TotalBorrowAssets,
+    TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
+
 use codec::Decode;
 use frame_support::traits::UnfilteredDispatchable;
 use frame_support::{
     sp_runtime::traits::Convert,
     storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
 };
-#[cfg(feature = "freeze-time")]
-use our_std::if_std;
+
 pub use our_std::{fmt, result};
-#[cfg(feature = "freeze-time")]
-use std::{env, fs};
 
 // Public helper functions //
 
-#[cfg(feature = "freeze-time")]
-pub fn get_now<T: Config>() -> Timestamp {
-    if_std! {
-        if let Ok(filename) = env::var("FREEZE_TIME") {
-            if let Ok(contents) = fs::read_to_string(filename) {
-                if let Ok(time) = contents.parse::<u64>() {
-                    println!("Freeze Time: {}", time);
-                    if time > 0 {
-                        return time;
-                    }
+/// Return the recent timestamp (from the FREEZE_TIME file).
+#[cfg(all(feature = "freeze-time", feature = "std"))]
+pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
+    use std::{env, fs};
+    if let Ok(filename) = env::var("FREEZE_TIME") {
+        if let Ok(contents) = fs::read_to_string(filename) {
+            if let Ok(time) = contents.parse::<u64>() {
+                println!("Freeze Time: {}", time);
+                if time > 0 {
+                    return Ok(time);
                 }
             }
         }
     }
-
-    let now = <pallet_timestamp::Module<T>>::get();
-    T::TimeConverter::convert(now)
+    return Err(Reason::TimestampMissing);
 }
 
-#[cfg(not(feature = "freeze-time"))]
-pub fn get_now<T: Config>() -> Timestamp {
-    let now = <pallet_timestamp::Module<T>>::get();
-    T::TimeConverter::convert(now)
+/// Return the recent timestamp (from the timestamp pallet).
+#[cfg(any(not(feature = "freeze-time"), not(feature = "std")))]
+pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
+    let ts = <pallet_timestamp::Module<T>>::get();
+    let time = T::TimeConverter::convert(ts);
+    if time > 0 {
+        return Ok(time);
+    }
+    return Err(Reason::TimestampMissing);
 }
 
 /// Return the event ingression queue for the underlying chain.
@@ -113,9 +114,21 @@ pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBal
     Ok(info)
 }
 
+/// Calculates the current total CASH value of the account, including all interest from non-CASH markets.
+pub fn get_cash_balance_with_asset_interest<T: Config>(
+    account: ChainAccount,
+) -> Result<Balance, Reason> {
+    Ok(pipeline::load_portfolio::<T>(account)?.cash)
+}
+
 /// Return the portfolio of the chain account.
 pub fn get_portfolio<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
     Ok(pipeline::load_portfolio::<T>(account)?)
+}
+
+/// Calculates the current liquidity value for an account.
+pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
+    Ok(pipeline::load_portfolio::<T>(account)?.get_liquidity::<T>()?)
 }
 
 /// Return the set of validator identities to compare with others.
@@ -327,29 +340,6 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
     Ok(())
 }
 
-/// Calculates the current total CASH value of the account, including all interest from non-CASH markets.
-pub fn get_cash_balance_with_asset_interest<T: Config>(
-    account: ChainAccount,
-) -> Result<Balance, Reason> {
-    Ok(pipeline::load_portfolio::<T>(account)?.cash)
-}
-
-/// Calculates the current liquidity value for an account.
-pub fn get_liquidity<T: Config>(account: ChainAccount) -> Result<Balance, Reason> {
-    Ok(pipeline::load_portfolio::<T>(account)?.get_liquidity::<T>()?)
-}
-
-// Dispatch Extrinsic Lifecycle //
-
-/// Block initialization wrapper.
-pub fn on_initialize<T: Config>() -> Result<(), Reason> {
-    internal::initialize::on_initialize_internal::<T>(
-        get_now::<T>(),
-        LastYieldTimestamp::get(),
-        LastBlockTimestamp::get(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use crate::factor::Factor;
@@ -410,11 +400,11 @@ mod tests {
     }
 
     #[test]
-    fn test_now() {
+    fn test_get_recent_timestamp() {
         new_test_ext().execute_with(|| {
             let expected = 123;
             <pallet_timestamp::Module<Test>>::set_timestamp(expected);
-            let actual = get_now::<Test>();
+            let actual = get_recent_timestamp::<Test>().unwrap();
             assert_eq!(actual, expected);
         });
     }

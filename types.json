@@ -481,6 +481,7 @@
       "SetYieldNextError": "SetYieldNextError",
       "SignatureAccountMismatch": "",
       "SignatureMismatch": "",
+      "TimestampMissing": "",
       "TimeTravelNotAllowed": "",
       "TrxRequestParseError": "TrxReqParseError",
       "UnknownValidator": "",
@@ -518,8 +519,8 @@
   },
   "SetYieldNextError": {
     "_enum": {
-      "TimestampTooSoonToNow": "",
-      "TimestampTooSoonToNext": ""
+      "NotEnoughTimeToSyncBeforeNext": "",
+      "NotEnoughTimeToSyncBeforeCancel": ""
     }
   },
   "SignedPayload": "Vec<u8>",

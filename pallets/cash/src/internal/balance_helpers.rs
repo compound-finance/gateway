@@ -6,13 +6,13 @@ use crate::{
 };
 use our_std::{cmp::min, convert::TryFrom};
 
-/// Adds an asset quantity to a given unsigned amount
+/// Adds an asset quantity to a given unsigned amount.
 pub fn add_amount_to_raw(a: AssetAmount, b: AssetQuantity) -> Result<AssetAmount, MathError> {
     Ok(a.checked_add(b.value).ok_or(MathError::Overflow)?)
 }
 
-/// Subtracts an asset quantity from a given unsigned amount, returning an unsigned amount
-/// TODO: Remove underflow param here and just return a math error
+/// Subtracts an asset quantity from a given unsigned amount, returning an unsigned amount.
+/// Its an input error to underflow, the caller may define the reason given in that case.
 pub fn sub_amount_from_raw(
     a: AssetAmount,
     b: AssetQuantity,
@@ -21,7 +21,7 @@ pub fn sub_amount_from_raw(
     Ok(a.checked_sub(b.value).ok_or(underflow)?)
 }
 
-/// Adds an asset quantity to a given signed balance
+/// Adds an asset quantity to a given signed balance.
 pub fn add_amount_to_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
@@ -30,7 +30,7 @@ pub fn add_amount_to_balance(
     Ok(balance.checked_add(signed).ok_or(MathError::Overflow)?)
 }
 
-/// Subtracts an asset quantity to a given signed balance, returning a signed balance
+/// Subtracts an asset quantity to a given signed balance, returning a signed balance.
 pub fn sub_amount_from_balance(
     balance: AssetBalance,
     amount: AssetQuantity,
@@ -39,7 +39,7 @@ pub fn sub_amount_from_balance(
     Ok(balance.checked_sub(signed).ok_or(MathError::Underflow)?)
 }
 
-/// Sums two cash unsigned principals
+/// Sums two cash unsigned principals.
 pub fn add_principal_amounts(
     a: CashPrincipalAmount,
     b: CashPrincipalAmount,
@@ -47,8 +47,8 @@ pub fn add_principal_amounts(
     Ok(a.add(b)?)
 }
 
-/// Subtracts two cash unsigned principals, returning an unsigned result or given error
-/// TODO: Simply return math error instead?
+/// Subtracts two cash unsigned principals, returning an unsigned result or given error.
+/// Its an input error to underflow, the caller may define the reason given in that case.
 pub fn sub_principal_amounts(
     a: CashPrincipalAmount,
     b: CashPrincipalAmount,
