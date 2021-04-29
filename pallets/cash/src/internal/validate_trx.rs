@@ -602,12 +602,12 @@ mod tests {
                 amount: 100,
                 account: [2; 20],
             });
+            let signer = <Ethereum as Chain>::signer_address().unwrap();
             let signature = notice.sign_notice().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
                 _ => panic!("invalid signature"),
             };
-            let signer = <Ethereum as Chain>::signer_address().unwrap();
             let notice_state = NoticeState::Pending {
                 signature_pairs: ChainSignatureList::Eth(vec![(signer, eth_signature)]),
             };
