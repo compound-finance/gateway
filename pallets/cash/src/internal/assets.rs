@@ -266,7 +266,10 @@ mod tests {
                 },
             ];
 
-            assert_eq!(super::get_assets::<Test>()?, assets);
+            let actual_assets = super::get_assets::<Test>()?;
+            assert_eq!(actual_assets.len(), assets.len());
+            assert_eq!(actual_assets.contains(&assets[0]), true);
+            assert_eq!(actual_assets.contains(&assets[1]), true);
 
             Ok(())
         })

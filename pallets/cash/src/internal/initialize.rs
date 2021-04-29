@@ -1,13 +1,13 @@
 use crate::{
-    chains::ChainAsset,
+    chains::{ChainAccount, ChainAsset},
     core::get_recent_timestamp,
     factor::Factor,
     internal,
     reason::Reason,
     types::{AssetIndex, CashPrincipalAmount, Quantity, Timestamp, CASH},
-    BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, GlobalCashIndex,
+    BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, Event, GlobalCashIndex,
     LastBlockTimestamp, LastMinerSharePrincipal, LastYieldCashIndex, LastYieldTimestamp,
-    MinerCumulative, SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal,
+    MinerCumulative, Module, SupplyIndices, SupportedAssets, TotalBorrowAssets, TotalCashPrincipal,
     TotalSupplyAssets,
 };
 use frame_support::storage::{IterableStorageMap, StorageMap, StorageValue};
@@ -114,6 +114,14 @@ pub fn initialize_block<T: Config>(now: Timestamp) -> Result<(), Reason> {
         }
     }
 
+    <Module<T>>::deposit_event(Event::TransferCash(
+        ChainAccount::Reserved,
+        last_miner,
+        last_miner_share_principal,
+        cash_index_new,
+    ));
+    <Module<T>>::deposit_event(Event::MinerPaid(last_miner, last_miner_share_principal));
+
     Ok(())
 }
 
@@ -189,6 +197,20 @@ mod tests {
             );
             assert_eq!(LastMinerSharePrincipal::get(), CashPrincipalAmount(0));
             assert_eq!(MinerCumulative::get(&miner), shares);
+
+            let mut events_iter = System::events().into_iter();
+            let _transfer_cash_event_1 = events_iter.next().unwrap();
+            let miner_paid_event_1 = events_iter.next().unwrap();
+            let _transfer_cash_event_2 = events_iter.next().unwrap();
+            let miner_paid_event_2 = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::MinerPaid(miner, CashPrincipalAmount(0))),
+                miner_paid_event_1.event
+            );
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::MinerPaid(miner, shares)),
+                miner_paid_event_2.event
+            );
         });
     }
 

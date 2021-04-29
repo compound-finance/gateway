@@ -510,6 +510,7 @@ mod tests {
             let mut events_iter = System::events().into_iter();
             let transfer_event = events_iter.next().unwrap();
             let transfer_fee_event = events_iter.next().unwrap();
+            let miner_paid_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::Transfer(
@@ -529,6 +530,14 @@ mod tests {
                     index
                 )),
                 transfer_fee_event.event
+            );
+            // Check emitted `MinerPaid` event
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::MinerPaid(
+                    miner,
+                    index.cash_principal_amount(TRANSFER_FEE).unwrap()
+                )),
+                miner_paid_event.event
             );
         });
     }
@@ -566,6 +575,7 @@ mod tests {
             let mut events_iter = System::events().into_iter();
             let transfer_cash_event = events_iter.next().unwrap();
             let transfer_cash_fee_event = events_iter.next().unwrap();
+            let miner_paid_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::TransferCash(
@@ -587,6 +597,14 @@ mod tests {
                     index
                 )),
                 transfer_cash_fee_event.event
+            );
+            // Check emitted `MinerPaid` event
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::MinerPaid(
+                    miner,
+                    index.cash_principal_amount(TRANSFER_FEE).unwrap()
+                )),
+                miner_paid_event.event
             );
         });
     }

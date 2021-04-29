@@ -291,6 +291,9 @@ decl_event!(
         /// An account using CASH as collateral has been liquidated. [asset, liquidator, borrower, amount]
         LiquidateCashCollateral(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
 
+        /// Miner paid. [miner, principal]
+        MinerPaid(ChainAccount, CashPrincipalAmount),
+
         /// The next code hash has been allowed. [hash]
         AllowedNextCodeHash(CodeHash),
 
