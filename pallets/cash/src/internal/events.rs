@@ -522,18 +522,18 @@ mod tests {
             let real_block_hash = [5; 32];
 
             let reorg_event = EthereumEvent::Lock {
+                asset: [238; 20],
                 sender: [3; 20],
                 chain: String::from("ETH"),
                 recipient: [4; 32],
                 amount: qty!("10", ETH).value,
-                asset: [238; 20],
             };
 
             let real_event = EthereumEvent::Lock {
                 sender: [3; 20],
                 chain: String::from("ETH"),
                 recipient: [5; 32],
-                amount: qty!("10", ETH).value,
+                amount: qty!("9", ETH).value,
                 asset: [238; 20],
             };
 
@@ -541,7 +541,7 @@ mod tests {
                 hash: reorg_block_hash,
                 parent_hash: premined_block().hash,
                 number: 2,
-                events: vec![reorg_event],
+                events: vec![reorg_event.clone()],
             };
 
             let real_block = ethereum_client::EthereumBlock {
@@ -552,28 +552,42 @@ mod tests {
             };
 
             let reorg = ChainReorg::Eth {
-                from_hash: reorg_block_hash,
+                from_hash: [5; 32],
                 to_hash: real_block_hash,
                 reverse_blocks: vec![reorg_block.clone()],
                 forward_blocks: vec![real_block.clone()],
             };
 
-            let reorg_block3 = ethereum_client::EthereumBlock {
-                hash: [3; 32],
-                parent_hash: reorg_block_hash,
-                number: 3,
-                events: vec![],
-            };
+            // mine dummy blocks to get past limit
+            let blocks_3 = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: reorg_block_hash,
+                    number: 3,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [4; 32],
+                    parent_hash: [3; 32],
+                    number: 4,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [5; 32],
+                    parent_hash: [4; 32],
+                    number: 5,
+                    events: vec![],
+                },
+            ]);
 
             // apply the to-be reorg'd block and a dummy block so that it is ingressed, show that the event was applied
-            assert_ok!(
-                all_receive_chain_blocks(&ChainBlocks::Eth(vec![reorg_block])),
-                ()
-            );
-            assert_ok!(
-                all_receive_chain_blocks(&ChainBlocks::Eth(vec![reorg_block3])),
-                ()
-            );
+            assert_ok!(all_receive_chain_blocks(&ChainBlocks::Eth(vec![
+                reorg_block
+            ])));
+            let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
+            assert_eq!(event_queue, ChainBlockEvents::Eth(vec![(2, reorg_event)]));
+
+            assert_ok!(all_receive_chain_blocks(&blocks_3));
             assert_eq!(
                 AssetBalances::get(&Eth, ChainAccount::Eth([4; 20])),
                 bal!("10", ETH).value
@@ -599,24 +613,38 @@ mod tests {
             );
             assert_eq!(PendingChainReorgs::get(ChainId::Eth), vec![]);
             let event_queue = get_event_queue::<Test>(ChainId::Eth)?;
-            assert_eq!(event_queue, ChainBlockEvents::Eth(vec![(2, real_event)]));
+            assert_eq!(
+                event_queue,
+                ChainBlockEvents::Eth(vec![(2, real_event.clone())])
+            );
 
             // mine a block so that block is ingressed
-            let block3 = ethereum_client::EthereumBlock {
-                hash: [3; 32],
-                parent_hash: real_block_hash,
-                number: 3,
-                events: vec![],
-            };
-
-            assert_ok!(
-                all_receive_chain_blocks(&ChainBlocks::Eth(vec![block3])),
-                ()
-            );
+            // mine dummy blocks to get past limit
+            let blocks_4 = ChainBlocks::Eth(vec![
+                ethereum_client::EthereumBlock {
+                    hash: [3; 32],
+                    parent_hash: real_block_hash,
+                    number: 3,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [4; 32],
+                    parent_hash: [3; 32],
+                    number: 4,
+                    events: vec![],
+                },
+                ethereum_client::EthereumBlock {
+                    hash: [5; 32],
+                    parent_hash: [4; 32],
+                    number: 5,
+                    events: vec![],
+                },
+            ]);
+            assert_ok!(all_receive_chain_blocks(&blocks_4));
 
             assert_eq!(
                 AssetBalances::get(&Eth, ChainAccount::Eth([5; 20])),
-                bal!("10", ETH).value
+                bal!("9", ETH).value
             );
 
             assert_eq!(
