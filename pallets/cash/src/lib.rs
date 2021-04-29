@@ -207,6 +207,9 @@ decl_storage! {
         /// Miner of the current block.
         Miner get(fn miner): Option<ChainAccount>;
 
+        /// Mapping of total principal paid to each miner.
+        MinerCumulative get(fn miner_cumulative): map hasher(blake2_128_concat) ChainAccount => CashPrincipalAmount;
+
         /// Validator spread due to miner of last block.
         LastMinerSharePrincipal get(fn last_miner_share_principal): CashPrincipalAmount;
 
@@ -288,6 +291,9 @@ decl_event!(
         /// An account using CASH as collateral has been liquidated. [asset, liquidator, borrower, amount]
         LiquidateCashCollateral(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
 
+        /// Miner paid. [miner, principal]
+        MinerPaid(ChainAccount, CashPrincipalAmount),
+
         /// The next code hash has been allowed. [hash]
         AllowedNextCodeHash(CodeHash),
 
@@ -309,13 +315,13 @@ decl_event!(
         /// A sequence of governance actions has been executed. [actions]
         ExecutedGovernance(Vec<(Vec<u8>, GovernanceResult)>),
 
-        /// A new supply cap has been set. [asset, cap]
-        SetSupplyCap(ChainAsset, AssetAmount),
+        /// A supported asset has been modified. [asset_info]
+        AssetModified(AssetInfo),
 
-        /// A new validator set has been chosen
+        /// A new validator set has been chosen. [validators]
         ChangeValidators(Vec<ValidatorKeys>),
 
-        /// A new yield rate has been chosen
+        /// A new yield rate has been chosen. [next_rate, next_start_at]
         SetYieldNext(APR, Timestamp),
 
         /// Failed to process a given extrinsic. [reason]
@@ -499,6 +505,8 @@ fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::
 /* ::MODULE:: */
 /* ::EXTRINSICS:: */
 
+// Dispatch Extrinsic Lifecycle //
+
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -510,7 +518,7 @@ decl_module! {
         /// Called by substrate on block initialization.
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
-            match core::on_initialize::<T>() {
+            match internal::initialize::on_initialize::<T>() {
                 Ok(()) => <T as Config>::WeightInfo::on_initialize(SupportedAssets::iter().count().try_into().unwrap()),
                 Err(err) => {
                     // This should never happen...

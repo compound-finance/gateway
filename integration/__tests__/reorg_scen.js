@@ -9,7 +9,9 @@ let lock_scen_info = {
 
 buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
   {
-    block_time: 1,
+    info: {
+      block_time: 1
+    },
     name: 'Re-org Lock Collateral and Lock Different Amount',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth, logger }) => {
       let snapshotId = await eth.snapshot();
@@ -33,7 +35,9 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
     }
   },
   {
-    block_time: 1,
+    info: {
+      block_time: 1
+    },
     name: 'Re-org Lock Collateral but Send Away Elsewhere',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth, logger }) => {
       let snapshotId = await eth.snapshot();

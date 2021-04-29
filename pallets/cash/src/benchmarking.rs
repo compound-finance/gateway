@@ -158,6 +158,7 @@ benchmarks! {
     set_yield_next {
         assert_eq!(CashYieldNext::get(), None);
     }: {
+        <pallet_timestamp::Now<T>>::put(1u64);
         assert_eq!(Cash::<T>::set_yield_next(RawOrigin::Root.into(), APR(100).into(), 86400500), Ok(()));
     }
 
