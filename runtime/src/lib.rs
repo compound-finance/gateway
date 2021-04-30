@@ -43,6 +43,7 @@ pub use pallet_grandpa::fg_primitives;
 pub use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 pub use pallet_timestamp::Call as TimestampCall;
 
+use our_std::warn;
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
     portfolio::Portfolio,
@@ -204,6 +205,8 @@ impl frame_system::Config for Runtime {
     type OnNewAccount = ();
     /// What to do if an account is fully reaped from the system.
     type OnKilledAccount = ();
+    /// The set code logic, just the default since we're not a parachain.
+    type OnSetCode = ();
     /// The data to be stored in an account.
     type AccountData = ();
     /// Weight information for the extrinsics of this pallet.
@@ -326,7 +329,7 @@ where
         #[cfg_attr(not(feature = "std"), allow(unused_variables))]
         let raw_payload = SignedPayload::new(call, extra)
             .map_err(|e| {
-                debug::native::warn!("SignedPayload error: {:?}", e);
+                warn!("SignedPayload error: {:?}", e);
             })
             .ok()?;
 
@@ -361,18 +364,18 @@ construct_runtime!(
         NodeBlock = opaque::Block,
         UncheckedExtrinsic = UncheckedExtrinsic
     {
-        System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
-        Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-        Aura: pallet_aura::{Module, Config<T>},
-        Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
+        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Call, Storage},
+        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+        Aura: pallet_aura::{Pallet, Config<T>},
+        Grandpa: pallet_grandpa::{Pallet, Call, Storage, Config, Event},
 
         // Include the custom logic from the Cash and Oracle pallets in the runtime.
-        Cash: pallet_cash::{Module, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
-        Oracle: pallet_oracle::{Module, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
+        Cash: pallet_cash::{Pallet, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
+        Oracle: pallet_oracle::{Pallet, Call, Config, Storage, Event, ValidateUnsigned, Inherent},
 
         // comes after CASH pallet bc it asks CASH for validators during initialization
-        Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
+        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>},
     }
 );
 
@@ -405,7 +408,7 @@ pub type Executive = frame_executive::Executive<
     Block,
     frame_system::ChainContext<Runtime>,
     Runtime,
-    AllModules,
+    AllPallets,
 >;
 
 impl_runtime_apis! {
@@ -450,7 +453,7 @@ impl_runtime_apis! {
         }
 
         fn random_seed() -> <Block as BlockT>::Hash {
-            RandomnessCollectiveFlip::random_seed()
+            RandomnessCollectiveFlip::random_seed().0
         }
     }
 
@@ -470,8 +473,8 @@ impl_runtime_apis! {
     }
 
     impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
-        fn slot_duration() -> u64 {
-            Aura::slot_duration() as u64
+        fn slot_duration() -> sp_consensus_aura::SlotDuration {
+        sp_consensus_aura::SlotDuration::from_millis(Aura::slot_duration())
         }
 
         fn authorities() -> Vec<AuraId> {
@@ -589,7 +592,7 @@ impl_runtime_apis! {
         ) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
             use frame_benchmarking::{Benchmarking, BenchmarkBatch, add_benchmark, TrackedStorageKey};
 
-            use frame_system_benchmarking::Module as SystemBench;
+            use frame_system_benchmarking::Pallet as SystemBench;
             impl frame_system_benchmarking::Config for Runtime {}
 
             let whitelist: Vec<TrackedStorageKey> = vec![
@@ -609,7 +612,7 @@ impl_runtime_apis! {
             let params = (&config, &whitelist);
 
             add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
-            add_benchmark!(params, batches, pallet_cash, Cash);
+            // XXX broke add_benchmark!(params, batches, pallet_cash, Cash);
             add_benchmark!(params, batches, pallet_timestamp, Timestamp);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

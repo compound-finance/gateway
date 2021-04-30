@@ -28,20 +28,22 @@ use crate::{
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
-    sp_runtime::traits::Convert,
     traits::{StoredMap, UnfilteredDispatchable},
     weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
+use num_traits::Zero;
 use our_std::{
     collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec, warn,
     Debuggable,
 };
 use sp_core::crypto::AccountId32;
-use sp_runtime::transaction_validity::{
-    InvalidTransaction, TransactionSource, TransactionValidity,
+use sp_runtime::{
+    traits::Convert,
+    transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidity},
+    Percent,
 };
 
 use pallet_oracle;
@@ -114,7 +116,7 @@ pub trait Config:
 }
 
 decl_storage! {
-    trait Store for Module<T: Config> as Cash {
+    trait Store for Pallet<T: Config> as Cash {
         /// The timestamp of the previous block (or initialized to yield start defined in genesis).
         LastYieldTimestamp get(fn last_yield_timestamp) config(): Timestamp;
 
@@ -241,10 +243,10 @@ decl_storage! {
         config(starports): Vec<ChainAccount>;
         config(genesis_blocks): Vec<ChainBlock>;
         build(|config| {
-            Module::<T>::initialize_assets(config.assets.clone());
-            Module::<T>::initialize_validators(config.validators.clone());
-            Module::<T>::initialize_starports(config.starports.clone());
-            Module::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
+            Pallet::<T>::initialize_assets(config.assets.clone());
+            Pallet::<T>::initialize_validators(config.validators.clone());
+            Pallet::<T>::initialize_starports(config.starports.clone());
+            Pallet::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
         })
     }
 }
@@ -340,7 +342,7 @@ decl_event!(
 
 fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
     if let Err(err) = res {
-        <Module<T>>::deposit_event(Event::Failure(err));
+        <Pallet<T>>::deposit_event(Event::Failure(err));
         log!("Cash Failure {:#?}", err);
     }
     res
@@ -356,14 +358,14 @@ where
     T: pallet_session::Config<ValidatorId = SubstrateId>,
 {
     fn has_next_keys(x: SubstrateId) -> bool {
-        match <pallet_session::Module<T>>::next_keys(x as T::ValidatorId) {
+        match <pallet_session::Pallet<T>>::next_keys(x as T::ValidatorId) {
             Some(_keys) => true,
             None => false,
         }
     }
 
     fn rotate_session() {
-        <pallet_session::Module<T>>::rotate_session();
+        <pallet_session::Pallet<T>>::rotate_session();
     }
 }
 
@@ -476,14 +478,21 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
 }
 
 impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumber> for Module<T> {
-    fn estimate_next_session_rotation(now: T::BlockNumber) -> Option<T::BlockNumber> {
-        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
-        Some(now + period - now % period)
+    fn average_session_length() -> T::BlockNumber {
+        T::BlockNumber::zero()
     }
 
-    // The validity of this weight depends on the implementation of `estimate_next_session_rotation`
-    fn weight(_now: T::BlockNumber) -> Weight {
-        0
+    fn estimate_current_session_progress(now: T::BlockNumber) -> (Option<Percent>, Weight) {
+        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+        (
+            Some(Percent::from_rational(now % period, period)),
+            Weight::zero(),
+        )
+    }
+
+    fn estimate_next_session_rotation(now: T::BlockNumber) -> (Option<T::BlockNumber>, Weight) {
+        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+        (Some(now + period - now % period), Weight::zero())
     }
 }
 
@@ -698,10 +707,10 @@ impl<T: Config> Module<T> {
                 "Duplicate validator keys in genesis config"
             );
             // XXX for Substrate 3
-            // assert!(
-            //     T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
-            //     "Could not placate the substrate account existence thing"
-            // );
+            assert!(
+                T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
+                "Could not placate the substrate account existence thing"
+            );
             <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
         }
     }

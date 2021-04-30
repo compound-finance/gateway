@@ -126,4 +126,12 @@ impl<T: Config> ProvideInherent for Module<T> {
             }
         }
     }
+
+    fn is_inherent(call: &Self::Call) -> bool {
+        // XXX
+        match call {
+            Call::post_prices(_) => true,
+            _ => false,
+        }
+    }
 }

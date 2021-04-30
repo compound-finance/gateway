@@ -4,17 +4,14 @@ use parking_lot::RwLock;
 use sp_core::{
     offchain::{
         testing::{self, OffchainState, PoolState},
-        OffchainExt, TransactionPoolExt,
+        OffchainDbExt, OffchainWorkerExt, TransactionPoolExt,
     },
     H256,
 };
 use sp_runtime::{
     generic,
     testing::{Header, TestXt},
-    traits::{
-        BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
-        Verify,
-    },
+    traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
     MultiAddress, MultiSignature as Signature,
 };
 
@@ -44,8 +41,8 @@ frame_support::construct_runtime!(
     NodeBlock = Block,
     UncheckedExtrinsic = UncheckedExtrinsic,
     {
-        System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        Oracle: pallet_oracle::{Module, Call, Config, Storage, Event, Inherent},
+        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        Oracle: pallet_oracle::{Pallet, Call, Config, Storage, Event, Inherent},
     }
 );
 
@@ -75,6 +72,7 @@ impl frame_system::Config for Test {
     type AccountData = ();
     type OnNewAccount = ();
     type OnKilledAccount = ();
+    type OnSetCode = ();
     type SystemWeightInfo = ();
     type SS58Prefix = SS58Prefix;
 }
@@ -130,7 +128,8 @@ pub fn new_test_ext_with_http_calls(
     // XXX
     // let mut test_externalities: sp_io::TestExternalities = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
     let mut test_externalities = sp_io::TestExternalities::default();
-    test_externalities.register_extension(OffchainExt::new(offchain));
+    test_externalities.register_extension(OffchainDbExt::new(offchain.clone()));
+    test_externalities.register_extension(OffchainWorkerExt::new(offchain));
     test_externalities.register_extension(TransactionPoolExt::new(pool));
 
     {

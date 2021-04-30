@@ -114,6 +114,14 @@ impl<T: Config> ProvideInherent for Module<T> {
         // We don't actually have any qualms with the miner's choice, so long as it decodes
         Ok(())
     }
+
+    fn is_inherent(call: &Self::Call) -> bool {
+        // XXX
+        match call {
+            Call::set_miner(_) => true,
+            _ => false,
+        }
+    }
 }
 
 // Miner might not be set (e.g. in the first block mined), but for accouting

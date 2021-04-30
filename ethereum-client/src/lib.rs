@@ -2,12 +2,11 @@
 extern crate lazy_static;
 
 use codec::{Decode, Encode};
-use frame_support::debug;
+use hex_buffer_serde::{ConstHex, ConstHexForm};
 use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
-use hex_buffer_serde::{ConstHex, ConstHexForm};
-use our_std::{debug, log, Deserialize, RuntimeDebug, Serialize};
+use our_std::{debug, error, info, warn, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -143,7 +142,7 @@ pub struct BlockNumberResponse {
 }
 
 fn parse_error(data: &str) -> EthereumClientError {
-    log!("Error Parsing: {}", data);
+    error!("Error Parsing: {}", data);
     EthereumClientError::JsonParseError
 }
 
@@ -199,7 +198,7 @@ pub fn send_rpc(
         .map_err(|_| EthereumClientError::HttpTimeout)?;
 
     if response.code != 200 {
-        log!("Unexpected status code: {}", response.code);
+        warn!("Unexpected status code: {}", response.code);
         return Err(EthereumClientError::HttpErrorCode(response.code));
     }
 
@@ -207,7 +206,7 @@ pub fn send_rpc(
 
     // Create a str slice from the body.
     let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
-        log!("No UTF8 body");
+        warn!("No UTF8 body");
         EthereumClientError::InvalidUTF8
     })?;
     debug!("RPC Response: {}", body_str.clone());
@@ -236,8 +235,8 @@ pub fn get_block(
         .ok_or_else(|| parse_error(&get_logs_response_str[..]))?;
 
     if event_objects.len() > 0 {
-        log!(
-            "Found {} events @ Eth Starport {:X?}",
+        info!(
+            "Found {} events @ Eth Starport {:?}",
             event_objects.len(),
             &eth_starport_address[..]
         );
@@ -254,10 +253,10 @@ pub fn get_block(
         match events::decode_event(topics, data) {
             Ok(event) => events.push(event),
             Err(events::EventError::UnknownEventTopic(topic)) => {
-                log!("Skipping unrecognized topic {:?}", topic)
+                warn!("Skipping unrecognized topic {:?}", topic)
             }
             Err(err) => {
-                debug::error!("Failed to decode {:?}", err);
+                error!("Failed to decode {:?}", err);
                 return Err(EthereumClientError::DecodeError);
             }
         }
@@ -292,13 +291,14 @@ pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError>
 mod tests {
     use crate::*;
 
-    use sp_core::offchain::{testing, OffchainExt};
+    use sp_core::offchain::{testing, OffchainDbExt, OffchainWorkerExt};
 
     #[test]
     fn test_get_block() {
         let (offchain, state) = testing::TestOffchainExt::new();
         let mut t = sp_io::TestExternalities::default();
-        t.register_extension(OffchainExt::new(offchain));
+        t.register_extension(OffchainDbExt::new(offchain.clone()));
+        t.register_extension(OffchainWorkerExt::new(offchain));
         {
             let mut s = state.write();
             s.expect_request(
@@ -373,7 +373,8 @@ mod tests {
     fn test_get_latest_block_number() {
         let (offchain, state) = testing::TestOffchainExt::new();
         let mut t = sp_io::TestExternalities::default();
-        t.register_extension(OffchainExt::new(offchain));
+        t.register_extension(OffchainDbExt::new(offchain.clone()));
+        t.register_extension(OffchainWorkerExt::new(offchain));
         {
             let mut s = state.write();
             s.expect_request(testing::PendingRequest {
@@ -397,7 +398,8 @@ mod tests {
     fn test_get_block_object() {
         let (offchain, state) = testing::TestOffchainExt::new();
         let mut t = sp_io::TestExternalities::default();
-        t.register_extension(OffchainExt::new(offchain));
+        t.register_extension(OffchainDbExt::new(offchain.clone()));
+        t.register_extension(OffchainWorkerExt::new(offchain));
         {
             let mut s = state.write();
             s.expect_request(
