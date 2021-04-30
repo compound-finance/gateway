@@ -25,8 +25,7 @@ use crate::{
         LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, APR,
     },
 };
-
-use codec::alloc::string::String;
+use codec::{alloc::string::String, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     traits::{StoredMap, UnfilteredDispatchable},
@@ -515,6 +514,53 @@ fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::
     }
 }
 
+fn get_chain_reorg_weights<T: Config>(
+    reorg: &ChainReorg,
+    signature: &ChainSignature,
+) -> Result<frame_support::weights::Weight, Reason> {
+    match reorg {
+        ChainReorg::Eth {
+            from_hash: _,
+            to_hash: _,
+            forward_blocks,
+            reverse_blocks,
+        } => {
+            let forward_event_count: u64 = forward_blocks
+                .iter()
+                .fold(0usize, |acc, x| acc.checked_add(x.events.len()).unwrap())
+                .try_into()
+                .unwrap();
+            let reverse_event_count: u64 = reverse_blocks
+                .iter()
+                .fold(0usize, |acc, x| acc.checked_add(x.events.len()).unwrap())
+                .try_into()
+                .unwrap();
+            let event_count = forward_event_count + reverse_event_count;
+
+            if let Some(prior) = PendingChainReorgs::get(ChainId::Eth)
+                .iter_mut()
+                .find(|r| r.reorg == *reorg)
+            {
+                let validator = core::recover_validator::<T>(&reorg.encode(), *signature)?;
+                // if reorg would get applied, just estimate gas by counting the number of reorged events
+                if prior.would_have_enough_support(&prior.support, &validator) {
+                    let avg_weight = <T as Config>::WeightInfo::exec_trx_request_extract();
+                    // TODO: only count forward weight if we have passed than min_event_blocks
+                    Ok(event_count * avg_weight)
+                } else {
+                    Ok(<T as Config>::WeightInfo::receive_chain_reorg_pending(
+                        event_count.try_into().unwrap(),
+                    ))
+                }
+            } else {
+                Ok(<T as Config>::WeightInfo::receive_chain_reorg_pending(
+                    event_count.try_into().unwrap(),
+                ))
+            }
+        }
+    }
+}
+
 /* ::MODULE:: */
 /* ::EXTRINSICS:: */
 
@@ -660,7 +706,7 @@ decl_module! {
         }
 
         /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
-        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        #[weight = (get_chain_reorg_weights::<T>(reorg, signature).unwrap_or(params::ERROR_WEIGHT), DispatchClass::Operational, Pays::No)]
         pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult {
             log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature);
             ensure_none(origin)?;
