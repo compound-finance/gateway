@@ -181,17 +181,18 @@ class Validator {
       versioning = [
         "--wasm-runtime-overrides",
         this.version.releasePath(),
-        "--execution",
-        "Wasm",
       ];
     }
 
     let executionArgs = [];
     if (this.ctx.__native()) {
-      if (this.version) {
-        throw new Error('Cannot use `version` and `native` options together');
-      }
+      // TODO: Consider setting native versions better per node
       executionArgs = ['--execution', 'Native'];
+    } else {
+      // Scen did not specify execution. Only force WASM if we're on a non-current version
+      if (!this.version.isCurr()) {
+        executionArgs = ['--execution', 'Wasm'];
+      }
     }
 
     if (this.ctx.__freezeTime()) {
@@ -201,6 +202,21 @@ class Validator {
     }
 
     this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
+
+    let newCliArgs = [];
+    if (this.version.supportsNewCliArgs()) {
+      newCliArgs = [
+        '--eth-rpc-url', this.ctx.eth.web3Url,
+        '--eth-key-id', "my_eth_key_id",
+        '--miner', `Eth:${this.ethAccount}`,
+        '--opf-url', this.ctx.__opfUrl(),
+      ];
+    } else {
+      env['ETH_RPC_URL'] = this.ctx.eth.web3Url;
+      env['ETH_KEY_ID'] = "my_eth_key_id";
+      env['MINER'] = `Eth:${this.ethAccount}`;
+      env['OPF_URL'] = this.ctx.__opfUrl();
+    }
 
     let ps = spawnValidator(this.ctx, this.colorize(this.name), [
       '--chain',
@@ -217,10 +233,7 @@ class Validator {
       '--no-mdns',
       '--node-key',
       this.nodeKey,
-      '--eth-rpc-url', this.ctx.eth.web3Url,
-      '--eth-key-id', "my_eth_key_id",
-      '--miner', `Eth:${this.ethAccount}`,
-      '--opf-url', this.ctx.__opfUrl(),
+      ...newCliArgs,
       '-lruntime=debug,gateway=debug,pallet_cash=debug,ethereum_client=debug',
       '--reserved-only',
       ...versioning,

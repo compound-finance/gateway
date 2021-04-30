@@ -38,12 +38,20 @@ function releaseContractsInfo(repoUrl, version) {
   };
 }
 
+function releaseTargetInfo(repoUrl, version, platform, arch) {
+  return {
+    url: releaseUrl(repoUrl, version, `gateway-${platform}-${arch}`),
+    path: releasePath(version, `gateway-${platform}-${arch}`),
+  };
+}
+
 async function pullVersion(ctx, repoUrl, version) {
   ctx.log(`Fetching version: ${version}...`);
 
   let wasmInfo = releaseWasmInfo(repoUrl, version);
   let typesInfo = releaseTypesInfo(repoUrl, version);
   let contractsInfo = releaseContractsInfo(repoUrl, version);
+  // TODO: Pull target
 
   await fs.mkdir(baseReleasePath(version), { recursive: true });
 
@@ -66,6 +74,7 @@ async function checkVersion(repoUrl, version) {
   let wasmInfo = releaseWasmInfo(repoUrl, version);
   let typesInfo = releaseTypesInfo(repoUrl, version);
   let contractsInfo = releaseContractsInfo(repoUrl, version);
+  // TODO: Check target
 
   let exists = await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
     return checkFile(path);
@@ -110,6 +119,10 @@ class Version {
     return releaseContractsInfo(this.ctx.__repoUrl(), this.version).path;
   }
 
+  targetFile(platform, arch) {
+    return releaseTargetInfo(this.ctx.__repoUrl(), this.version, platform, arch).path;
+  }
+
   async ensure() {
     let exists = await this.check();
     if (!exists) {
@@ -123,6 +136,25 @@ class Version {
 
   async pull() {
     await pullVersion(this.ctx, this.ctx.__repoUrl(), this.version);
+  }
+
+  isCurr() {
+    return false;
+  }
+
+  versionNumber() {
+    let match = this.version.match(/^m(\d+)$/);
+
+    if (match) {
+      return Number(match[1]);
+    }
+
+    throw new Error(`No version number for ${this.version}`)
+  }
+
+  supportsNewCliArgs() {
+    // New CLI args supported in m9+
+    this.versionNumber() >= 9;
   }
 }
 
@@ -146,6 +178,14 @@ class CurrentVersion extends Version {
     return this.ctx.__getContractsFile();
   }
 
+  targetFile(platform, arch) {
+    return this.ctx.__target();
+  }
+
+  isCurr() {
+    return true;
+  }
+
   async check() {
     if (!await checkFile(this.wasmFile())) {
       this.ctx.warn(`Missing wasm file at ${this.wasmFile()}`)
@@ -160,6 +200,10 @@ class CurrentVersion extends Version {
     }
 
     return true;
+  }
+
+  versionNumber() {
+    return 9999; // Arbitrarily high version number for "current"
   }
 }
 
