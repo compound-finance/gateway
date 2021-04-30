@@ -25,7 +25,6 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    skip: true,
     name: "Upgrade Chain WASM [Allow Next Code]",
     info: {
       versions: ['m7'],
@@ -33,6 +32,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
       validators: {
         alice: {
           version: 'm7',
+          extra_versions: ['curr']
         }
       },
     },
@@ -45,7 +45,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
 
       expect(await chain.nextCodeHash()).toEqual(currHash);
 
-      let event = await chain.setNextCode(await curr.wasm());
+      let event = await chain.setNextCode(await curr.wasm(), curr, false);
       expect(event).toEqual({
         CodeHash: currHash,
         DispatchResult: {

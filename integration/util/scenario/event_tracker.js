@@ -42,8 +42,13 @@ class EventTracker {
 
   async subscribeEvents() {
     this.ctx.getApi().query.system.events((events) => {
-      events.forEach(({ event, phase }, i) => {
-        this.ctx.debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
+      events.forEach((eventObject, i) => {
+        try {
+          let { event, phase } = eventObject;
+          this.ctx.debug(`Found event: ${event.section}:${event.method} [${phase.toString()}]`);
+        } catch (e) {
+          this.ctx.error('Failed to decode event', e);
+        }
       });
       // TODO: Clean this up [trying to remember why we sleep here...]
       this.ctx.sleep(5000).then(() => {
@@ -51,7 +56,9 @@ class EventTracker {
         // debug(`Found ${finalizedEvents.length } finalized event(s)`);
 
         this.allEvents = [...this.allEvents, ...events];
-        this.callbacks.forEach((callback) => callback(this.allEvents));
+        this.callbacks.forEach((callback) => {
+          callback(this.allEvents)
+        });
       });
     });
   }
@@ -119,10 +126,9 @@ class EventTracker {
       ...opts
     };
 
-    let api = this.ctx.getApi();
-
     return new Promise(async (resolve, reject) => {
-      const  id = this.trxId++;
+      let api = this.ctx.getApi();
+      const id = this.trxId++;
       const debugMsg = (msg) => {
         this.ctx.debug(`sendAndWaitForEvents[id=${id}] - ${msg}`);
       }
@@ -206,6 +212,63 @@ class EventTracker {
     });
   }
 
+  send(call, opts = {}) {
+    opts = {
+      onFinalize: true,
+      signer: null,
+      setUnsubDelay: true,
+      ...opts
+    };
+
+    return new Promise(async (resolve, reject) => {
+      let api = this.ctx.getApi();
+      const id = this.trxId++;
+      const debugMsg = (msg) => {
+        this.ctx.debug(`send[id=${id}] - ${msg}`);
+      }
+
+      const doResolve = async () => {
+        if (opts.setUnsubDelay) {
+          this.setUnsubDelay();
+        }
+        await unsub(); // Note: unsub isn't apparently working, but we are calling it
+
+        resolve();
+      };
+
+      let doCall = opts.signer
+        ? (cb) => call.signAndSend(opts.signer, cb)
+        : (cb) => call.send(cb);
+
+      const unsub = await doCall(({ status }) => {
+        debugMsg(`Current status is ${status}`);
+
+        if (status.isInBlock) {
+          debugMsg(`Transaction included at blockHash ${status.asInBlock}`);
+          if (!opts.onFinalize) {
+            doResolve();
+          }
+        } else if (status.isFinalized) {
+          debugMsg(`Transaction finalized at blockHash ${status.asFinalized}`);
+          if (opts.onFinalize) {
+            doResolve();
+          }
+        } else if (status.isInvalid) {
+          reject("Transaction failed (Invalid)");
+        }
+      });
+
+      debugMsg(`Submitted unsigned transaction...`);
+    });
+  }
+
+  async start() {
+    if (this.ctx.validators.count() > 0) {
+      await this.subscribeBlocks();
+      await this.subscribeEvents();
+    }
+  }
+
   async teardown() {
     if (this.unsubNewBlocks) {
       this.unsubNewBlocks();
@@ -226,10 +289,7 @@ class EventTracker {
 
 async function buildEventTracker(ctx) {
   let eventTracker = new EventTracker(ctx);
-  if (ctx.validators.count() > 0) {
-    await eventTracker.subscribeBlocks();
-    await eventTracker.subscribeEvents();
-  }
+  await eventTracker.start();
   return eventTracker;
 }
 
