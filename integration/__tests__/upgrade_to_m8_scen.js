@@ -7,7 +7,6 @@ let scen_info = {};
 
 buildScenarios('Upgrade to m8', scen_info, [
   {
-    skip: true,
     name: "Upgrade from m7 to m8",
     info: {
       versions: ['m7', 'm8'],
@@ -36,7 +35,7 @@ buildScenarios('Upgrade to m8', scen_info, [
         { substrate_id: keyring.decodeAddress(bob.aura_key), eth_address: bob.eth_account }
       ];
 
-      // Just set validators to same, but Bob won't be able to sign it
+      // Just set validators to same, but Charlie won't be able to sign it
       let extrinsic = api.tx.cash.changeValidators(newAuthsRaw);
 
       let { notice } = await starport.executeProposal("Update authorities", [extrinsic], { awaitNotice: true });
