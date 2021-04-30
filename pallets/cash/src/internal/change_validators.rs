@@ -59,6 +59,8 @@ mod tests {
                 eth_address: eth_address.clone(),
             }];
             let session_keys = MockSessionKeys { dummy: 1u64.into() };
+            // XXX we have to figure out how to deal with these accounts not existing more generally
+            //  or put another patch on substrate
             assert_eq!(
                 Ok(()),
                 Session::set_keys(

@@ -5,7 +5,6 @@ use crate::{
     ticker::{Ticker, CASH_TICKER, USD_TICKER},
     types::{AssetPrice, Price, ReporterSet, Timestamp},
 };
-use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     traits::UnfilteredDispatchable,

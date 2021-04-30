@@ -1,6 +1,5 @@
 use crate::{error::OracleError, oracle, Call, Config};
-use codec::Decode;
-use codec::Encode;
+use codec::{Decode, Encode};
 use our_std::{log, RuntimeDebug};
 use sp_runtime::transaction_validity::{TransactionSource, TransactionValidity, ValidTransaction};
 
@@ -8,8 +7,7 @@ const MAX_EXTERNAL_PAIRS: usize = 30;
 const UNSIGNED_TXS_PRIORITY: u64 = 100;
 const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
-#[derive(Encode, Eq, PartialEq, RuntimeDebug, Clone, Copy)]
-#[cfg_attr(feature = "std", derive(Decode))]
+#[derive(Encode, Decode, Eq, PartialEq, RuntimeDebug, Clone, Copy)]
 pub enum ValidationError {
     InvalidInternalOnly,
     InvalidPriceSignature,

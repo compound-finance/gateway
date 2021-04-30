@@ -12,7 +12,7 @@ use crate::{
         SignersSet, Timestamp, ValidatorKeys,
     },
     AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
-    IngressionQueue, LastProcessedBlock, Module, Starports, SupportedAssets, TotalBorrowAssets,
+    IngressionQueue, LastProcessedBlock, Pallet, Starports, SupportedAssets, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
@@ -47,7 +47,7 @@ pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
 /// Return the recent timestamp (from the timestamp pallet).
 #[cfg(not(all(feature = "freeze-time", feature = "std")))]
 pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
-    let ts = <pallet_timestamp::Module<T>>::get();
+    let ts = <pallet_timestamp::Pallet<T>>::get();
     let time = T::TimeConverter::convert(ts);
     if time > 0 {
         return Ok(time);
@@ -337,7 +337,7 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
         })
         .collect();
 
-    <Module<T>>::deposit_event(Event::ExecutedGovernance(results));
+    <Pallet<T>>::deposit_event(Event::ExecutedGovernance(results));
 
     Ok(())
 }
@@ -405,7 +405,7 @@ mod tests {
     fn test_get_recent_timestamp() {
         new_test_ext().execute_with(|| {
             let expected = 123;
-            <pallet_timestamp::Module<Test>>::set_timestamp(expected);
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(expected);
             let actual = get_recent_timestamp::<Test>().unwrap();
             assert_eq!(actual, expected);
         });

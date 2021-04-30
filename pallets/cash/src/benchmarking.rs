@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg(not(feature = "std"))]
 use super::{Module as Cash, *};
 use crate::{
     chains::{Chain, ChainAsset, ChainSignatureList, Ethereum},
@@ -9,17 +9,19 @@ use crate::{
 };
 use codec::EncodeLike;
 use frame_benchmarking::benchmarks;
-pub use frame_support::{assert_err, assert_ok, traits::OnInitialize, StorageValue};
+pub use frame_support::{
+    assert_err, assert_ok,
+    traits::{OnInitialize, OriginTrait},
+    StorageValue,
+};
 use frame_system::RawOrigin;
 use hex_literal::hex;
 use num_traits::Zero;
-pub use our_std::{convert::TryInto, str::FromStr};
-use pallet_oracle::Prices;
-use pallet_session;
 use sp_core::crypto::AccountId32;
 use sp_std::prelude::*;
 
-use crate::sp_api_hidden_includes_decl_storage::hidden_include::traits::OriginTrait;
+pub use our_std::{convert::TryInto, str::FromStr};
+use pallet_oracle::Prices;
 
 const TKN_ADDR: &str = "0x0101010101010101010101010101010101010101";
 const TKN_ADDR_BYTES: [u8; 20] = [1; 20];

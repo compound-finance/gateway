@@ -1,5 +1,7 @@
 #![macro_use]
 
+pub use log;
+
 // This file includes macros to make it easy to log from either an
 // std or no_std environment. Just use log!("My Log: {}", 5); and
 // things should just magically work.
@@ -8,7 +10,7 @@
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {{
-        frame_support::debug::native::info!($($arg)*);
+        $crate::log::log::info!($($arg)*);
     }}
 }
 
@@ -16,7 +18,7 @@ macro_rules! log {
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {{
-        sp_runtime::print(format!($($arg)*).as_str());
+        sp_runtime::print($crate::alloc::format!($($arg)*).as_str());
     }}
 }
 
@@ -24,7 +26,7 @@ macro_rules! log {
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {{
-        frame_support::debug::native::debug!($($arg)*);
+        $crate::log::log::debug!($($arg)*);
     }}
 }
 
@@ -32,7 +34,7 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {{
-        crate::log!($($arg)*);
+        $crate::log!($($arg)*);
     }}
 }
 
@@ -40,7 +42,7 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {{
-        frame_support::debug::native::info!($($arg)*);
+        $crate::log::log::info!($($arg)*);
     }}
 }
 
@@ -48,7 +50,7 @@ macro_rules! info {
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {{
-        crate::log!($($arg)*);
+        $crate::log!($($arg)*);
     }}
 }
 
@@ -56,7 +58,7 @@ macro_rules! info {
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {{
-        frame_support::debug::native::warn!($($arg)*);
+        $crate::log::log::warn!($($arg)*);
     }}
 }
 
@@ -64,7 +66,7 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {{
-        crate::log!($($arg)*);
+        $crate::log!($($arg)*);
     }}
 }
 
@@ -72,7 +74,7 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {{
-        frame_support::debug::native::error!($($arg)*);
+        $crate::log::log::error!($($arg)*);
     }}
 }
 
@@ -80,6 +82,6 @@ macro_rules! error {
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {{
-        crate::log!($($arg)*);
+        $crate::log!($($arg)*);
     }}
 }
