@@ -1,4 +1,5 @@
 const path = require('path');
+const os = require('os');
 const { merge } = require('../util');
 const { declare } = require('./declare');
 
@@ -81,8 +82,16 @@ class Ctx {
     return process.env['PROFILE'] || this.scenInfo['profile'];
   }
 
-  __target() {
+  __buildTarget() {
     return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'gateway');
+  }
+
+  __target() {
+    if (this.__native() && this.__genesisVersion()) {
+      return this.versions.mustFind(this.__genesisVersion()).targetFile(os.platform(), os.arch());
+    }
+
+    return this.__buildTarget();
   }
 
   __native() {
