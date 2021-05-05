@@ -4,7 +4,7 @@ use gateway_runtime::{
 };
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
-    chains::{Chain, Ethereum},
+    chains::{Chain, ChainAccount, ChainBlock, Ethereum},
     types::{AssetInfo, Timestamp, ValidatorKeys, APR},
 };
 
@@ -89,6 +89,10 @@ fn development_genesis() -> GenesisConfig {
             .duration_since(wasm_timer::UNIX_EPOCH)
             .expect("cannot get system time for genesis")
             .as_millis() as Timestamp,
+        // Starports
+        vec![],
+        // Genesis Blocks
+        vec![],
     )
 }
 
@@ -125,6 +129,10 @@ fn local_testnet_genesis() -> GenesisConfig {
         FromStr::from_str("0").unwrap(),
         // Initial timestamp
         0 as Timestamp,
+        // Starports
+        vec![],
+        // Genesis Blocks
+        vec![],
     )
 }
 
@@ -156,6 +164,8 @@ fn testnet_genesis(
     assets: Vec<AssetInfo>,
     cash_yield: APR,
     last_yield_timestamp: Timestamp,
+    starports: Vec<ChainAccount>,
+    genesis_blocks: Vec<ChainBlock>,
 ) -> GenesisConfig {
     GenesisConfig {
         frame_system: Some(SystemConfig {
@@ -198,6 +208,8 @@ fn testnet_genesis(
                     eth_address: v.1,
                 })
                 .collect::<Vec<_>>(),
+            starports: starports,
+            genesis_blocks: genesis_blocks,
         }),
 
         pallet_oracle: Some(OracleConfig {
@@ -206,90 +218,10 @@ fn testnet_genesis(
     }
 }
 
-/// A helper function used to extract the runtime interface configuration used for offchain workers
-/// from the properties attribute of the chain spec file.
-pub fn extract_properties(
-    properties: &sp_chain_spec::Properties,
-) -> Option<runtime_interfaces::Config> {
-    let eth_starport_address_json = properties.get("eth_starport_address")?;
-    let eth_starport_address = eth_starport_address_json.as_str()?.into();
-
-    let eth_starport_parent_block_json = properties.get("eth_starport_parent_block")?;
-    let eth_spb_hash = eth_starport_parent_block_json.get("hash")?.as_str()?;
-    let eth_spb_parent_hash = eth_starport_parent_block_json
-        .get("parent_hash")?
-        .as_str()?;
-    let eth_spb_number = eth_starport_parent_block_json.get("number")?.as_u64()?;
-    let eth_starport_parent_block = ethereum_client::EthereumBlock {
-        hash: <Ethereum as Chain>::str_to_hash(eth_spb_hash).ok()?,
-        parent_hash: <Ethereum as Chain>::str_to_hash(eth_spb_parent_hash).ok()?,
-        number: eth_spb_number,
-        events: vec![],
-    };
-
-    Some(runtime_interfaces::new_config(
-        eth_starport_address,
-        eth_starport_parent_block,
-    ))
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
     use gateway_runtime::BuildStorage;
-
-    /// Best case scenario - we have the key we need in the properties map and we _can_ return
-    /// the OCW configuration
-    #[test]
-    fn test_extract_properties_happy_path() {
-        let properties = serde_json::json!({
-            "eth_starport_address": "hello starport",
-            "eth_starport_parent_block": {
-                "hash": "0x4b7a5a7b804bd6f0f0c0aa50392d701b1ff230770d27d50d0e240e1946fe8765",
-                "parent_hash": "0x4b7a5a7b804bd6f0f0c0aa50392d701b1ff230770d27d50d0e240e1946fe8765",
-                "number": 9853195,
-            }
-        });
-        let properties = properties.as_object().unwrap();
-
-        let config = extract_properties(&properties).unwrap();
-        assert_eq!(config.eth_starport_address, "hello starport");
-        assert_eq!(
-            config.eth_starport_parent_block,
-            ethereum_client::EthereumBlock {
-                hash: [
-                    75, 122, 90, 123, 128, 75, 214, 240, 240, 192, 170, 80, 57, 45, 112, 27, 31,
-                    242, 48, 119, 13, 39, 213, 13, 14, 36, 14, 25, 70, 254, 135, 101
-                ],
-                parent_hash: [
-                    75, 122, 90, 123, 128, 75, 214, 240, 240, 192, 170, 80, 57, 45, 112, 27, 31,
-                    242, 48, 119, 13, 39, 213, 13, 14, 36, 14, 25, 70, 254, 135, 101
-                ],
-                number: 9853195,
-                events: vec![],
-            }
-        );
-    }
-
-    /// Bad case - we do _not_ have the keys we need to return the OCW configuration
-    #[test]
-    fn test_extract_missing_keys() {
-        let properties = serde_json::json!({ "wrong_key": "some value" });
-        let properties = properties.as_object().unwrap();
-
-        let config = extract_properties(&properties);
-        assert!(config.is_none());
-    }
-
-    /// Bad case - we do have the keys we need but we have the wrong data types
-    #[test]
-    fn test_extract_properties_wrong_type() {
-        let properties = serde_json::json!({ "eth_rpc_url": 0 });
-        let properties = properties.as_object().unwrap();
-
-        let config = extract_properties(&properties);
-        assert!(config.is_none());
-    }
 
     #[test]
     fn test_create_development_chain_spec() {
@@ -321,6 +253,10 @@ pub(crate) mod tests {
             FromStr::from_str("0").unwrap(),
             // Initial timestamp
             0 as Timestamp,
+            // Starports
+            vec![],
+            // Genesis Blocks
+            vec![],
         )
     }
 

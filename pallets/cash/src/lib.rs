@@ -230,14 +230,21 @@ decl_storage! {
 
         /// The mapping of worker tallies for each alternate reorg, relative to current fork of underlying chain.
         PendingChainReorgs get(fn pending_chain_reorgs): map hasher(blake2_128_concat) ChainId => Vec<ChainReorgTally>;
+
+        /// Mapping of chain to the relevant Starport address
+        Starports get(fn chain_starports): map hasher(blake2_128_concat) ChainId => Option<ChainAccount>;
     }
 
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
         config(validators): Vec<ValidatorKeys>;
+        config(starports): Vec<ChainAccount>;
+        config(genesis_blocks): Vec<ChainBlock>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_starports(config.starports.clone());
+            Module::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
         })
     }
 }
@@ -581,6 +588,21 @@ decl_module! {
             Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
         }
 
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn set_starport(origin, chain_account: ChainAccount) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            Starports::insert(chain_account.chain_id(), chain_account);
+            Ok(())
+        }
+
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn set_genesis_block(origin, chain_block: ChainBlock) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            // TODO: Ensure not set
+            LastProcessedBlock::insert(chain_block.chain_id(), chain_block);
+            Ok(())
+        }
+
         /// Sets the supply cap for a given chain asset [Root]
         #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)]
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
@@ -675,6 +697,38 @@ impl<T: Config> Module<T> {
             //     "Could not placate the substrate account existence thing"
             // );
             <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
+        }
+    }
+
+    /// Set the initial starports from the genesis config.
+    fn initialize_starports(starports: Vec<ChainAccount>) {
+        assert!(
+            !starports.is_empty(),
+            "Starports must be set in the genesis config"
+        );
+        for starport in starports {
+            log!("Adding Starport {:?}", starport);
+            assert!(
+                Starports::get(starport.chain_id()) == None,
+                "Duplicate chain starport in genesis config"
+            );
+            Starports::insert(starport.chain_id(), starport);
+        }
+    }
+
+    /// Set the initial last processed blocks from the genesis config.
+    fn initialize_genesis_blocks(genesis_blocks: Vec<ChainBlock>) {
+        assert!(
+            !genesis_blocks.is_empty(),
+            "Genesis blocks must be set in the genesis config"
+        );
+        for genesis_block in genesis_blocks {
+            log!("Adding Genesis Block {:?}", genesis_block);
+            assert!(
+                LastProcessedBlock::get(genesis_block.chain_id()) == None,
+                "Duplicate genesis block in genesis config"
+            );
+            LastProcessedBlock::insert(genesis_block.chain_id(), genesis_block);
         }
     }
 

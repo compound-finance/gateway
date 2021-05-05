@@ -122,6 +122,10 @@ class Ctx {
     return process.env['GENESIS_VERSION'] || this.scenInfo['genesis_version'];
   }
 
+  genesisVersion() {
+    return this.versions.mustFind(this.__genesisVersion() || 'curr');
+  }
+
   __blockTime() {
     return process.env['BLOCK_TIME'] || this.scenInfo['block_time'];
   }

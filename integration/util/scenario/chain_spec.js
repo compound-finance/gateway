@@ -60,24 +60,35 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     };
   }
 
-  let frameSystem = {};
-  if (ctx.__genesisVersion()) {
-    let version = ctx.versions.mustFind(ctx.__genesisVersion());
-    frameSystem = {
-      frameSystem: {
-        code: await version.wasm()
-      }
-    };
-  }
+  let genesisVersion = ctx.genesisVersion();
+  let frameSystem = {
+    frameSystem: {
+      code: await genesisVersion.wasm()
+    }
+  };
 
   let reporters = ctx.__reporters();
 
+  let cashGenesis = {};
+  console.log(['yabba000', genesisVersion]);
+  if (genesisVersion.supports('eth-starport-parent-block')) {
+    console.log(['yabba000', true]);
+    cashGenesis.genesisBlocks = [{
+      Eth: {
+        hash: ctx.eth.blockInfo.hash.slice(2),
+        parent_hash: ctx.eth.blockInfo.parent_hash.slice(2),
+        number: ctx.eth.blockInfo.number,
+      }
+    }];
+    cashGenesis.starports = [ctx.starport.chainAddress()];
+  } else {
+    console.log(['yabba000', false]);
+  }
+
+  console.log(cashGenesis.genesisBlocks);
+
   return {
     name: 'Integration Test Network',
-    properties: {
-      eth_starport_address: ctx.starport.ethAddress(),
-      eth_starport_parent_block: ctx.eth.blockInfo
-    },
     genesis: {
       runtime: {
         ...frameSystem,
@@ -85,6 +96,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
           assets,
           ...initialYieldConfig,
           validators,
+          ...cashGenesis
         },
         palletSession: {
           keys: session_args

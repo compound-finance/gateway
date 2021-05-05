@@ -184,6 +184,8 @@ class Validator {
       ];
     }
 
+    this.version = this.version || this.ctx.genesisVersion();
+
     let executionArgs = [];
     if (this.ctx.__native()) {
       // TODO: Consider setting native versions better per node
@@ -204,7 +206,7 @@ class Validator {
     this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let newCliArgs = [];
-    if (this.version.supportsNewCliArgs()) {
+    if (this.version.supports('full-cli-args')) {
       newCliArgs = [
         '--eth-rpc-url', this.ctx.eth.web3Url,
         '--eth-key-id', "my_eth_key_id",

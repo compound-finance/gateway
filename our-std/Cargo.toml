@@ -14,6 +14,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 serde = { version = "1.0.101", features = ["derive"], default-features = false }
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+hex = { version = '0.4.2', features = ['alloc'], default-features = false }
 
 our-std-proc-macro = { path = "./proc-macro" }
 

@@ -152,9 +152,18 @@ class Version {
     throw new Error(`No version number for ${this.version}`)
   }
 
-  supportsNewCliArgs() {
-    // New CLI args supported in m9+
-    this.versionNumber() >= 9;
+  supports(t) {
+    let versionMap = {
+      'full-cli-args': (v) => v >= 9,
+      'eth-starport-parent-block': (v) => v >= 9,
+    };
+
+    if (!versionMap.hasOwnProperty(t)) {
+      throw new Error(`Unknown support type: ${t}`);
+    }
+
+    let versionCheck = versionMap[t];
+    return versionCheck(this.versionNumber());
   }
 }
 
@@ -166,7 +175,6 @@ class CurrentVersion extends Version {
   async pull() {}
 
   wasmFile() {
-    this.ctx.log({wasmFile: this.ctx.__wasmFile()});
     return this.ctx.__wasmFile();
   }
 

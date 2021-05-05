@@ -17,6 +17,10 @@ class Starport {
     return this.starport._address;
   }
 
+  chainAddress() {
+    return `ETH:${this.ethAddress()}`;
+  }
+
   topics() {
     return this.starportTopics;
   }
