@@ -1514,6 +1514,7 @@ dependencies = [
  "ethabi 12.0.0",
  "frame-support",
  "hex",
+ "hex-buffer-serde",
  "lazy_static",
  "our-std",
  "parity-scale-codec",
@@ -2497,9 +2498,19 @@ dependencies = [
 
 [[package]]
 name = "hex"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hex-buffer-serde"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08f52012c160668b4494727f3588045aa00429849fcae51de70d68fa98228039"
+dependencies = [
+ "hex",
+ "serde",
+]
 
 [[package]]
 name = "hex-literal"
@@ -4325,6 +4336,7 @@ dependencies = [
 name = "our-std"
 version = "0.0.1"
 dependencies = [
+ "hex",
  "our-std-proc-macro",
  "serde",
  "sp-runtime",

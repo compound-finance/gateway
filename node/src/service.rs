@@ -2,7 +2,6 @@
 
 use crate::rpc;
 use gateway_runtime::{self as node_runtime, opaque::Block, RuntimeApi};
-use our_std::{debug, error};
 use pallet_cash;
 use pallet_oracle;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
@@ -23,7 +22,6 @@ native_executor_instance!(
     node_runtime::native_version,
     (
         frame_benchmarking::benchmarking::HostFunctions,
-        runtime_interfaces::config_interface::HostFunctions,
         runtime_interfaces::validator_config_interface::HostFunctions,
         runtime_interfaces::keyring_interface::HostFunctions,
         runtime_interfaces::price_feed_interface::HostFunctions,
@@ -204,15 +202,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     let enable_grandpa = !config.disable_grandpa;
     let prometheus_registry = config.prometheus_registry().cloned();
     let telemetry_connection_sinks = sc_service::TelemetryConnectionSinks::default();
-
-    // Setup our custom config/communication between node <> OCW
-    let properties = config.chain_spec.properties();
-    if let Some(runtime_config) = crate::chain_spec::extract_properties(&properties) {
-        debug!("Parsed runtime config {:?}", runtime_config);
-        runtime_interfaces::config_interface::set(runtime_config);
-    } else {
-        error!("☢️ Could not parse properties from {:?}", properties);
-    }
 
     sc_service::spawn_tasks(sc_service::SpawnTasksParams {
         config,

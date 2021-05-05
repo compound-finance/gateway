@@ -1,17 +1,8 @@
 #[macro_use]
 extern crate lazy_static;
 
-use codec::{Decode, Encode};
-use ethereum_client::EthereumBlock;
 use gateway_crypto::CryptoError;
-use sp_runtime_interface::pass_by::PassByCodec;
 use std::{str, sync::Mutex};
-
-#[derive(Clone, Decode, Encode, PassByCodec, Debug)]
-pub struct Config {
-    pub eth_starport_address: String,
-    pub eth_starport_parent_block: EthereumBlock,
-}
 
 #[derive(Clone, Debug)]
 pub struct ValidatorConfig {
@@ -21,34 +12,9 @@ pub struct ValidatorConfig {
     pub opf_url: String,
 }
 
-impl Config {
-    pub fn update(&mut self, new: Config) {
-        self.eth_starport_address = new.eth_starport_address;
-        self.eth_starport_parent_block = new.eth_starport_parent_block;
-    }
-}
-
-pub fn new_config(
-    eth_starport_address: String,
-    eth_starport_parent_block: EthereumBlock,
-) -> Config {
-    return Config {
-        eth_starport_address,
-        eth_starport_parent_block,
-    };
-}
-
 pub type PriceFeedData = (Vec<(Vec<u8>, Vec<u8>)>, u64);
 
-pub const NULL_ETH_BLOCK: EthereumBlock = EthereumBlock {
-    hash: [0; 32],
-    parent_hash: [0; 32],
-    number: 0,
-    events: vec![],
-};
-
 lazy_static! {
-    static ref CONFIG: Mutex<Config> = Mutex::new(new_config("".into(), NULL_ETH_BLOCK));
     static ref VALIDATOR_CONFIG: Mutex<Option<ValidatorConfig>> = Mutex::new(None);
     static ref PRICE_FEED_DATA: Mutex<Option<PriceFeedData>> = Mutex::new(None);
 }
@@ -70,46 +36,6 @@ pub fn initialize_validator_config(
         }
         _ => (), // XXX todo: log?
     };
-}
-
-/// The configuration interface for offchain workers. This is designed to manage configuration
-/// that is specific to gateway AND distributed in the chain spec file. Ultimately
-/// the things that are being configured here should not be changed by any honest validators.
-/// Each chain spec file will have different values for these configurations by design, for example
-/// testnet may point to an Ethereum testnet starport address and lock event topic.
-#[sp_runtime_interface::runtime_interface]
-pub trait ConfigInterface {
-    /// This method is designed to be used by the node as it starts up. The node reads
-    /// the chain configuration from the "properties" key in the "chain spec" file. Those
-    /// properties determine what goes into the Config object which will then be set here
-    /// on startup.
-    fn set(config: Config) {
-        CONFIG.lock().unwrap().update(config);
-    }
-
-    /// This is designed for use in the context of an offchain worker. The offchain worker may grab
-    /// the configuration to determine where to make RPC calls among other parameters.
-    fn get() -> Config {
-        CONFIG.lock().unwrap().clone()
-    }
-
-    /// Get the Ethereum Starport address.
-    fn get_eth_starport_address() -> Option<String> {
-        if let Ok(config) = CONFIG.lock() {
-            if config.eth_starport_address.len() == 42 {
-                return Some(config.eth_starport_address.clone());
-            }
-        }
-        return None;
-    }
-
-    /// Get the Ethereum Starport parent block.
-    fn get_eth_starport_parent_block() -> EthereumBlock {
-        if let Ok(config) = CONFIG.lock() {
-            return config.eth_starport_parent_block.clone();
-        }
-        return NULL_ETH_BLOCK;
-    }
 }
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
@@ -279,20 +205,4 @@ pub trait PriceFeedInterface {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_basic() {
-        // this gets loaded from the json file "chain config file"
-        let given_eth_starport_address = String::from("0xbbde1662bC3ED16aA8C618c9833c801F3543B587");
-        let expected_eth_starport_address =
-            String::from("0xbbde1662bC3ED16aA8C618c9833c801F3543B587");
-
-        let config = new_config(given_eth_starport_address.clone(), NULL_ETH_BLOCK);
-        // set in node
-        config_interface::set(config);
-        // ...later... in offchain worker context, get the configuration
-        let actual_config = config_interface::get();
-        let actual_eth_starport_address = actual_config.eth_starport_address;
-        assert_eq!(expected_eth_starport_address, actual_eth_starport_address);
-    }
 }

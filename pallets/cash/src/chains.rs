@@ -75,15 +75,6 @@ impl ChainId {
         }
     }
 
-    pub fn starport_parent_block(self) -> ChainBlock {
-        match self {
-            ChainId::Eth => ChainBlock::Eth(
-                runtime_interfaces::config_interface::get_eth_starport_parent_block(),
-            ),
-            ChainId::Reserved | ChainId::Dot => panic!("xxx not supported"),
-        }
-    }
-
     pub fn zero_hash(self) -> ChainHash {
         match self {
             ChainId::Reserved => ChainHash::Reserved,
@@ -343,6 +334,7 @@ impl FromStr for ChainId {
 }
 
 /// Type for describing a block coming from an underlying chain.
+#[derive(Serialize, Deserialize)] // used in config
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlock {
     Reserved,

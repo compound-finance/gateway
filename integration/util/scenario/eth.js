@@ -23,6 +23,17 @@ class Eth {
     return this.defaultFrom;
   }
 
+  genesisBlock() {
+    return {
+      Eth: {
+        hash: this.blockInfo.hash,
+        parent_hash: this.blockInfo.parent_hash,
+        number: this.blockInfo.number,
+        events: []
+      }
+    };
+  }
+
   sendAsync(method, params = []) {
     let id = this.asyncId++;
 

@@ -9,31 +9,6 @@ const os = require('os');
 const path = require('path');
 const chalk = require('chalk');
 
-async function loadTypes(ctx, version) {
-  let contents = await fs.readFile(ctx.__typesFile(version));
-  try {
-    return {
-      ...JSON.parse(contents),
-      ...ctx.__types()
-    };
-  } catch (e) {
-    let match = /in JSON at position (\d+)/.exec(e.message);
-    if (match) {
-      let pos = Number(match[1]);
-      let show = (start, end) => contents.slice(start, end).toString().replaceAll("\n", "\\n");
-      let colored =
-          chalk.green(show(pos - 20, pos)) +
-          chalk.red(show(pos, pos + 1)) +
-          chalk.green(show(pos + 1, pos + 20));
-
-      ctx.error("JSON Error Around: \n" + chalk.bgWhiteBright(colored));
-      throw new Error(`Error Parsing \`types.json\`: ${e.toString()} [around \`${colored}\`]`);
-    } else {
-      throw new Error(`Error Parsing \`types.json\`: ${e.toString()}`);
-    }
-  }
-}
-
 async function loadRpc(ctx) {
   // TODO: Handle versioning
   let contents = await fs.readFile(ctx.__rpcFile());
@@ -184,6 +159,8 @@ class Validator {
       ];
     }
 
+    this.version = this.version || this.ctx.genesisVersion();
+
     let executionArgs = [];
     if (this.ctx.__native()) {
       // TODO: Consider setting native versions better per node
@@ -204,7 +181,7 @@ class Validator {
     this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let newCliArgs = [];
-    if (this.version.supportsNewCliArgs()) {
+    if (this.version.supports('full-cli-args')) {
       newCliArgs = [
         '--eth-rpc-url', this.ctx.eth.web3Url,
         '--eth-key-id', "my_eth_key_id",
@@ -273,11 +250,11 @@ class Validator {
 
   async buildApi() {
     const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
-    let types = await loadTypes(this.ctx, this.version);
+    let types = await this.version.loadTypes();
     for (let version of this.extraVersions) {
       types = {
         ...types,
-        ...await loadTypes(this.ctx, version)
+        ...await version.loadTypes()
       };
     }
     const api = await ApiPromise.create({

@@ -1,8 +1,9 @@
 const { download } = require('../download');
 const { instantiateInfo } = require('./scen_info');
 const { keccak256 } = require('../util');
-const fs = require('fs').promises;
 const { constants } = require('fs');
+const { TypeRegistry } = require('@polkadot/types');
+const fs = require('fs').promises;
 const path = require('path');
 
 function releaseUrl(repoUrl, version, file) {
@@ -88,6 +89,7 @@ class Version {
     this.version = version;
     this.ctx = ctx;
     this.symbolized = version.replace(/[.]/mig, '_');
+    this.__registry = null;
   }
 
   matches(v) {
@@ -152,9 +154,35 @@ class Version {
     throw new Error(`No version number for ${this.version}`)
   }
 
-  supportsNewCliArgs() {
-    // New CLI args supported in m9+
-    this.versionNumber() >= 9;
+  supports(t) {
+    let versionMap = {
+      'full-cli-args': (v) => v >= 9,
+      'eth-starport-parent-block': (v) => v >= 9,
+    };
+
+    if (!versionMap.hasOwnProperty(t)) {
+      throw new Error(`Unknown support type: ${t}`);
+    }
+
+    let versionCheck = versionMap[t];
+    return versionCheck(this.versionNumber());
+  }
+
+  async loadTypes(ctx, version) {
+    let contents = await fs.readFile(this.typesJson());
+    return JSON.parse(contents);
+  }
+
+  async registry() {
+    if (this.__registry) {
+      return this.__registry;
+    }
+
+    let typesJson = await this.loadTypes()
+    const registry = new TypeRegistry();
+    registry.register(typesJson);
+    this.__registry = registry;
+    return registry;
   }
 }
 
@@ -166,7 +194,6 @@ class CurrentVersion extends Version {
   async pull() {}
 
   wasmFile() {
-    this.ctx.log({wasmFile: this.ctx.__wasmFile()});
     return this.ctx.__wasmFile();
   }
 
