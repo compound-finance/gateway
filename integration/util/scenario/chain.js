@@ -1,5 +1,5 @@
 const { findEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
-const { arrayEquals, keccak256, intervalToSeconds } = require('../util');
+const { arrayEquals, keccak256, intervalToSeconds, zip } = require('../util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -12,6 +12,10 @@ const chalk = require('chalk');
 const { u8aToHex } = require('@polkadot/util');
 const { xxhashAsHex } = require('@polkadot/util-crypto');
 const web3 = require('web3');
+
+function hexByte(x) {
+  return ('00' + x.toString(16)).slice(-2);
+}
 
 class Chain {
   constructor(ctx) {
@@ -166,14 +170,20 @@ class Chain {
     return await this.ctx.getApi().query.cash.globalCashIndex();
   }
 
-  async upgradeTo(version) {
+  async upgradeTo(version, extrinsics = [], wasmFn = null) {
     this.ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
     let versionHash = await version.hash();
-    let extrinsic = this.ctx.getApi().tx.cash.allowNextCodeWithHash(versionHash);
+    let allExtrinsics =
+      [ this.ctx.getApi().tx.cash.allowNextCodeWithHash(versionHash)
+      , ...extrinsics
+      ];
 
-    await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, [extrinsic]);
+    console.log({allExtrinsics});
+
+    await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, allExtrinsics);
     expect(await this.nextCodeHash()).toEqual(versionHash);
-    await this.setNextCode(await version.wasm(), version, false);
+    let wasm = await version.wasm();
+    await this.setNextCode(wasmFn ? wasmFn(wasm) : wasm, version, false);
     this.ctx.log(chalk.blueBright(`Upgrade to version ${version.version} complete.`));
   }
 
@@ -229,15 +239,17 @@ class Chain {
   async setNextCode(code, version, onFinalize = true) {
     await this.ctx.eventTracker.teardown();
 
-    return await this.ctx.eventTracker.send(this.api().tx.cash.setNextCodeViaHash(code), { setUnsubDelay: false, onFinalize: false });
-
+    console.log("hhju0");
+    await this.ctx.eventTracker.send(this.api().tx.cash.setNextCodeViaHash(code), { setUnsubDelay: false, onFinalize: false });
+    console.log("hhju1");
     await Promise.all(this.ctx.validators.all().map((validator) => validator.teardownApi()));
+    console.log("hhju2");
     await this.ctx.sleep(60000);
+    console.log("hhju3", version);
     await Promise.all(this.ctx.validators.all().map((validator) => validator.setVersion(version)));
+    console.log("hhju4");
 
     await this.ctx.eventTracker.start();
-
-    return getEventData(findEvent(events, 'cash', 'AttemptedSetCodeByHash'));
   }
 
   async version() {
@@ -328,6 +340,17 @@ class Chain {
         return true;
       }
     }, { delay: 1000 });
+  }
+
+  async encodeCall(palletNumber, callNumber, version, argTypes, argValues) {
+    let registry = await version.registry();
+    console.log({registry});
+    let argsEncoded = zip(argTypes, argValues).map(([argType, argValue]) => {
+      return registry.createType(argType, argValue).toHex().slice(2);
+    });
+    let encodedCall = `0x${hexByte(palletNumber)}${hexByte(callNumber)}${argsEncoded.join('')}`
+    console.log({encodedCall});
+    return encodedCall;
   }
 }
 

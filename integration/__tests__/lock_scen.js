@@ -22,6 +22,7 @@ let now = Date.now();
 
 buildScenarios('Lock Scenarios', lock_scen_info, [
   {
+    only: true,
     name: 'Lock Collateral',
     scenario: async ({ ashley, usdc, chain }) => {
       await ashley.lock(100, usdc);

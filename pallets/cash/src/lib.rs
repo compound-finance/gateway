@@ -26,6 +26,7 @@ use crate::{
 };
 
 use codec::alloc::string::String;
+use ethereum_client::EthereumBlock;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
@@ -238,9 +239,13 @@ decl_storage! {
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
         config(validators): Vec<ValidatorKeys>;
+        config(starports): Vec<ChainAccount>;
+        config(genesis_blocks): Vec<ChainBlock>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_starports(config.starports.clone());
+            Module::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
         })
     }
 }
@@ -518,6 +523,17 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
+        fn on_runtime_upgrade() -> Weight {
+            // LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(EthereumBlock {
+            //     hash: hex::decode(&Module::<T>::next_genesis_hash()[2..]).expect("genesis block hash incorrect").try_into().expect("genesis block hash incorrect size"),
+            //     parent_hash: hex::decode(&Module::<T>::next_genesis_parent_hash()[2..]).expect("genesis block parent hash incorrect").try_into().expect("genesis block parent hash incorrect size"),
+            //     number: u64::from_le_bytes(hex::decode(&Module::<T>::next_genesis_number()[2..]).expect("genesis block number incorrect")[..].try_into().expect("genesis block number incorrect size")),
+            //     events: vec![],
+            // }));
+            // Starports::insert(ChainId::Eth, ChainAccount::Eth(hex::decode(&Module::<T>::next_starport()[2..]).expect("starport address incorrect").try_into().expect("starport address incorrect size")));
+            0
+        }
+
         /// Called by substrate on block initialization.
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
@@ -602,6 +618,21 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn set_starport(origin, chain_account: ChainAccount) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            Starports::insert(chain_account.chain_id(), chain_account);
+            Ok(())
+        }
+
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn set_genesis_block(origin, chain_block: ChainBlock) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            // TODO: Ensure not set
+            LastProcessedBlock::insert(chain_block.chain_id(), chain_block);
+            Ok(())
+        }
+
         /// Sets the supply cap for a given chain asset [Root]
         #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)]
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
@@ -670,6 +701,22 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
+    fn next_genesis_hash() -> &'static str {
+        "0x8888888888888888888888888888888888888888888888888888888888888888"
+    }
+
+    fn next_genesis_parent_hash() -> &'static str {
+        "0x9999999999999999999999999999999999999999999999999999999999999999"
+    }
+
+    fn next_genesis_number() -> &'static str {
+        "0xaaaaaaaaaaaaaaaa"
+    }
+
+    fn next_starport() -> &'static str {
+        "0x7777777777777777777777777777777777777777"
+    }
+
     /// Initializes the set of supported assets from a config value.
     fn initialize_assets(assets: Vec<AssetInfo>) {
         for asset in assets {
@@ -696,6 +743,38 @@ impl<T: Config> Module<T> {
             //     "Could not placate the substrate account existence thing"
             // );
             <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
+        }
+    }
+
+    /// Set the initial starports from the genesis config.
+    fn initialize_starports(starports: Vec<ChainAccount>) {
+        assert!(
+            !starports.is_empty(),
+            "Starports must be set in the genesis config"
+        );
+        for starport in starports {
+            log!("Adding Starport {:?}", starport);
+            assert!(
+                Starports::get(starport.chain_id()) == None,
+                "Duplicate chain starport in genesis config"
+            );
+            Starports::insert(starport.chain_id(), starport);
+        }
+    }
+
+    /// Set the initial last processed blocks from the genesis config.
+    fn initialize_genesis_blocks(genesis_blocks: Vec<ChainBlock>) {
+        assert!(
+            !genesis_blocks.is_empty(),
+            "Genesis blocks must be set in the genesis config"
+        );
+        for genesis_block in genesis_blocks {
+            log!("Adding Genesis Block {:?}", genesis_block);
+            assert!(
+                LastProcessedBlock::get(genesis_block.chain_id()) == None,
+                "Duplicate genesis block in genesis config"
+            );
+            LastProcessedBlock::insert(genesis_block.chain_id(), genesis_block);
         }
     }
 

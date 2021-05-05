@@ -3,11 +3,12 @@ extern crate lazy_static;
 
 use codec::{Decode, Encode};
 use frame_support::debug;
-use serde::Deserialize;
 use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
-use our_std::RuntimeDebug;
+use hex_buffer_serde::{ConstHex, ConstHexForm};
+use our_std::{debug, log};
+use our_std::{Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -24,11 +25,15 @@ pub type EthereumHash = [u8; 32];
 
 const ETH_FETCH_DEADLINE: u64 = 10_000;
 
+#[derive(Serialize, Deserialize)] // used in config
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 pub struct EthereumBlock {
+    #[serde(with = "ConstHexForm")]
     pub hash: EthereumHash,
+    #[serde(with = "ConstHexForm")]
     pub parent_hash: EthereumHash,
     pub number: EthereumBlockNumber,
+    #[serde(skip)]
     pub events: Vec<EthereumEvent>,
 }
 
@@ -138,27 +143,36 @@ pub struct BlockNumberResponse {
     pub error: Option<ResponseError>,
 }
 
+fn parse_error(data: &str) -> EthereumClientError {
+    log!("Error Parsing: {}", data);
+    EthereumClientError::JsonParseError
+}
+
 fn deserialize_get_logs_response(response: &str) -> Result<GetLogsResponse, EthereumClientError> {
     let result: serde_json::error::Result<GetLogsResponse> = serde_json::from_str(response);
-    Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
+    Ok(result.map_err(|_| parse_error(response))?)
 }
 
 fn deserialize_get_block_by_number_response(
     response: &str,
 ) -> Result<BlockResponse, EthereumClientError> {
     let result: serde_json::error::Result<BlockResponse> = serde_json::from_str(response);
-    Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
+    Ok(result.map_err(|_| parse_error(response))?)
 }
 
 fn deserialize_block_number_response(
     response: &str,
 ) -> Result<BlockNumberResponse, EthereumClientError> {
     let result: serde_json::error::Result<BlockNumberResponse> = serde_json::from_str(response);
-    Ok(result.map_err(|_| EthereumClientError::JsonParseError)?)
+    Ok(result.map_err(|_| parse_error(response))?)
 }
 
 pub fn encode_block_hex(block_number: EthereumBlockNumber) -> String {
     format!("{:#X}", block_number)
+}
+
+pub fn encode_address_hex(address: &[u8; 20]) -> String {
+    format!("0x{}", ::hex::encode(&address[..]))
 }
 
 pub fn send_rpc(
@@ -174,6 +188,7 @@ pub fn send_rpc(
         "id":1
     })
     .to_string();
+    log!("RPC: {}", &data);
 
     let request = http::Request::post(server, vec![data]);
 
@@ -206,34 +221,39 @@ pub fn send_rpc(
 
 pub fn get_block(
     server: &str,
-    eth_starport_address: &str,
+    eth_starport_address: &[u8; 20],
     block_num: EthereumBlockNumber,
 ) -> Result<EthereumBlock, EthereumClientError> {
     let block_str = encode_block_hex(block_num);
     let block_obj = get_block_object(server, &block_str)?;
     let get_logs_params = vec![serde_json::json!({
-        "address": eth_starport_address,
+        "address": encode_address_hex(eth_starport_address),
         "fromBlock": &block_str,
         "toBlock": &block_str,
     })];
+    log!("get_logs_params: {:?}", get_logs_params.clone());
     let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
     let event_objects = get_logs_response
         .result
-        .ok_or(EthereumClientError::JsonParseError)?;
+        .ok_or_else(|| parse_error(&get_logs_response_str[..]))?;
 
     if event_objects.len() > 0 {
         debug::info!(
-            "Found {} events @ Eth Starport {}",
+            "Found {} events @ Eth Starport {:X?}",
             event_objects.len(),
-            eth_starport_address
+            &eth_starport_address[..]
         );
     }
 
     let mut events = Vec::with_capacity(event_objects.len());
     for ev_obj in event_objects {
-        let topics = ev_obj.topics.ok_or(EthereumClientError::JsonParseError)?;
-        let data = ev_obj.data.ok_or(EthereumClientError::JsonParseError)?;
+        let topics = ev_obj
+            .topics
+            .ok_or_else(|| parse_error(&get_logs_response_str[..]))?;
+        let data = ev_obj
+            .data
+            .ok_or_else(|| parse_error(&get_logs_response_str[..]))?;
         match events::decode_event(topics, data) {
             Ok(event) => events.push(event),
             Err(events::EventError::UnknownEventTopic(topic)) => {
@@ -247,9 +267,11 @@ pub fn get_block(
     }
 
     Ok(EthereumBlock {
-        hash: parse_word(block_obj.hash).ok_or(EthereumClientError::JsonParseError)?,
-        parent_hash: parse_word(block_obj.parentHash).ok_or(EthereumClientError::JsonParseError)?,
-        number: parse_u64(block_obj.number).ok_or(EthereumClientError::JsonParseError)?,
+        hash: parse_word(block_obj.hash).ok_or_else(|| parse_error(&get_logs_response_str[..]))?,
+        parent_hash: parse_word(block_obj.parentHash)
+            .ok_or_else(|| parse_error(&get_logs_response_str[..]))?,
+        number: parse_u64(block_obj.number)
+            .ok_or_else(|| parse_error(&get_logs_response_str[..]))?,
         events,
     })
 }
