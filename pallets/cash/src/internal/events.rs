@@ -77,7 +77,6 @@ pub fn risk_adjusted_value<T: Config>(
 
             _ => Ok(Quantity::new(0, USD)),
         },
-        _ => Err(Reason::Unreachable),
     }
 }
 
@@ -311,21 +310,21 @@ pub fn formulate_reorg<T: Config>(
                 .into_iter()
                 .take_while(|b| b.parent_hash() != common_ancestor)
                 .filter_map(|b| match b {
+                    ChainBlock::Reserved => panic!("unreachable"),
                     ChainBlock::Eth(eth_block) => Some(eth_block),
-                    _ => None,
                 })
                 .collect(),
             forward_blocks: drawrof_blocks
                 .into_iter()
                 .take_while(|b| b.parent_hash() != common_ancestor)
                 .filter_map(|b| match b {
+                    ChainBlock::Reserved => panic!("unreachable"),
                     ChainBlock::Eth(eth_block) => Some(eth_block),
-                    _ => None,
                 })
                 .collect_rev(),
         }),
 
-        _ => panic!("XXX not implemented"),
+        _ => return Err(Reason::Unreachable),
     }
 }
 

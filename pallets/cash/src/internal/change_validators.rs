@@ -59,8 +59,8 @@ mod tests {
                 eth_address: eth_address.clone(),
             }];
             let session_keys = MockSessionKeys { dummy: 1u64.into() };
-            // XXX we have to figure out how to deal with these accounts not existing more generally
-            //  or put another patch on substrate
+            // XXX really set it up using a transfer to validator first
+            assert!(<Test as Config>::AccountStore::insert(&substrate_id, ()).is_ok());
             assert_eq!(
                 Ok(()),
                 Session::set_keys(
@@ -104,17 +104,24 @@ mod tests {
             );
 
             assert_eq!(
-                vec![&(substrate_id, session_keys)],
+                vec![&(substrate_id.clone(), session_keys)],
                 Session::queued_keys().iter().collect::<Vec<_>>()
             );
 
-            // Check emitted `ChangeValidators` event
             let mut events_iter = System::events().into_iter();
+            let new_account_event = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::frame_system(SysEvent::NewAccount(substrate_id)),
+                new_account_event.event
+            );
+
+            // Check emitted `ChangeValidators` event
             let change_validators_event = events_iter.next().unwrap();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::ChangeValidators(val_keys.clone())),
                 change_validators_event.event
             );
+
             // Check emitted `Notice` event
             let notice_event = events_iter.next().unwrap();
             let expected_notice_encoded = expected_notice.encode_notice();

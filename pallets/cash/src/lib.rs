@@ -47,7 +47,6 @@ use sp_runtime::{
 };
 
 use pallet_oracle;
-use pallet_oracle::ticker::Ticker;
 use pallet_session;
 use pallet_timestamp;
 use types_derive::type_alias;
@@ -116,7 +115,7 @@ pub trait Config:
 }
 
 decl_storage! {
-    trait Store for Pallet<T: Config> as Cash {
+    trait Store for Module<T: Config> as Cash {
         /// The timestamp of the previous block (or initialized to yield start defined in genesis).
         LastYieldTimestamp get(fn last_yield_timestamp) config(): Timestamp;
 
@@ -202,9 +201,6 @@ decl_storage! {
 
         /// The asset metadata for each supported asset, which will also be synced with the starports.
         SupportedAssets get(fn asset): map hasher(blake2_128_concat) ChainAsset => Option<AssetInfo>;
-
-        /// Mapping of strings to tickers (valid tickers indexed by ticker string).
-        Tickers get(fn ticker): map hasher(blake2_128_concat) String => Option<Ticker>;
 
         /// Miner of the current block.
         Miner get(fn miner): Option<ChainAccount>;
@@ -342,7 +338,7 @@ decl_event!(
 
 fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
     if let Err(err) = res {
-        <Pallet<T>>::deposit_event(Event::Failure(err));
+        <Module<T>>::deposit_event(Event::Failure(err));
         log!("Cash Failure {:#?}", err);
     }
     res
@@ -358,14 +354,14 @@ where
     T: pallet_session::Config<ValidatorId = SubstrateId>,
 {
     fn has_next_keys(x: SubstrateId) -> bool {
-        match <pallet_session::Pallet<T>>::next_keys(x as T::ValidatorId) {
+        match <pallet_session::Module<T>>::next_keys(x as T::ValidatorId) {
             Some(_keys) => true,
             None => false,
         }
     }
 
     fn rotate_session() {
-        <pallet_session::Pallet<T>>::rotate_session();
+        <pallet_session::Module<T>>::rotate_session();
     }
 }
 
@@ -385,13 +381,13 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
         // if starting the queued session
         if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
             // delete existing validators
-            for kv in <Validators>::iter() {
-                <Validators>::take(&kv.0);
+            for validator in <Validators>::iter_values() {
+                <Validators>::take(&validator.substrate_id);
             }
             // push next validators into current validators
-            for (id, chain_keys) in <NextValidators>::iter() {
+            for (id, validator) in <NextValidators>::iter() {
                 <NextValidators>::take(&id);
-                <Validators>::insert(&id, chain_keys);
+                <Validators>::insert(&id, validator);
             }
         } else {
             ()
@@ -700,18 +696,10 @@ impl<T: Config> Module<T> {
         if validators.is_empty() {
             warn!("Validators must be set in the genesis config");
         }
-        for validator_keys in validators {
-            log!("Adding validator with keys: {:?}", validator_keys);
-            assert!(
-                <Validators>::get(&validator_keys.substrate_id) == None,
-                "Duplicate validator keys in genesis config"
-            );
-            // XXX for Substrate 3
-            assert!(
-                T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
-                "Could not placate the substrate account existence thing"
-            );
-            <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
+        for validator in validators {
+            log!("Adding validator: {:?}", validator);
+            <Validators>::insert(&validator.substrate_id, validator.clone());
+            T::AccountStore::insert(&validator.substrate_id, ()); // XXX can fail...
         }
     }
 

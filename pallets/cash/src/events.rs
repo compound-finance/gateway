@@ -24,7 +24,7 @@ pub fn fetch_chain_block(
     starport: ChainAccount,
 ) -> Result<ChainBlock, Reason> {
     match (chain_id, starport) {
-        (ChainId::Reserved, _) => Err(Reason::Unreachable),
+        (ChainId::Gate, _) => Err(Reason::Unreachable),
         (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
             Ok(fetch_eth_block(number, &eth_starport_address).map(ChainBlock::Eth)?)
         }
@@ -41,7 +41,7 @@ pub fn fetch_chain_blocks(
     starport: ChainAccount,
 ) -> Result<ChainBlocks, Reason> {
     match (chain_id, starport) {
-        (ChainId::Reserved, _) => Err(Reason::Unreachable),
+        (ChainId::Gate, _) => Err(Reason::Unreachable),
         (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
             Ok(fetch_eth_blocks(from, to, &eth_starport_address)?)
         }

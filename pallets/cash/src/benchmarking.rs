@@ -1,14 +1,16 @@
-#![cfg(not(feature = "std"))]
-use super::{Module as Cash, *};
+#![cfg(feature = "runtime-benchmarks")]
+
+use super::*;
 use crate::{
     chains::{Chain, ChainAsset, ChainSignatureList, Ethereum},
     notices::{ExtractionNotice, Notice},
     rates::APR,
     types::*,
     types::{AssetInfo, Factor, ValidatorKeys},
+    Pallet as Cash,
 };
 use codec::EncodeLike;
-use frame_benchmarking::benchmarks;
+use frame_benchmarking::{benchmarks, impl_benchmark_test_suite};
 pub use frame_support::{
     assert_err, assert_ok,
     traits::{OnInitialize, OriginTrait},
@@ -34,14 +36,6 @@ const BOB_ADDRESS: &str = "0x59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e";
 const BOB_ADDRESS_BYTES: [u8; 20] = hex!("59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e");
 
 const MIN_TX_VALUE: u128 = params::MIN_TX_VALUE.value;
-
-pub struct Pallet<T: Config>(Module<T>);
-
-impl<T: Config> OnInitialize<T::BlockNumber> for Pallet<T> {
-    fn on_initialize(n: T::BlockNumber) -> frame_support::weights::Weight {
-        Cash::<T>::on_initialize(n)
-    }
-}
 
 // endow token to user, create market, add some dummy data
 fn endow_tkn<T: Config>(
@@ -250,6 +244,8 @@ benchmarks! {
         substrate_id: substrate_id.clone(),
         eth_address: eth_address.clone(),
     }];
+    // XXX really set it up using a transfer to validator first
+    assert!(<T as Config>::AccountStore::insert(&substrate_id, ()).is_ok());
     assert_eq!(
       pallet_session::Module::<T>::set_keys(
         T::Origin::signed(substrate_id.into()),
@@ -330,6 +326,12 @@ benchmarks! {
   }
 }
 
+impl_benchmark_test_suite!(
+	Cash,
+	crate::tests::new_test_ext(),
+	crate::tests::Test,
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,6 +339,7 @@ mod tests {
         initialize_storage,
         mock::{new_test_ext, Test},
     };
+
     #[test]
     fn test_benchmarks() {
         new_test_ext().execute_with(|| {
