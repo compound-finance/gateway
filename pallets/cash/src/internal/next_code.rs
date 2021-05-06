@@ -1,5 +1,5 @@
 use crate::{
-    chains::{Chain, Ethereum},
+    chains::{Chain, Gateway},
     reason::Reason,
     require,
     types::CodeHash,
@@ -21,7 +21,7 @@ fn dispatch_call<T: Config>(code: Vec<u8>) -> DispatchResultWithPostInfo {
 }
 
 pub fn set_next_code_via_hash<T: Config>(code: Vec<u8>) -> Result<(), Reason> {
-    let hash = <Ethereum as Chain>::hash_bytes(&code);
+    let hash = <Gateway as Chain>::hash_bytes(&code);
     require!(
         Some(hash) == AllowedNextCodeHash::get(),
         Reason::InvalidCodeHash
@@ -97,7 +97,7 @@ mod tests {
     fn test_set_next_code_via_hash() {
         new_test_ext().execute_with(|| {
             let new_code = vec![1, 2, 3];
-            let hash = <Ethereum as Chain>::hash_bytes(&new_code);
+            let hash = <Gateway as Chain>::hash_bytes(&new_code);
             let events_pre: Vec<_> = System::events().into_iter().collect();
             AllowedNextCodeHash::put(hash);
 

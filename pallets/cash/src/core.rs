@@ -57,7 +57,7 @@ pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
 
 /// Return the event ingression queue for the underlying chain.
 pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents, Reason> {
-    Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
+    Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)?))
 }
 
 /// Return the last processed block for the underlying chain, or the initial one for the starport.
@@ -259,7 +259,6 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
                 result.to_vec(),
             ),
         },
-        _ => Err(Reason::Unreachable),
     }
 }
 
@@ -296,7 +295,6 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
 
             _ => Ok(()),
         },
-        _ => Err(Reason::Unreachable),
     }
 }
 
