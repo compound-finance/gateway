@@ -25,6 +25,8 @@ pub use crate::{
 
 use test_env_log::test;
 
+pub type SysEvent = frame_system::Event<Test>;
+
 #[macro_export]
 macro_rules! bal {
     ($string:expr, $units:expr) => {

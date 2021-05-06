@@ -1,8 +1,9 @@
 use crate::{
-    chains::{ChainAccount, ChainAsset},
+    chains::ChainAsset,
     core::get_recent_timestamp,
     factor::Factor,
     internal,
+    params::GATEWAY_VOID,
     reason::Reason,
     types::{AssetIndex, CashPrincipalAmount, Quantity, Timestamp, CASH},
     BorrowIndices, CashPrincipals, CashYield, CashYieldNext, Config, Event, GlobalCashIndex,
@@ -115,7 +116,7 @@ pub fn initialize_block<T: Config>(now: Timestamp) -> Result<(), Reason> {
     }
 
     <Module<T>>::deposit_event(Event::TransferCash(
-        ChainAccount::Reserved,
+        GATEWAY_VOID,
         last_miner,
         last_miner_share_principal,
         cash_index_new,
