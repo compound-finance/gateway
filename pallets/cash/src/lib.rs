@@ -26,6 +26,7 @@ use crate::{
 };
 
 use codec::alloc::string::String;
+use ethereum_client::EthereumBlock;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
@@ -522,6 +523,17 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
+        fn on_runtime_upgrade() -> Weight {
+            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(EthereumBlock {
+                hash: hex::decode(Module::<T>::next_genesis_hash()).expect("genesis block hash incorrect").try_into().expect("genesis block hash incorrect size"),
+                parent_hash: hex::decode(Module::<T>::next_genesis_parent_hash()).expect("genesis block parent hash incorrect").try_into().expect("genesis block parent hash incorrect size"),
+                number: u64::from_le_bytes(hex::decode(Module::<T>::next_genesis_number()).expect("genesis block number incorrect")[..].try_into().expect("genesis block number incorrect size")),
+                events: vec![],
+            }));
+            Starports::insert(ChainId::Eth, ChainAccount::Eth(hex::decode(Module::<T>::next_starport()).expect("starport address incorrect").try_into().expect("starport address incorrect size")));
+            0
+        }
+
         /// Called by substrate on block initialization.
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
@@ -671,6 +683,22 @@ decl_module! {
 
 /// Reading error messages inside `decl_module!` can be difficult, so we move them here.
 impl<T: Config> Module<T> {
+    fn next_genesis_hash() -> &'static str {
+        "0x8888888888888888888888888888888888888888888888888888888888888888"
+    }
+
+    fn next_genesis_parent_hash() -> &'static str {
+        "0x9999999999999999999999999999999999999999999999999999999999999999"
+    }
+
+    fn next_genesis_number() -> &'static str {
+        "0xaaaaaaaaaaaaaaaa"
+    }
+
+    fn next_starport() -> &'static str {
+        "0x7777777777777777777777777777777777777777"
+    }
+
     /// Initializes the set of supported assets from a config value.
     fn initialize_assets(assets: Vec<AssetInfo>) {
         for asset in assets {

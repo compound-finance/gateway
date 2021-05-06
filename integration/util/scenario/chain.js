@@ -166,7 +166,7 @@ class Chain {
     return await this.ctx.getApi().query.cash.globalCashIndex();
   }
 
-  async upgradeTo(version, extrinsics = []) {
+  async upgradeTo(version, extrinsics = [], wasmFn = null) {
     this.ctx.log(chalk.blueBright(`Upgrading Chain to version ${version.version}...`));
     let versionHash = await version.hash();
     let allExtrinsics =
@@ -176,7 +176,8 @@ class Chain {
 
     await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, allExtrinsics);
     expect(await this.nextCodeHash()).toEqual(versionHash);
-    await this.setNextCode(await version.wasm(), version, false);
+    let wasm = await version.wasm();
+    await this.setNextCode(wasmFn ? wasmFn(wasm) : wasm, version, false);
     this.ctx.log(chalk.blueBright(`Upgrade to version ${version.version} complete.`));
   }
 
