@@ -1,7 +1,7 @@
 use crate::{
-    chains::ChainBlockNumber,
+    chains::{ChainAccount, ChainBlockNumber},
     symbol::{CASH, USD},
-    types::{Quantity, Timestamp},
+    types::{CashPrincipal, Quantity, Timestamp},
 };
 
 /// The large value (USD) used for ingesting gov events.
@@ -27,22 +27,27 @@ pub const MAX_EVENT_BLOCKS: ChainBlockNumber = 60;
 /// Must be sufficient time to propagate changes to L1s before they occur.
 pub const MIN_NEXT_SYNC_TIME: Timestamp = 24 * 60 * 60 * 1000; // XXX confirm
 
+/// Minimum CASH principal required in order to use a Gateway account.
+/// Note that validators must meet this minimum in order to submit the set session keys extrinsic.
+pub const MIN_PRINCIPAL_GATE: CashPrincipal = CashPrincipal::from_nominal("1");
+
 /// Minimum value (USD) required across all protocol interactions.
 pub const MIN_TX_VALUE: Quantity = Quantity::from_nominal("1", USD);
 
 /// Flat transfer fee (CASH).
 pub const TRANSFER_FEE: Quantity = Quantity::from_nominal("0.01", CASH);
 
-// The number of blocks in between periodic sessions
+/// The number of blocks in between periodic sessions.
 pub const SESSION_PERIOD: u32 = 14400; // Assuming 6s blocks, ~1 period per day
 
-/// Standard priority for all unsigned transactions
-/// More an be found here https://substrate.dev/docs/en/knowledgebase/learn-substrate/tx-pool
+/// Standard priority for all unsigned transactions.
 pub const UNSIGNED_TXS_PRIORITY: u64 = 100;
 
-/// Standard longevity for all unsigned transactions
-/// More an be found here https://substrate.dev/docs/en/knowledgebase/learn-substrate/tx-pool
+/// Standard longevity for all unsigned transactions.
 pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
-// Weight given to extrinsics that will exit early, to avoid spam
+/// Weight given to extrinsics that will exit early, to avoid spam.
 pub const ERROR_WEIGHT: u64 = 100_000_000;
+
+/// The void account from whence miner CASH is transferred out of.
+pub const GATEWAY_VOID: ChainAccount = ChainAccount::Gate([0u8; 32]);
