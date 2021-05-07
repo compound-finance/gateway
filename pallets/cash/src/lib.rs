@@ -524,13 +524,13 @@ decl_module! {
         fn deposit_event() = default;
 
         fn on_runtime_upgrade() -> Weight {
-            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(EthereumBlock {
-                hash: hex::decode(Module::<T>::next_genesis_hash()).expect("genesis block hash incorrect").try_into().expect("genesis block hash incorrect size"),
-                parent_hash: hex::decode(Module::<T>::next_genesis_parent_hash()).expect("genesis block parent hash incorrect").try_into().expect("genesis block parent hash incorrect size"),
-                number: u64::from_le_bytes(hex::decode(Module::<T>::next_genesis_number()).expect("genesis block number incorrect")[..].try_into().expect("genesis block number incorrect size")),
-                events: vec![],
-            }));
-            Starports::insert(ChainId::Eth, ChainAccount::Eth(hex::decode(Module::<T>::next_starport()).expect("starport address incorrect").try_into().expect("starport address incorrect size")));
+            // LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(EthereumBlock {
+            //     hash: hex::decode(&Module::<T>::next_genesis_hash()[2..]).expect("genesis block hash incorrect").try_into().expect("genesis block hash incorrect size"),
+            //     parent_hash: hex::decode(&Module::<T>::next_genesis_parent_hash()[2..]).expect("genesis block parent hash incorrect").try_into().expect("genesis block parent hash incorrect size"),
+            //     number: u64::from_le_bytes(hex::decode(&Module::<T>::next_genesis_number()[2..]).expect("genesis block number incorrect")[..].try_into().expect("genesis block number incorrect size")),
+            //     events: vec![],
+            // }));
+            // Starports::insert(ChainId::Eth, ChainAccount::Eth(hex::decode(&Module::<T>::next_starport()[2..]).expect("starport address incorrect").try_into().expect("starport address incorrect size")));
             0
         }
 
