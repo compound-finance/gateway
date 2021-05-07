@@ -80,7 +80,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         number: ctx.eth.blockInfo.number,
       }
     }];
-    cashGenesis.starports = [ctx.starport.chainAddress()];
+    cashGenesis.starports = [ctx.starport.chainAddressStr()];
   } else {
     console.log(['yabba000', false]);
   }

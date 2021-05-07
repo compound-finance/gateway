@@ -178,6 +178,8 @@ class Chain {
       , ...extrinsics
       ];
 
+    console.log({allExtrinsics});
+
     await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, allExtrinsics);
     expect(await this.nextCodeHash()).toEqual(versionHash);
     let wasm = await version.wasm();
