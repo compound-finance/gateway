@@ -99,6 +99,12 @@ function intervalToSeconds(interval) {
   }, 0);
 }
 
+// From https://stackoverflow.com/a/22015930/320471
+const zip = (a, b) => Array(Math.max(b.length, a.length)).fill().map((_,i) => [a[i], b[i]]);
+
+
+
+
 module.exports = {
   arrayEquals,
   arrayToHex,
@@ -112,4 +118,5 @@ module.exports = {
   merge,
   sleep,
   stripHexPrefix,
+  zip
 };

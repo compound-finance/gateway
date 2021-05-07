@@ -148,23 +148,10 @@ buildScenarios('Upgrade to m9', scen_info, [
       console.log("yabba6");
       // Okay great, we've executed the change-over, but we still have a notice hold...
       // But what if we upgrade to curr??
-      let blockNumberHex = '0x' + ([...new Array(16)].map((i) => "0").join("") + eth.blockInfo.number.toString(16)).slice(-16);
-
-      console.log([starport.ethAddress(), eth.blockInfo.hash, eth.blockInfo.parent_hash, blockNumberHex]);
-
-      let enc = eth.web3.utils.asciiToHex;
-
       await chain.upgradeTo(curr, [
-        //api.tx.cash.setGenesisBlock(eth.genesisBlock()),
-        //api.tx.cash.setStarport(starport.chainAddress())
-      ], (wasm) => {
-        return wasm
-          .replace(enc("0x7777777777777777777777777777777777777777"), enc(starport.ethAddress()))
-          .replace(enc("0x8888888888888888888888888888888888888888888888888888888888888888"), enc(eth.blockInfo.hash))
-          .replace(enc("0x9999999999999999999999999999999999999999999999999999999999999999"), (eth.blockInfo.parent_hash))
-          .replace(enc("0xaaaaaaaaaaaaaaaa"), enc(blockNumberHex));
-
-      });
+        await chain.encodeCall(0x5, 0x5, curr, ['ChainBlock'], [eth.genesisBlock()]),
+        await chain.encodeCall(0x5, 0x4, curr, ['ChainAccount'], [starport.chainAddress()])
+      ]);
 
       expect(await chain.getSemVer()).toEqual([1, 9, 1]);
       expect(await chain.noticeHold('Eth')).toEqual(null);

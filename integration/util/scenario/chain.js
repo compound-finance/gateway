@@ -1,5 +1,5 @@
 const { findEvent, getEventData, mapToJson, signAndSend } = require('../substrate');
-const { arrayEquals, keccak256, intervalToSeconds } = require('../util');
+const { arrayEquals, keccak256, intervalToSeconds, zip } = require('../util');
 const {
   getNoticeChainId,
   encodeNotice,
@@ -12,6 +12,10 @@ const chalk = require('chalk');
 const { u8aToHex } = require('@polkadot/util');
 const { xxhashAsHex } = require('@polkadot/util-crypto');
 const web3 = require('web3');
+
+function hexByte(x) {
+  return ('00' + x.toString(16)).slice(-2);
+}
 
 class Chain {
   constructor(ctx) {
@@ -334,6 +338,17 @@ class Chain {
         return true;
       }
     }, { delay: 1000 });
+  }
+
+  async encodeCall(palletNumber, callNumber, version, argTypes, argValues) {
+    let registry = await version.registry();
+    console.log({registry});
+    let argsEncoded = zip(argTypes, argValues).map(([argType, argValue]) => {
+      return registry.createType(argType, argValue).toHex().slice(2);
+    });
+    let encodedCall = `0x${hexByte(palletNumber)}${hexByte(callNumber)}${argsEncoded.join('')}`
+    console.log({encodedCall});
+    return encodedCall;
   }
 }
 

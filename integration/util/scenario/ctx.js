@@ -130,14 +130,11 @@ class Ctx {
     return process.env['BLOCK_TIME'] || this.scenInfo['block_time'];
   }
 
-  __typesFile(version) {
-    if (version) {
-      return version.typesJson();
-    }
-
+  __typesFile() {
     return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json');
   }
 
+  // TODO: Continue to support extra types
   __types() {
     return this.scenInfo['types'] || undefined;
   }
