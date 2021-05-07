@@ -35,7 +35,11 @@ function getNotice(events) {
 }
 
 function encodeCall(call) {
-  return '0x' + arrayToHex(concatArray(call.callIndex, call.data));
+  if (typeof(call) === 'string') {
+    return call;
+  } else {
+    return '0x' + arrayToHex(concatArray(call.callIndex, call.data));
+  }
 }
 
 function decodeCall(api, callData) {
