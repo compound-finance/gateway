@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use gateway_runtime::{opaque::Block, AccountId, Hash, Index};
+use gateway_runtime::{opaque::Block, AccountId, Index};
 use sc_client_api::AuxStore;
 pub use sc_rpc_api::DenyUnsafe;
 use sp_api::ProvideRuntimeApi;
@@ -23,18 +23,6 @@ use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_consensus::SelectChain;
 use sp_transaction_pool::TransactionPool;
-
-/// Light client extra dependencies.
-pub struct LightDeps<C, F, P> {
-    /// The client instance to use.
-    pub client: Arc<C>,
-    /// Transaction pool instance.
-    pub pool: Arc<P>,
-    /// Remote access to the blockchain (async).
-    pub remote_blockchain: Arc<dyn sc_client_api::light::RemoteBlockchain<Block>>,
-    /// Fetcher instance.
-    pub fetcher: Arc<F>,
-}
 
 /// Full client dependencies.
 pub struct FullDeps<C, P, SC> {
@@ -49,9 +37,6 @@ pub struct FullDeps<C, P, SC> {
     /// Whether to deny unsafe calls
     pub deny_unsafe: DenyUnsafe,
 }
-
-/// A IO handler that uses all Full RPC extensions.
-pub type IoHandler = jsonrpc_core::IoHandler<sc_rpc::Metadata>;
 
 /// Instantiate all Full RPC extensions.
 pub fn create_full<C, P, SC>(
@@ -89,31 +74,6 @@ where
 
     io.extend_with(crate::api::GatewayRpcApi::to_delegate(
         crate::api::GatewayRpcHandler::new(client),
-    ));
-
-    io
-}
-
-/// Instantiate all Light RPC extensions.
-pub fn create_light<C, P, M, F>(deps: LightDeps<C, F, P>) -> jsonrpc_core::IoHandler<M>
-where
-    C: sp_blockchain::HeaderBackend<Block>,
-    C: Send + Sync + 'static,
-    F: sc_client_api::light::Fetcher<Block> + 'static,
-    P: TransactionPool + 'static,
-    M: jsonrpc_core::Metadata + Default,
-{
-    use substrate_frame_rpc_system::{LightSystem, SystemApi};
-
-    let LightDeps {
-        client,
-        pool,
-        remote_blockchain,
-        fetcher,
-    } = deps;
-    let mut io = jsonrpc_core::IoHandler::default();
-    io.extend_with(SystemApi::<Hash, AccountId, Index>::to_delegate(
-        LightSystem::new(client, remote_blockchain, fetcher, pool),
     ));
 
     io

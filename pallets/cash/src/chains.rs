@@ -346,6 +346,7 @@ impl FromStr for ChainId {
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlock {
+    // TODO: remove this Reserved in a future upgrade, this is unnecessary and panics are bad
     Reserved,
     Eth(<Ethereum as Chain>::Block),
 }
