@@ -271,12 +271,15 @@ impl State {
                 // Existential balance for Gateway accounts...
                 match account {
                     ChainAccount::Gate(gate_address) => {
-                        if cash_principal > &MIN_PRINCIPAL_GATE {
-                            T::AccountStore::insert(&AccountId32::new(*gate_address), ());
-                        // XXX can fail...
+                        // Note: Technically we could just inc_provider/dec_provider
+                        //  however we only want to do so when the state actually changes.
+                        //  For now we just inefficiently write to the StoredMap each time principal changes.
+                        // Also note: Technically these StoredMap calls can fail (though probably provably safe),
+                        //  which would presumably trigger the underlying panic this is meant to avoid.
+                        if cash_principal >= &MIN_PRINCIPAL_GATE {
+                            _ = T::AccountStore::insert(&AccountId32::new(*gate_address), ());
                         } else {
-                            T::AccountStore::remove(&AccountId32::new(*gate_address));
-                            // XXX can fail...
+                            _ = T::AccountStore::remove(&AccountId32::new(*gate_address));
                         }
                     }
 
