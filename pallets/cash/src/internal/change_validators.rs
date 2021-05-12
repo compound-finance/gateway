@@ -54,13 +54,24 @@ mod tests {
 
             let substrate_id: AccountId32 = [2; 32].into();
             let eth_address = [1; 20];
-            let val_keys = vec![ValidatorKeys {
+            let val_keys = ValidatorKeys {
                 substrate_id: substrate_id.clone(),
                 eth_address: eth_address.clone(),
-            }];
+            };
+            let val_keyses = vec![val_keys];
+            let val_account = ChainAccount::Gate(substrate_id.clone().into());
             let session_keys = MockSessionKeys { dummy: 1u64.into() };
-            // XXX really set it up using a transfer to validator first
-            assert!(<Test as Config>::AccountStore::insert(&substrate_id, ()).is_ok());
+
+            // Min balance needed for account existence, to set session keys
+            let min_amount = MIN_PRINCIPAL_GATE.amount_withdrawable().unwrap();
+            ChainCashPrincipals::insert(ChainId::Gate, min_amount);
+            assert_ok!(internal::lock::lock_cash_principal_internal::<Test>(
+                val_account,
+                val_account,
+                min_amount
+            ));
+
+            // Set session key
             assert_eq!(
                 Ok(()),
                 Session::set_keys(
@@ -69,10 +80,10 @@ mod tests {
                     vec![]
                 )
             );
-            assert_eq!(change_validators::<Test>(val_keys.clone()), Ok(()));
+            assert_eq!(change_validators::<Test>(val_keyses.clone()), Ok(()));
             let val_state_post: Vec<ValidatorKeys> =
                 NextValidators::iter().map(|x| x.1).collect::<Vec<_>>();
-            assert_eq!(val_state_post, val_keys);
+            assert_eq!(val_state_post, val_keyses);
 
             let notice_state_post: Vec<(ChainId, NoticeId, NoticeState)> =
                 NoticeStates::iter().collect();
@@ -114,11 +125,12 @@ mod tests {
                 mock::Event::frame_system(SysEvent::NewAccount(substrate_id)),
                 new_account_event.event
             );
+            let _locked_cash_event = events_iter.next().unwrap();
 
             // Check emitted `ChangeValidators` event
             let change_validators_event = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::ChangeValidators(val_keys.clone())),
+                mock::Event::pallet_cash(crate::Event::ChangeValidators(val_keyses.clone())),
                 change_validators_event.event
             );
 

@@ -697,9 +697,10 @@ impl<T: Config> Module<T> {
             warn!("Validators must be set in the genesis config");
         }
         for validator in validators {
+            // Note: See pipeline commit for usage of T::AccountStore
             log!("Adding validator: {:?}", validator);
             <Validators>::insert(&validator.substrate_id, validator.clone());
-            T::AccountStore::insert(&validator.substrate_id, ()); // XXX can fail...
+            assert!(T::AccountStore::insert(&validator.substrate_id, ()).is_ok());
         }
     }
 

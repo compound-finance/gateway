@@ -17,11 +17,13 @@ use crate::{
 };
 
 use codec::Decode;
-use frame_support::traits::UnfilteredDispatchable;
 use frame_support::{
-    sp_runtime::traits::Convert,
     storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
+    traits::UnfilteredDispatchable,
 };
+
+#[cfg(any(not(feature = "freeze-time"), not(feature = "std")))]
+use sp_runtime::traits::Convert;
 
 pub use our_std::{fmt, result};
 
