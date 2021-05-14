@@ -1,5 +1,5 @@
 use crate::{
-    chains::ChainBlockNumber,
+    chains::{ChainBlock, ChainBlockNumber},
     symbol::{CASH, USD},
     types::{Quantity, Timestamp},
 };
@@ -46,3 +46,33 @@ pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 
 // Weight given to extrinsics that will exit early, to avoid spam
 pub const ERROR_WEIGHT: u64 = 100_000_000;
+
+/// Either mainnet or testnet definitions.
+#[cfg(feature = "mainnet")]
+pub use mainnet::*;
+#[cfg(not(feature = "mainnet"))]
+pub use testnet::*;
+
+pub mod mainnet {
+    use super::*;
+    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0; 20]; // XXX
+    pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(
+        ethereum_client::EthereumBlock {
+            hash: [0u8; 32],
+            parent_hash: [0u8; 32],
+            number: 10000,
+            events: vec![],
+        }); // XXX
+}
+
+pub mod testnet {
+    use super::*;
+    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0; 20]; // XXX
+    pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(
+        ethereum_client::EthereumBlock {
+            hash: [0u8; 32],
+            parent_hash: [0u8; 32],
+            number: 10000,
+            events: vec![],
+        }); // XXX
+}

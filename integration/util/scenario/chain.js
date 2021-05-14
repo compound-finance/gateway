@@ -243,7 +243,7 @@ class Chain {
     await this.ctx.eventTracker.send(this.api().tx.cash.setNextCodeViaHash(code), { setUnsubDelay: false, onFinalize: false });
     console.log("hhju1");
     await Promise.all(this.ctx.validators.all().map((validator) => validator.teardownApi()));
-    console.log("hhju2");
+    console.log("hhju2"); // XXX last one?
     await this.ctx.sleep(60000);
     console.log("hhju3", version);
     await Promise.all(this.ctx.validators.all().map((validator) => validator.setVersion(version)));
