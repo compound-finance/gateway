@@ -18,6 +18,7 @@ use crate::{
     },
     notices::{Notice, NoticeId, NoticeState},
     portfolio::Portfolio,
+    symbol::CASH,
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, Balance, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
@@ -36,8 +37,8 @@ use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use num_traits::Zero;
 use our_std::{
-    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec, warn,
-    Debuggable,
+    collections::btree_map::BTreeMap, collections::btree_set::BTreeSet, convert::TryInto, debug,
+    error, log, str, vec::Vec, warn, Debuggable,
 };
 use sp_core::crypto::AccountId32;
 use sp_runtime::{
@@ -786,9 +787,16 @@ impl<T: Config> Module<T> {
     pub fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
         Ok(internal::assets::get_assets::<T>()?)
     }
+
     /// Get the rates for the given asset.
     pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
         Ok(core::get_accounts::<T>()?)
+    }
+
+    /// Get the user counts for the given asset.
+    pub fn get_asset_meta(
+    ) -> Result<(BTreeMap<String, u32>, BTreeMap<String, u32>, u32, u32), Reason> {
+        Ok(core::get_asset_meta::<T>()?)
     }
 
     /// Get the all liquidity
@@ -803,6 +811,28 @@ impl<T: Config> Module<T> {
     /// Get the portfolio for the given chain account.
     pub fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
         Ok(core::get_portfolio::<T>(account)?)
+    }
+
+    /// Get the active validators, and  sets
+    pub fn get_validator_info() -> Result<(Vec<ValidatorKeys>, Vec<(ChainAccount, String)>), Reason>
+    {
+        let validator_keys: Vec<ValidatorKeys> = Validators::iter().map(|(_, v)| v).collect();
+        let (cash_index, _) = core::get_cash_data::<T>()?;
+
+        let miner_earnings: Vec<(ChainAccount, String)> = MinerCumulative::iter()
+            .map(|(miner_address, miner_principal_amount)| {
+                let miner_principal: CashPrincipal = miner_principal_amount
+                    .try_into()
+                    .unwrap_or(CashPrincipal::from_nominal("0"));
+                let miner_balance = cash_index
+                    .cash_balance(miner_principal)
+                    .unwrap_or(Balance::from_nominal("0", CASH))
+                    .value
+                    .to_string();
+                (miner_address, miner_balance)
+            })
+            .collect();
+        Ok((validator_keys, miner_earnings))
     }
 }
 
