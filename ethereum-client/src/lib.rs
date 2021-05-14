@@ -7,8 +7,7 @@ use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
 use hex_buffer_serde::{ConstHex, ConstHexForm};
-use our_std::{debug, log};
-use our_std::{Deserialize, RuntimeDebug, Serialize};
+use our_std::{log, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;

@@ -149,6 +149,7 @@ buildScenarios('Upgrade to m9', scen_info, [
       // Okay great, we've executed the change-over, but we still have a notice hold...
       // But what if we upgrade to curr??
       await chain.upgradeTo(curr, [
+        // XXX how do these encode to extrinsics? also chain doesn't seem to recognize either
         await chain.encodeCall(0x5, 0x5, curr, ['ChainBlock'], [eth.genesisBlock()]),
         await chain.encodeCall(0x5, 0x4, curr, ['ChainAccount'], [starport.chainAddress()])
       ]);

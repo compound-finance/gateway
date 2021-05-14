@@ -12,7 +12,7 @@ use crate::{
         SignersSet, Timestamp, ValidatorKeys,
     },
     AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
-    IngressionQueue, LastProcessedBlock, Module, Starports, SupportedAssets, TotalBorrowAssets,
+    IngressionQueue, LastProcessedBlock, Module, SupportedAssets, TotalBorrowAssets,
     TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
@@ -62,7 +62,7 @@ pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents,
 
 /// Return the last processed block for the underlying chain, or the initial one for the starport.
 pub fn get_last_block<T: Config>(chain_id: ChainId) -> Result<ChainBlock, Reason> {
-    LastProcessedBlock::get(chain_id).ok_or(Reason::MissingLastBlock)
+    Ok(LastProcessedBlock::get(chain_id).unwrap_or_else(|| chain_id.initial_starport_block()))
 }
 
 /// Return the current total borrow and total supply balances for the asset.
@@ -159,11 +159,6 @@ pub fn get_validator<T: Config>(signer: ChainAccount) -> Result<ValidatorKeys, R
 pub fn get_current_validator<T: Config>() -> Result<ValidatorKeys, Reason> {
     // Note: we can lookup *any* signer, may as well choose the first and only option (Eth)
     get_validator::<T>(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?))
-}
-
-/// Return the starport associated with a given chain
-pub fn get_starport<T: Config>(chain_id: ChainId) -> Result<ChainAccount, Reason> {
-    Starports::get(chain_id).ok_or(Reason::StarportMissing)
 }
 
 /// Return the validator which signed the given data, given signature.
