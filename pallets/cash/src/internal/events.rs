@@ -5,8 +5,8 @@ use crate::{
         ChainSignature,
     },
     core::{
-        self, get_current_validator, get_event_queue, get_last_block, get_starport,
-        get_validator_set, recover_validator, validator_sign,
+        self, get_current_validator, get_event_queue, get_last_block, get_validator_set,
+        recover_validator, validator_sign,
     },
     debug, error,
     events::{fetch_chain_block, fetch_chain_blocks},
@@ -97,10 +97,9 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
 
 /// Perform the next step of tracking events from an underlying chain.
 pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
-    let starport = get_starport::<T>(chain_id)?;
     let me = get_current_validator::<T>()?;
     let last_block = get_last_block::<T>(chain_id)?;
-    let true_block = fetch_chain_block(chain_id, last_block.number(), starport)?;
+    let true_block = fetch_chain_block(chain_id, last_block.number())?;
     if last_block.hash() == true_block.hash() {
         let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = get_event_queue::<T>(chain_id)?;
@@ -109,7 +108,6 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             chain_id,
             last_block.number() + 1,
             last_block.number() + 1 + slack,
-            starport,
         )?
         .filter_already_signed(&me.substrate_id, pending_blocks);
         memorize_chain_blocks::<T>(&blocks)?;
@@ -120,7 +118,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             true_block, last_block
         );
         let pending_reorgs = PendingChainReorgs::get(chain_id);
-        let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block)?;
+        let reorg = formulate_reorg::<T>(&last_block, &true_block)?;
         if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
             submit_chain_reorg::<T>(&reorg)
         } else {
@@ -252,12 +250,10 @@ pub fn recall_chain_blocks<T: Config>(
 
 /// Try to form a path from the last block to the new true block.
 pub fn formulate_reorg<T: Config>(
-    chain_id: ChainId,
     last_block: &ChainBlock,
     true_block: &ChainBlock,
 ) -> Result<ChainReorg, Reason> {
     const CHUNK: u32 = 10;
-    let starport = get_starport::<T>(chain_id)?;
     let mut reverse_blocks: Vec<ChainBlock> = vec![];
     let mut drawrof_blocks: Vec<ChainBlock> = vec![];
     let mut reverse_hashes = BTreeSet::<ChainHash>::new();
@@ -274,7 +270,6 @@ pub fn formulate_reorg<T: Config>(
                 true_block.chain_id(),
                 number.saturating_sub(CHUNK as u64),
                 number,
-                starport,
             )?
             .blocks()
             .collect_rev(),
