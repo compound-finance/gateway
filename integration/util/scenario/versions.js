@@ -46,6 +46,41 @@ function releaseTargetInfo(repoUrl, version, platform, arch) {
   };
 }
 
+function* littleEndian(bigint, nbytes = 8) {
+  for (let i = 0n; i < nbytes; i++) {
+    yield (bigint >> (i * 8n)) & 255n;
+  }
+}
+
+function numToWasmHex(num) {
+  return [...littleEndian(BigInt(num))].reduce((a, b) => a + b.toString(16), '');
+}
+
+function wasmConfReplacer(conf) {
+  console.log('xxx replacer', conf)
+  return wasmHex => {
+    console.log('xxx replacer called', conf, wasmHex.length)
+    let hex = wasmHex;
+    for (const name in conf) {
+      const hash = keccak256(name);
+      const value = conf[name];
+      if ('u8x20' in value && value.u8x20.length == 42) {
+        console.log('xxx u8x20', name, hash, value, hash.slice(2, 40), value.u8x20.slice(2), hex.match(hash.slice(2, 40)))
+        //XXX hex = hex.replace(hash.slice(2, 40), value.u8x20.slice(2));
+      } else if ('u8x32' in value && value.u8x32.length == 66) {
+        console.log('xxx u8x32', name, hash, value, hash.slice(2, 64), value.u8x32.slice(2), hex.match(hash.slice(2, 64)))
+        //XXX hex = hex.replace(hash.slice(2, 64), value.u8x32.slice(2));
+      } else if ('u64' in value) {
+        console.log('xxx u64', name, hash, value, numToWasmHex(hash), numToWasmHex(value.u64), hex.match(numToWasmHex(hash)))
+        //XXX hex = hex.replace(numToWasmHex(hash), numToWasmHex(value.u64));
+      } else {
+        throw new Error(`Unexpected value for ${name}: ${JSON.stringify(value)}`)
+      }
+    }
+    return hex;
+  };
+}
+
 async function pullVersion(ctx, repoUrl, version) {
   ctx.log(`Fetching version: ${version}...`);
 
@@ -85,9 +120,10 @@ async function checkVersion(repoUrl, version) {
 }
 
 class Version {
-  constructor(version, ctx) {
+  constructor(version, ctx, wasmFn = w => w) {
     this.version = version;
     this.ctx = ctx;
+    this.wasmFn = wasmFn;
     this.symbolized = version.replace(/[.]/mig, '_');
     this.__registry = null;
   }
@@ -102,7 +138,7 @@ class Version {
 
   async wasm() {
     let wasmBlob = await fs.readFile(this.wasmFile());
-    return '0x' + wasmBlob.hexSlice();
+    return this.wasmFn('0x' + wasmBlob.hexSlice());
   }
 
   async hash() {
@@ -184,11 +220,15 @@ class Version {
     this.__registry = registry;
     return registry;
   }
+
+  withConf(conf) {
+    return new Version(this.version, this.ctx, wasmConfReplacer(conf));
+  }
 }
 
 class CurrentVersion extends Version {
-  constructor(ctx) {
-    super('curr', ctx);
+  constructor(...args) {
+    super('curr', ...args);
   }
 
   async pull() {}
@@ -231,6 +271,10 @@ class CurrentVersion extends Version {
 
   versionNumber() {
     return 9999; // Arbitrarily high version number for "current"
+  }
+
+  withConf(conf) {
+    return new CurrentVersion(this.ctx, wasmConfReplacer(conf));
   }
 }
 

@@ -47,32 +47,17 @@ pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 // Weight given to extrinsics that will exit early, to avoid spam
 pub const ERROR_WEIGHT: u64 = 100_000_000;
 
-/// Either mainnet or testnet definitions.
-#[cfg(feature = "mainnet")]
-pub use mainnet::*;
-#[cfg(not(feature = "mainnet"))]
-pub use testnet::*;
+/// The Ethereum Starport address (to be replaced).
+pub const ETH_STARPORT_ADDRESS: [u8; 20] = [237, 60, 225, 174, 49, 97, 172, 143, 135, 193, 207, 130, 242, 169, 114, 226, 235, 45, 211, 173]; // XXX
 
-pub mod mainnet {
-    use super::*;
-    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0; 20]; // XXX
-    pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(
-        ethereum_client::EthereumBlock {
-            hash: [0u8; 32],
-            parent_hash: [0u8; 32],
-            number: 10000,
-            events: vec![],
-        }); // XXX
-}
-
-pub mod testnet {
-    use super::*;
-    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0; 20]; // XXX
-    pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(
-        ethereum_client::EthereumBlock {
-            hash: [0u8; 32],
-            parent_hash: [0u8; 32],
-            number: 10000,
-            events: vec![],
-        }); // XXX
-}
+/// The Ethereum Starport last block info (each to be replaced).
+pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(
+    ethereum_client::EthereumBlock {
+        // ETH_STARPORT_BLOCK_HASH
+        hash: [89, 27, 30, 104, 20, 177, 24, 56, 61, 76, 166, 51, 20, 153, 110, 183, 61, 146, 233, 239, 24, 70, 145, 98, 20, 51, 118, 181, 83, 28, 217, 17],
+        // ETH_STARPORT_BLOCK_PARENT_HASH
+        parent_hash: [185, 86, 181, 91, 5, 124, 81, 41, 80, 95, 188, 208, 14, 175, 229, 236, 244, 27, 246, 41, 255, 142, 229, 83, 126, 253, 254, 16, 9, 124, 76, 164],
+        // ETH_STARPORT_BLOCK_NUMBER
+        number: 15015590786536052272,
+        events: vec![],
+    }); // XXX
