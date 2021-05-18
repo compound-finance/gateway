@@ -30,26 +30,32 @@ types="./types.json"
 rpc="./rpc.json"
 wasm="./target/release/wbuild/gateway-runtime/gateway_runtime.compact.wasm"
 
-if [ ! -f "$bin" -o ! -f "$wasm" -o ! -f "$types" -o ! -f "$rpc" -o ! -f "$contracts" ]; then
+if [ ! -f "$bin" -o ! -f "$wasm" -o ! -f "$types" -o ! -f "$rpc" -o ! -f "$contracts" -o ]; then
 	echo "Missing one of the following build files: $bin, $wasm, $types, $rpc, $contracts"
 	exit 1
 fi
 
 echo "*** Building checksum of wasm ***"
-checksum="$(node ./ethereum/scripts/utils/keccak.js "$wasm")"
+wasm_checksum="$(node ./ethereum/scripts/utils/keccak.js "$wasm")"
+bin_checksum="$(node ./ethereum/scripts/utils/keccak.js "$bin")"
 
 release_dir="./releases/$version"
 
 mkdir -p "$release_dir"
-cp "$wasm" "$release_dir/gateway_runtime.compact.wasm"
-echo "$checksum" > "$release_dir/gateway_runtime.checksum"
+cp "$wasm" "$release_dir/gateway-testnet.wasm"
+echo "$wasm_checksum" > "$release_dir/gateway-testnet.wasm.checksum"
+cp "$bin" "$release_dir/gateway-darwin-arm64"
+echo "$bin_checksum" > "$release_dir/gateway-darwin-arm64.checksum"
+
 cp "$types" "$release_dir/types.json"
 cp "$rpc" "$release_dir/rpc.json"
 cp "$contracts" "$release_dir/contracts.json"
 
 echo "Built release $version"
-echo "  wasm: $release_dir/gateway_runtime.compact.wasm"
-echo "  wasm.checksum: $release_dir/gateway_runtime.checksum"
+echo "  wasm: $release_dir/gateway-testnet.wasm"
+echo "  wasm.checksum: $release_dir/gateway-testnet.wasm.checksum"
+echo "  bin: $release_dir/gateway-darwin-arm64"
+echo "  bin.checksum: $release_dir/gateway-darwin-arm64.checksum"
 echo "  types: $release_dir/types.json"
 echo "  rpc: $release_dir/rpc.json"
 echo "  contracts: $release_dir/contracts.json"
