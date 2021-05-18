@@ -145,7 +145,8 @@ buildScenarios('Upgrade to m9', scen_info, [
       curr.setWasmReplacements({
         "0x7777777777777777777777777777777777777777": starport.ethAddress(),
         "0x8888888888888888888888888888888888888888888888888888888888888888": eth.blockInfo.hash,
-        "0x9999999999999999999999999999999999999999999999999999999999999999": eth.blockInfo.parent_hash
+        "0x9999999999999999999999999999999999999999999999999999999999999999": eth.blockInfo.parent_hash,
+        "0xAAAAAAAAAAAAAAAA": blockNumberHex
       });
       await chain.upgradeTo(curr);
 
