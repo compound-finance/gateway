@@ -104,7 +104,6 @@ class Version {
   async wasm() {
     let wasmBlob = await fs.readFile(this.wasmFile());
     let wasm = '0x' + wasmBlob.hexSlice();
-    console.log(this.wasmReplacements);
     return Object.entries(this.wasmReplacements).reduce((acc, [k, v]) => {
       return acc.replace(new RegExp(k.slice(2), 'i'), v.slice(2));
     }, wasm);

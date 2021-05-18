@@ -4,7 +4,7 @@ use gateway_runtime::{
 };
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
-    chains::{Chain, ChainBlock, Ethereum},
+    chains::{Chain, Ethereum},
     types::{AssetInfo, Timestamp, ValidatorKeys, APR},
 };
 

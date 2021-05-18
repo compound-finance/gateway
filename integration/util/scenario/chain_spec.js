@@ -70,9 +70,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   let reporters = ctx.__reporters();
 
   let cashGenesis = {};
-  console.log(['yabba000', genesisVersion]);
   if (genesisVersion.supports('eth-starport-parent-block')) {
-    console.log(['yabba000', true]);
     cashGenesis.genesisBlocks = [{
       Eth: {
         hash: ctx.eth.blockInfo.hash.slice(2),
@@ -81,11 +79,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
       }
     }];
     cashGenesis.starports = [ctx.starport.chainAddressStr()];
-  } else {
-    console.log(['yabba000', false]);
   }
-
-  console.log(cashGenesis.genesisBlocks);
 
   return {
     name: 'Integration Test Network',
