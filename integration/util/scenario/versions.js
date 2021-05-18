@@ -90,6 +90,7 @@ class Version {
     this.ctx = ctx;
     this.symbolized = version.replace(/[.]/mig, '_');
     this.__registry = null;
+    this.wasmReplacements = {};
   }
 
   matches(v) {
@@ -102,7 +103,11 @@ class Version {
 
   async wasm() {
     let wasmBlob = await fs.readFile(this.wasmFile());
-    return '0x' + wasmBlob.hexSlice();
+    let wasm = '0x' + wasmBlob.hexSlice();
+    console.log(this.wasmReplacements);
+    return Object.entries(this.wasmReplacements).reduce((acc, [k, v]) => {
+      return acc.replace(new RegExp(k.slice(2), 'i'), v.slice(2));
+    }, wasm);
   }
 
   async hash() {
@@ -183,6 +188,10 @@ class Version {
     registry.register(typesJson);
     this.__registry = registry;
     return registry;
+  }
+
+  setWasmReplacements(wasmReplacements) {
+    this.wasmReplacements = wasmReplacements;
   }
 }
 
