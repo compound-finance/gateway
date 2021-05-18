@@ -154,7 +154,7 @@ buildScenarios('Upgrade to m9', scen_info, [
       // start at 0, rotate through 1, actually perform change over on 2
       await chain.waitUntilSession(2);
       // Try to lock again
-      //await ashley.lock(1, usdc);
+      await ashley.lock(1, usdc);
       expect(await ashley.chainBalance(usdc)).toEqual(2); // 3?
     }
   }

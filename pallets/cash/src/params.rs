@@ -48,10 +48,13 @@ pub const UNSIGNED_TXS_LONGEVITY: u64 = 32;
 pub const ERROR_WEIGHT: u64 = 100_000_000;
 
 /// Either mainnet or testnet definitions.
+/// It's an error to flag more than one.
 #[cfg(feature = "mainnet")]
 pub use mainnet::*;
-#[cfg(not(feature = "mainnet"))]
+#[cfg(feature = "testnet")]
 pub use testnet::*;
+#[cfg(feature = "stubnet")]
+pub use stubnet::*;
 
 pub mod mainnet {
     use super::*;
@@ -79,6 +82,17 @@ pub mod testnet {
             13, 144, 165, 133, 62, 215, 147, 158, 72, 252, 162, 241, 216, 218,
         ],
         number: 9853195,
+        events: vec![],
+    });
+}
+
+pub mod stubnet {
+    use super::*;
+    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0x77u8; 20];
+    pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(ethereum_client::EthereumBlock {
+        hash: [0x88u8; 32],
+        parent_hash: [0x99u8; 32],
+        number: 0xaaaaaaaaaaaaaaaa,
         events: vec![],
     });
 }
