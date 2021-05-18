@@ -56,7 +56,7 @@ serial_test = "*"
 test-env-log = "*"
 
 [features]
-default = ['std']
+default = ['std', 'stubnet']
 std = [
     'codec/std',
     'serde/std',
@@ -75,4 +75,7 @@ std = [
 ]
 runtime-debug = ['our-std/runtime-debug']
 runtime-benchmarks = ['frame-benchmarking']
-freeze-time=[]
+freeze-time = [] # XXX group with stubnet?
+stubnet = []
+mainnet = []
+testnet = []
