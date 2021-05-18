@@ -178,8 +178,6 @@ class Chain {
       , ...extrinsics
       ];
 
-    console.log({allExtrinsics});
-
     await this.ctx.starport.executeProposal(`Upgrade Chain to ${version.version}`, allExtrinsics);
     expect(await this.nextCodeHash()).toEqual(versionHash);
     let wasm = await version.wasm();
@@ -238,16 +236,10 @@ class Chain {
 
   async setNextCode(code, version, onFinalize = true) {
     await this.ctx.eventTracker.teardown();
-
-    console.log("hhju0");
     await this.ctx.eventTracker.send(this.api().tx.cash.setNextCodeViaHash(code), { setUnsubDelay: false, onFinalize: false });
-    console.log("hhju1");
     await Promise.all(this.ctx.validators.all().map((validator) => validator.teardownApi()));
-    console.log("hhju2"); // XXX last one?
     await this.ctx.sleep(60000);
-    console.log("hhju3", version);
     await Promise.all(this.ctx.validators.all().map((validator) => validator.setVersion(version)));
-    console.log("hhju4");
 
     await this.ctx.eventTracker.start();
   }
@@ -344,12 +336,10 @@ class Chain {
 
   async encodeCall(palletNumber, callNumber, version, argTypes, argValues) {
     let registry = await version.registry();
-    console.log({registry});
     let argsEncoded = zip(argTypes, argValues).map(([argType, argValue]) => {
       return registry.createType(argType, argValue).toHex().slice(2);
     });
     let encodedCall = `0x${hexByte(palletNumber)}${hexByte(callNumber)}${argsEncoded.join('')}`
-    console.log({encodedCall});
     return encodedCall;
   }
 }
