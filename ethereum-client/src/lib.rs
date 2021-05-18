@@ -170,10 +170,6 @@ pub fn encode_block_hex(block_number: EthereumBlockNumber) -> String {
     format!("{:#X}", block_number)
 }
 
-pub fn encode_address_hex(address: &[u8; 20]) -> String {
-    format!("0x{}", ::hex::encode(&address[..]))
-}
-
 pub fn send_rpc(
     server: &str,
     method: serde_json::Value,
@@ -203,7 +199,7 @@ pub fn send_rpc(
         .map_err(|_| EthereumClientError::HttpTimeout)?;
 
     if response.code != 200 {
-        debug::warn!("Unexpected status code: {}", response.code);
+        log!("Unexpected status code: {}", response.code);
         return Err(EthereumClientError::HttpErrorCode(response.code));
     }
 
@@ -211,9 +207,10 @@ pub fn send_rpc(
 
     // Create a str slice from the body.
     let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
-        debug::warn!("No UTF8 body");
+        log!("No UTF8 body");
         EthereumClientError::InvalidUTF8
     })?;
+    log!("RPC Response: {}", body_str.clone());
 
     Ok(String::from(body_str))
 }
@@ -225,8 +222,9 @@ pub fn get_block(
 ) -> Result<EthereumBlock, EthereumClientError> {
     let block_str = encode_block_hex(block_num);
     let block_obj = get_block_object(server, &block_str)?;
+    log!("eth_starport_address: {:X?}", &eth_starport_address[..]);
     let get_logs_params = vec![serde_json::json!({
-        "address": encode_address_hex(eth_starport_address),
+        "address": format!("0x{}", &eth_starport_address[..].iter().map(|x| format!("{:02x}", x)).collect::<String>()),
         "fromBlock": &block_str,
         "toBlock": &block_str,
     })];
@@ -237,13 +235,13 @@ pub fn get_block(
         .result
         .ok_or_else(|| parse_error(&get_logs_response_str[..]))?;
 
-    if event_objects.len() > 0 {
-        debug::info!(
-            "Found {} events @ Eth Starport {:X?}",
-            event_objects.len(),
-            &eth_starport_address[..]
-        );
-    }
+    //if event_objects.len() > 0 {
+    log!(
+        "Found {} events @ Eth Starport {:X?}",
+        event_objects.len(),
+        &eth_starport_address[..]
+    );
+    //}
 
     let mut events = Vec::with_capacity(event_objects.len());
     for ev_obj in event_objects {
@@ -256,7 +254,7 @@ pub fn get_block(
         match events::decode_event(topics, data) {
             Ok(event) => events.push(event),
             Err(events::EventError::UnknownEventTopic(topic)) => {
-                debug::warn!("Skipping unrecognized topic {:?}", topic)
+                log!("Skipping unrecognized topic {:?}", topic)
             }
             Err(err) => {
                 debug::error!("Failed to decode {:?}", err);
@@ -285,6 +283,7 @@ pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, Et
 pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError> {
     let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
     let response = deserialize_block_number_response(&response_str)?;
+    log!("eth_blockNumber response: {:?}", response.result.clone());
     parse_u64(Some(response.result.ok_or(EthereumClientError::NoResult)?))
         .ok_or(EthereumClientError::JsonParseError)
 }
