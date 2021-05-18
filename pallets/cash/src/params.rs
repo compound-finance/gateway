@@ -66,11 +66,11 @@ pub mod mainnet {
 
 pub mod testnet {
     use super::*;
-    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0; 20]; // XXX
+    pub const ETH_STARPORT_ADDRESS: [u8; 20] = [0x77u8; 20]; // XXX
     pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(ethereum_client::EthereumBlock {
-        hash: [0u8; 32],
-        parent_hash: [0u8; 32],
-        number: 10000,
+        hash: [0x88u8; 32],
+        parent_hash: [0x99u8; 32],
+        number: 0, // 0xaaaaaaaaaaaaaaaa
         events: vec![],
     }); // XXX
 }

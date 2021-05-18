@@ -582,7 +582,9 @@ decl_module! {
         )]
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
+            let res = check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code));
+            debug!("Successfully set next code: {:?}", res);
+            Ok(res?)
         }
 
         /// Sets the supply cap for a given chain asset [Root]

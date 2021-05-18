@@ -146,13 +146,16 @@ buildScenarios('Upgrade to m9', scen_info, [
       expect(await chain.noticeHold('Eth')).toEqual(null);
       expect(await chain.sessionValidators()).toEqualSet([alice.info.aura_key, bob.info.aura_key]);
       console.log("yabba6");
+      let blockNumberHex = '0x' + ([...new Array(16)].map((i) => "0").join("") + eth.blockInfo.number.toString(16)).slice(-16);
       // Okay great, we've executed the change-over, but we still have a notice hold...
       // But what if we upgrade to curr??
-      await chain.upgradeTo(curr, [
-        // XXX how do these encode to extrinsics? also chain doesn't seem to recognize either
-        await chain.encodeCall(0x5, 0x5, curr, ['ChainBlock'], [eth.genesisBlock()]),
-        await chain.encodeCall(0x5, 0x4, curr, ['ChainAccount'], [starport.chainAddress()])
-      ]);
+      curr.setWasmReplacements({
+        "0x7777777777777777777777777777777777777777": starport.ethAddress(),
+        "0x8888888888888888888888888888888888888888888888888888888888888888": eth.blockInfo.hash,
+        "0x9999999999999999999999999999999999999999999999999999999999999999": eth.blockInfo.parent_hash,
+        "0xAAAAAAAAAAAAAAAA": blockNumberHex
+      });
+      await chain.upgradeTo(curr);
 
       expect(await chain.getSemVer()).toEqual([1, 9, 1]);
       expect(await chain.noticeHold('Eth')).toEqual(null);
