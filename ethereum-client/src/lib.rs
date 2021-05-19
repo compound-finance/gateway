@@ -7,7 +7,7 @@ use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
 use hex_buffer_serde::{ConstHex, ConstHexForm};
-use our_std::{log, Deserialize, RuntimeDebug, Serialize};
+use our_std::{debug, log, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -183,7 +183,7 @@ pub fn send_rpc(
         "id":1
     })
     .to_string();
-    log!("RPC: {}", &data);
+    debug!("RPC: {}", &data);
 
     let request = http::Request::post(server, vec![data]);
 
@@ -210,7 +210,7 @@ pub fn send_rpc(
         log!("No UTF8 body");
         EthereumClientError::InvalidUTF8
     })?;
-    log!("RPC Response: {}", body_str.clone());
+    debug!("RPC Response: {}", body_str.clone());
 
     Ok(String::from(body_str))
 }
@@ -222,26 +222,26 @@ pub fn get_block(
 ) -> Result<EthereumBlock, EthereumClientError> {
     let block_str = encode_block_hex(block_num);
     let block_obj = get_block_object(server, &block_str)?;
-    log!("eth_starport_address: {:X?}", &eth_starport_address[..]);
+    debug!("eth_starport_address: {:X?}", &eth_starport_address[..]);
     let get_logs_params = vec![serde_json::json!({
         "address": format!("0x{}", &eth_starport_address[..].iter().map(|x| format!("{:02x}", x)).collect::<String>()),
         "fromBlock": &block_str,
         "toBlock": &block_str,
     })];
-    log!("get_logs_params: {:?}", get_logs_params.clone());
+    debug!("get_logs_params: {:?}", get_logs_params.clone());
     let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
     let event_objects = get_logs_response
         .result
         .ok_or_else(|| parse_error(&get_logs_response_str[..]))?;
 
-    //if event_objects.len() > 0 {
-    log!(
-        "Found {} events @ Eth Starport {:X?}",
-        event_objects.len(),
-        &eth_starport_address[..]
-    );
-    //}
+    if event_objects.len() > 0 {
+        log!(
+            "Found {} events @ Eth Starport {:X?}",
+            event_objects.len(),
+            &eth_starport_address[..]
+        );
+    }
 
     let mut events = Vec::with_capacity(event_objects.len());
     for ev_obj in event_objects {
@@ -283,7 +283,7 @@ pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, Et
 pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError> {
     let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
     let response = deserialize_block_number_response(&response_str)?;
-    log!("eth_blockNumber response: {:?}", response.result.clone());
+    debug!("eth_blockNumber response: {:?}", response.result.clone());
     parse_u64(Some(response.result.ok_or(EthereumClientError::NoResult)?))
         .ok_or(EthereumClientError::JsonParseError)
 }
