@@ -45,7 +45,7 @@ pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
 }
 
 /// Return the recent timestamp (from the timestamp pallet).
-#[cfg(any(not(feature = "freeze-time"), not(feature = "std")))]
+#[cfg(not(all(feature = "freeze-time", feature = "std")))]
 pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
     let ts = <pallet_timestamp::Module<T>>::get();
     let time = T::TimeConverter::convert(ts);

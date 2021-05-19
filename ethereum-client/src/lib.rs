@@ -325,7 +325,10 @@ mod tests {
         t.execute_with(|| {
             let result = get_block(
                 "https://mainnet-eth.compound.finance",
-                "0x3a275655586a049fe860be867d10cdae2ffc0f33",
+                &[
+                    58, 39, 86, 85, 88, 106, 4, 159, 232, 96, 190, 134, 125, 16, 205, 174, 47, 252,
+                    15, 51,
+                ],
                 1286,
             );
             let block = result.unwrap();

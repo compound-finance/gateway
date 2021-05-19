@@ -51,7 +51,7 @@ pub const ERROR_WEIGHT: u64 = 100_000_000;
 /// It's an error to flag more than one.
 #[cfg(feature = "stubnet")]
 pub use stubnet::*;
-#[cfg(feature = "testnet")]
+#[cfg(not(feature = "stubnet"))]
 pub use testnet::*;
 
 pub mod stubnet {

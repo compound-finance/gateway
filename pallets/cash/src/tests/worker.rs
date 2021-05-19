@@ -5,12 +5,6 @@ use frame_support::traits::OffchainWorker;
 
 #[test]
 fn test_offchain_worker() {
-    // XXX this creates problems for test parallelization...
-    runtime_interfaces::config_interface::set(runtime_interfaces::new_config(
-        "0xbbde1662bC3ED16aA8C618c9833c801F3543B587".into(),
-        runtime_interfaces::NULL_ETH_BLOCK,
-    ));
-
     let calls = vec![
         testing::PendingRequest {
             method: "POST".into(),
@@ -25,7 +19,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0xbbde1662bC3ED16aA8C618c9833c801F3543B587","fromBlock":"0x1","toBlock":"0x1"}],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","fromBlock":"0x1","toBlock":"0x1"}],"id":1}"#.to_vec(),
             response: Some(testdata::json_responses::GET_LOGS_1.to_vec()),
             sent: true,
             ..Default::default()
@@ -43,7 +37,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0xbbde1662bC3ED16aA8C618c9833c801F3543B587","fromBlock":"0x2","toBlock":"0x2"}],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","fromBlock":"0x2","toBlock":"0x2"}],"id":1}"#.to_vec(),
             response: Some(testdata::json_responses::GET_LOGS_2.to_vec()),
             sent: true,
             ..Default::default()
