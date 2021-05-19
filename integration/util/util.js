@@ -102,8 +102,28 @@ function intervalToSeconds(interval) {
 // From https://stackoverflow.com/a/22015930/320471
 const zip = (a, b) => Array(Math.max(b.length, a.length)).fill().map((_,i) => [a[i], b[i]]);
 
+const encodeULEB128 = (value, minLen = null) => {
+  value |= 0n;
+  const result = [];
+  while (true) {
+    const byte = value & 0x7fn;
+    value >>= 7n;
+    if (
+      (minLen === null || result.length + 1 >= minLen) && (
+        (value === 0n && (byte & 0x40n) === 0n) ||
+        (value === -1n && (byte & 0x40n) !== 0n)
+      )
+    ) {
+      result.push(byte);
+      return result;
+    }
+    result.push(byte | 0x80n);
+  }
+};
 
-
+function encodeULEB128Hex(value, minLen = null) {
+  return '0x' + (encodeULEB128(value, minLen).map((x) => ('0' + x.toString(16)).slice(-2)).join(''));
+}
 
 module.exports = {
   arrayEquals,
@@ -118,5 +138,7 @@ module.exports = {
   merge,
   sleep,
   stripHexPrefix,
-  zip
+  zip,
+  encodeULEB128,
+  encodeULEB128Hex
 };
