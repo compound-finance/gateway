@@ -60,7 +60,7 @@ pub mod stubnet {
     pub const ETH_STARPORT_BLOCK: ChainBlock = ChainBlock::Eth(ethereum_client::EthereumBlock {
         hash: [0x88u8; 32],
         parent_hash: [0x99u8; 32],
-        number: 0, // 0xaaaaaaaaaaaaaaaa
+        number: 0xaabbccddeeff,
         events: vec![],
     });
 }

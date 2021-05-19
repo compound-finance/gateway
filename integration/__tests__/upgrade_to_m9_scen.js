@@ -1,6 +1,6 @@
 const { buildScenarios } = require('../util/scenario');
 const { decodeCall, getEventData } = require('../util/substrate');
-const { bytes32 } = require('../util/util');
+const { bytes32, encodeULEB128Hex } = require('../util/util');
 const { getNotice } = require('../util/substrate');
 
 let scen_info = {
@@ -139,14 +139,14 @@ buildScenarios('Upgrade to m9', scen_info, [
       expect(await chain.noticeState(notice1)).toEqual({"Executed": null});
       expect(await chain.noticeHold('Eth')).toEqual(null);
       expect(await chain.sessionValidators()).toEqualSet([alice.info.aura_key, bob.info.aura_key]);
-      let blockNumberHex = '0x' + ([...new Array(16)].map((i) => "0").join("") + eth.blockInfo.number.toString(16)).slice(-16);
-      // Okay great, we've executed the change-over, but we still have a notice hold...
-      // But what if we upgrade to curr??
+
+      await eth.blockInfo.update();
+      let magicBlockEnc = encodeULEB128Hex(0xAABBCCDDEEFFn);
       curr.setWasmReplacements({
         "0x7777777777777777777777777777777777777777": starport.ethAddress(),
         "0x8888888888888888888888888888888888888888888888888888888888888888": eth.blockInfo.hash,
-        "0x9999999999999999999999999999999999999999999999999999999999999999": eth.blockInfo.parent_hash,
-        "0xAAAAAAAAAAAAAAAA": blockNumberHex
+        "0x9999999999999999999999999999999999999999999999999999999999999999": eth.blockInfo.parentHash,
+        [magicBlockEnc]: encodeULEB128Hex(BigInt(eth.blockInfo.number), magicBlockEnc.length / 2 - 1)
       });
       await chain.upgradeTo(curr);
 

@@ -4,6 +4,24 @@ const RLP = require('rlp');
 const { readContractsFile, deployContract, getContractAt } = require('../ethereum');
 const { genPort } = require('../util');
 
+class BlockInfo {
+  constructor(web3, ctx) {
+    this.web3 = web3;
+    this.ctx = ctx;
+    this.hash = null;
+    this.parentHash = null;
+    this.number = null;
+  }
+
+  async update() {
+    let block = await this.web3.eth.getBlock('latest');
+
+    this.hash = block.hash;
+    this.parentHash = block.parentHash;
+    this.number = block.number;
+  }
+}
+
 class Eth {
   constructor(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx) {
     this.ethInfo = ethInfo;
@@ -27,7 +45,7 @@ class Eth {
     return {
       Eth: {
         hash: this.blockInfo.hash,
-        parent_hash: this.blockInfo.parent_hash,
+        parentHash: this.blockInfo.parentHash,
         number: this.blockInfo.number,
         events: []
       }
@@ -210,12 +228,8 @@ async function buildEth(ethInfo, ctx) {
 
   let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
 
-  let block = await web3.eth.getBlock('latest');
-  let blockInfo = {
-    hash: block.hash,
-    parent_hash: block.parentHash,
-    number: block.number,
-  };
+  let blockInfo = new BlockInfo(web3, ctx);
+  await blockInfo.update();
 
   return new Eth(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
 }
