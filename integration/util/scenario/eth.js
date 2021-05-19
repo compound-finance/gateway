@@ -210,12 +210,17 @@ async function buildEth(ethInfo, ctx) {
 
   let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
 
-  let block = await web3.eth.getBlock('latest');
-  let blockInfo = {
-    hash: block.hash,
-    parent_hash: block.parentHash,
-    number: block.number,
-  };
+  class BlockInfo {
+    async update() {
+      let block = await web3.eth.getBlock('latest');
+      return Object.assign(this, {
+        hash: block.hash,
+        parent_hash: block.parentHash,
+        number: block.number,
+      })
+    }
+  }
+  let blockInfo = await (new BlockInfo).update();
 
   return new Eth(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
 }
