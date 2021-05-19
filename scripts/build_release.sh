@@ -15,15 +15,22 @@ echo "*** Building release $version ***"
 
 cd $(dirname ${BASH_SOURCE[0]})/..
 
+release_dir="./releases/$version"
+
+if [ -d "$release_dir" ]; then
+	echo "Release directory $release_dir already exists. Please remove before building release."
+	exit 1;
+fi
+
 echo "*** Building Solidity ***"
 
 (cd ethereum && yarn install && yarn compile)
 
 contracts="./ethereum/.build/contracts.json"
 
-echo "*** Building release gateway ***"
+echo "*** Building testnet release gateway ***"
 
-cargo +nightly build --release
+WASM_BUILD_RUSTFLAGS='--cfg feature="testnet"' cargo +nightly build --release --features testnet
 
 bin="./target/release/gateway"
 types="./types.json"
@@ -35,15 +42,14 @@ if [ ! -f "$bin" -o ! -f "$wasm" -o ! -f "$types" -o ! -f "$rpc" -o ! -f "$contr
 	exit 1
 fi
 
-echo "*** Building checksum of wasm ***"
+echo "*** Building checksums ***"
 wasm_checksum="$(node ./ethereum/scripts/utils/keccak.js "$wasm")"
 bin_checksum="$(node ./ethereum/scripts/utils/keccak.js "$bin")"
-
-release_dir="./releases/$version"
 
 mkdir -p "$release_dir"
 cp "$wasm" "$release_dir/gateway-testnet.wasm"
 echo "$wasm_checksum" > "$release_dir/gateway-testnet.wasm.checksum"
+# TODO: Check os/arch for real
 cp "$bin" "$release_dir/gateway-darwin-arm64"
 echo "$bin_checksum" > "$release_dir/gateway-darwin-arm64.checksum"
 
