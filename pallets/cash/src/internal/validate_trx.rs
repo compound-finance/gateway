@@ -108,6 +108,22 @@ pub fn validate_unsigned<T: Config>(
             .and_provides("cull_notices")
             .propagate(false)
             .build()),
+        Call::set_starport(starport) => {
+            Ok(ValidTransaction::with_tag_prefix("Gateway::set_starport")
+                .priority(100)
+                .longevity(32)
+                .and_provides(starport)
+                .propagate(true)
+                .build())
+        }
+        Call::set_genesis_block(chain_id, genesis_block) => Ok(ValidTransaction::with_tag_prefix(
+            "Gateway::set_genesis_block",
+        )
+        .priority(100)
+        .longevity(32)
+        .and_provides((chain_id, genesis_block))
+        .propagate(true)
+        .build()),
         _ => Err(ValidationError::InvalidCall),
     }
 }

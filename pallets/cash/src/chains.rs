@@ -222,6 +222,13 @@ impl ChainAccountSignature {
     }
 }
 
+/// Type for describing a block coming from an underlying chain.
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum ChainBlock {
+    Reserved,
+    Eth(ethereum_client::EthereumBlock),
+}
+
 /// Type for an hash tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub enum ChainHash {

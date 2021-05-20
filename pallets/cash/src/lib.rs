@@ -13,8 +13,8 @@ extern crate trx_request;
 
 use crate::{
     chains::{
-        ChainAccount, ChainAccountSignature, ChainAsset, ChainHash, ChainId, ChainSignature,
-        ChainSignatureList,
+        ChainAccount, ChainAccountSignature, ChainAsset, ChainBlock, ChainHash, ChainId,
+        ChainSignature, ChainSignatureList,
     },
     events::{ChainLogEvent, ChainLogId, EventState},
     notices::{Notice, NoticeId, NoticeState},
@@ -200,6 +200,12 @@ decl_storage! {
 
         /// The cash index of the previous yield accrual point or defaults to initial cash index.
         LastYieldCashIndex get(fn last_yield_cash_index): CashIndex;
+
+        /// The mapping of last block number for which validators added events to the ingression queue, by chain.
+        LastProcessedBlock get(fn last_processed_block): map hasher(blake2_128_concat) ChainId => Option<ChainBlock>;
+
+        /// Mapping of chain to the relevant Starport address
+        Starports get(fn chain_starports): map hasher(blake2_128_concat) ChainId => Option<ChainAccount>;
     }
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
@@ -499,7 +505,25 @@ decl_module! {
         #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code))?)
+            let res = check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code));
+            log!("Set next code via hash result: {:?}", res);
+            Ok(res?)
+        }
+
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn set_starport(origin, chain_account: ChainAccount) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            log!("Setting Starport to {:?}", chain_account);
+            Starports::insert(chain_account.chain_id(), chain_account);
+            Ok(())
+        }
+
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn set_genesis_block(origin, chain_id: ChainId, chain_block: ChainBlock) -> dispatch::DispatchResult {
+            ensure_root(origin)?;
+            log!("Setting last processed block to {:?} {:?}", chain_id, chain_block);
+            LastProcessedBlock::insert(chain_id, chain_block);
+            Ok(())
         }
 
         /// Sets the supply cap for a given chain asset [Root]

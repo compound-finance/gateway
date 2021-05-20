@@ -460,5 +460,19 @@
     "balance": "String",
     "cash_yield": "String",
     "price": "String"
-  }
+  },
+  "ChainBlock": {
+    "_enum": {
+      "Reserved": "",
+      "Eth": "EthereumBlock"
+    }
+  },
+  "EthereumBlock": {
+    "hash": "EthereumHash",
+    "parent_hash": "EthereumHash",
+    "number": "EthereumBlockNumber",
+    "events": "Vec<EthereumEvent>"
+  },
+  "EthereumBlockNumber": "u64",
+  "EthereumHash": "[u8; 32]"
 }
