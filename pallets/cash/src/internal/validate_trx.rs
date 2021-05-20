@@ -168,22 +168,6 @@ pub fn validate_unsigned<T: Config>(
                 Err(ValidationError::InvalidValidator)
             }
         }
-        Call::set_starport(starport) => {
-            Ok(ValidTransaction::with_tag_prefix("Gateway::set_starport")
-                .priority(UNSIGNED_TXS_PRIORITY)
-                .longevity(UNSIGNED_TXS_LONGEVITY)
-                .and_provides(starport)
-                .propagate(true)
-                .build())
-        }
-        Call::set_genesis_block(chain_id, genesis_block) => Ok(ValidTransaction::with_tag_prefix(
-            "Gateway::set_genesis_block",
-        )
-        .priority(UNSIGNED_TXS_PRIORITY)
-        .longevity(UNSIGNED_TXS_LONGEVITY)
-        .and_provides((chain_id, genesis_block))
-        .propagate(true)
-        .build()),
         _ => Err(ValidationError::InvalidCall),
     }
 }
