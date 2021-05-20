@@ -65,6 +65,24 @@ pub fn validate_unsigned<T: Config>(
             }
         }
 
+        Call::set_starport(starport) => {
+            Ok(ValidTransaction::with_tag_prefix("Gateway::set_starport")
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .longevity(UNSIGNED_TXS_LONGEVITY)
+                .and_provides(starport)
+                .propagate(true)
+                .build())
+        }
+
+        Call::set_genesis_block(genesis_block) => Ok(ValidTransaction::with_tag_prefix(
+            "Gateway::set_genesis_block",
+        )
+        .priority(UNSIGNED_TXS_PRIORITY)
+        .longevity(UNSIGNED_TXS_LONGEVITY)
+        .and_provides(genesis_block)
+        .propagate(true)
+        .build()),
+
         Call::receive_chain_blocks(blocks, signature) => {
             let validator = recover_validator::<T>(&blocks.encode(), *signature)
                 .map_err(|_| ValidationError::InvalidValidator)?;

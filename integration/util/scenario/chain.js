@@ -339,8 +339,7 @@ class Chain {
     let argsEncoded = zip(argTypes, argValues).map(([argType, argValue]) => {
       return registry.createType(argType, argValue).toHex().slice(2);
     });
-    let encodedCall = `0x${hexByte(palletNumber)}${hexByte(callNumber)}${argsEncoded.join('')}`
-    return encodedCall;
+    return `0x04${hexByte(palletNumber)}${hexByte(callNumber)}${argsEncoded.join('')}`;
   }
 }
 

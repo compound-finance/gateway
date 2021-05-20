@@ -4,7 +4,7 @@ use gateway_runtime::{
 };
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
-    chains::{Chain, Ethereum},
+    chains::{Chain, ChainAccount, ChainBlock, Ethereum},
     types::{AssetInfo, Timestamp, ValidatorKeys, APR},
 };
 
@@ -89,6 +89,10 @@ fn development_genesis() -> GenesisConfig {
             .duration_since(wasm_timer::UNIX_EPOCH)
             .expect("cannot get system time for genesis")
             .as_millis() as Timestamp,
+        // Starports
+        vec![],
+        // Genesis Blocks
+        vec![],
     )
 }
 
@@ -125,6 +129,10 @@ fn local_testnet_genesis() -> GenesisConfig {
         FromStr::from_str("0").unwrap(),
         // Initial timestamp
         0 as Timestamp,
+        // Starports
+        vec![],
+        // Genesis Blocks
+        vec![],
     )
 }
 
@@ -156,6 +164,8 @@ fn testnet_genesis(
     assets: Vec<AssetInfo>,
     cash_yield: APR,
     last_yield_timestamp: Timestamp,
+    starports: Vec<ChainAccount>,
+    genesis_blocks: Vec<ChainBlock>,
 ) -> GenesisConfig {
     GenesisConfig {
         frame_system: Some(SystemConfig {
@@ -198,6 +208,8 @@ fn testnet_genesis(
                     eth_address: v.1,
                 })
                 .collect::<Vec<_>>(),
+            starports: starports,
+            genesis_blocks: genesis_blocks,
         }),
 
         pallet_oracle: Some(OracleConfig {
@@ -241,6 +253,10 @@ pub(crate) mod tests {
             FromStr::from_str("0").unwrap(),
             // Initial timestamp
             0 as Timestamp,
+            // Starports
+            vec![],
+            // Genesis Blocks
+            vec![],
         )
     }
 

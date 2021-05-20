@@ -18,7 +18,7 @@
     "test": "PROFILE=release QUIET_SCENARIOS=true jest",
     "build": "yarn build:ethereum && yarn build:cargo",
     "build:ethereum": "(cd ../ethereum && yarn compile)",
-    "build:cargo": "WASM_BUILD_RUSTFLAGS='--cfg feature=\"stubnet\"' cargo build --release --features stubnet",
+    "build:cargo": "WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
   "resolutions": {

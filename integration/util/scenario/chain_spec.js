@@ -74,7 +74,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     cashGenesis.genesisBlocks = [{
       Eth: {
         hash: ctx.eth.blockInfo.hash.slice(2),
-        parentHash: ctx.eth.blockInfo.parentHash.slice(2),
+        parent_hash: ctx.eth.blockInfo.parentHash.slice(2),
         number: ctx.eth.blockInfo.number,
       }
     }];

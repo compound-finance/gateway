@@ -1,4 +1,3 @@
-use crate::params;
 use crate::rates::APR;
 use crate::reason::Reason;
 use crate::types::{
@@ -81,14 +80,6 @@ impl ChainId {
             ChainId::Reserved => ChainHash::Reserved,
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
-        }
-    }
-
-    pub fn initial_starport_block(self) -> ChainBlock {
-        match self {
-            ChainId::Reserved => ChainBlock::Reserved,
-            ChainId::Eth => params::ETH_STARPORT_BLOCK,
-            ChainId::Dot => ChainBlock::Reserved, // XXX
         }
     }
 }
