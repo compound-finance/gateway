@@ -165,7 +165,7 @@ class Starport {
   }
 }
 
-async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
+async function buildStarport(starportInfo, validatorsInfoHash, ctx, cashTokenAddress) {
   ctx.log("Deploying Starport...");
   if (!ctx.cashToken) {
     throw new Error(`Cannot deploy Starport without first deploying Cash Token`);
@@ -175,7 +175,7 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
 
   // Deploy Proxies and Starport
   let proxyAdmin = ctx.cashToken.proxyAdmin;
-  let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
+  let starportImpl = await ctx.eth.__deploy('Starport', [cashTokenAddress, ctx.eth.root()]);
   let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
     starportImpl._address,
     proxyAdmin._address,

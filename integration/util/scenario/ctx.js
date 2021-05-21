@@ -15,6 +15,7 @@ const { buildTrxReq } = require('./trx_req');
 const { buildChain } = require('./chain');
 const { buildPrices } = require('./prices');
 const { buildVersions } = require('./versions');
+const { buildEthClone } = require('./eth_clone');
 const { buildLogger } = require('./logger');
 const { buildEventTracker } = require('./event_tracker');
 
@@ -300,15 +301,15 @@ async function buildCtx(scenInfo={}) {
   ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
 
-  // Note: `3` below is the number of transactions we expect to occur between now and when
+  // Note: `4` below is the number of transactions we expect to occur between now and when
   //       the Starport token is deployed.
   //       That's now: deploy Proxy Admin (1), Cash Token Impl (2), Starport Impl (3), Proxy (4)
   let starportAddress = await ctx.eth.getNextContractAddress(4);
-
   ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
-  ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
+  ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx, ctx.cashToken.ethAddress());
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
+  ctx.matic = await buildEthClone(ctx, scenInfo);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
   ctx.prices = await buildPrices(scenInfo.prices, scenInfo.tokens, ctx);
   ctx.validators = await buildValidators(scenInfo.validators, ctx);

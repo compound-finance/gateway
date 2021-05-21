@@ -319,7 +319,7 @@ async function buildToken(ticker, tokenInfo, ctx) {
 
 async function getTokensInfo(tokensInfoHash, ctx) {
   return await instantiateInfo(tokensInfoHash, 'Token', 'token', tokenInfoMap(ctx));
-};
+}
 
 async function buildTokens(tokensInfoHash, scenInfo, ctx) {
   ctx.log("Deploying Erc20 Tokens...");
