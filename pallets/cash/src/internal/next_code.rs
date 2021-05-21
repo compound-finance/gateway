@@ -1,5 +1,3 @@
-use frame_support::{dispatch::DispatchResultWithPostInfo, storage::StorageValue};
-
 use crate::{
     chains::{Chain, Ethereum},
     reason::Reason,
@@ -7,6 +5,7 @@ use crate::{
     types::CodeHash,
     AllowedNextCodeHash, Config, Event, Module,
 };
+use frame_support::{dispatch::DispatchResultWithPostInfo, storage::StorageValue};
 
 pub fn allow_next_code_with_hash<T: Config>(hash: CodeHash) -> Result<(), Reason> {
     AllowedNextCodeHash::put(hash);
@@ -22,7 +21,6 @@ fn dispatch_call<T: Config>(code: Vec<u8>) -> DispatchResultWithPostInfo {
 }
 
 pub fn set_next_code_via_hash<T: Config>(code: Vec<u8>) -> Result<(), Reason> {
-    // XXX what Hash type to use?
     let hash = <Ethereum as Chain>::hash_bytes(&code);
     require!(
         Some(hash) == AllowedNextCodeHash::get(),
@@ -108,6 +106,13 @@ mod tests {
             let events_post: Vec<_> = System::events().into_iter().collect();
             assert_eq!(events_pre.len() + 1, events_post.len());
             assert_eq!(AllowedNextCodeHash::get(), None);
+
+            // Check emitted `AttemptedSetCodeByHash` event
+            let attempted_set_code_event = events_post.into_iter().last().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::AttemptedSetCodeByHash(hash, Ok(()))),
+                attempted_set_code_event.event
+            );
         });
     }
 }

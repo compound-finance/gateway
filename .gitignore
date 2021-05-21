@@ -39,5 +39,9 @@ lcov.info
 # Releases
 releases
 
-# Dev Chain
+# Chains
 chains/dev/*
+*.gateway_history
+
+# Backups
+*.bak

@@ -1,7 +1,4 @@
-const {
-  years,
-  buildScenarios,
-} = require('../util/scenario');
+const { buildScenarios } = require('../util/scenario');
 const { getNotice } = require('../util/substrate');
 
 let transfer_scen_info = {
@@ -38,24 +35,23 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
     }
   },
   {
-    only: true,
     name: "Transfer Cash Max",
     scenario: async ({ ashley, bert, chuck, zrx, chain, starport, cash }) => {
-      await ashley.transfer(10, cash, bert);
-      await bert.transfer('Max', cash, chuck); // This is failing due to Insufficient Liquidity (!)
-      let ashleyCash = await ashley.cash();
-      let bertCash = await bert.cash();
-      let chuckCash = await chuck.cash();
-      console.log({
-        ashleyCash,
-        bertCash,
-        chuckCash,
-      })
-
-      // TODO: Fix checks below
-      expect(ashleyCash).toBeCloseTo(-10.01, 4);
-      expect(bertCash).toEqual(0, 4);
-      expect(chuckCash).toEqual(10, 4);
+      await ashley.transfer(2, cash, bert);
+      await bert.transfer('Max', cash, chuck);
+      expect(await bert.cash()).toBeCloseTo(0, 4);
+      expect(await chuck.cash()).toBeCloseTo(1.99, 4);
+    }
+  },
+  {
+    name: "Transfer Cash Max Insufficient",
+    scenario: async ({ ashley, bert, chuck, zrx, chain, starport, cash }) => {
+      await ashley.transfer(2, cash, bert);
+      await bert.transfer(1.985, cash, ashley);
+      expect(await bert.cash()).toBeCloseTo(0.005, 4);
+      await expect(bert.transfer('Max', cash, chuck)).rejects.toThrow(/InsufficientCashForMaxTransfer/);
+      expect(await bert.cash()).toBeCloseTo(0.005, 4);
+      expect(await chuck.cash()).toBeCloseTo(0, 4);
     }
   }
 ]);

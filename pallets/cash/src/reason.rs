@@ -1,16 +1,17 @@
-use crate::chains::ChainId;
-use crate::internal::set_yield_next::SetYieldNextError;
-use crate::notices::NoticeId;
-use crate::rates::RatesError;
-use crate::types::Nonce;
+use crate::{
+    chains::ChainId, events::EventError, internal::set_yield_next::SetYieldNextError,
+    notices::NoticeId, rates::RatesError, types::Nonce,
+};
+
 use codec::{Decode, Encode};
 use gateway_crypto::CryptoError;
 use our_std::RuntimeDebug;
 use pallet_oracle::error::OracleError;
 use trx_request;
+use types_derive::Types;
 
 /// Type for reporting failures for reasons outside of our control.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum Reason {
     AssetExtractionNotSupported,
     AssetNotSupported,
@@ -19,13 +20,18 @@ pub enum Reason {
     BadAsset,
     BadChainId,
     BadFactor,
+    BadHash,
     BadSymbol,
     BadTicker,
     BadUnits,
     ChainMismatch,
+    HashMismatch,
     CryptoError(CryptoError),
+    EventError(EventError),
     FailedToSubmitExtrinsic,
-    FetchError,
+    CannotFormulateReorg,
+    WorkerFetchError,
+    WorkerBusy,
     IncorrectNonce(Nonce, Nonce),
     InKindLiquidation,
     InsufficientChainCash,
@@ -42,8 +48,6 @@ pub enum Reason {
     None,
     NoPrice,
     NoSuchAsset,
-    DeprecatedNoticeAlreadySigned,
-    NoticeHashMismatch,
     NoticeMissing(ChainId, NoticeId),
     NotImplemented,
     OracleError(OracleError),
@@ -54,12 +58,23 @@ pub enum Reason {
     SetYieldNextError(SetYieldNextError),
     SignatureAccountMismatch,
     SignatureMismatch,
+    TimestampMissing,
     TimeTravelNotAllowed,
     TrxRequestParseError(TrxReqParseError),
     UnknownValidator,
     InvalidChain,
     PendingAuthNotice,
     ChangeValidatorsError,
+    InsufficientCashForMaxTransfer,
+    SufficientLiquidity,
+    AssetQuantityMismatch,
+    Unreachable,
+    TotalBorrowUnderflow,
+    InsufficientCollateral,
+    NegativeChainCash,
+    MissingLastBlock,
+    StarportMissing,
+    InvalidChainBlock,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -76,13 +91,18 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::BadAsset => (1, 2, "bad asset"),
             Reason::BadChainId => (1, 3, "bad chain id"),
             Reason::BadFactor => (1, 4, "bad factor"),
-            Reason::BadSymbol => (1, 5, "bad symbol"),
-            Reason::BadTicker => (1, 6, "bad ticker"),
-            Reason::BadUnits => (1, 7, "bad units"),
+            Reason::BadHash => (1, 5, "bad hash"),
+            Reason::BadSymbol => (1, 6, "bad symbol"),
+            Reason::BadTicker => (1, 7, "bad ticker"),
+            Reason::BadUnits => (1, 8, "bad units"),
             Reason::ChainMismatch => (2, 0, "chain mismatch"),
+            Reason::HashMismatch => (2, 1, "hash mismatch"),
             Reason::CryptoError(_) => (3, 0, "crypto error"),
+            Reason::EventError(_) => (4, 0, "event error"),
             Reason::FailedToSubmitExtrinsic => (5, 0, "failed to submit extrinsic"),
-            Reason::FetchError => (6, 0, "fetch error"),
+            Reason::CannotFormulateReorg => (5, 1, "cannot formulate the reorg path"),
+            Reason::WorkerFetchError => (6, 0, "worker fetch error"),
+            Reason::WorkerBusy => (6, 1, "worker busy"),
             Reason::IncorrectNonce(_, _) => (7, 0, "incorrect nonce"),
             Reason::InKindLiquidation => (8, 0, "in kind liquidation"),
             Reason::InsufficientChainCash => (9, 0, "insufficient chain cash"),
@@ -99,9 +119,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::None => (15, 0, "none"),
             Reason::NoPrice => (16, 0, "no price"),
             Reason::NoSuchAsset => (16, 1, "no such asset"),
-            Reason::DeprecatedNoticeAlreadySigned => (17, 0, "deprecated: notice already signed"),
-            Reason::NoticeHashMismatch => (17, 1, "notice hash mismatch"),
-            Reason::NoticeMissing(_, _) => (17, 2, "notice missing"),
+            Reason::NoticeMissing(_, _) => (17, 0, "notice missing"),
             Reason::NotImplemented => (18, 0, "not implemented"),
             Reason::OracleError(_) => (19, 0, "oracle error"),
             Reason::RatesError(_) => (20, 0, "rates error"),
@@ -111,12 +129,25 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::SetYieldNextError(_) => (24, 0, "set yield next error"),
             Reason::SignatureAccountMismatch => (25, 0, "signature account mismatch"),
             Reason::SignatureMismatch => (25, 1, "signature mismatch"),
-            Reason::TimeTravelNotAllowed => (26, 0, "time travel not allowed"),
+            Reason::TimestampMissing => (26, 0, "timestamp missing"),
+            Reason::TimeTravelNotAllowed => (26, 1, "time travel not allowed"),
             Reason::TrxRequestParseError(_) => (27, 0, "trx request parse error"),
             Reason::UnknownValidator => (28, 0, "unknown validator"),
             Reason::InvalidChain => (29, 0, "invalid chain"),
             Reason::PendingAuthNotice => (30, 0, "change auth notice is already pending"),
             Reason::ChangeValidatorsError => (31, 0, "change validators error"),
+            Reason::InsufficientCashForMaxTransfer => (32, 0, "insufficient cash for max transfer"),
+            Reason::SufficientLiquidity => (33, 0, "sufficient liquidity for borrower"),
+            Reason::AssetQuantityMismatch => (34, 0, "asset does not match quantity"),
+            Reason::Unreachable => (35, 0, "unreachable state should be impossible"),
+            Reason::TotalBorrowUnderflow => (36, 0, "total borrows underlflow"),
+            Reason::InsufficientCollateral => {
+                (37, 0, "borrower has insufficient collateral to seize")
+            }
+            Reason::NegativeChainCash => (38, 0, "chain cash underflow"),
+            Reason::MissingLastBlock => (39, 0, "last processed block not set"),
+            Reason::StarportMissing => (40, 0, "starport address not set"),
+            Reason::InvalidChainBlock => (41, 0, "invalid chain block"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
@@ -138,6 +169,12 @@ impl From<CryptoError> for Reason {
     }
 }
 
+impl From<EventError> for Reason {
+    fn from(err: EventError) -> Self {
+        Reason::EventError(err)
+    }
+}
+
 impl From<OracleError> for Reason {
     fn from(err: OracleError) -> Self {
         Reason::OracleError(err)
@@ -147,6 +184,12 @@ impl From<OracleError> for Reason {
 impl From<RatesError> for Reason {
     fn from(err: RatesError) -> Self {
         Reason::RatesError(err)
+    }
+}
+
+impl From<SetYieldNextError> for Reason {
+    fn from(err: SetYieldNextError) -> Self {
+        Reason::SetYieldNextError(err)
     }
 }
 
@@ -177,7 +220,7 @@ impl serde::de::Error for Reason {
 impl serde::de::StdError for Reason {}
 
 /// Type for reporting failures from calculations.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum MathError {
     AbnormalFloatingPointResult,
     DivisionByZero,
@@ -189,7 +232,7 @@ pub enum MathError {
 }
 
 /// Error from parsing trx requests.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum TrxReqParseError {
     NotImplemented,
     LexError,

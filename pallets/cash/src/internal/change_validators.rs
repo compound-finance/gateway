@@ -1,16 +1,15 @@
-use frame_support::storage::{IterableStorageMap, StorageMap};
-
 use crate::{
     internal, reason::Reason, require, types::ValidatorKeys, Config, Event, Module, NextValidators,
     NoticeHolds, SessionInterface,
 };
+use frame_support::storage::{IterableStorageMap, StorageMap};
 
 pub fn change_validators<T: Config>(validators: Vec<ValidatorKeys>) -> Result<(), Reason> {
     require!(NoticeHolds::iter().count() == 0, Reason::PendingAuthNotice);
 
     for validator in validators.iter() {
         require!(
-            <T>::SessionInterface::is_valid_keys(validator.substrate_id.clone()),
+            <T>::SessionInterface::has_next_keys(validator.substrate_id.clone()),
             Reason::ChangeValidatorsError
         );
     }
@@ -43,7 +42,7 @@ mod tests {
     use mock::opaque::MockSessionKeys;
 
     #[test]
-    fn test_change_val() {
+    fn test_change_validators() {
         new_test_ext().execute_with(|| {
             let prev_substrate_id: AccountId32 = [8; 32].into();
             let prev_keys = ValidatorKeys {
@@ -106,11 +105,30 @@ mod tests {
                 vec![&(substrate_id, session_keys)],
                 Session::queued_keys().iter().collect::<Vec<_>>()
             );
+
+            // Check emitted `ChangeValidators` event
+            let mut events_iter = System::events().into_iter();
+            let change_validators_event = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::ChangeValidators(val_keys.clone())),
+                change_validators_event.event
+            );
+            // Check emitted `Notice` event
+            let notice_event = events_iter.next().unwrap();
+            let expected_notice_encoded = expected_notice.encode_notice();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Notice(
+                    expected_notice_id,
+                    expected_notice.clone(),
+                    expected_notice_encoded
+                )),
+                notice_event.event
+            );
         });
     }
 
     #[test]
-    fn test_keys_unset() {
+    fn test_change_validators_with_unset_keys() {
         new_test_ext().execute_with(|| {
             let substrate_id: AccountId32 = [2; 32].into();
             let vals = vec![ValidatorKeys {

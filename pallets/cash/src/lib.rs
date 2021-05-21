@@ -4,7 +4,6 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(const_panic)]
 #![feature(destructuring_assignment)]
-#![feature(str_split_once)]
 
 #[macro_use]
 extern crate alloc;
@@ -13,15 +12,16 @@ extern crate trx_request;
 
 use crate::{
     chains::{
-        ChainAccount, ChainAccountSignature, ChainAsset, ChainBlock, ChainHash, ChainId,
-        ChainSignature, ChainSignatureList,
+        ChainAccount, ChainAccountSignature, ChainAsset, ChainBlock, ChainBlockEvent,
+        ChainBlockEvents, ChainBlockTally, ChainBlocks, ChainHash, ChainId, ChainReorg,
+        ChainReorgTally, ChainSignature, ChainSignatureList, ChainStarport,
     },
-    events::{ChainLogEvent, ChainLogId, EventState},
     notices::{Notice, NoticeId, NoticeState},
+    portfolio::Portfolio,
     types::{
-        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Bips, CashIndex, CashPrincipal,
+        AssetAmount, AssetBalance, AssetIndex, AssetInfo, Balance, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
-        LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, ValidatorSig, APR,
+        LiquidityFactor, Nonce, Reason, SessionIndex, Timestamp, ValidatorKeys, APR,
     },
 };
 
@@ -29,13 +29,16 @@ use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
-    traits::{OnRuntimeUpgrade, StoredMap, UnfilteredDispatchable},
+    traits::{StoredMap, UnfilteredDispatchable},
     weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
-use our_std::{collections::btree_set::BTreeSet, error, log, str, vec::Vec, Debuggable};
+use our_std::{
+    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec, warn,
+    Debuggable,
+};
 use sp_core::crypto::AccountId32;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity,
@@ -45,6 +48,7 @@ use pallet_oracle;
 use pallet_oracle::ticker::Ticker;
 use pallet_session;
 use pallet_timestamp;
+use types_derive::type_alias;
 
 #[macro_use]
 extern crate lazy_static;
@@ -57,18 +61,27 @@ pub mod factor;
 pub mod internal;
 pub mod notices;
 pub mod params;
+pub mod pipeline;
 pub mod portfolio;
 pub mod rates;
 pub mod reason;
+pub mod require;
 pub mod serdes;
 pub mod symbol;
 pub mod trx_req;
 pub mod types;
 
+pub mod weights;
+pub use weights::WeightInfo;
+
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking;
+
 #[cfg(test)]
 mod tests;
 
 /// Type for linking sessions to validators.
+#[type_alias]
 pub type SubstrateId = AccountId32;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
@@ -92,7 +105,12 @@ pub trait Config:
 
     /// Placate substrate's `HandleLifetime` trait.
     type AccountStore: StoredMap<SubstrateId, ()>;
+
+    /// Associated type which allows us to interact with substrate Sessions.
     type SessionInterface: self::SessionInterface<SubstrateId>;
+
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 decl_storage! {
@@ -107,10 +125,10 @@ decl_storage! {
         NextSessionIndex get(fn next_session_index): SessionIndex;
 
         /// The upcoming set of allowed validators, and their associated keys (or none).
-        NextValidators get(fn next_validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
+        NextValidators get(fn next_validators): map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// The current set of allowed validators, and their associated keys.
-        Validators get(fn validators) : map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
+        Validators get(fn validators): map hasher(blake2_128_concat) SubstrateId => Option<ValidatorKeys>;
 
         /// An index to track interest earned by CASH holders and owed by CASH borrowers.
         /// Note - the implementation of Default for CashIndex returns ONE. This also provides
@@ -159,9 +177,6 @@ decl_storage! {
         /// The mapping of asset indices, by asset and account.
         LastIndices get(fn last_index): double_map hasher(blake2_128_concat) ChainAsset, hasher(blake2_128_concat) ChainAccount => AssetIndex;
 
-        /// The mapping of (status of) events witnessed on a given chain, by event id.
-        EventStates get(fn event_state): map hasher(blake2_128_concat) ChainLogId => EventState;
-
         /// The mapping of notice id to notice.
         Notices get(fn notice): double_map hasher(blake2_128_concat) ChainId, hasher(blake2_128_concat) NoticeId => Option<Notice>;
 
@@ -192,6 +207,9 @@ decl_storage! {
         /// Miner of the current block.
         Miner get(fn miner): Option<ChainAccount>;
 
+        /// Mapping of total principal paid to each miner.
+        MinerCumulative get(fn miner_cumulative): map hasher(blake2_128_concat) ChainAccount => CashPrincipalAmount;
+
         /// Validator spread due to miner of last block.
         LastMinerSharePrincipal get(fn last_miner_share_principal): CashPrincipalAmount;
 
@@ -201,18 +219,32 @@ decl_storage! {
         /// The cash index of the previous yield accrual point or defaults to initial cash index.
         LastYieldCashIndex get(fn last_yield_cash_index): CashIndex;
 
+        /// The mapping of ingression queue events, by chain.
+        IngressionQueue get(fn ingression_queue): map hasher(blake2_128_concat) ChainId => Option<ChainBlockEvents>;
+
         /// The mapping of last block number for which validators added events to the ingression queue, by chain.
         LastProcessedBlock get(fn last_processed_block): map hasher(blake2_128_concat) ChainId => Option<ChainBlock>;
 
-        /// Mapping of chain to the relevant Starport address
-        Starports get(fn chain_starports): map hasher(blake2_128_concat) ChainId => Option<ChainAccount>;
+        /// The mapping of worker tallies for each descendant block, on current fork of underlying chain.
+        PendingChainBlocks get(fn pending_chain_blocks): map hasher(blake2_128_concat) ChainId => Vec<ChainBlockTally>;
+
+        /// The mapping of worker tallies for each alternate reorg, relative to current fork of underlying chain.
+        PendingChainReorgs get(fn pending_chain_reorgs): map hasher(blake2_128_concat) ChainId => Vec<ChainReorgTally>;
+
+        /// Mapping of chain to the relevant Starport address.
+        Starports get(fn starports): map hasher(blake2_128_concat) ChainId => Option<ChainStarport>;
     }
+
     add_extra_genesis {
         config(assets): Vec<AssetInfo>;
         config(validators): Vec<ValidatorKeys>;
+        config(starports): Vec<ChainAccount>;
+        config(genesis_blocks): Vec<ChainBlock>;
         build(|config| {
             Module::<T>::initialize_assets(config.assets.clone());
             Module::<T>::initialize_validators(config.validators.clone());
+            Module::<T>::initialize_starports(config.starports.clone());
+            Module::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
         })
     }
 }
@@ -224,8 +256,14 @@ decl_event!(
         /// An account has locked an asset. [asset, sender, recipient, amount]
         Locked(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
 
+        /// Revert a lock event while handling a chain re-organization. [asset, sender, recipient, amount]
+        ReorgRevertLocked(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
+
         /// An account has locked CASH. [sender, recipient, principal, index]
         LockedCash(ChainAccount, ChainAccount, CashPrincipalAmount, CashIndex),
+
+        /// Revert a lock cash event while handling a chain re-organization. [sender, recipient, principal, index]
+        ReorgRevertLockedCash(ChainAccount, ChainAccount, CashPrincipalAmount, CashIndex),
 
         /// An account has extracted an asset. [asset, sender, recipient, amount]
         Extract(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
@@ -260,6 +298,9 @@ decl_event!(
         /// An account using CASH as collateral has been liquidated. [asset, liquidator, borrower, amount]
         LiquidateCashCollateral(ChainAsset, ChainAccount, ChainAccount, AssetAmount),
 
+        /// Miner paid. [miner, principal]
+        MinerPaid(ChainAccount, CashPrincipalAmount),
+
         /// The next code hash has been allowed. [hash]
         AllowedNextCodeHash(CodeHash),
 
@@ -267,10 +308,10 @@ decl_event!(
         AttemptedSetCodeByHash(CodeHash, dispatch::DispatchResult),
 
         /// An Ethereum event was successfully processed. [event_id]
-        ProcessedChainEvent(ChainLogId),
+        ProcessedChainBlockEvent(ChainBlockEvent),
 
         /// An Ethereum event failed during processing. [event_id, reason]
-        FailedProcessingChainEvent(ChainLogId, Reason),
+        FailedProcessingChainBlockEvent(ChainBlockEvent, Reason),
 
         /// A new notice is generated by the chain. [notice_id, notice, encoded_notice]
         Notice(NoticeId, Notice, EncodedNotice),
@@ -281,13 +322,13 @@ decl_event!(
         /// A sequence of governance actions has been executed. [actions]
         ExecutedGovernance(Vec<(Vec<u8>, GovernanceResult)>),
 
-        /// A new supply cap has been set. [asset, cap]
-        SetSupplyCap(ChainAsset, AssetAmount),
+        /// A supported asset has been modified. [asset_info]
+        AssetModified(AssetInfo),
 
-        /// A new validator set has been chosen
+        /// A new validator set has been chosen. [validators]
         ChangeValidators(Vec<ValidatorKeys>),
 
-        /// A new yield rate has been chosen
+        /// A new yield rate has been chosen. [next_rate, next_start_at]
         SetYieldNext(APR, Timestamp),
 
         /// Failed to process a given extrinsic. [reason]
@@ -306,7 +347,7 @@ fn check_failure<T: Config>(res: Result<(), Reason>) -> Result<(), Reason> {
 }
 
 pub trait SessionInterface<AccountId>: frame_system::Config {
-    fn is_valid_keys(x: AccountId) -> bool;
+    fn has_next_keys(x: AccountId) -> bool;
     fn rotate_session();
 }
 
@@ -314,7 +355,7 @@ impl<T: Config> SessionInterface<SubstrateId> for T
 where
     T: pallet_session::Config<ValidatorId = SubstrateId>,
 {
-    fn is_valid_keys(x: SubstrateId) -> bool {
+    fn has_next_keys(x: SubstrateId) -> bool {
         match <pallet_session::Module<T>>::next_keys(x as T::ValidatorId) {
             Some(_keys) => true,
             None => false,
@@ -370,31 +411,25 @@ changeAuth extrinsic, nextValidators set, hold is set, rotate_session is called
 
 */
 
-fn intersection_count<T: Ord + Debuggable>(a: Vec<T>, b: Vec<T>) -> usize {
+fn vec_to_set<T: Ord + Debuggable>(a: Vec<T>) -> BTreeSet<T> {
     let mut a_set = BTreeSet::<T>::new();
     for v in a {
         a_set.insert(v);
     }
-
-    let mut b_set = BTreeSet::<T>::new();
-    for v in b {
-        b_set.insert(v);
-    }
-
-    a_set.intersection(&b_set).into_iter().count()
+    return a_set;
 }
 
 fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<ValidatorKeys>) -> bool {
-    let validator_count = validators.iter().count();
-    let quorum_count = validator_count; // TODO: Add a real quorum count
-
     match notice_state {
         NoticeState::Pending { signature_pairs } => match signature_pairs {
             ChainSignatureList::Eth(signature_pairs) => {
-                intersection_count(
-                    signature_pairs.iter().map(|p| p.0).collect(),
-                    validators.iter().map(|v| v.eth_address).collect(),
-                ) >= quorum_count
+                // Note: inefficient, probably best to store as sorted lists / zip compare
+                type EthAddrType = <chains::Ethereum as chains::Chain>::Address;
+                let signature_set =
+                    vec_to_set::<EthAddrType>(signature_pairs.iter().map(|p| p.0).collect());
+                let validator_set =
+                    vec_to_set::<EthAddrType>(validators.iter().map(|v| v.eth_address).collect());
+                chains::has_super_majority::<EthAddrType>(&signature_set, &validator_set)
             }
             _ => false,
         },
@@ -402,7 +437,6 @@ fn has_requisite_signatures(notice_state: NoticeState, validators: &Vec<Validato
     }
 }
 
-// XXX should this have all these printlns?
 // periodic except when new authorities are pending and when an era notice has just been completed
 impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
     fn should_end_session(now: T::BlockNumber) -> bool {
@@ -417,10 +451,10 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
                 for (chain_id, _) in NoticeHolds::iter() {
                     NoticeHolds::take(chain_id);
                 }
-                println!("should_end_session=true[next_validators]");
+                log!("should_end_session=true[next_validators]");
                 true
             } else {
-                println!("should_end_session=false[pending_notice_held]");
+                log!("should_end_session=false[pending_notice_held]");
                 false
             }
         } else {
@@ -429,9 +463,11 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
             let is_new_period = (now % period) == <T>::BlockNumber::from(0 as u32);
 
             if is_new_period {
-                println!(
+                log!(
                     "should_end_session={}[periodic {:?}%{:?}]",
-                    is_new_period, now, period
+                    is_new_period,
+                    now,
+                    period
                 );
             }
             is_new_period
@@ -451,8 +487,32 @@ impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumbe
     }
 }
 
+fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::Weight {
+    let request_str = match str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8) {
+        Err(_) => return params::ERROR_WEIGHT,
+        Ok(f) => f,
+    };
+    match trx_request::parse_request(request_str) {
+        Ok(trx_request::TrxRequest::Extract(_max_amount, _asset, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_extract()
+        }
+
+        Ok(trx_request::TrxRequest::Transfer(_max_amount, _asset, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_transfer()
+        }
+
+        Ok(trx_request::TrxRequest::Liquidate(_max_amount, _borrowed, _collat, _account)) => {
+            <T as Config>::WeightInfo::exec_trx_request_liquidate()
+        }
+
+        _ => params::ERROR_WEIGHT,
+    }
+}
+
 /* ::MODULE:: */
 /* ::EXTRINSICS:: */
+
+// Dispatch Extrinsic Lifecycle //
 
 // Dispatchable functions allows users to interact with the pallet and invoke state changes.
 // These functions materialize as "extrinsics", which are often compared to transactions.
@@ -462,11 +522,15 @@ decl_module! {
         // Events must be initialized if they are used by the pallet.
         fn deposit_event() = default;
 
+        fn on_runtime_upgrade() -> Weight {
+            0 // XXX
+        }
+
         /// Called by substrate on block initialization.
         /// Our initialization function is fallible, but that's not allowed.
         fn on_initialize(block: T::BlockNumber) -> frame_support::weights::Weight {
-            match core::on_initialize::<T>() {
-                Ok(weight) => weight,
+            match internal::initialize::on_initialize::<T>() {
+                Ok(()) => <T as Config>::WeightInfo::on_initialize(SupportedAssets::iter().count().try_into().unwrap()),
                 Err(err) => {
                     // This should never happen...
                     error!("Could not initialize block!!! {:#?} {:#?}", block, err);
@@ -475,34 +539,54 @@ decl_module! {
             }
         }
 
+        /// Offchain Worker entry point.
+        fn offchain_worker(block_number: T::BlockNumber) {
+            match internal::events::track_chain_events::<T>() {
+                Ok(()) => (),
+                Err(err) => {
+                    error!("offchain_worker error during track_chain_events: {:?}", err);
+                }
+            }
+
+            match internal::notices::process_notices::<T>(block_number) {
+                (succ, skip, failures) => {
+                    if succ > 0 || skip > 0 {
+                        log!("offchain_worker process_notices: {} successful, {} skipped", succ, skip);
+                    }
+                    if failures.len() > 0 {
+                        error!("offchain_worker error(s) during process notices: {:?}", failures);
+                    }
+                }
+            }
+        }
+
         /// Sets the miner of the this block via inherent
-        #[weight = (
-            0,
-            DispatchClass::Operational
-        )]
+        #[weight = (0, DispatchClass::Operational)]
         fn set_miner(origin, miner: ChainAccount) {
             ensure_none(origin)?;
-
-            log!("set_miner({:?})", miner);
-            Miner::put(miner);
+            internal::miner::set_miner::<T>(miner);
         }
 
         /// Sets the keys for the next set of validators beginning at the next session. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::change_validators(), DispatchClass::Operational, Pays::No)]
         pub fn change_validators(origin, validators: Vec<ValidatorKeys>) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::change_validators::change_validators::<T>(validators))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::allow_next_code_with_hash(), DispatchClass::Operational, Pays::No)]
         pub fn allow_next_code_with_hash(origin, hash: CodeHash) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::next_code::allow_next_code_with_hash::<T>(hash))?)
         }
 
         /// Sets the allowed next code hash to the given hash. [User] [Free]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (
+            <T as Config>::WeightInfo::set_next_code_via_hash(code.len().try_into().unwrap_or(u32::MAX)),
+            DispatchClass::Operational,
+            Pays::No
+        )]
         pub fn set_next_code_via_hash(origin, code: Vec<u8>) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             let res = check_failure::<T>(internal::next_code::set_next_code_via_hash::<T>(code));
@@ -511,110 +595,83 @@ decl_module! {
         }
 
         #[weight = (0, DispatchClass::Operational, Pays::No)]
-        pub fn set_starport(origin, chain_account: ChainAccount) -> dispatch::DispatchResult {
+        pub fn set_starport(origin, starport: ChainStarport) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            log!("Setting Starport to {:?}", chain_account);
-            Starports::insert(chain_account.chain_id(), chain_account);
+            log!("Setting Starport to {:?}", starport);
+            Starports::insert(starport.chain_id(), starport);
             Ok(())
         }
 
         #[weight = (0, DispatchClass::Operational, Pays::No)]
-        pub fn set_genesis_block(origin, chain_id: ChainId, chain_block: ChainBlock) -> dispatch::DispatchResult {
+        pub fn set_genesis_block(origin, chain_block: ChainBlock) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            log!("Setting last processed block to {:?} {:?}", chain_id, chain_block);
-            LastProcessedBlock::insert(chain_id, chain_block);
+            log!("Setting last processed block to {:?}", chain_block);
+            LastProcessedBlock::insert(chain_block.chain_id(), chain_block);
             Ok(())
         }
 
         /// Sets the supply cap for a given chain asset [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_supply_cap(), DispatchClass::Operational, Pays::No)]
         pub fn set_supply_cap(origin, asset: ChainAsset, amount: AssetAmount) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::supply_cap::set_supply_cap::<T>(asset, amount))?)
         }
 
         /// Set the liquidity factor for an asset [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_liquidity_factor(), DispatchClass::Operational, Pays::No)]
         pub fn set_liquidity_factor(origin, asset: ChainAsset, factor: LiquidityFactor) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_liquidity_factor::<T>(asset, factor))?)
         }
 
         /// Update the interest rate model for a given asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_rate_model(), DispatchClass::Operational, Pays::No)]
         pub fn set_rate_model(origin, asset: ChainAsset, model: InterestRateModel) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::assets::set_rate_model::<T>(asset, model))?)
         }
 
         /// Set the cash yield rate at some point in the future. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        #[weight = (<T as Config>::WeightInfo::set_yield_next(), DispatchClass::Operational, Pays::No)]
         pub fn set_yield_next(origin, next_apr: APR, next_apr_start: Timestamp) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             Ok(check_failure::<T>(internal::set_yield_next::set_yield_next::<T>(next_apr, next_apr_start))?)
         }
 
         /// Adds the asset to the runtime by defining it as a supported asset. [Root]
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn support_asset(origin, asset: ChainAsset, asset_info: AssetInfo) -> dispatch::DispatchResult {
+        #[weight = (<T as Config>::WeightInfo::support_asset(), DispatchClass::Operational, Pays::No)]
+        pub fn support_asset(origin, asset_info: AssetInfo) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset, asset_info))?)
+            Ok(check_failure::<T>(internal::assets::support_asset::<T>(asset_info))?)
         }
 
-        // TODO: Do we need to sign the event id, too?
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
-        pub fn receive_event(origin, event_id: ChainLogId, event: ChainLogEvent, signature: ValidatorSig) -> dispatch::DispatchResult { // XXX sig
-            log!("receive_event(origin,event_id,event,signature): {:?} {:?} {}", event_id, &event, hex::encode(&signature)); // XXX ?
+        /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn receive_chain_blocks(origin, blocks: ChainBlocks, signature: ChainSignature) -> dispatch::DispatchResult {
+            log!("receive_chain_blocks(origin, blocks, signature): {:?} {:?}", blocks, signature);
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::events::receive_event::<T>(event_id, event, signature))?)
+            Ok(check_failure::<T>(internal::events::receive_chain_blocks::<T>(blocks, signature))?)
         }
 
-        #[weight = (1, DispatchClass::Operational, Pays::No)] // XXX
+        /// Receive the chain blocks message from the worker to make progress on event ingression. [Root]
+        #[weight = (0, DispatchClass::Operational, Pays::No)]
+        pub fn receive_chain_reorg(origin, reorg: ChainReorg, signature: ChainSignature) -> dispatch::DispatchResult {
+            log!("receive_chain_reorg(origin, reorg, signature): {:?} {:?}", reorg, signature);
+            ensure_none(origin)?;
+            Ok(check_failure::<T>(internal::events::receive_chain_reorg::<T>(reorg, signature))?)
+        }
+
+        #[weight = (<T as Config>::WeightInfo::publish_signature(), DispatchClass::Operational, Pays::No)]
         pub fn publish_signature(origin, chain_id: ChainId, notice_id: NoticeId, signature: ChainSignature) -> dispatch::DispatchResult {
             ensure_none(origin)?;
-            Ok(check_failure::<T>(internal::notices::publish_signature(chain_id, notice_id, signature))?)
-        }
-
-        /// Offchain Worker entry point.
-        fn offchain_worker(block_number: T::BlockNumber) {
-            if let Err(e) = internal::events::fetch_events::<T>() {
-                log!("offchain_worker error during fetch events: {:?}", e);
-            }
-
-            let (succ, skip, failures) = internal::notices::process_notices::<T>(block_number);
-
-            let fail: usize = failures.iter().count();
-
-            if succ > 0 || skip > 0 || fail > 0 {
-                log!("offchain_worker process_notices: {} succ, {} skip, {} fail", succ, skip, fail);
-            }
-
-            if fail > 0 {
-                log!("offchain_worker error(s) during process notices: {:?}", failures);
-            }
+            Ok(check_failure::<T>(internal::notices::publish_signature::<T>(chain_id, notice_id, signature))?)
         }
 
         /// Execute a transaction request on behalf of a user
-        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
+        #[weight = (get_exec_req_weights::<T>(request.to_vec()), DispatchClass::Normal, Pays::No)]
         pub fn exec_trx_request(origin, request: Vec<u8>, signature: ChainAccountSignature, nonce: Nonce) -> dispatch::DispatchResult {
             ensure_none(origin)?;
             Ok(check_failure::<T>(internal::exec_trx_request::exec::<T>(request, signature, nonce))?)
-        }
-
-        // Remove any notice holds if they have been executed
-        #[weight = (1, DispatchClass::Normal, Pays::No)] // XXX
-        pub fn cull_notices(origin) -> dispatch::DispatchResult {
-            log!("Culling executed notices");
-            NoticeHolds::iter().for_each(|(chain_id, notice_id)| {
-                match NoticeStates::get(chain_id, notice_id) {
-                    NoticeState::Executed => {
-                        NoticeHolds::take(chain_id);
-                        log!("Removed notice hold {:?}:{:?} as it was already executed", chain_id, notice_id);
-                    },
-                    _ => ()
-                }
-            });
-            Ok(())
         }
     }
 }
@@ -631,10 +688,9 @@ impl<T: Config> Module<T> {
     /// Set the initial set of validators from the genesis config.
     /// NextValidators will become current Validators upon first session start.
     fn initialize_validators(validators: Vec<ValidatorKeys>) {
-        assert!(
-            !validators.is_empty(),
-            "Validators must be set in the genesis config"
-        );
+        if validators.is_empty() {
+            warn!("Validators must be set in the genesis config");
+        }
         for validator_keys in validators {
             log!("Adding validator with keys: {:?}", validator_keys);
             assert!(
@@ -650,6 +706,36 @@ impl<T: Config> Module<T> {
         }
     }
 
+    /// Set the initial starports from the genesis config.
+    fn initialize_starports(starports: Vec<ChainStarport>) {
+        if starports.is_empty() {
+            warn!("Starports must be set in the genesis config");
+        }
+        for starport in starports {
+            log!("Adding Starport {:?}", starport);
+            assert!(
+                Starports::get(starport.chain_id()) == None,
+                "Duplicate chain starport in genesis config"
+            );
+            Starports::insert(starport.chain_id(), starport);
+        }
+    }
+
+    /// Set the initial last processed blocks from the genesis config.
+    fn initialize_genesis_blocks(genesis_blocks: Vec<ChainBlock>) {
+        if genesis_blocks.is_empty() {
+            warn!("Genesis blocks must be set in the genesis config");
+        }
+        for genesis_block in genesis_blocks {
+            log!("Adding Genesis Block {:?}", genesis_block);
+            assert!(
+                LastProcessedBlock::get(genesis_block.chain_id()) == None,
+                "Duplicate genesis block in genesis config"
+            );
+            LastProcessedBlock::insert(genesis_block.chain_id(), genesis_block);
+        }
+    }
+
     // ** API / View Functions ** //
 
     /// Get the asset balance for the given account.
@@ -662,12 +748,20 @@ impl<T: Config> Module<T> {
 
     /// Get the asset info for the given asset.
     pub fn get_asset(asset: ChainAsset) -> Result<AssetInfo, Reason> {
-        Ok(core::get_asset::<T>(asset)?)
+        Ok(internal::assets::get_asset::<T>(asset)?)
     }
 
     /// Get the cash yield.
     pub fn get_cash_yield() -> Result<APR, Reason> {
         Ok(core::get_cash_yield::<T>()?)
+    }
+
+    /// Get the cash data.
+    pub fn get_cash_data() -> Result<(CashIndex, CashPrincipal, Balance), Reason> {
+        let (cash_index, cash_principal_amount) = core::get_cash_data::<T>()?;
+        let cash_principal: CashPrincipal = cash_principal_amount.try_into()?;
+        let total_cash = cash_index.cash_balance(cash_principal)?;
+        Ok((cash_index, cash_principal, total_cash))
     }
 
     /// Get the full cash balance for the given account.
@@ -687,7 +781,30 @@ impl<T: Config> Module<T> {
 
     /// Get the rates for the given asset.
     pub fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
-        Ok(core::get_rates::<T>(asset)?)
+        Ok(internal::assets::get_rates::<T>(asset)?)
+    }
+
+    /// Get the list of assets
+    pub fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
+        Ok(internal::assets::get_assets::<T>()?)
+    }
+    /// Get the rates for the given asset.
+    pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
+        Ok(core::get_accounts::<T>()?)
+    }
+
+    /// Get the all liquidity
+    pub fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
+        let accounts: Vec<(ChainAccount, String)> = core::get_accounts_liquidity::<T>()?
+            .iter()
+            .map(|(chain_account, bal)| (chain_account.clone(), format!("{}", bal)))
+            .collect();
+        Ok(accounts)
+    }
+
+    /// Get the portfolio for the given chain account.
+    pub fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
+        Ok(core::get_portfolio::<T>(account)?)
     }
 }
 
@@ -700,7 +817,10 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// here we make sure that some particular calls (the ones produced by offchain worker)
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-        internal::validate_trx::validate_unsigned::<T>(source, call)
-            .unwrap_or(InvalidTransaction::Call.into())
+        internal::validate_trx::check_validation_failure(
+            call,
+            internal::validate_trx::validate_unsigned::<T>(source, call),
+        )
+        .unwrap_or(InvalidTransaction::Call.into())
     }
 }

@@ -1,6 +1,6 @@
-const { debug, log, error } = require('../log');
-const { merge, sleep } = require('../util');
 const path = require('path');
+const os = require('os');
+const { merge } = require('../util');
 const { declare } = require('./declare');
 
 const { baseScenInfo } = require('./scen_info');
@@ -15,11 +15,14 @@ const { buildTrxReq } = require('./trx_req');
 const { buildChain } = require('./chain');
 const { buildPrices } = require('./prices');
 const { buildVersions } = require('./versions');
+const { buildLogger } = require('./logger');
+const { buildEventTracker } = require('./event_tracker');
 
 class Ctx {
   constructor(scenInfo) {
     this.scenInfo = scenInfo;
-    this.startTime = Math.floor(Date.now() / 1000);
+    this.startTime = Date.now();
+    this.sleeps = [];
   }
 
   __startTime() {
@@ -34,8 +37,22 @@ class Ctx {
     return process.env['INITIAL_YIELD'] || this.scenInfo['initial_yield'] || 0;
   }
 
-  __initialYieldStart() {
+  __initialYieldStartRaw() {
     return process.env['INITIAL_YIELD_START'] || this.scenInfo['initial_yield_start'] || this.startTime;
+  }
+
+  __initialYieldStartMS() {
+    let raw = this.__initialYieldStartRaw();
+    if (raw > 4102444800) { // Jan 1, 2100 as seconds since 1970
+      // Time is in ms
+      return raw;
+    } else {
+      return raw * 1000;
+    }
+  }
+
+  __initialYieldStart() {
+    return Math.floor(this.__initialYieldStartMS() / 1000);
   }
 
   __getContractsDir() {
@@ -52,6 +69,7 @@ class Ctx {
   }
 
   __abort(msg) {
+    console.error(msg);
     this.error(msg);
     process.exit(1);
   }
@@ -64,8 +82,36 @@ class Ctx {
     return process.env['PROFILE'] || this.scenInfo['profile'];
   }
 
-  __target() {
+  __buildTarget() {
     return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'gateway');
+  }
+
+  __target() {
+    if (this.__native() && this.__genesisVersion()) {
+      return this.versions.mustFind(this.__genesisVersion()).targetFile(os.platform(), os.arch());
+    }
+
+    return this.__buildTarget();
+  }
+
+  __native() {
+    return this.__freezeTime() || process.env['NATIVE'] || this.scenInfo['native'] || false;
+  }
+
+  __freezeTime() {
+    let value = process.env['FREEZE_TIME'] || this.scenInfo['freeze_time'];
+    if (value !== undefined && value !== null) {
+      if (value === true || value === "true") {
+        return 0;
+      } else {
+        let freezeTime = Number(value);
+        if (Number.isNaN(freezeTime)) {
+          throw new Error(`Invalid freeze time: ${value}`);
+        }
+        return freezeTime;
+      }
+    }
+    return null;
   }
 
   __wasmFile() {
@@ -76,8 +122,21 @@ class Ctx {
     return process.env['GENESIS_VERSION'] || this.scenInfo['genesis_version'];
   }
 
+  genesisVersion() {
+    return this.versions.mustFind(this.__genesisVersion() || 'curr');
+  }
+
+  __blockTime() {
+    return process.env['BLOCK_TIME'] || this.scenInfo['block_time'];
+  }
+
   __typesFile() {
     return process.env['TYPES_FILE'] || this.scenInfo['types_file'] || path.join(__dirname, '..', '..', '..', 'types.json');
+  }
+
+  // TODO: Continue to support extra types
+  __types() {
+    return this.scenInfo['types'] || undefined;
   }
 
   __rpcFile() {
@@ -100,20 +159,28 @@ class Ctx {
     return process.env['REPORTERS'] ? process.env['REPORTERS'].split(',') : this.scenInfo['reporters'];
   }
 
+  logFile() {
+    return process.env['LOG_FILE'] || this.scenInfo['log_file'];
+  }
+
   debug(...msg) {
-    debug(...msg);
+    this.logger.debug(...msg);
   }
 
   log(...msg) {
-    log(...msg);
+    this.logger.log(...msg);
   }
 
   error(...msg) {
-    error(...msg);
+    this.logger.error(...msg);
   }
 
-  api() {
+  getApi() {
     return this.validators.api();
+  }
+
+  tryApi() {
+    return this.validators.tryApi();
   }
 
   declare(declareInfo, ...args) {
@@ -143,7 +210,50 @@ class Ctx {
     return this.trxReq.generate(...args);
   }
 
+  __sleep(ms) {
+    let resolve, timerId;
+    let promise = new Promise((resolve_, reject_) => {
+      resolve = resolve_;
+      timerId = setTimeout(resolve_, ms)
+    });
+    this.sleeps.push([timerId, resolve]);
+    return promise;
+  }
+
+  async until(cond, opts = {}) {
+    let options = {
+      delay: 5000,
+      retries: null,
+      message: null,
+      ...opts
+    };
+
+    let start = +new Date();
+
+    if (await cond()) {
+      return;
+    } else {
+      if (options.message) {
+        this.log(options.message);
+      }
+      await this.__sleep(options.delay + start - new Date());
+      return await this.until(cond, {
+        ...options,
+        retries: options.retries === null ? null : options.retries - 1
+      });
+    }
+  }
+
   async teardown() {
+    this.sleeps.forEach(([timerId, resolve]) => {
+      clearTimeout(timerId)
+      resolve();
+    });
+
+    if (this.eventTracker) {
+      await this.eventTracker.teardown();
+    }
+
     if (this.validators) {
       await this.validators.teardown();
     }
@@ -156,7 +266,11 @@ class Ctx {
       await this.prices.teardown();
     }
 
-    await sleep(1000); // Give things a second to close
+    if (this.logger) {
+      await this.logger.teardown();
+    }
+
+    await this.sleep(1000); // Give things a second to close
   }
 }
 
@@ -179,9 +293,10 @@ function aliasBy(ctx, iterator, key) {
 
 async function buildCtx(scenInfo={}) {
   scenInfo = merge(baseScenInfo, scenInfo);
-  debug(() => `Builing ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
-  debug(() => `test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   let ctx = new Ctx(scenInfo);
+  ctx.logger = await buildLogger(ctx);
+  ctx.log(`Building ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
+  ctx.log(`test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
 
@@ -199,7 +314,10 @@ async function buildCtx(scenInfo={}) {
   ctx.validators = await buildValidators(scenInfo.validators, ctx);
   ctx.trxReq = await buildTrxReq(ctx);
   ctx.chain = await buildChain(ctx);
-  ctx.sleep = sleep;
+  ctx.eventTracker = await buildEventTracker(ctx);
+  ctx.sleep = ctx.__sleep.bind(ctx);
+  ctx.keyring = ctx.actors.keyring;
+  ctx.api = ctx.tryApi();
 
   // TODO: Post prices?
 

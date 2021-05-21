@@ -1,9 +1,9 @@
 use crate::{
-    core::get_now,
+    core::get_recent_timestamp,
     internal,
     params::MIN_NEXT_SYNC_TIME,
     rates::APR,
-    reason::Reason,
+    reason::{MathError, Reason},
     require,
     types::{CashIndex, Timestamp},
     CashYield, CashYieldNext, Config, Event, GlobalCashIndex, Module,
@@ -11,51 +11,46 @@ use crate::{
 use codec::{Decode, Encode};
 use frame_support::storage::StorageValue;
 use our_std::Debuggable;
+use types_derive::Types;
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, Debuggable, Types)]
 pub enum SetYieldNextError {
-    TimestampTooSoonToNow,
-    TimestampTooSoonToNext,
+    NotEnoughTimeToSyncBeforeNext,
+    NotEnoughTimeToSyncBeforeCancel,
 }
 
-fn get_cash_yield_index_after<T: Config>(change_in_time: Timestamp) -> Result<CashIndex, Reason> {
+fn get_cash_yield_index_after<T: Config>(dt: Timestamp) -> Result<CashIndex, Reason> {
     let cash_yield = CashYield::get();
     let cash_index_old = GlobalCashIndex::get();
-    let increment = cash_yield.compound(change_in_time)?;
-    cash_index_old
-        .increment(increment)
-        .map_err(Reason::MathError)
+    let increment = cash_yield.compound(dt)?;
+    Ok(cash_index_old.increment(increment.into())?)
 }
 
 pub fn set_yield_next<T: Config>(
     next_yield: APR,
     next_yield_start: Timestamp,
 ) -> Result<(), Reason> {
-    let now = get_now::<T>();
-    let change_in_time = next_yield_start
-        .checked_sub(now)
-        .ok_or(Reason::TimeTravelNotAllowed)?;
+    let now = get_recent_timestamp::<T>()?;
+    let min_t = now
+        .checked_add(MIN_NEXT_SYNC_TIME)
+        .ok_or(MathError::Overflow)?;
 
-    // TODO: Maybe check if `now` is zero / default?
+    require!(
+        next_yield_start >= min_t,
+        SetYieldNextError::NotEnoughTimeToSyncBeforeNext.into()
+    );
 
-    // Read Require CashYieldNext.NextAPRStartNow+ParamsMinNextSyncTime
     if let Some((_, next_start)) = CashYieldNext::get() {
         require!(
-            next_start >= now + MIN_NEXT_SYNC_TIME,
-            Reason::SetYieldNextError(SetYieldNextError::TimestampTooSoonToNext)
+            next_start >= min_t,
+            SetYieldNextError::NotEnoughTimeToSyncBeforeCancel.into()
         );
     }
 
-    // Note: Any already pending change cannot be canceled unless the min sync time is also met for the cancel.
-    // Read Require NextAPRStartNow+ParamsMinNextSyncTime
-    require!(
-        next_yield_start >= now + MIN_NEXT_SYNC_TIME,
-        Reason::SetYieldNextError(SetYieldNextError::TimestampTooSoonToNow)
-    );
-
-    // XXX fix this up
-    // Read NextYieldIndex=GetCashYieldIndexAt(NextAPRStart)
-    let next_yield_index: CashIndex = get_cash_yield_index_after::<T>(change_in_time)?;
+    let dt = next_yield_start
+        .checked_sub(now)
+        .ok_or(MathError::Underflow)?;
+    let next_yield_index = get_cash_yield_index_after::<T>(dt)?;
 
     CashYieldNext::put((next_yield, next_yield_start));
 
@@ -79,27 +74,24 @@ mod tests {
     };
 
     #[test]
-    fn test_too_soon_to_now() {
+    fn test_too_soon_to_next() {
         new_test_ext().execute_with(|| {
             <pallet_timestamp::Module<Test>>::set_timestamp(500);
             assert_eq!(
                 set_yield_next::<Test>(APR(100), 501),
-                Err(Reason::SetYieldNextError(
-                    SetYieldNextError::TimestampTooSoonToNow
-                ))
+                Err(SetYieldNextError::NotEnoughTimeToSyncBeforeNext.into())
             );
         });
     }
 
     #[test]
-    fn test_too_soon_to_next() {
+    fn test_too_soon_to_cancel() {
         new_test_ext().execute_with(|| {
+            <pallet_timestamp::Module<Test>>::set_timestamp(1);
             CashYieldNext::put((APR(100), 500));
             assert_eq!(
-                set_yield_next::<Test>(APR(100), 501),
-                Err(Reason::SetYieldNextError(
-                    SetYieldNextError::TimestampTooSoonToNext
-                ))
+                set_yield_next::<Test>(APR(100), MIN_NEXT_SYNC_TIME + 1),
+                Err(SetYieldNextError::NotEnoughTimeToSyncBeforeCancel.into())
             );
         });
     }
@@ -146,6 +138,25 @@ mod tests {
             assert_eq!(
                 LatestNotice::get(ChainId::Eth),
                 Some((expected_notice_id, expected_notice.hash()))
+            );
+
+            // Check emitted `SetYieldNext` event
+            let mut events_iter = System::events().into_iter();
+            let yield_next_event = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::SetYieldNext(APR(100), 86400500)),
+                yield_next_event.event
+            );
+            // Check emitted `Notice` event
+            let notice_event = events_iter.next().unwrap();
+            let expected_notice_encoded = expected_notice.encode_notice();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::Notice(
+                    expected_notice_id,
+                    expected_notice.clone(),
+                    expected_notice_encoded
+                )),
+                notice_event.event
             );
         });
     }

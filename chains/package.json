@@ -4,10 +4,19 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "@polkadot/types": "^4.1.1",
+    "@polkadot/api": "^3.4.1",
     "chalk": "^4.1.0",
     "compound-config": "https://github.com/compound-finance/compound-config.git",
+    "eth-saddle": "^0.1.23",
     "getopts": "^2.3.0",
-    "web3-eth-contract": "^1.3.4"
+    "node-fetch": "^2.6.1",
+    "web3": "^1.3.4"
+  },
+  "scripts": {
+    "postinstall": "cd node_modules/solidity-parser-antlr && yarn install && yarn build",
+    "repl": "NODE_OPTIONS='--experimental-repl-await' node repl.js"
+  },
+  "resolutions": {
+    "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git"
   }
 }

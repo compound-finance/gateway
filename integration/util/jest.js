@@ -94,10 +94,28 @@ expect.extend({
       };
     }
   },
-  toEthRevert(actual, msg='revert') {
-    return {
-      pass: !!actual['message'] && actual.message === `VM Exception while processing transaction: ${msg}`,
-      message: () => `expected revert, got: ${actual && actual.message ? actual : JSON.stringify(actual)}`
+  toEthRevert(actual, reason = null) {
+    if (reason === null) {
+      return {
+        pass: !!actual['message'] && (
+          actual.message.startsWith(`Transaction has been reverted by the EVM:`)
+          || actual.message.startsWith(`VM Exception while processing transaction: revert`)
+        ),
+        message: () => `expected revert without reason, got: ${JSON.stringify(actual)}`
+      };
+    } else {
+      return {
+        pass: !!actual['reason'] && actual.reason === reason,
+        message: () => `expected revert with reason "${reason}", got: ${JSON.stringify(actual)}`
+      };
     }
+  },
+  toEqualSet(actual, expected) {
+    let actualSorted = [...actual].sort();
+    let expectedSorted = [...expected].sort();
+    expect(actualSorted).toEqual(expectedSorted);
+    return {
+      pass: true
+    };
   }
 });

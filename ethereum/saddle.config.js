@@ -66,24 +66,33 @@ module.exports = {
       ]
     }
   },
+  get_build_file: () => {
+    const fs = require('fs').promises;
+    const path = require('path');
+    const env = require('process').env;
+
+    return env['BUILD_FILE'] || path.join(__dirname, '.build', `contracts.json`);
+  },
   read_network_file: (network) => {
     const fs = require('fs').promises;
     const { constants } = require('fs');
     const path = require('path');
     const env = require('process').env;
 
-    const networkFile = env['NETWORK_FILE'] || path.join(process.cwd(), 'networks', `${network}.json`);
+    const networkFile = env['NETWORK_FILE'] || path.join(__dirname, 'networks', `${network}.json`);
     return fs.access(networkFile, constants.R_OK).then(() => {
       return fs.readFile(networkFile).then((json) => {
         return JSON.parse(json)['Contracts'] || {};
       });
     }).catch((e) => {
+      console.error("Error fetching network file", e);
       return {};
     });
   },
   scripts: {
     "deploy": "scripts/deploy.js",
     "deploy:m3": "scripts/migrations/m3.js",
-    "deploy:m4": "scripts/migrations/m4.js"
+    "deploy:m4": "scripts/migrations/m4.js",
+    "deploy:starport": "scripts/migrations/deploy_starport.js"
   }                                                     // Aliases for scripts
 }

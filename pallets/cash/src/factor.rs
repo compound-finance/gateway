@@ -1,12 +1,13 @@
-use codec::{Decode, Encode};
-use num_bigint::{BigInt as BigI, BigUint as BigU};
-use num_traits::{CheckedDiv, ToPrimitive};
-use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
-
 use crate::{
     reason::{MathError, Reason},
     types::{Decimals, Int, Uint},
 };
+use codec::{Decode, Encode};
+use num_bigint::{BigInt as BigI, BigUint as BigU};
+use num_traits::{CheckedDiv, ToPrimitive};
+use our_std::{consts::uint_from_string_with_decimals, Deserialize, RuntimeDebug, Serialize};
+use pallet_oracle::types::Price;
+use types_derive::Types;
 
 /// Type for wrapping intermediate signed calculations.
 pub struct BigInt(pub BigI);
@@ -77,6 +78,10 @@ impl BigUint {
         ))
     }
 
+    pub fn add(self, other: Self) -> Self {
+        BigUint(self.0 + other.0)
+    }
+
     pub fn convert(self, from_decimals: Decimals, to_decimals: Decimals) -> Self {
         if from_decimals > to_decimals {
             BigUint(self.0 / 10u128.pow((from_decimals - to_decimals) as u32))
@@ -92,7 +97,7 @@ impl BigUint {
 
 /// Type for an unsigned factor, with a large fixed number of decimals.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Factor(pub Uint);
 
 impl Factor {
@@ -125,6 +130,15 @@ impl Factor {
 
     pub fn mul_uint(self, number: Uint) -> BigUint {
         BigUint::from_uint(self.0).mul_uint(number)
+    }
+
+    /// Take a ratio of prices.
+    // If we generalized prices over the quote type, this would probably be:
+    //  Price<A, Q> / P<B, Q> -> Price<A, B>
+    // But we don't need generalize prices, just enough Decimals, so we have:
+    //  Price<A, { USD }> / Price<B, { USD }> -> Factor(B per A)
+    pub fn ratio(num: Price, denom: Price) -> Result<Factor, MathError> {
+        Factor::from_fraction(num.value, denom.value)
     }
 }
 

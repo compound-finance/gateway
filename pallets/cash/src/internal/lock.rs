@@ -1,44 +1,83 @@
-// Note: The substrate build requires these be re-exported.
-use frame_support::storage::{StorageMap, StorageValue};
-
-// Import these traits so we can interact with the substrate storage modules.
 use crate::{
     chains::ChainAccount,
-    core::{repay_and_supply_principal, sub_principal_amounts},
+    pipeline::CashPipeline,
     reason::Reason,
-    types::{CashIndex, CashPrincipalAmount},
-    CashPrincipals, ChainCashPrincipals, Config, Event, GlobalCashIndex, Module,
-    TotalCashPrincipal,
+    types::{AssetInfo, AssetQuantity, CashIndex, CashPrincipalAmount},
+    Config, Event, GlobalCashIndex, Module,
 };
+use frame_support::storage::StorageValue;
+
+pub fn lock_internal<T: Config>(
+    asset: AssetInfo,
+    sender: ChainAccount,
+    recipient: ChainAccount,
+    quantity: AssetQuantity,
+) -> Result<(), Reason> {
+    CashPipeline::new()
+        .lock_asset::<T>(recipient, asset.asset, quantity)?
+        .commit::<T>();
+
+    <Module<T>>::deposit_event(Event::Locked(
+        asset.asset,
+        sender,
+        recipient,
+        quantity.value,
+    ));
+
+    Ok(())
+}
 
 pub fn lock_cash_principal_internal<T: Config>(
     sender: ChainAccount,
-    holder: ChainAccount,
+    recipient: ChainAccount,
     principal: CashPrincipalAmount,
 ) -> Result<(), Reason> {
-    let holder_cash_principal = CashPrincipals::get(holder);
-    let (holder_repay_principal, _holder_supply_principal) =
-        repay_and_supply_principal(holder_cash_principal, principal);
-
-    let chain_id = holder.chain_id();
-    let chain_cash_principal_new = sub_principal_amounts(
-        ChainCashPrincipals::get(chain_id),
-        principal,
-        Reason::InsufficientChainCash,
-    )?;
-    let holder_cash_principal_new = holder_cash_principal.add_amount(principal)?;
-    let total_cash_principal_new = sub_principal_amounts(
-        TotalCashPrincipal::get(),
-        holder_repay_principal,
-        Reason::RepayTooMuch,
-    )?;
+    CashPipeline::new()
+        .lock_cash::<T>(recipient, principal)?
+        .commit::<T>();
 
     let index: CashIndex = GlobalCashIndex::get(); // Grab cash index just for event
-    ChainCashPrincipals::insert(chain_id, chain_cash_principal_new);
-    CashPrincipals::insert(holder, holder_cash_principal_new);
-    TotalCashPrincipal::put(total_cash_principal_new);
+    <Module<T>>::deposit_event(Event::LockedCash(sender, recipient, principal, index));
 
-    <Module<T>>::deposit_event(Event::LockedCash(sender, holder, principal, index));
+    Ok(())
+}
+
+// TODO: Test
+pub fn undo_lock_internal<T: Config>(
+    asset: AssetInfo,
+    sender: ChainAccount,
+    recipient: ChainAccount,
+    quantity: AssetQuantity,
+) -> Result<(), Reason> {
+    // Note: we don't check liquidity here since who knows
+    CashPipeline::new()
+        .extract_asset::<T>(recipient, asset.asset, quantity)?
+        .commit::<T>();
+
+    <Module<T>>::deposit_event(Event::ReorgRevertLocked(
+        asset.asset,
+        sender,
+        recipient,
+        quantity.value,
+    ));
+
+    Ok(())
+}
+
+// TODO: Test
+pub fn undo_lock_cash_principal_internal<T: Config>(
+    sender: ChainAccount,
+    recipient: ChainAccount,
+    principal: CashPrincipalAmount,
+) -> Result<(), Reason> {
+    CashPipeline::new()
+        .extract_cash::<T>(recipient, principal)?
+        .commit::<T>();
+
+    let index: CashIndex = GlobalCashIndex::get(); // Grab cash index just for event
+    <Module<T>>::deposit_event(Event::ReorgRevertLockedCash(
+        sender, recipient, principal, index,
+    ));
 
     Ok(())
 }
@@ -70,7 +109,7 @@ mod tests {
                     GEOFF,
                     CashPrincipalAmount::from_nominal("1.0")
                 ),
-                Err(Reason::InsufficientChainCash)
+                Err(Reason::NegativeChainCash)
             );
         });
     }
@@ -90,7 +129,7 @@ mod tests {
 
             assert_eq!(
                 lock_cash_principal_internal::<Test>(GEOFF, JARED, twice_principal_amount),
-                Err(Reason::RepayTooMuch)
+                Err(Reason::InsufficientChainCash)
             );
         });
     }
@@ -119,6 +158,19 @@ mod tests {
             );
             assert_eq!(CashPrincipals::get(JARED), twice_principal.negate());
             assert_eq!(TotalCashPrincipal::get(), twice_principal_amount);
+
+            // Check emitted `LockedCash` event
+            let index = GlobalCashIndex::get();
+            let locked_cash_event = System::events().into_iter().next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LockedCash(
+                    GEOFF,
+                    JARED,
+                    once_principal_amount,
+                    index
+                )),
+                locked_cash_event.event
+            );
         });
     }
 
@@ -166,7 +218,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             assert_err!(
                 lock_cash_principal_internal::<Test>(jared, jared, lock_principal),
-                Reason::InsufficientChainCash
+                Reason::NegativeChainCash
             );
             ChainCashPrincipals::insert(ChainId::Eth, lock_principal);
             assert_ok!(lock_cash_principal_internal::<Test>(
@@ -179,11 +231,25 @@ mod tests {
                 CashPrincipalAmount(0)
             );
 
+            // Check emitted `LockedCash` event
+            let index = GlobalCashIndex::get();
+            let mut events_iter = System::events().into_iter();
+            let jared_locked_cash_event = events_iter.next().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LockedCash(
+                    jared,
+                    jared,
+                    lock_principal,
+                    index
+                )),
+                jared_locked_cash_event.event
+            );
+
             ChainCashPrincipals::insert(ChainId::Eth, lock_principal);
             CashPrincipals::insert(&geoff, CashPrincipal::from_nominal("-1"));
             assert_err!(
                 lock_cash_principal_internal::<Test>(geoff, geoff, lock_principal),
-                Reason::RepayTooMuch
+                Reason::InsufficientChainCash
             );
             TotalCashPrincipal::put(CashPrincipalAmount::from_nominal("1"));
             assert_ok!(lock_cash_principal_internal::<Test>(
@@ -192,6 +258,18 @@ mod tests {
                 lock_principal
             ));
             assert_eq!(TotalCashPrincipal::get(), CashPrincipalAmount(0));
+
+            // Check emitted `LockedCash` event
+            let geoff_locked_cash_event = System::events().into_iter().last().unwrap();
+            assert_eq!(
+                mock::Event::pallet_cash(crate::Event::LockedCash(
+                    geoff,
+                    geoff,
+                    lock_principal,
+                    index
+                )),
+                geoff_locked_cash_event.event
+            );
 
             Ok(())
         })

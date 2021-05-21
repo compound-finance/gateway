@@ -122,16 +122,11 @@ decl_module! {
 }
 
 /// Return the USD price associated with the given units.
-pub fn get_price_by_ticker<T: Config>(ticker: Ticker) -> Result<Price, OracleError> {
+pub fn get_price_by_ticker<T: Config>(ticker: Ticker) -> Option<Price> {
     match ticker {
-        t if t == USD_TICKER => Ok(Price::from_nominal(USD_TICKER, "1.0")),
-        t if t == CASH_TICKER => Ok(Price::from_nominal(CASH_TICKER, "1.0")),
-        _ => Ok(Price::new(
-            ticker,
-            // XXX Prices::get(units.ticker).ok_or(OracleError::NoPrice)?,
-            // XXX fix me how to handle no prices during initialization?
-            Prices::get(ticker).unwrap_or(0),
-        )),
+        t if t == USD_TICKER => Some(Price::from_nominal(USD_TICKER, "1.0")),
+        t if t == CASH_TICKER => Some(Price::from_nominal(CASH_TICKER, "1.0")),
+        _ => Prices::get(ticker).map(|price| Price::new(ticker, price)),
     }
 }
 
@@ -150,7 +145,9 @@ impl<T: Config> Module<T> {
 
     /// Get the price for the given asset.
     pub fn get_price(ticker: Ticker) -> Result<AssetPrice, OracleError> {
-        Ok(get_price_by_ticker::<T>(ticker)?.value)
+        Ok(get_price_by_ticker::<T>(ticker)
+            .ok_or(OracleError::NoPrice)?
+            .value)
     }
 }
 
@@ -163,7 +160,10 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     /// here we make sure that some particular calls (the ones produced by offchain worker)
     /// are being whitelisted and marked as valid.
     fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-        validate_trx::validate_unsigned::<T>(source, call)
-            .unwrap_or(InvalidTransaction::Call.into())
+        validate_trx::check_validation_failure(
+            call,
+            validate_trx::validate_unsigned::<T>(source, call),
+        )
+        .unwrap_or(InvalidTransaction::Call.into())
     }
 }

@@ -1,5 +1,4 @@
 use crate::{ticker::Ticker, types::ReporterSet};
-use gateway_crypto;
 use our_std::str::FromStr;
 use serde::{de, ser::SerializeSeq, Deserializer, Serialize, Serializer};
 
@@ -20,8 +19,9 @@ impl<'de> de::Visitor<'de> for ReporterSetVisitor {
     {
         let mut reporters = Vec::with_capacity(seq.size_hint().unwrap_or(0));
         while let Some(r) = seq.next_element::<String>()? {
-            reporters
-                .push(gateway_crypto::str_to_address(&r).ok_or(de::Error::custom("bad reporter"))?)
+            reporters.push(
+                gateway_crypto::eth_str_to_address(&r).ok_or(de::Error::custom("bad reporter"))?,
+            )
         }
         Ok(ReporterSet(reporters))
     }
@@ -43,7 +43,7 @@ impl Serialize for ReporterSet {
     {
         let mut seq = ser.serialize_seq(Some(self.0.len()))?;
         for element in &self.0 {
-            seq.serialize_element(&gateway_crypto::address_string(element))?;
+            seq.serialize_element(&gateway_crypto::eth_address_string(element))?;
         }
         seq.end()
     }

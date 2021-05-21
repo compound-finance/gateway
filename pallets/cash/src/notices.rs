@@ -1,20 +1,24 @@
 use crate::{
-    chains::{
-        Chain, ChainAccount, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum,
-    },
+    chains::{Chain, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum},
     reason::Reason,
 };
 use codec::{Decode, Encode};
 use ethabi::Token;
 use our_std::{vec::Vec, RuntimeDebug};
 
+use types_derive::{type_alias, Types};
+
 /// Type for a generic encoded message, potentially for any chain.
+#[type_alias]
 pub type EncodedNotice = Vec<u8>;
 
+#[type_alias]
 pub type EraId = u32;
+
+#[type_alias]
 pub type EraIndex = u32;
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct NoticeId(pub EraId, pub EraIndex);
 
 impl NoticeId {
@@ -50,7 +54,7 @@ lazy_static! {
         <Ethereum as Chain>::hash_bytes(b"changeAuthorities(address[])");
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ExtractionNotice {
     Eth {
         id: NoticeId,
@@ -61,7 +65,7 @@ pub enum ExtractionNotice {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum CashExtractionNotice {
     Eth {
         id: NoticeId,
@@ -71,7 +75,7 @@ pub enum CashExtractionNotice {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum FutureYieldNotice {
     Eth {
         id: NoticeId,
@@ -82,7 +86,7 @@ pub enum FutureYieldNotice {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum SetSupplyCapNotice {
     Eth {
         id: NoticeId,
@@ -92,7 +96,7 @@ pub enum SetSupplyCapNotice {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChangeAuthorityNotice {
     Eth {
         id: NoticeId,
@@ -101,7 +105,7 @@ pub enum ChangeAuthorityNotice {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum Notice {
     ExtractionNotice(ExtractionNotice),
     CashExtractionNotice(CashExtractionNotice),
@@ -306,7 +310,7 @@ pub fn default_notice_signatures(notice: &Notice) -> ChainSignatureList {
 }
 
 /// Type for the status of a notice on the queue.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum NoticeState {
     Missing,
     Pending { signature_pairs: ChainSignatureList },
@@ -324,15 +328,6 @@ impl NoticeState {
 impl Default for NoticeState {
     fn default() -> Self {
         NoticeState::Missing
-    }
-}
-
-pub fn has_signer(signature_pairs: &ChainSignatureList, signer: ChainAccount) -> bool {
-    match (signature_pairs, signer) {
-        (ChainSignatureList::Eth(eth_signature_pairs), ChainAccount::Eth(eth_account)) => {
-            eth_signature_pairs.iter().any(|(s, _)| s == &eth_account)
-        }
-        _ => false,
     }
 }
 

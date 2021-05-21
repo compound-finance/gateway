@@ -17,6 +17,14 @@ class Starport {
     return this.starport._address;
   }
 
+  chainAddressStr() {
+    return `ETH:${this.ethAddress()}`;
+  }
+
+  chainAddress() {
+    return { Eth: this.ethAddress() };
+  }
+
   topics() {
     return this.starportTopics;
   }
@@ -91,8 +99,8 @@ class Starport {
     };
   }
 
-  async isNoticeUsed(noticeHash) {
-    return await this.starport.methods.isNoticeUsed(noticeHash).call();
+  async isNoticeInvoked(noticeHash) {
+    return await this.starport.methods.isNoticeInvoked(noticeHash).call();
   }
 
   async getAuthorities() {
@@ -149,6 +157,11 @@ class Starport {
     let token = this.ctx.tokens.get(tokenLookup);
 
     return this.starport.methods.supplyCaps(token.ethAddress()).call();
+  }
+
+  async tokenBalance(tokenLookup) {
+    let token = this.ctx.tokens.get(tokenLookup);
+    return await token.getBalance(this.starport._address);
   }
 }
 

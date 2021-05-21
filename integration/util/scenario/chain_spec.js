@@ -48,7 +48,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
         full_rate: 2000
       }
     },
-    miner_shares: 1000,
+    miner_shares: 0,
     supply_cap: 0
   }));
 
@@ -56,28 +56,33 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
   if (ctx.__initialYield() > 0) {
     initialYieldConfig = {
       cashYield: ctx.__initialYield(),
-      lastYieldTimestamp: ctx.__initialYieldStart() * 1000
+      lastYieldTimestamp: ctx.__initialYieldStartMS()
     };
   }
 
-  let frameSystem = {};
-  if (ctx.__genesisVersion()) {
-    let version = ctx.versions.mustFind(ctx.__genesisVersion());
-    frameSystem = {
-      frameSystem: {
-        code: await version.wasm()
-      }
-    };
-  }
+  let genesisVersion = ctx.genesisVersion();
+  let frameSystem = {
+    frameSystem: {
+      code: await genesisVersion.wasm()
+    }
+  };
 
   let reporters = ctx.__reporters();
 
+  let cashGenesis = {};
+  if (genesisVersion.supports('eth-starport-parent-block')) {
+    cashGenesis.genesisBlocks = [{
+      Eth: {
+        hash: ctx.eth.blockInfo.hash.slice(2),
+        parent_hash: ctx.eth.blockInfo.parentHash.slice(2),
+        number: ctx.eth.blockInfo.number,
+      }
+    }];
+    cashGenesis.starports = [ctx.starport.chainAddressStr()];
+  }
+
   return {
     name: 'Integration Test Network',
-    properties: {
-      eth_starport_address: ctx.starport.ethAddress(),
-      eth_lock_event_topic: ctx.starport.topics()['Lock']
-    },
     genesis: {
       runtime: {
         ...frameSystem,
@@ -85,6 +90,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
           assets,
           ...initialYieldConfig,
           validators,
+          ...cashGenesis
         },
         palletSession: {
           keys: session_args
@@ -107,7 +113,7 @@ async function buildChainSpec(chainSpecInfo, validatorsInfoHash, tokenInfoHash, 
   let chainSpecFile = chainSpecInfo.use_temp ?
     await tmpFile('chainSpec.json') : path.join(__dirname, '..', '..', 'chainSpec.json');
   let target = ctx.__target();
-  ctx.log('Building chain spec from ' + target + ' to temp file ' + chainSpecFile);
+  ctx.log('[CHAINSPEC] Scenario chain_spec.json: ' + chainSpecFile);
   let chainSpecJson;
   try {
     let { error, stdout, stderr } =

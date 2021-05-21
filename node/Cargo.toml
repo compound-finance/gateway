@@ -32,6 +32,8 @@ serde_json = { version = "1.0.58", features=["alloc"] } # XXX 128 bit also arbit
 wasm-timer = "0.2"
 
 # Substrate dependencies
+frame-support = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-chain-spec = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-client-api = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sc-cli = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -73,6 +75,7 @@ frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', br
 frame-benchmarking-cli = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
 
 # Local dependencies
+ethereum-client = { path = '../ethereum-client' }
 gateway-runtime = { path = '../runtime' }
 gateway-crypto = { path = '../gateway-crypto' }
 our-std = { path = '../our-std' }
@@ -80,6 +83,8 @@ pallet-cash = { path = '../pallets/cash' }
 pallet-cash-runtime-api = { path = '../pallets/cash/runtime-api' }
 pallet-oracle = { path = '../pallets/oracle' }
 runtime-interfaces = { path = '../pallets/runtime-interfaces' }
+
+types-derive = { path = '../types-derive' }
 
 [dev-dependencies]
 tempfile = "3.1.0"
@@ -89,8 +94,6 @@ sp-keyring = { git = 'https://github.com/compound-finance/substrate', branch = '
 sc-service-test = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 
-frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'master' }
-
 [features]
 default = ['with-parity-db']
 with-parity-db=['sc-client-db/with-parity-db']
@@ -98,5 +101,6 @@ with-rocks-db=['sc-client-db/with-kvdb-rocksdb']
 runtime-benchmarks = [
 	'gateway-runtime/runtime-benchmarks',
 	'frame-benchmarking-cli',
+	'with-rocks-db'
 ]
 runtime-debug = ['our-std/runtime-debug']

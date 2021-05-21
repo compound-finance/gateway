@@ -1,66 +1,22 @@
-use codec::{Decode, Encode};
-use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap};
-use our_std::RuntimeDebug;
-
 use crate::{
-    chains::ChainAccount,
-    core::{get_asset, get_cash_balance_with_asset_interest, get_price},
+    internal::assets::get_price,
     reason::Reason,
     symbol::CASH,
     types::{AssetInfo, Balance},
-    AssetBalances, AssetsWithNonZeroBalance, Config,
+    Config,
 };
+use codec::{Decode, Encode};
+use our_std::RuntimeDebug;
+use types_derive::Types;
 
 /// Type for representing a set of positions for an account.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub struct Portfolio {
     pub cash: Balance,
     pub positions: Vec<(AssetInfo, Balance)>,
 }
 
 impl Portfolio {
-    /// Read a portfolio from storage.
-    pub fn from_storage<T: Config>(account: ChainAccount) -> Result<Portfolio, Reason> {
-        let cash = get_cash_balance_with_asset_interest::<T>(account)?;
-        let mut positions = Vec::new();
-        for (asset, _) in AssetsWithNonZeroBalance::iter_prefix(&account) {
-            let asset_info = get_asset::<T>(asset)?;
-            let asset_balance = AssetBalances::get(&asset, account);
-            positions.push((asset_info, asset_info.as_balance(asset_balance)));
-        }
-        Ok(Portfolio { cash, positions })
-    }
-
-    /// Modify an asset balance to see what it does to account liquidity.
-    pub fn asset_change(&self, asset_info: AssetInfo, delta: Balance) -> Result<Portfolio, Reason> {
-        let mut positions = Vec::new();
-        let mut seen: bool = false;
-        for (info, balance) in &self.positions {
-            if info.asset == asset_info.asset {
-                seen = true;
-                positions.push((*info, (*balance).add(delta)?))
-            } else {
-                positions.push((*info, (*balance)))
-            };
-        }
-        if !seen {
-            positions.push((asset_info, delta));
-        }
-        Ok(Portfolio {
-            cash: self.cash,
-            positions,
-        })
-    }
-
-    /// Modify the cash principal to see what it does to account liquidity.
-    pub fn cash_change(&self, delta: Balance) -> Result<Portfolio, Reason> {
-        let cash = self.cash.add(delta)?;
-        Ok(Portfolio {
-            cash,
-            positions: self.positions.clone(), // XXX
-        })
-    }
-
     /// Get the hypothetical liquidity value.
     pub fn get_liquidity<T: Config>(&self) -> Result<Balance, Reason> {
         let mut liquidity = self.cash.mul_price(get_price::<T>(CASH)?)?;
@@ -79,10 +35,7 @@ impl Portfolio {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::{chains::*, core::*, rates::*, reason::*, symbol::*, tests::*, types::*, *};
-    use pallet_oracle;
-    use pallet_oracle::types::Price;
+    use crate::{pipeline, tests::*};
 
     struct TestAsset {
         asset: u8,
@@ -143,7 +96,7 @@ pub mod tests {
                 CashPrincipals::insert(&account, CashPrincipal::from_nominal(cash_principal));
             }
 
-            let actual = Portfolio::from_storage::<Test>(account)
+            let actual = pipeline::load_portfolio::<Test>(account)
                 .unwrap()
                 .get_liquidity::<Test>();
             let expected = match case.expected_liquidity {

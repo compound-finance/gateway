@@ -10,30 +10,6 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function until(cond, opts = {}) {
-  let options = {
-    delay: 5000,
-    retries: null,
-    message: null,
-    ...opts
-  };
-
-  let start = +new Date();
-
-  if (await cond()) {
-    return;
-  } else {
-    if (options.message) {
-      log(options.message);
-    }
-    await sleep(options.delay + start - new Date());
-    return await until(cond, {
-      ...options,
-      retries: options.retries === null ? null : options.retries - 1
-    });
-  }
-}
-
 function merge(x, y) {
   Object.entries(y).forEach(([key, val]) => {
     if (typeof (x[key]) === 'object' && typeof (val) === 'object' && !Array.isArray(x[key]) && x[key] !== null) {
@@ -104,17 +80,65 @@ function bytes32(x) {
   return x.toLowerCase() + [...new Array(padding)].map((i) => "0").join("");
 }
 
+function intervalToSeconds(interval) {
+  let intervalLengths = {
+    second: 1,
+    minute: 60,
+    hour: 60 * 60,
+    day: 24 * 60 * 60,
+    month: 365 * 24 * 60 * 60 / 12,
+    year: 365 * 24 * 60 * 60
+  };
+
+  return Object.entries(interval).reduce((acc, [k, v]) => {
+    let unit = k.endsWith('s') ? k.slice(0, k.length - 1) : k;
+    if (!intervalLengths.hasOwnProperty(unit)) {
+      throw new Error(`Unknown time unit: ${k}`);
+    }
+    return acc + Math.ceil(intervalLengths[unit] * v);
+  }, 0);
+}
+
+// From https://stackoverflow.com/a/22015930/320471
+const zip = (a, b) => Array(Math.max(b.length, a.length)).fill().map((_,i) => [a[i], b[i]]);
+
+const encodeULEB128 = (value, minLen = null) => {
+  value |= 0n;
+  const result = [];
+  while (true) {
+    const byte = value & 0x7fn;
+    value >>= 7n;
+    if (
+      (minLen === null || result.length + 1 >= minLen) && (
+        (value === 0n && (byte & 0x40n) === 0n) ||
+        (value === -1n && (byte & 0x40n) !== 0n)
+      )
+    ) {
+      result.push(byte);
+      return result;
+    }
+    result.push(byte | 0x80n);
+  }
+};
+
+function encodeULEB128Hex(value, minLen = null) {
+  return '0x' + (encodeULEB128(value, minLen).map((x) => ('0' + x.toString(16)).slice(-2)).join(''));
+}
+
 module.exports = {
+  arrayEquals,
   arrayToHex,
+  bytes32,
   concatArray,
   genPort,
-  sleep,
-  until,
-  merge,
   getInfoKey,
-  stripHexPrefix,
-  lookupBy,
-  arrayEquals,
+  intervalToSeconds,
   keccak256: Web3Utils.keccak256,
-  bytes32,
+  lookupBy,
+  merge,
+  sleep,
+  stripHexPrefix,
+  zip,
+  encodeULEB128,
+  encodeULEB128Hex
 };

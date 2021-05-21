@@ -1,13 +1,9 @@
-use frame_support::storage::{
-    IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap,
-};
-use frame_system::offchain::SubmitTransaction;
-
 use crate::{
-    chains::{ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature, ChainSignatureList},
+    chains::{ChainAccount, ChainAsset, ChainHash, ChainId, ChainSignature},
+    core::recover_validator,
     log,
     notices::{
-        has_signer, CashExtractionNotice, ChangeAuthorityNotice, EncodeNotice, ExtractionNotice,
+        CashExtractionNotice, ChangeAuthorityNotice, EncodeNotice, ExtractionNotice,
         FutureYieldNotice, Notice, NoticeId, NoticeState, SetSupplyCapNotice,
     },
     require,
@@ -16,8 +12,10 @@ use crate::{
         ValidatorKeys, APR,
     },
     AccountNotices, Call, Config, Event, LatestNotice, Module, NoticeHashes, NoticeHolds,
-    NoticeStates, Notices, Validators,
+    NoticeStates, Notices,
 };
+use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
+use frame_system::offchain::SubmitTransaction;
 
 pub fn dispatch_extraction_notice<T: Config>(
     asset: ChainAsset,
@@ -178,7 +176,7 @@ pub fn handle_notice_invoked<T: Config>(
 ) -> Result<(), Reason> {
     require!(
         NoticeHashes::get(notice_hash) == Some(notice_id),
-        Reason::NoticeHashMismatch
+        Reason::HashMismatch
     );
     Notices::take(chain_id, notice_id);
     if let Some(notice_hold_id) = NoticeHolds::get(chain_id) {
@@ -199,7 +197,7 @@ fn process_notice_state<T: Config>(
     match notice_state {
         NoticeState::Pending { signature_pairs } => {
             let signer = chain_id.signer_address()?;
-            if !has_signer(&signature_pairs, signer) {
+            if !signature_pairs.has_signer(signer) {
                 let notice = Notices::get(chain_id, notice_id)
                     .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
                 let signature: ChainSignature = notice.sign_notice()?; // NO_COV_FAIL: key already checked
@@ -231,53 +229,35 @@ pub fn process_notices<T: Config>(_block_number: T::BlockNumber) -> (usize, usiz
     })
 }
 
-pub fn publish_signature(
+pub fn publish_signature<T: Config>(
     chain_id: ChainId,
     notice_id: NoticeId,
     signature: ChainSignature,
 ) -> Result<(), Reason> {
     log!("Publishing Signature: [{},{}]", notice_id.0, notice_id.1);
-    let state = NoticeStates::get(chain_id, notice_id);
 
-    match state {
+    match NoticeStates::get(chain_id, notice_id) {
         NoticeState::Missing => Ok(()),
 
-        NoticeState::Pending { signature_pairs } => {
+        NoticeState::Pending {
+            mut signature_pairs,
+        } => {
             let notice = Notices::get(chain_id, notice_id)
                 .ok_or(Reason::NoticeMissing(chain_id, notice_id))?;
-            let signer: ChainAccount = signature.recover(&notice.encode_notice())?;
-            let has_signer_v = has_signer(&signature_pairs, signer);
+            let validator = recover_validator::<T>(&notice.encode_notice(), signature)?;
 
-            if has_signer_v {
-                return Ok(()); // Ignore for double-signs
+            if signature_pairs.has_validator_signature(signature.chain_id(), &validator) {
+                return Ok(());
             }
 
-            // TODO: Can this be easier?
-            let signature_pairs_next = match (signature_pairs, signer, signature) {
-                (
-                    ChainSignatureList::Eth(eth_signature_list),
-                    ChainAccount::Eth(eth_account),
-                    ChainSignature::Eth(eth_sig),
-                ) => {
-                    let mut eth_signature_list_mut = eth_signature_list.clone();
-                    eth_signature_list_mut.push((eth_account, eth_sig));
-                    Ok(ChainSignatureList::Eth(eth_signature_list_mut))
-                }
-                _ => Err(Reason::SignatureMismatch),
-            }?;
-
-            // Note: we currently iterate all potentially all validators to check validity
-            if !Validators::iter().any(|(_, v)| ChainAccount::Eth(v.eth_address) == signer) {
-                Err(Reason::UnknownValidator)?
-            }
+            signature_pairs.add_validator_signature(&signature, &validator)?;
 
             NoticeStates::insert(
                 chain_id,
                 notice_id,
-                NoticeState::Pending {
-                    signature_pairs: signature_pairs_next,
-                },
+                NoticeState::Pending { signature_pairs },
             );
+
             Ok(())
         }
 
@@ -288,14 +268,7 @@ pub fn publish_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        chains::{Chain, ChainSignatureList, Ethereum},
-        notices::{ExtractionNotice, Notice},
-        tests::*,
-        types::ValidatorKeys,
-    };
-    use gateway_crypto::CryptoError;
-    use sp_core::crypto::AccountId32;
+    use crate::tests::*;
 
     /** `handle_notice_invoked` tests **/
 
@@ -427,7 +400,7 @@ mod tests {
             let result =
                 handle_notice_invoked::<Test>(chain_id, NoticeId(66, 77), notice_hash, vec![]);
 
-            assert_eq!(result, Err(Reason::NoticeHashMismatch));
+            assert_eq!(result, Err(Reason::HashMismatch));
 
             assert_eq!(NoticeHashes::get(notice_hash), Some(notice_id));
             assert_eq!(Notices::get(chain_id, notice_id), Some(notice));
@@ -470,7 +443,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_missing_notice() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -492,7 +464,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_non_pending() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice_state = NoticeState::Executed {};
@@ -507,7 +478,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_already_signed() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let signer = <Ethereum as Chain>::signer_address().unwrap();
@@ -525,7 +495,6 @@ mod tests {
     #[test]
     fn test_process_notice_state_valid() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -550,7 +519,6 @@ mod tests {
     #[test]
     fn test_process_notices() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id_1 = NoticeId(5, 6);
             let notice_1 = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -596,7 +564,10 @@ mod tests {
             let signature = ChainSignature::Eth([1u8; 65]);
             NoticeStates::insert(chain_id, notice_id, notice_state);
 
-            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
+            assert_eq!(
+                publish_signature::<Test>(chain_id, notice_id, signature),
+                Ok(())
+            );
         });
     }
 
@@ -609,14 +580,16 @@ mod tests {
             let signature = ChainSignature::Eth([1u8; 65]);
             NoticeStates::insert(chain_id, notice_id, notice_state);
 
-            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
+            assert_eq!(
+                publish_signature::<Test>(chain_id, notice_id, signature),
+                Ok(())
+            );
         });
     }
 
     #[test]
     fn test_publish_signature_pending_valid() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -627,6 +600,7 @@ mod tests {
                 account: [2; 20],
             });
             let signature = notice.sign_notice().unwrap();
+            let signer = <Ethereum as Chain>::signer_address().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
                 _ => panic!("absurd"),
@@ -637,20 +611,22 @@ mod tests {
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
             let substrate_id = AccountId32::new([0u8; 32]);
-            let eth_address = <Ethereum as Chain>::signer_address().unwrap();
             Validators::insert(
                 substrate_id.clone(),
                 ValidatorKeys {
                     substrate_id,
-                    eth_address,
+                    eth_address: signer,
                 },
             );
 
             let expected_notice_state = NoticeState::Pending {
-                signature_pairs: ChainSignatureList::Eth(vec![(eth_address, eth_signature)]),
+                signature_pairs: ChainSignatureList::Eth(vec![(signer, eth_signature)]),
             };
 
-            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
+            assert_eq!(
+                publish_signature::<Test>(chain_id, notice_id, signature),
+                Ok(())
+            );
 
             assert_eq!(
                 NoticeStates::get(chain_id, notice_id),
@@ -676,7 +652,7 @@ mod tests {
             NoticeStates::insert(chain_id, notice_id, notice_state);
 
             assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
+                publish_signature::<Test>(chain_id, notice_id, signature),
                 Err(Reason::NoticeMissing(chain_id, notice_id))
             );
         });
@@ -685,7 +661,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_already_signed() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -707,14 +682,25 @@ mod tests {
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
 
-            assert_eq!(publish_signature(chain_id, notice_id, signature), Ok(()));
+            let substrate_id = AccountId32::new([0u8; 32]);
+            Validators::insert(
+                substrate_id.clone(),
+                ValidatorKeys {
+                    substrate_id,
+                    eth_address: signer,
+                },
+            );
+
+            assert_eq!(
+                publish_signature::<Test>(chain_id, notice_id, signature),
+                Ok(())
+            );
         });
     }
 
     #[test]
     fn test_publish_signature_signature_mismatch() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -724,20 +710,30 @@ mod tests {
                 amount: 100,
                 account: [2; 20],
             });
+            let signer = <Ethereum as Chain>::signer_address().unwrap();
             let signature = notice.sign_notice().unwrap();
             let eth_signature = match signature {
                 ChainSignature::Eth(a) => a,
                 _ => panic!("invalid signature"),
             };
-            let signer = <Ethereum as Chain>::signer_address().unwrap();
             let notice_state = NoticeState::Pending {
-                signature_pairs: ChainSignatureList::Gate(vec![(signer, eth_signature)]),
+                signature_pairs: ChainSignatureList::Dot(vec![(signer, eth_signature)]),
             };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);
 
+            let substrate_id = AccountId32::new([0u8; 32]);
+
+            Validators::insert(
+                substrate_id.clone(),
+                ValidatorKeys {
+                    substrate_id,
+                    eth_address: signer,
+                },
+            );
+
             assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
+                publish_signature::<Test>(chain_id, notice_id, signature),
                 Err(Reason::SignatureMismatch)
             );
         });
@@ -746,7 +742,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_unknown_validator() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -764,7 +759,7 @@ mod tests {
             Notices::insert(chain_id, notice_id, notice);
 
             assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
+                publish_signature::<Test>(chain_id, notice_id, signature),
                 Err(Reason::UnknownValidator)
             );
         });
@@ -773,7 +768,6 @@ mod tests {
     #[test]
     fn test_publish_signature_pending_invalid_signature() {
         new_test_ext().execute_with(|| {
-            runtime_interfaces::set_validator_config_dev_defaults();
             let chain_id = ChainId::Eth;
             let notice_id = NoticeId(5, 6);
             let notice = Notice::ExtractionNotice(ExtractionNotice::Eth {
@@ -799,8 +793,10 @@ mod tests {
             Notices::insert(chain_id, notice_id, notice);
 
             assert_eq!(
-                publish_signature(chain_id, notice_id, signature),
-                Err(Reason::CryptoError(CryptoError::RecoverError))
+                publish_signature::<Test>(chain_id, notice_id, signature),
+                Err(Reason::CryptoError(
+                    gateway_crypto::CryptoError::RecoverError
+                ))
             );
         });
     }

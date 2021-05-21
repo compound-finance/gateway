@@ -25,6 +25,8 @@ fn get_eth_private_key_from_environment_variable() -> Result<EcdsaPair, CryptoEr
     Ok(pair)
 }
 
+const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
+
 /// Sets up the development keyring, an in memory keyring loaded with the default key
 /// for signing messages headed to ethereum.
 ///
@@ -32,7 +34,15 @@ fn get_eth_private_key_from_environment_variable() -> Result<EcdsaPair, CryptoEr
 /// variable. That is "ok" because it should only be used during boot.
 pub fn dev_keyring() -> InMemoryKeyring {
     let mut keyring = InMemoryKeyring::new();
-    let eth_key_id: KeyId = ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into();
+    let eth_key_id: KeyId = if let Ok(eth_key_id_from_env) = std::env::var(ETH_KEY_ID_ENV_VAR) {
+        if eth_key_id_from_env.len() > 0 {
+            KeyId::from(eth_key_id_from_env)
+        } else {
+            ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into()
+        }
+    } else {
+        ETH_KEY_ID_ENV_VAR_DEV_DEFAULT.into()
+    };
 
     let pair = match get_eth_private_key_from_environment_variable() {
         Ok(pair) => pair,

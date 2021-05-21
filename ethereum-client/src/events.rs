@@ -3,7 +3,9 @@ use codec::{Decode, Encode};
 use our_std::convert::TryInto;
 use our_std::RuntimeDebug;
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+use types_derive::Types;
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum EthereumEvent {
     Lock {
         asset: [u8; 20],
@@ -35,34 +37,19 @@ pub enum EthereumEvent {
     },
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub enum EventError {
+    UnknownEventTopic([u8; 32]),
+    ErrorParsingLog,
+    InvalidHex,
+    InvalidTopic,
+    Overflow,
+    InvalidHash,
+    InvalidLogParams,
+    InvalidRecipient,
+}
+
 lazy_static! {
-    static ref LOCK_OLD_EVENT: ethabi::Event = ethabi::Event {
-        name: String::from("Lock"),
-        inputs: vec![
-            ethabi::EventParam {
-                name: String::from("asset"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("sender"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("recipient"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("amount"),
-                kind: ethabi::param_type::ParamType::Uint(256),
-                indexed: false
-            }
-        ],
-        anonymous: false
-    };
-    static ref LOCK_OLD_EVENT_TOPIC: ethabi::Hash = LOCK_OLD_EVENT.signature();
     static ref LOCK_EVENT: ethabi::Event = ethabi::Event {
         name: String::from("Lock"),
         inputs: vec![
@@ -95,33 +82,6 @@ lazy_static! {
         anonymous: false
     };
     static ref LOCK_EVENT_TOPIC: ethabi::Hash = LOCK_EVENT.signature();
-    static ref LOCK_CASH_OLD_EVENT: ethabi::Event = ethabi::Event {
-        name: String::from("LockCash"),
-        inputs: vec![
-            ethabi::EventParam {
-                name: String::from("sender"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("recipient"),
-                kind: ethabi::param_type::ParamType::Address,
-                indexed: true
-            },
-            ethabi::EventParam {
-                name: String::from("amount"),
-                kind: ethabi::param_type::ParamType::Uint(256),
-                indexed: false
-            },
-            ethabi::EventParam {
-                name: String::from("principal"),
-                kind: ethabi::param_type::ParamType::Uint(128),
-                indexed: false
-            },
-        ],
-        anonymous: false
-    };
-    static ref LOCK_CASH_OLD_EVENT_TOPIC: ethabi::Hash = LOCK_CASH_OLD_EVENT.signature();
     static ref LOCK_CASH_EVENT: ethabi::Event = ethabi::Event {
         name: String::from("LockCash"),
         inputs: vec![
@@ -347,71 +307,63 @@ fn parse_notice_invoked_log(log: ethabi::Log) -> Result<EthereumEvent, EventErro
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
-pub enum EventError {
-    UnknownEventTopic([u8; 32]),
-    ErrorParsingLog,
-    InvalidHex,
-    InvalidTopic,
-    Overflow,
-    InvalidHash,
-    InvalidLogParams,
-    InvalidRecipient,
-}
-
 pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, EventError> {
     let topic_hashes = topics
         .iter()
         .map(|topic| decode_topic(topic).ok_or(EventError::InvalidTopic))
         .collect::<Result<Vec<ethabi::Hash>, _>>()?;
-    let topic_hash = topic_hashes.first().ok_or(EventError::InvalidTopic)?;
-    if *topic_hash == *LOCK_EVENT_TOPIC {
-        let log: ethabi::Log = LOCK_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
+    match topic_hashes.first().ok_or(EventError::InvalidTopic)? {
+        t if *t == *LOCK_EVENT_TOPIC => {
+            let log: ethabi::Log = LOCK_EVENT
+                .parse_log(ethabi::RawLog {
+                    topics: topic_hashes,
+                    data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
+                })
+                .map_err(|_| EventError::ErrorParsingLog)?;
+            parse_lock_log(log)
+        }
 
-        parse_lock_log(log)
-    } else if *topic_hash == *LOCK_CASH_EVENT_TOPIC {
-        let log: ethabi::Log = LOCK_CASH_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
+        t if *t == *LOCK_CASH_EVENT_TOPIC => {
+            let log: ethabi::Log = LOCK_CASH_EVENT
+                .parse_log(ethabi::RawLog {
+                    topics: topic_hashes,
+                    data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
+                })
+                .map_err(|_| EventError::ErrorParsingLog)?;
+            parse_lock_cash_log(log)
+        }
 
-        parse_lock_cash_log(log)
-    } else if *topic_hash == *EXEC_TRX_REQUEST_EVENT_TOPIC {
-        let log: ethabi::Log = EXEC_TRX_REQUEST_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
+        t if *t == *EXEC_TRX_REQUEST_EVENT_TOPIC => {
+            let log: ethabi::Log = EXEC_TRX_REQUEST_EVENT
+                .parse_log(ethabi::RawLog {
+                    topics: topic_hashes,
+                    data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
+                })
+                .map_err(|_| EventError::ErrorParsingLog)?;
+            parse_exec_trx_request_log(log)
+        }
 
-        parse_exec_trx_request_log(log)
-    } else if *topic_hash == *EXECUTE_PROPOSAL_EVENT_TOPIC {
-        let log: ethabi::Log = EXECUTE_PROPOSAL_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
+        t if *t == *EXECUTE_PROPOSAL_EVENT_TOPIC => {
+            let log: ethabi::Log = EXECUTE_PROPOSAL_EVENT
+                .parse_log(ethabi::RawLog {
+                    topics: topic_hashes,
+                    data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
+                })
+                .map_err(|_| EventError::ErrorParsingLog)?;
+            parse_execute_proposal_log(log)
+        }
 
-        parse_execute_proposal_log(log)
-    } else if *topic_hash == *NOTICE_INVOKED_EVENT_TOPIC {
-        let log: ethabi::Log = NOTICE_INVOKED_EVENT
-            .parse_log(ethabi::RawLog {
-                topics: topic_hashes,
-                data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
-            })
-            .map_err(|_| EventError::ErrorParsingLog)?;
+        t if *t == *NOTICE_INVOKED_EVENT_TOPIC => {
+            let log: ethabi::Log = NOTICE_INVOKED_EVENT
+                .parse_log(ethabi::RawLog {
+                    topics: topic_hashes,
+                    data: decode_hex(&data).ok_or(EventError::InvalidHex)?,
+                })
+                .map_err(|_| EventError::ErrorParsingLog)?;
+            parse_notice_invoked_log(log)
+        }
 
-        parse_notice_invoked_log(log)
-    } else {
-        Err(EventError::UnknownEventTopic(*topic_hash.as_fixed_bytes()))
+        t => Err(EventError::UnknownEventTopic(*t.as_fixed_bytes())),
     }
 }
 

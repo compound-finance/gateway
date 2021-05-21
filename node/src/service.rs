@@ -22,7 +22,6 @@ native_executor_instance!(
     node_runtime::native_version,
     (
         frame_benchmarking::benchmarking::HostFunctions,
-        runtime_interfaces::config_interface::HostFunctions,
         runtime_interfaces::validator_config_interface::HostFunctions,
         runtime_interfaces::keyring_interface::HostFunctions,
         runtime_interfaces::price_feed_interface::HostFunctions,
@@ -203,17 +202,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     let enable_grandpa = !config.disable_grandpa;
     let prometheus_registry = config.prometheus_registry().cloned();
     let telemetry_connection_sinks = sc_service::TelemetryConnectionSinks::default();
-
-    // Setup our custom config/communication between node <> OCW
-    let properties = config.chain_spec.properties();
-    let runtime_config = crate::chain_spec::extract_configuration_from_properties(&properties)
-        .ok_or_else(|| {
-            sc_service::Error::Other(
-                "could not extract runtime configuration from properties key of chain spec"
-                    .to_owned(),
-            )
-        })?;
-    runtime_interfaces::config_interface::set(runtime_config);
 
     sc_service::spawn_tasks(sc_service::SpawnTasksParams {
         config,

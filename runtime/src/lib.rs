@@ -45,9 +45,10 @@ pub use pallet_timestamp::Call as TimestampCall;
 
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
+    portfolio::Portfolio,
     rates::APR,
     reason::Reason,
-    types::{AssetAmount, AssetBalance, AssetInfo},
+    types::{AssetAmount, AssetBalance, AssetInfo, Balance, CashIndex, CashPrincipal},
 };
 use pallet_oracle::{ticker::Ticker, types::AssetPrice};
 
@@ -80,9 +81,6 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 /// The type for looking up accounts. We don't expect more than 4 billion of them, but you
 /// never know...
 pub type AccountIndex = u32;
-
-/// Balance of an account.
-pub type Balance = u128;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
@@ -121,7 +119,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("gateway"),
     impl_name: create_runtime_str!("gateway"),
     authoring_version: 1,
-    spec_version: 9,
+    spec_version: 10,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -222,7 +220,7 @@ impl pallet_grandpa::Config for Runtime {
     type Event = Event;
     type Call = Call;
 
-    type KeyOwnerProofSystem = (); // XXX we prob want one?
+    type KeyOwnerProofSystem = ();
 
     type KeyOwnerProof =
         <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
@@ -249,16 +247,6 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 500;
-    pub const MaxLocks: u32 = 50;
-}
-
-parameter_types! {
-    pub const TransactionByteFee: Balance = 10_000_000; // XXX how are we doing weights/fees for substrate?
-    pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
-}
-
-parameter_types! {
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
 }
 
@@ -281,7 +269,7 @@ impl pallet_session::Config for Runtime {
     type ValidatorIdOf = IdConverter<Self>;
     type ShouldEndSession = Cash;
     type NextSessionRotation = Cash;
-    type SessionManager = Cash; // XXX probably use NoteHistoricalRoot manager at some point
+    type SessionManager = Cash;
     type SessionHandler = <opaque::SessionKeys as OpaqueKeys>::KeyTypeIdProviders; // eg: aura and grandpa
     type Keys = opaque::SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
@@ -300,6 +288,7 @@ impl pallet_cash::Config for Runtime {
     type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
     type AccountStore = System;
     type SessionInterface = Self;
+    type WeightInfo = pallet_cash::weights::SubstrateWeight<Runtime>;
 }
 
 // ---------------------- Recipe Pallet Configurations ----------------------
@@ -548,6 +537,10 @@ impl_runtime_apis! {
             Cash::get_cash_yield()
         }
 
+        fn get_cash_data() -> Result<(CashIndex, CashPrincipal, Balance), Reason> {
+            Cash::get_cash_data()
+        }
+
         fn get_full_cash_balance(account: ChainAccount) -> Result<AssetBalance, Reason> {
             Cash::get_full_cash_balance(account)
         }
@@ -570,6 +563,22 @@ impl_runtime_apis! {
 
         fn get_rates(asset: ChainAsset) -> Result<(APR, APR), Reason> {
             Cash::get_rates(asset)
+        }
+
+        fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
+            Cash::get_assets()
+        }
+
+        fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
+            Cash::get_accounts()
+        }
+
+        fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
+            Cash::get_accounts_liquidity()
+        }
+
+        fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
+            Cash::get_portfolio(account)
         }
     }
 
@@ -600,6 +609,7 @@ impl_runtime_apis! {
             let params = (&config, &whitelist);
 
             add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
+            add_benchmark!(params, batches, pallet_cash, Cash);
             add_benchmark!(params, batches, pallet_timestamp, Timestamp);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

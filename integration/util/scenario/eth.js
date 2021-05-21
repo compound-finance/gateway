@@ -4,21 +4,94 @@ const RLP = require('rlp');
 const { readContractsFile, deployContract, getContractAt } = require('../ethereum');
 const { genPort } = require('../util');
 
+class BlockInfo {
+  constructor(web3, ctx) {
+    this.web3 = web3;
+    this.ctx = ctx;
+    this.hash = null;
+    this.parentHash = null;
+    this.number = null;
+  }
+
+  async update() {
+    let block = await this.web3.eth.getBlock('latest');
+
+    this.hash = block.hash;
+    this.parentHash = block.parentHash;
+    this.number = block.number;
+  }
+}
+
 class Eth {
-  constructor(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx) {
+  constructor(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx) {
     this.ethInfo = ethInfo;
     this.web3 = web3;
     this.web3Url = web3Url;
     this.accounts = accounts;
     this.defaultFrom = accounts[0];
+    this.blockInfo = blockInfo;
     this.ganacheServer = ganacheServer;
     this.version = version;
     this.ctx = ctx;
     this.contractsFiles = {};
+    this.asyncId = 1;
   }
 
   root() {
     return this.defaultFrom;
+  }
+
+  async updateGenesisBlock() {
+    await this.blockInfo.update();
+  }
+
+  genesisBlock() {
+    return {
+      Eth: {
+        hash: this.blockInfo.hash,
+        parentHash: this.blockInfo.parentHash,
+        number: this.blockInfo.number,
+        events: []
+      }
+    };
+  }
+
+  sendAsync(method, params = []) {
+    let id = this.asyncId++;
+
+    return new Promise((resolve, reject) => {
+      this.web3.currentProvider.sendAsync({
+        jsonrpc: "2.0",
+        method,
+        params,
+        id: id
+      }, function(err, result) {
+        if (err) {
+          reject(err);
+        } else {
+          if (result.id !== id) {
+            throw new Error(`Incorrect response id. Expected=${id}, Received=${result.id}`);
+          }
+
+          resolve(result.result);
+        }
+      });
+    });
+  }
+
+  async mine(count = 1, ts = undefined) {
+    for (const i in [...new Array(count)]) {
+      let params = [ts].filter((x) => x !== undefined);
+      await this.sendAsync('evm_mine', params);
+    }
+  }
+
+  async snapshot() {
+    return await this.sendAsync('evm_snapshot');
+  }
+
+  async restore(snapshotId) {
+    await this.sendAsync('evm_revert', [snapshotId]);
   }
 
   async getContractsFile(contractsFile) {
@@ -44,7 +117,7 @@ class Eth {
       from: this.defaultFrom,
       ...opts
     };
-    console.log("Deploying " + contractName + " from " + contractsFile)
+    this.ctx.log("Deploying " + contractName + " from " + contractsFile)
     let contracts = await this.getContractsFile(contractsFile);
 
     let contract = await deployContract(
@@ -85,9 +158,15 @@ class Eth {
   }
 
   async ethBalance(actorLookup) {
-    let actor = this.ctx.actors.get(actorLookup);
+    let ethAddress;
+    if (typeof(actorLookup) === 'string' && actorLookup.slice(0, 2) === '0x') {
+      ethAddress = actorLookup;
+    } else {
+      let actor = this.ctx.actors.get(actorLookup);
+      ethAddress = actor.ethAddress();
+    }
 
-    return Number(await this.web3.eth.getBalance(actor.ethAddress()));
+    return Number(await this.web3.eth.getBalance(ethAddress));
   }
 
   async getNextContractAddress(skip = 0) {
@@ -127,7 +206,12 @@ async function buildEth(ethInfo, ctx) {
   let web3Url;
 
   if (provider === 'ganache') {
-    ganacheServer = ganache.server(ethInfo.ganache.opts);
+    let ganacheOpts = ethInfo.ganache.opts;
+    if (ctx.__blockTime() !== null) {
+      ganacheOpts.blockTime = ctx.__blockTime();
+    }
+
+    ganacheServer = ganache.server(ganacheOpts);
     let ganacheProvider = ganacheServer.provider;
 
     web3Port = ethInfo.ganache.web3_port || genPort();
@@ -148,7 +232,10 @@ async function buildEth(ethInfo, ctx) {
 
   let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
 
-  return new Eth(ethInfo, web3, web3Url, accounts, ganacheServer, version, ctx);
+  let blockInfo = new BlockInfo(web3, ctx);
+  await blockInfo.update();
+
+  return new Eth(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
 }
 
 module.exports = {

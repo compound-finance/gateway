@@ -1,0 +1,16 @@
+[package]
+name = "types-derive"
+version = "0.1.0"
+authors = ["Geoffrey Hayes <hayesgm@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = { version = "1.0", features=["full"] }
+quote = "1.0"
+lazy_static = '1.4.0'
+serde_json = { version = "1.0.64", features=["preserve_order"] }
+
+[lib]
+proc-macro = true

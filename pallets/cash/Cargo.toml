@@ -32,6 +32,9 @@ sp-core = { default-features = false, git = 'https://github.com/compound-finance
 sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'master' }
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master'  }
+sp-tracing = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
+frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master', optional = true }
 frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
 pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'master' }
@@ -44,6 +47,14 @@ gateway-crypto = { path = '../../gateway-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
 our-std = { path = '../../our-std', default-features = false }
 
+types-derive = { path = '../../types-derive' }
+
+[dev-dependencies]
+env_logger = "*"
+frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'master'}
+serial_test = "*"
+test-env-log = "*"
+
 [features]
 default = ['std']
 std = [
@@ -54,6 +65,8 @@ std = [
     'sp-io/std',
     'sp-core/std',
     'sp-runtime/std',
+    'sp-std/std',
+    'sp-tracing/std',
     'runtime-interfaces/std',
     'gateway-crypto/std',
     'our-std/std',
@@ -61,3 +74,7 @@ std = [
     'pallet-oracle/std',
 ]
 runtime-debug = ['our-std/runtime-debug']
+runtime-benchmarks = ['frame-benchmarking']
+freeze-time = []
+stubnet = []
+integration = ['stubnet', 'freeze-time', 'runtime-debug']

@@ -1514,14 +1514,18 @@ dependencies = [
  "ethabi 12.0.0",
  "frame-support",
  "hex",
+ "hex-buffer-serde",
  "lazy_static",
  "our-std",
  "parity-scale-codec",
  "serde",
  "serde_json",
+ "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-runtime-interface",
  "sp-std",
+ "types-derive",
 ]
 
 [[package]]
@@ -2156,8 +2160,10 @@ dependencies = [
 name = "gateway"
 version = "1.0.0"
 dependencies = [
+ "ethereum-client",
  "frame-benchmarking",
  "frame-benchmarking-cli",
+ "frame-support",
  "frame-system",
  "futures 0.3.13",
  "gateway-crypto",
@@ -2213,6 +2219,7 @@ dependencies = [
  "substrate-build-script-utils",
  "substrate-frame-rpc-system",
  "tempfile",
+ "types-derive",
  "wasm-timer",
 ]
 
@@ -2232,6 +2239,7 @@ dependencies = [
  "sp-core",
  "tiny-keccak 2.0.2",
  "tokio 0.2.25",
+ "types-derive",
 ]
 
 [[package]]
@@ -2490,9 +2498,19 @@ dependencies = [
 
 [[package]]
 name = "hex"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hex-buffer-serde"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08f52012c160668b4494727f3588045aa00429849fcae51de70d68fa98228039"
+dependencies = [
+ "hex",
+ "serde",
+]
 
 [[package]]
 name = "hex-literal"
@@ -4318,6 +4336,7 @@ dependencies = [
 name = "our-std"
 version = "0.0.1"
 dependencies = [
+ "hex",
  "our-std-proc-macro",
  "serde",
  "sp-runtime",
@@ -4404,9 +4423,11 @@ dependencies = [
 name = "pallet-cash"
 version = "1.0.0"
 dependencies = [
+ "env_logger",
  "ethabi 12.0.0",
  "ethereum-client",
  "ethereum-types 0.11.0",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "gateway-crypto",
@@ -4425,12 +4446,17 @@ dependencies = [
  "runtime-interfaces",
  "serde",
  "serde_json",
+ "serial_test",
  "sp-core",
  "sp-inherents",
  "sp-io",
  "sp-runtime",
+ "sp-std",
+ "sp-tracing",
+ "test-env-log",
  "tiny-keccak 2.0.2",
  "trx-request",
+ "types-derive",
 ]
 
 [[package]]
@@ -4494,6 +4520,7 @@ dependencies = [
  "sp-runtime",
  "tiny-keccak 2.0.2",
  "trx-request",
+ "types-derive",
 ]
 
 [[package]]
@@ -5682,6 +5709,8 @@ dependencies = [
 name = "runtime-interfaces"
 version = "1.0.0"
 dependencies = [
+ "ethereum-client",
+ "frame-support",
  "gateway-crypto",
  "lazy_static",
  "our-std",
@@ -7053,13 +7082,36 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.61"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fceb2595057b6891a4ee808f70054bd2d12f0e97f1cbb78689b59f676df325a"
+checksum = "799e97dc9fdae36a5c8b8f2cae9ce2ee9fdce2058c57a93e6099d919fd982f79"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serial_test"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0bccbcf40c8938196944a3da0e133e031a33f4d6b72db3bda3cc556e361905d"
+dependencies = [
+ "lazy_static",
+ "parking_lot 0.11.1",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2acd6defeddb41eb60bb468f8825d0cfd0c2a76bc03bfd235b6a1dc4f6a1ad5"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.9",
+ "syn 1.0.58",
 ]
 
 [[package]]
@@ -8309,6 +8361,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-env-log"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3e4b132a630cc8a0d06cfcb400da67adef3d0087a94b3332d4692908f0c2544"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.9",
+ "syn 1.0.58",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8900,7 +8963,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
 dependencies = [
  "cfg-if 0.1.10",
- "rand 0.3.23",
+ "rand 0.7.3",
  "static_assertions",
 ]
 
@@ -8915,6 +8978,16 @@ name = "typenum"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
+
+[[package]]
+name = "types-derive"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "quote 1.0.9",
+ "serde_json",
+ "syn 1.0.58",
+]
 
 [[package]]
 name = "ucd-trie"

@@ -1,17 +1,18 @@
 use codec::{Decode, Encode};
+use frame_support::sp_runtime::DispatchError;
+
 use our_std::{
     collections::btree_set::BTreeSet,
     consts::{int_from_string_with_decimals, static_pow10, uint_from_string_with_decimals},
     convert::{TryFrom, TryInto},
     Deserialize, RuntimeDebug, Serialize,
 };
+use types_derive::{type_alias, Types};
 
-use frame_support::sp_runtime::DispatchError;
-
-use pallet_oracle::{ticker::Ticker, types::Price};
+pub use pallet_oracle::{ticker::Ticker, types::Price};
 
 pub use crate::{
-    chains::{Chain, ChainAsset, ChainId, Ethereum},
+    chains::{Chain, ChainAsset, ChainBlockNumber, ChainId, Ethereum},
     factor::{BigInt, BigUint, Factor},
     notices::{Notice, NoticeId},
     rates::{InterestRateModel, APR},
@@ -23,55 +24,71 @@ pub use crate::{
 // Type aliases //
 
 /// Type for representing a percentage/fractional, often between [0, 100].
+#[type_alias]
 pub type Bips = u128;
 
 /// Type for representing a number of decimal places.
+#[type_alias]
 pub type Decimals = u8;
 
 /// Type for a nonce.
+#[type_alias]
 pub type Nonce = u32;
 
 /// Type for representing time since current Unix epoch in milliseconds.
+#[type_alias]
 pub type Timestamp = u64;
 
 /// Type of the largest possible signed integer.
+#[type_alias]
 pub type Int = i128;
 
 /// Type of the largest possible unsigned integer.
+#[type_alias]
 pub type Uint = u128;
 
 /// Type for a generic encoded message, potentially for any chain.
+#[type_alias]
 pub type EncodedNotice = Vec<u8>;
 
 /// Type for representing an amount, potentially of any symbol.
+#[type_alias]
 pub type AssetAmount = Uint;
 
 /// Type for representing an amount of CASH
+#[type_alias]
 pub type CashAmount = Uint;
 
 /// Type for representing a balance of a specific asset.
+#[type_alias]
 pub type AssetBalance = Int;
 
 /// Type for representing an amount of an asset, together with its units.
+#[type_alias]
 pub type AssetQuantity = Quantity;
 
 /// Type for representing a quantity of CASH.
+#[type_alias]
 pub type CashQuantity = Quantity; // ideally Quantity<{ CASH }>
 
 /// Type for representing a quantity of USD.
+#[type_alias]
 pub type USDQuantity = Quantity; // ideally Quantity<{ USD }>
 
 /// Type for a market's liquidity factor.
+#[type_alias]
 pub type LiquidityFactor = Factor;
 
 /// Type for the miner shares portion of interest going to miners.
+#[type_alias]
 pub type MinerShares = Factor;
 
 /// Type for a code hash.
-pub type CodeHash = <Ethereum as Chain>::Hash; // XXX what to use?
+#[type_alias]
+pub type CodeHash = <Ethereum as Chain>::Hash;
 
 /// Governance Result type
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum GovernanceResult {
     FailedToDecodeCall,
     DispatchSuccess,
@@ -79,26 +96,26 @@ pub enum GovernanceResult {
 }
 
 /// Type for enumerating sessions.
+#[type_alias]
 pub type SessionIndex = u32;
 
 /// Type for an address used to identify a validator.
-pub type ValidatorIdentity = <Ethereum as Chain>::Address;
-
-/// Type for signature used to verify that a signed payload comes from a validator.
-pub type ValidatorSig = <Ethereum as Chain>::Signature;
+#[type_alias]
+pub type ValidatorIdentity = SubstrateId;
 
 /// Type for signers set used to identify validators that signed this event.
+#[type_alias]
 pub type SignersSet = BTreeSet<ValidatorIdentity>;
 
 /// Type for representing the keys to sign notices.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub struct ValidatorKeys {
     pub substrate_id: SubstrateId,
     pub eth_address: <Ethereum as Chain>::Address,
 }
 
 /// Type for referring to either an asset or CASH.
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum CashOrChainAsset {
     Cash,
     ChainAsset(ChainAsset),
@@ -106,7 +123,7 @@ pub enum CashOrChainAsset {
 
 /// Type for representing a quantity, potentially of any symbol.
 #[derive(Serialize, Deserialize)] // used in config
-#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub struct AssetInfo {
     pub asset: ChainAsset,
     pub decimals: Decimals,
@@ -153,8 +170,12 @@ impl AssetInfo {
     }
 }
 
+// Note: ideally we would impl Ord ourselves for all these Ord types,
+//  and assert ticker/units are the same when comparing.
+// We would have to panic, though not for PartialOrd...
+
 /// Type for representing a quantity of an asset, bound to its ticker and number of decimals.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Quantity {
     pub value: AssetAmount,
     pub units: Units,
@@ -194,6 +215,19 @@ impl Quantity {
             self.value
                 .checked_add(rhs.value)
                 .ok_or(MathError::Overflow)?,
+            self.units,
+        ))
+    }
+
+    // Quantity<U> - Quantity<U> -> Quantity<U>
+    pub fn sub(self, rhs: Quantity) -> Result<Quantity, MathError> {
+        if self.units != rhs.units {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Quantity::new(
+            self.value
+                .checked_sub(rhs.value)
+                .ok_or(MathError::Underflow)?,
             self.units,
         ))
     }
@@ -253,10 +287,27 @@ impl Quantity {
             self.units,
         ))
     }
+
+    pub fn decay(self, nblocks: ChainBlockNumber) -> Result<Quantity, MathError> {
+        // XXX TODO decide on what decay fn?
+        //  currently V / 2^T
+        let nbits = u32::try_from(nblocks).unwrap_or(u32::MAX);
+        let value = self.value.checked_shr(nbits).unwrap_or(0);
+        Ok(Quantity::new(value, self.units))
+    }
+
+    pub fn negate(self) -> Result<Balance, MathError> {
+        let signed_value: i128 = self.value.try_into().map_err(|_| MathError::Overflow)?;
+        let negative_value = signed_value.checked_neg().ok_or(MathError::Underflow)?;
+        Ok(Balance {
+            value: negative_value,
+            units: self.units,
+        })
+    }
 }
 
 /// Type for representing a signed balance of an asset, bound to its ticker and number of decimals.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct Balance {
     pub value: AssetBalance,
     pub units: Units,
@@ -282,6 +333,32 @@ impl Balance {
             self.value
                 .checked_add(delta.value)
                 .ok_or(MathError::Overflow)?,
+            self.units,
+        ))
+    }
+
+    // Balance<U> + Quantity<U> -> Balance<U>
+    pub fn add_quantity(self, delta: Quantity) -> Result<Balance, MathError> {
+        if self.units.ticker != delta.units.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Balance::new(
+            self.value
+                .checked_add(delta.value.try_into().map_err(|_| MathError::Overflow)?)
+                .ok_or(MathError::Underflow)?,
+            self.units,
+        ))
+    }
+
+    // Balance<U> - Quantity<U> -> Balance<U>
+    pub fn sub_quantity(self, delta: Quantity) -> Result<Balance, MathError> {
+        if self.units.ticker != delta.units.ticker {
+            return Err(MathError::UnitsMismatch);
+        }
+        Ok(Balance::new(
+            self.value
+                .checked_sub(delta.value.try_into().map_err(|_| MathError::Overflow)?)
+                .ok_or(MathError::Underflow)?,
             self.units,
         ))
     }
@@ -324,10 +401,36 @@ impl Balance {
         )?;
         Ok(Balance::new(result, self.units))
     }
+
+    /// Returns true if the balance is greater than or equal to given value
+    pub fn gte(self: &Self, v: i128) -> bool {
+        self.value >= v
+    }
+
+    /// Returns true if the balance is less than or equal to given value
+    pub fn lte(self: &Self, v: i128) -> bool {
+        self.value <= v
+    }
+}
+
+impl TryInto<Balance> for Quantity {
+    type Error = Reason;
+
+    fn try_into(self) -> Result<Balance, Reason> {
+        match i128::try_from(self.value) {
+            Ok(v) => Ok(Balance {
+                value: v,
+                units: self.units,
+            }),
+            Err(_) => Err(Reason::MathError(MathError::Overflow)),
+        }
+    }
 }
 
 /// Type for representing a balance of CASH Principal.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug, Types,
+)]
 pub struct CashPrincipal(pub AssetBalance);
 
 impl CashPrincipal {
@@ -382,10 +485,27 @@ impl CashPrincipal {
     pub fn negate(self) -> Self {
         Self(-self.0)
     }
+
+    /// Returns true if the principal is equals value
+    pub fn eq(self: &Self, v: i128) -> bool {
+        self.0 == v
+    }
+
+    /// Returns true if the principal is greater than or equal to given value
+    pub fn gte(self: &Self, v: i128) -> bool {
+        self.0 >= v
+    }
+
+    /// Returns true if the principal is less than or equal to given value
+    pub fn lte(self: &Self, v: i128) -> bool {
+        self.0 <= v
+    }
 }
 
 /// Type for representing an amount of CASH Principal.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, Default, RuntimeDebug, Types,
+)]
 pub struct CashPrincipalAmount(pub AssetAmount);
 
 impl CashPrincipalAmount {
@@ -434,8 +554,10 @@ impl TryInto<CashPrincipalAmount> for CashPrincipal {
 }
 
 /// Type for representing a multiplicative index on Gateway.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct CashIndex(pub Uint);
+
+#[type_alias]
 pub type CashPerCashPrincipal = CashIndex;
 
 impl CashIndex {
@@ -520,6 +642,12 @@ impl Default for CashIndex {
     }
 }
 
+impl From<Factor> for CashIndex {
+    fn from(factor: Factor) -> Self {
+        CashIndex(factor.0)
+    }
+}
+
 impl<T> From<T> for CashIndex
 where
     T: Into<Uint>,
@@ -530,8 +658,10 @@ where
 }
 
 /// Type for representing the additive asset indices.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, Types)]
 pub struct AssetIndex(pub Uint);
+
+#[type_alias]
 pub type CashPrincipalPerAsset = AssetIndex;
 
 impl AssetIndex {
@@ -854,6 +984,21 @@ mod tests {
     }
 
     #[test]
+    fn test_add_quantities() {
+        let a = Quantity::from_nominal("5.5", ETH);
+        let b = Quantity::from_nominal("6.5", ETH);
+        assert_eq!(a.add(b), Ok(Quantity::from_nominal("12", ETH)));
+    }
+
+    #[test]
+    fn test_sub_quantities() {
+        let a = Quantity::from_nominal("5.5", ETH);
+        let b = Quantity::from_nominal("6.5", ETH);
+        assert_eq!(b.sub(a), Ok(Quantity::from_nominal("1", ETH)));
+        assert_eq!(a.sub(b), Err(MathError::Underflow));
+    }
+
+    #[test]
     fn test_quantity_times_price() {
         let price = Price::from_nominal(ETH.ticker, "1500");
         let quantity = Quantity::from_nominal("5.5", ETH);
@@ -870,6 +1015,22 @@ mod tests {
         let number_of_eth = value.div_price(price, ETH).unwrap();
         let expected_number_of_eth = Quantity::from_nominal("5.5", ETH);
         assert_eq!(number_of_eth, expected_number_of_eth);
+    }
+
+    #[test]
+    fn test_quantity_decay() {
+        let value = Quantity::from_nominal("8250", USD);
+        assert_eq!(value.decay(1), Ok(Quantity::from_nominal("4125", USD)));
+        assert_eq!(value.decay(2), Ok(Quantity::from_nominal("2062.5", USD)));
+        assert_eq!(value.decay(3), Ok(Quantity::from_nominal("1031.25", USD)));
+        assert_eq!(value.decay(4), Ok(Quantity::from_nominal("515.625", USD)));
+        assert_eq!(value.decay(5), Ok(Quantity::from_nominal("257.8125", USD)));
+        assert_eq!(value.decay(6), Ok(Quantity::from_nominal("128.90625", USD)));
+        assert_eq!(value.decay(7), Ok(Quantity::from_nominal("64.453125", USD)));
+        assert_eq!(value.decay(14), Ok(Quantity::new(503540, USD)));
+        assert_eq!(value.decay(28), Ok(Quantity::new(30, USD)));
+        assert_eq!(value.decay(35), Ok(Quantity::new(0, USD)));
+        assert_eq!(value.decay(1000000), Ok(Quantity::new(0, USD)));
     }
 
     #[test]

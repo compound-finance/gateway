@@ -1,8 +1,9 @@
 const { download } = require('../download');
 const { instantiateInfo } = require('./scen_info');
 const { keccak256 } = require('../util');
-const fs = require('fs').promises;
 const { constants } = require('fs');
+const { TypeRegistry } = require('@polkadot/types');
+const fs = require('fs').promises;
 const path = require('path');
 
 function releaseUrl(repoUrl, version, file) {
@@ -17,38 +18,53 @@ function releasePath(version, file) {
   return path.join(baseReleasePath(version), file);
 }
 
-function releaseWasmInfo(repoUrl, version) {
-  return {
-    url: releaseUrl(repoUrl, version, 'gateway_runtime.compact.wasm'),
-    path: releasePath(version, 'gateway_runtime.compact.wasm'),
-  };
+function releaseWasmInfo(repoUrl, version, v) {
+  if (v.supports('new-artifacts')) {
+    return {
+      url: releaseUrl(repoUrl, version, 'gateway.wasm'),
+      path: releasePath(version, 'gateway.wasm'),
+    };
+  } else {
+    return {
+      url: releaseUrl(repoUrl, version, 'gateway_runtime.compact.wasm'),
+      path: releasePath(version, 'gateway_runtime.compact.wasm'),
+    };
+  }
 }
 
-function releaseTypesInfo(repoUrl, version) {
+function releaseTypesInfo(repoUrl, version, v) {
   return {
     url: releaseUrl(repoUrl, version, 'types.json'),
     path: releasePath(version, 'types.json'),
   };
 }
 
-function releaseContractsInfo(repoUrl, version) {
+function releaseContractsInfo(repoUrl, version, v) {
   return {
     url: releaseUrl(repoUrl, version, 'contracts.json'),
     path: releasePath(version, 'contracts.json'),
   };
 }
 
-async function pullVersion(repoUrl, version) {
-  console.log(`Fetching version: ${version}...`);
+function releaseTargetInfo(repoUrl, version, platform, arch, v) {
+  return {
+    url: releaseUrl(repoUrl, version, `gateway-${platform}-${arch}`),
+    path: releasePath(version, `gateway-${platform}-${arch}`),
+  };
+}
 
-  let wasmInfo = releaseWasmInfo(repoUrl, version);
-  let typesInfo = releaseTypesInfo(repoUrl, version);
-  let contractsInfo = releaseContractsInfo(repoUrl, version);
+async function pullVersion(ctx, repoUrl, version, v) {
+  ctx.log(`Fetching version: ${version}...`);
+
+  let wasmInfo = releaseWasmInfo(repoUrl, version, v);
+  let typesInfo = releaseTypesInfo(repoUrl, version, v);
+  let contractsInfo = releaseContractsInfo(repoUrl, version, v);
+  // TODO: Pull target
 
   await fs.mkdir(baseReleasePath(version), { recursive: true });
 
   await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
-    console.log(`Downloading ${url} to ${path}`);
+    ctx.log(`Downloading ${url} to ${path}`);
     await download(url, path);
   }));
 }
@@ -62,10 +78,11 @@ async function checkFile(path) {
   }
 }
 
-async function checkVersion(repoUrl, version) {
-  let wasmInfo = releaseWasmInfo(repoUrl, version);
-  let typesInfo = releaseTypesInfo(repoUrl, version);
-  let contractsInfo = releaseContractsInfo(repoUrl, version);
+async function checkVersion(repoUrl, version, v) {
+  let wasmInfo = releaseWasmInfo(repoUrl, version, v);
+  let typesInfo = releaseTypesInfo(repoUrl, version, v);
+  let contractsInfo = releaseContractsInfo(repoUrl, version, v);
+  // TODO: Check target
 
   let exists = await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
     return checkFile(path);
@@ -79,6 +96,8 @@ class Version {
     this.version = version;
     this.ctx = ctx;
     this.symbolized = version.replace(/[.]/mig, '_');
+    this.__registry = null;
+    this.wasmReplacements = {};
   }
 
   matches(v) {
@@ -91,7 +110,10 @@ class Version {
 
   async wasm() {
     let wasmBlob = await fs.readFile(this.wasmFile());
-    return '0x' + wasmBlob.hexSlice();
+    let wasm = '0x' + wasmBlob.hexSlice();
+    return Object.entries(this.wasmReplacements).reduce((acc, [k, v]) => {
+      return acc.replace(new RegExp(k.slice(2), 'i'), v.slice(2));
+    }, wasm);
   }
 
   async hash() {
@@ -99,15 +121,19 @@ class Version {
   }
 
   wasmFile() {
-    return releaseWasmInfo(this.ctx.__repoUrl(), this.version).path;
+    return releaseWasmInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
   typesJson() {
-    return releaseTypesInfo(this.ctx.__repoUrl(), this.version).path;
+    return releaseTypesInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
   contractsFile() {
-    return releaseContractsInfo(this.ctx.__repoUrl(), this.version).path;
+    return releaseContractsInfo(this.ctx.__repoUrl(), this.version, this).path;
+  }
+
+  targetFile(platform, arch) {
+    return releaseTargetInfo(this.ctx.__repoUrl(), this.version, platform, arch, this).path;
   }
 
   async ensure() {
@@ -118,11 +144,61 @@ class Version {
   }
 
   async check() {
-    return await checkVersion(this.ctx.__repoUrl(), this.version);
+    return await checkVersion(this.ctx.__repoUrl(), this.version, this);
   }
 
   async pull() {
-    await pullVersion(this.ctx.__repoUrl(), this.version);
+    await pullVersion(this.ctx, this.ctx.__repoUrl(), this.version, this);
+  }
+
+  isCurr() {
+    return false;
+  }
+
+  versionNumber() {
+    let match = this.version.match(/^m(\d+)$/);
+
+    if (match) {
+      return Number(match[1]);
+    }
+
+    throw new Error(`No version number for ${this.version}`)
+  }
+
+  supports(t) {
+    let versionMap = {
+      'full-cli-args': (v) => v >= 9,
+      'eth-starport-parent-block': (v) => v >= 9,
+      'new-artifacts': (v) => v >= 10,
+    };
+
+    if (!versionMap.hasOwnProperty(t)) {
+      throw new Error(`Unknown support type: ${t}`);
+    }
+
+    let versionCheck = versionMap[t];
+    return versionCheck(this.versionNumber());
+  }
+
+  async loadTypes(ctx, version) {
+    let contents = await fs.readFile(this.typesJson());
+    return JSON.parse(contents);
+  }
+
+  async registry() {
+    if (this.__registry) {
+      return this.__registry;
+    }
+
+    let typesJson = await this.loadTypes()
+    const registry = new TypeRegistry();
+    registry.register(typesJson);
+    this.__registry = registry;
+    return registry;
+  }
+
+  setWasmReplacements(wasmReplacements) {
+    this.wasmReplacements = wasmReplacements;
   }
 }
 
@@ -134,7 +210,6 @@ class CurrentVersion extends Version {
   async pull() {}
 
   wasmFile() {
-    console.log({wasmFile: this.ctx.__wasmFile()});
     return this.ctx.__wasmFile();
   }
 
@@ -146,20 +221,32 @@ class CurrentVersion extends Version {
     return this.ctx.__getContractsFile();
   }
 
+  targetFile(platform, arch) {
+    return this.ctx.__target();
+  }
+
+  isCurr() {
+    return true;
+  }
+
   async check() {
     if (!await checkFile(this.wasmFile())) {
-      console.warn(`Missing wasm file at ${this.wasmFile()}`)
+      this.ctx.warn(`Missing wasm file at ${this.wasmFile()}`)
     }
 
     if (!await checkFile(this.typesJson())) {
-      console.warn(`Missing types file at ${this.typesJson()}`)
+      this.ctx.warn(`Missing types file at ${this.typesJson()}`)
     }
 
     if (!await checkFile(this.contractsFile())) {
-      console.warn(`Missing contracts file at ${this.contractsFile()}`)
+      this.ctx.warn(`Missing contracts file at ${this.contractsFile()}`)
     }
 
     return true;
+  }
+
+  versionNumber() {
+    return 9999; // Arbitrarily high version number for "current"
   }
 }
 
@@ -197,6 +284,11 @@ async function buildVersion(version, ctx) {
 
 async function buildVersions(versionsInfo, ctx) {
   let versions = await versionsInfo.reduce(async (acc, versionInfo) => {
+    if (versionInfo === 'curr') {
+      // curr is automatically included
+      return acc;
+    }
+
     return [
       ...await acc,
       await buildVersion(versionInfo, ctx)
@@ -205,8 +297,6 @@ async function buildVersions(versionsInfo, ctx) {
 
   let current = new CurrentVersion(ctx);
   versions.push(current);
-
-  console.log({versions});
 
   // Make sure we have all included versions
   await Promise.all(versions.map((version) => version.ensure()));

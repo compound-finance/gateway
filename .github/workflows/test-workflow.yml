@@ -13,9 +13,10 @@ jobs:
 
       - name: Cargo fmt
         run: |
-          rustup install nightly
-          rustup component add rustfmt --toolchain nightly
-          cargo +nightly fmt -- --check
+          NIGHTLY=nightly-2021-03-24
+          rustup install $NIGHTLY
+          rustup component add rustfmt --toolchain $NIGHTLY
+          cargo +$NIGHTLY fmt -- --check
 
   substrate-tests:
     name: Substrate Unit Tests
@@ -40,7 +41,7 @@ jobs:
       - name: Cargo Test
         run: |
           set -eo pipefail
-          cargo test -- -Z unstable-options --format json | tee unit-test-results.json
+          cargo test -- -Z unstable-options --format json --test-threads 1 | tee unit-test-results.json
           cat unit-test-results.json | cargo2junit > unit-test-results.xml
           test_url="$(curl -X POST --data-binary @unit-test-results.xml https://test.compound.finance/test)"
           echo "::set-output name=test_url::$test_url"
@@ -96,7 +97,7 @@ jobs:
         run: |
           PACKAGES="pallet-cash runtime-interfaces gateway-crypto ethereum-client open-oracle-mock-reporter trx-request"
           for PKG in $PACKAGES; do
-              RUSTFLAGS="-Z instrument-coverage" cargo +nightly test -p $PKG --no-run --message-format=json > messages
+              RUSTFLAGS="-Z instrument-coverage" cargo test -p $PKG --no-run --message-format=json > messages
               EXE=`scripts/list_executables.py < messages`
               $EXE
               llvm-profdata-11 merge -sparse default.profraw -o default.profdata
@@ -237,14 +238,14 @@ jobs:
 
       - name: Build Gateway
         run: |
-          cargo build
+          WASM_BUILD_RUSTFLAGS='--cfg feature="integration"' cargo build --release --features integration
 
       - name: Run Integration Test
-        timeout-minutes: 20
+        timeout-minutes: 40
         run: |
           set -eo pipefail
           cd integration
-          sudo npx jest --ci --reporters=default --reporters=jest-junit
+          sudo PROFILE=release QUIET_SCENARIOS=true npx jest --ci --reporters=default --reporters=jest-junit
 
       - name: Prepublish Integration results
         if: always()

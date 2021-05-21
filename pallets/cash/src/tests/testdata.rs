@@ -1,5 +1,101 @@
 pub mod json_responses {
-    pub const EVENTS_RESPONSE: &[u8] = br#"{
+    pub const NO_RESULT: &[u8] = br#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result": null
+    }"#;
+
+    pub const GET_BLOCK_BY_NUMBER_1: &[u8] = br#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result":{
+         "difficulty":"0xb9e274f7969f5",
+         "extraData":"0x65746865726d696e652d657531",
+         "gasLimit":"0x7a121d",
+         "gasUsed":"0x781503",
+         "hash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a",
+         "logsBloom":"0x044410ea904e1020440110008000902200168801c81010301489212010002008080b0010004001b006040222c42004b001200408400500901889c908212040401020008d300010100198d10800100080027900254120000000530141030808140c299400162c0000d200204080008838240009002c020010400010101000481660200420a884b8020282204a00141ce10805004810800190180114180001b0001b1000020ac8040007000320b0480004018240891882a20080010281002c00000010102e0184210003010100438004202003080401000806204010000a42200104110100201200008081005001104002410140114a002010808c00200894c0c0",
+         "miner":"0xea674fdde714fd979de3edf0f56aa9716b898ec8",
+         "mixHash":"0xd733e12126a2155f0278c3987777eaca558a274b42d0396306dffb8fa6d21e76",
+         "nonce":"0x56a66f3802150748",
+         "number":"0x1",
+         "parentHash":"0x062e77dced431eb671a56839f96da912f68d841024665748d38cd3d6795961ea",
+         "receiptsRoot":"0x19ad317358916207491d4b64340153b924f4dda88fa8ef5dcb49090f234c00e7",
+         "sha3Uncles":"0xd21bed33f01dac18a3ee5538d1607ff2709d742eb4e13877cf66dcbed6c980f2",
+         "size":"0x5f50",
+         "stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6",
+         "timestamp":"0x5aae89b9",
+         "totalDifficulty":"0xa91291ae5c752d4885",
+         "transactions":[{
+           "blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a",
+           "blockNumber":"0x1",
+           "from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2",
+           "gas":"0x186a0",
+           "gasPrice":"0x153005ce00",
+           "hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c",
+           "input":"0x",
+           "nonce":"0x6740d",
+           "r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91",
+           "s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706",
+           "v":"0x25",
+           "to":"0x1d53de4d66110689bf494a110e859f3a6d15661f",
+           "transactionIndex":"0x0",
+           "type":"0x0",
+           "value":"0x453aa4214124000"
+          }],
+         "transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610",
+         "uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}
+    }"#;
+
+    pub const GET_BLOCK_BY_NUMBER_2: &[u8] = br#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result":{
+         "difficulty":"0xb9e274f7969f5",
+         "extraData":"0x65746865726d696e652d657531",
+         "gasLimit":"0x7a121d",
+         "gasUsed":"0x781503",
+         "hash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a",
+         "logsBloom":"0x044410ea904e1020440110008000902200168801c81010301489212010002008080b0010004001b006040222c42004b001200408400500901889c908212040401020008d300010100198d10800100080027900254120000000530141030808140c299400162c0000d200204080008838240009002c020010400010101000481660200420a884b8020282204a00141ce10805004810800190180114180001b0001b1000020ac8040007000320b0480004018240891882a20080010281002c00000010102e0184210003010100438004202003080401000806204010000a42200104110100201200008081005001104002410140114a002010808c00200894c0c0",
+         "miner":"0xea674fdde714fd979de3edf0f56aa9716b898ec8",
+         "mixHash":"0xd733e12126a2155f0278c3987777eaca558a274b42d0396306dffb8fa6d21e76",
+         "nonce":"0x56a66f3802150748",
+         "number":"0x1",
+         "parentHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a",
+         "receiptsRoot":"0x19ad317358916207491d4b64340153b924f4dda88fa8ef5dcb49090f234c00e7",
+         "sha3Uncles":"0xd21bed33f01dac18a3ee5538d1607ff2709d742eb4e13877cf66dcbed6c980f2",
+         "size":"0x5f50",
+         "stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6",
+         "timestamp":"0x5aae89b9",
+         "totalDifficulty":"0xa91291ae5c752d4885",
+         "transactions":[{
+           "blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8b",
+           "blockNumber":"0x2",
+           "from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2",
+           "gas":"0x186a0",
+           "gasPrice":"0x153005ce00",
+           "hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c",
+           "input":"0x",
+           "nonce":"0x6740d",
+           "r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91",
+           "s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706",
+           "v":"0x25",
+           "to":"0x1d53de4d66110689bf494a110e859f3a6d15661f",
+           "transactionIndex":"0x0",
+           "type":"0x0",
+           "value":"0x453aa4214124000"
+          }],
+         "transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610",
+         "uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}
+    }"#;
+
+    pub const GET_LOGS_1: &[u8] = br#"{
+        "jsonrpc":"2.0",
+        "id":1,
+        "result": []
+    }"#;
+
+    pub const GET_LOGS_2: &[u8] = br#"{
         "jsonrpc":"2.0",
         "id":1,
         "result": [
@@ -52,17 +148,5 @@ pub mod json_responses {
                 "transactionIndex":"0x4"
             }
         ]
-    }"#;
-
-    pub const NO_EVENTS_RESPONSE: &[u8] = br#"{
-        "jsonrpc":"2.0",
-        "id":1,
-        "result": []
-    }"#;
-
-    pub const BLOCK_NUMBER_RESPONSE: &[u8] = br#"{
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": "0xb27467"
     }"#;
 }
