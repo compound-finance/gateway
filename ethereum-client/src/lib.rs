@@ -224,7 +224,7 @@ pub fn get_block(
     let block_obj = get_block_object(server, &block_str)?;
     debug!("eth_starport_address: {:X?}", &eth_starport_address[..]);
     let get_logs_params = vec![serde_json::json!({
-        "address": format!("0x{}", &eth_starport_address[..].iter().map(|x| format!("{:02x}", x)).collect::<String>()),
+        "address": format!("0x{}", ::hex::encode(&eth_starport_address[..])),
         "fromBlock": &block_str,
         "toBlock": &block_str,
     })];

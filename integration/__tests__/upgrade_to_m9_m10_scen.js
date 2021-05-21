@@ -85,7 +85,7 @@ buildScenarios('Upgrade to m9', scen_info, [
     }
   },
   {
-    only: true, // Currently CI doesnt have native binaries
+    skip: true, // Currently CI doesnt have native binaries
     name: "Upgrade from m8 to m9 - m8 shell",
     info: {
       versions: ['m8'],

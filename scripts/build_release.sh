@@ -18,8 +18,12 @@ cd $(dirname ${BASH_SOURCE[0]})/..
 release_dir="./releases/$version"
 
 if [ -d "$release_dir" ]; then
-	echo "Release directory $release_dir already exists. Please remove before building release."
-	exit 1;
+	if [ -n "$CLEAN" ]; then
+		rm -rf "$release_dir"
+	else
+		echo "Release directory $release_dir already exists. Please remove before building release or run with CLEAN=true."
+		exit 1;
+	fi
 fi
 
 echo "*** Building Solidity ***"
@@ -28,16 +32,16 @@ echo "*** Building Solidity ***"
 
 contracts="./ethereum/.build/contracts.json"
 
-echo "*** Building testnet release gateway ***"
+echo "*** Building release gateway ***"
 
-WASM_BUILD_RUSTFLAGS='--cfg feature="testnet"' cargo +nightly build --release --features testnet
+cargo +nightly build --release
 
 bin="./target/release/gateway"
 types="./types.json"
 rpc="./rpc.json"
 wasm="./target/release/wbuild/gateway-runtime/gateway_runtime.compact.wasm"
 
-if [ ! -f "$bin" -o ! -f "$wasm" -o ! -f "$types" -o ! -f "$rpc" -o ! -f "$contracts" -o ]; then
+if [ ! -f "$bin" -o ! -f "$wasm" -o ! -f "$types" -o ! -f "$rpc" -o ! -f "$contracts" ]; then
 	echo "Missing one of the following build files: $bin, $wasm, $types, $rpc, $contracts"
 	exit 1
 fi
@@ -47,8 +51,8 @@ wasm_checksum="$(node ./ethereum/scripts/utils/keccak.js "$wasm")"
 bin_checksum="$(node ./ethereum/scripts/utils/keccak.js "$bin")"
 
 mkdir -p "$release_dir"
-cp "$wasm" "$release_dir/gateway-testnet.wasm"
-echo "$wasm_checksum" > "$release_dir/gateway-testnet.wasm.checksum"
+cp "$wasm" "$release_dir/gateway.wasm"
+echo "$wasm_checksum" > "$release_dir/gateway.wasm.checksum"
 # TODO: Check os/arch for real
 cp "$bin" "$release_dir/gateway-darwin-arm64"
 echo "$bin_checksum" > "$release_dir/gateway-darwin-arm64.checksum"
@@ -58,8 +62,8 @@ cp "$rpc" "$release_dir/rpc.json"
 cp "$contracts" "$release_dir/contracts.json"
 
 echo "Built release $version"
-echo "  wasm: $release_dir/gateway-testnet.wasm"
-echo "  wasm.checksum: $release_dir/gateway-testnet.wasm.checksum"
+echo "  wasm: $release_dir/gateway.wasm"
+echo "  wasm.checksum: $release_dir/gateway.wasm.checksum"
 echo "  bin: $release_dir/gateway-darwin-arm64"
 echo "  bin.checksum: $release_dir/gateway-darwin-arm64.checksum"
 echo "  types: $release_dir/types.json"

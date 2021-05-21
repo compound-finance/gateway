@@ -494,7 +494,10 @@
       "Unreachable": "",
       "TotalBorrowUnderflow": "",
       "InsufficientCollateral": "",
-      "NegativeChainCash": ""
+      "NegativeChainCash": "",
+      "MissingLastBlock": "",
+      "StarportMissing": "",
+      "InvalidChainBlock": ""
     }
   },
   "ReasonIncorrectNonce": "(Nonce,Nonce)",
