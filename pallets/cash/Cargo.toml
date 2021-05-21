@@ -56,7 +56,7 @@ serial_test = "*"
 test-env-log = "*"
 
 [features]
-default = ['std']
+default = ['std', 'testnet']
 std = [
     'codec/std',
     'serde/std',
