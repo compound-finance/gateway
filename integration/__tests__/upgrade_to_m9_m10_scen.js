@@ -94,7 +94,7 @@ buildScenarios('Upgrade to m9', scen_info, [
       validators: {
         alice: {
           version: 'm8',
-          extra_versions: ['curr'],
+          extra_versions: ['m10'],
         },
         bob: {
           version: 'm8',
@@ -105,7 +105,7 @@ buildScenarios('Upgrade to m9', scen_info, [
         }
       },
     },
-    scenario: async ({ api, alice, ashley, bob, chain, curr, eth, keyring, sleep, starport, usdc, validators }) => {
+    scenario: async ({ api, alice, ashley, bob, chain, m10, eth, keyring, sleep, starport, usdc, validators }) => {
       const newAuthsRaw = [
         { substrate_id: keyring.decodeAddress(alice.info.aura_key), eth_address: alice.info.eth_account },
         { substrate_id: keyring.decodeAddress(bob.info.aura_key), eth_address: bob.info.eth_account }
@@ -140,8 +140,8 @@ buildScenarios('Upgrade to m9', scen_info, [
       expect(await chain.noticeHold('Eth')).toEqual(null);
       expect(await chain.sessionValidators()).toEqualSet([alice.info.aura_key, bob.info.aura_key]);
       // Okay great, we've executed the change-over, but we still have a notice hold...
-      // But what if we upgrade to curr??
-      await chain.upgradeTo(curr, [
+      // But what if we upgrade to m10??
+      await chain.upgradeTo(m10, [
         await chain.encodeCall(0x5, 0x5, curr, ['ChainBlock'], [eth.genesisBlock()]),
         await chain.encodeCall(0x5, 0x4, curr, ['ChainAccount'], [starport.chainAddress()])
       ]);
