@@ -84,6 +84,9 @@ impl ChainId {
     }
 }
 
+// Note: temporarily aliased until first non-Ethereum starport is added
+pub type ChainStarport = ChainAccount;
+
 /// Type for an account tied to a chain.
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainAccount {

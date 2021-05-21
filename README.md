@@ -34,6 +34,14 @@ cargo +nightly build --release
 
 Note that we require the rust `nightly` toolchain as we rely on unstable features (notably `const_generics`).
 
+## Test
+
+To test, run:
+
+```sh
+SKIP_WASM_BUILD=true cargo test --features stubnet
+```
+
 ## Run
 
 ### Single Node Development Chain
@@ -254,12 +262,15 @@ Attach the following files to the release, from the repository where you built t
 
 ```
 contracts.json
-gateway_runtime.checksum
-gateway_runtime.compact.wasm
+gateway-darwin-arm64           # optional
+gateway-darwin-arm64.checksum  # optional
+gateway-testnet.wasm
+gateway-testnet.wasm.checksum
 rpc.json
 types.json
 ```
 
 These files should all exist in the `releases/<MILESTONE TAG>` directory of the repository you built from,
  you should be able to simply drag and drop them.
-This will likely be automated by the process of merging certain release branches into the main development branch.
+
+This will, in the future, be automated by the process of merging certain release branches into the main development branch.
