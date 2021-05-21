@@ -97,7 +97,10 @@ expect.extend({
   toEthRevert(actual, reason = null) {
     if (reason === null) {
       return {
-        pass: !!actual['message'] && actual.message.startsWith(`Transaction has been reverted by the EVM:`),
+        pass: !!actual['message'] && (
+          actual.message.startsWith(`Transaction has been reverted by the EVM:`)
+          || actual.message.startsWith(`VM Exception while processing transaction: revert`)
+        ),
         message: () => `expected revert without reason, got: ${JSON.stringify(actual)}`
       };
     } else {

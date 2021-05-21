@@ -238,7 +238,7 @@ jobs:
 
       - name: Build Gateway
         run: |
-          cargo build --release --features freeze-time --features runtime-debug
+          WASM_BUILD_RUSTFLAGS='--cfg feature="integration"' cargo build --release --features integration
 
       - name: Run Integration Test
         timeout-minutes: 40

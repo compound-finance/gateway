@@ -18,40 +18,47 @@ function releasePath(version, file) {
   return path.join(baseReleasePath(version), file);
 }
 
-function releaseWasmInfo(repoUrl, version) {
-  return {
-    url: releaseUrl(repoUrl, version, 'gateway_runtime.compact.wasm'),
-    path: releasePath(version, 'gateway_runtime.compact.wasm'),
-  };
+function releaseWasmInfo(repoUrl, version, v) {
+  if (v.supports('new-artifacts')) {
+    return {
+      url: releaseUrl(repoUrl, version, 'gateway.wasm'),
+      path: releasePath(version, 'gateway.wasm'),
+    };
+  } else {
+    return {
+      url: releaseUrl(repoUrl, version, 'gateway_runtime.compact.wasm'),
+      path: releasePath(version, 'gateway_runtime.compact.wasm'),
+    };
+  }
 }
 
-function releaseTypesInfo(repoUrl, version) {
+function releaseTypesInfo(repoUrl, version, v) {
   return {
     url: releaseUrl(repoUrl, version, 'types.json'),
     path: releasePath(version, 'types.json'),
   };
 }
 
-function releaseContractsInfo(repoUrl, version) {
+function releaseContractsInfo(repoUrl, version, v) {
   return {
     url: releaseUrl(repoUrl, version, 'contracts.json'),
     path: releasePath(version, 'contracts.json'),
   };
 }
 
-function releaseTargetInfo(repoUrl, version, platform, arch) {
+function releaseTargetInfo(repoUrl, version, platform, arch, v) {
   return {
     url: releaseUrl(repoUrl, version, `gateway-${platform}-${arch}`),
     path: releasePath(version, `gateway-${platform}-${arch}`),
   };
 }
 
-async function pullVersion(ctx, repoUrl, version) {
+async function pullVersion(ctx, repoUrl, version, v) {
   ctx.log(`Fetching version: ${version}...`);
 
-  let wasmInfo = releaseWasmInfo(repoUrl, version);
-  let typesInfo = releaseTypesInfo(repoUrl, version);
-  let contractsInfo = releaseContractsInfo(repoUrl, version);
+  let wasmInfo = releaseWasmInfo(repoUrl, version, v);
+  let typesInfo = releaseTypesInfo(repoUrl, version, v);
+  let contractsInfo = releaseContractsInfo(repoUrl, version, v);
   // TODO: Pull target
 
   await fs.mkdir(baseReleasePath(version), { recursive: true });
@@ -71,10 +78,10 @@ async function checkFile(path) {
   }
 }
 
-async function checkVersion(repoUrl, version) {
-  let wasmInfo = releaseWasmInfo(repoUrl, version);
-  let typesInfo = releaseTypesInfo(repoUrl, version);
-  let contractsInfo = releaseContractsInfo(repoUrl, version);
+async function checkVersion(repoUrl, version, v) {
+  let wasmInfo = releaseWasmInfo(repoUrl, version, v);
+  let typesInfo = releaseTypesInfo(repoUrl, version, v);
+  let contractsInfo = releaseContractsInfo(repoUrl, version, v);
   // TODO: Check target
 
   let exists = await Promise.all([wasmInfo, typesInfo, contractsInfo].map(async ({ url, path }) => {
@@ -114,19 +121,19 @@ class Version {
   }
 
   wasmFile() {
-    return releaseWasmInfo(this.ctx.__repoUrl(), this.version).path;
+    return releaseWasmInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
   typesJson() {
-    return releaseTypesInfo(this.ctx.__repoUrl(), this.version).path;
+    return releaseTypesInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
   contractsFile() {
-    return releaseContractsInfo(this.ctx.__repoUrl(), this.version).path;
+    return releaseContractsInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
   targetFile(platform, arch) {
-    return releaseTargetInfo(this.ctx.__repoUrl(), this.version, platform, arch).path;
+    return releaseTargetInfo(this.ctx.__repoUrl(), this.version, platform, arch, this).path;
   }
 
   async ensure() {
@@ -137,11 +144,11 @@ class Version {
   }
 
   async check() {
-    return await checkVersion(this.ctx.__repoUrl(), this.version);
+    return await checkVersion(this.ctx.__repoUrl(), this.version, this);
   }
 
   async pull() {
-    await pullVersion(this.ctx, this.ctx.__repoUrl(), this.version);
+    await pullVersion(this.ctx, this.ctx.__repoUrl(), this.version, this);
   }
 
   isCurr() {
@@ -162,6 +169,7 @@ class Version {
     let versionMap = {
       'full-cli-args': (v) => v >= 9,
       'eth-starport-parent-block': (v) => v >= 9,
+      'new-artifacts': (v) => v >= 10,
     };
 
     if (!versionMap.hasOwnProperty(t)) {
