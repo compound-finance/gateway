@@ -14,7 +14,7 @@ use crate::{
     chains::{
         ChainAccount, ChainAccountSignature, ChainAsset, ChainBlock, ChainBlockEvent,
         ChainBlockEvents, ChainBlockTally, ChainBlocks, ChainHash, ChainId, ChainReorg,
-        ChainReorgTally, ChainSignature, ChainSignatureList,
+        ChainReorgTally, ChainSignature, ChainSignatureList, ChainStarport,
     },
     notices::{Notice, NoticeId, NoticeState},
     portfolio::Portfolio,
@@ -26,7 +26,6 @@ use crate::{
 };
 
 use codec::alloc::string::String;
-use ethereum_client::EthereumBlock;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
     sp_runtime::traits::Convert,
@@ -37,7 +36,7 @@ use frame_support::{
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
 use our_std::{
-    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec,
+    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec, warn,
     Debuggable,
 };
 use sp_core::crypto::AccountId32;
@@ -232,8 +231,8 @@ decl_storage! {
         /// The mapping of worker tallies for each alternate reorg, relative to current fork of underlying chain.
         PendingChainReorgs get(fn pending_chain_reorgs): map hasher(blake2_128_concat) ChainId => Vec<ChainReorgTally>;
 
-        /// Mapping of chain to the relevant Starport address
-        Starports get(fn chain_starports): map hasher(blake2_128_concat) ChainId => Option<ChainAccount>;
+        /// Mapping of chain to the relevant Starport address.
+        Starports get(fn starports): map hasher(blake2_128_concat) ChainId => Option<ChainStarport>;
     }
 
     add_extra_genesis {
@@ -596,10 +595,10 @@ decl_module! {
         }
 
         #[weight = (0, DispatchClass::Operational, Pays::No)]
-        pub fn set_starport(origin, chain_account: ChainAccount) -> dispatch::DispatchResult {
+        pub fn set_starport(origin, starport: ChainStarport) -> dispatch::DispatchResult {
             ensure_root(origin)?;
-            log!("Setting Starport to {:?}", chain_account);
-            Starports::insert(chain_account.chain_id(), chain_account);
+            log!("Setting Starport to {:?}", starport);
+            Starports::insert(starport.chain_id(), starport);
             Ok(())
         }
 
@@ -689,10 +688,9 @@ impl<T: Config> Module<T> {
     /// Set the initial set of validators from the genesis config.
     /// NextValidators will become current Validators upon first session start.
     fn initialize_validators(validators: Vec<ValidatorKeys>) {
-        assert!(
-            !validators.is_empty(),
-            "Validators must be set in the genesis config"
-        );
+        if validators.is_empty() {
+            warn!("Validators must be set in the genesis config");
+        }
         for validator_keys in validators {
             log!("Adding validator with keys: {:?}", validator_keys);
             assert!(
@@ -709,11 +707,10 @@ impl<T: Config> Module<T> {
     }
 
     /// Set the initial starports from the genesis config.
-    fn initialize_starports(starports: Vec<ChainAccount>) {
-        assert!(
-            !starports.is_empty(),
-            "Starports must be set in the genesis config"
-        );
+    fn initialize_starports(starports: Vec<ChainStarport>) {
+        if starports.is_empty() {
+            warn!("Starports must be set in the genesis config");
+        }
         for starport in starports {
             log!("Adding Starport {:?}", starport);
             assert!(
@@ -726,10 +723,9 @@ impl<T: Config> Module<T> {
 
     /// Set the initial last processed blocks from the genesis config.
     fn initialize_genesis_blocks(genesis_blocks: Vec<ChainBlock>) {
-        assert!(
-            !genesis_blocks.is_empty(),
-            "Genesis blocks must be set in the genesis config"
-        );
+        if genesis_blocks.is_empty() {
+            warn!("Genesis blocks must be set in the genesis config");
+        }
         for genesis_block in genesis_blocks {
             log!("Adding Genesis Block {:?}", genesis_block);
             assert!(

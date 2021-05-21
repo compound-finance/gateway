@@ -155,6 +155,7 @@ pub fn initialize_storage() {
 
     CashModule::initialize_validators(vec![val_a(), val_b()]);
 
+    Starports::insert(ChainId::Eth, ChainAccount::Eth([0x77; 20]));
     LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(premined_block()));
 }
 

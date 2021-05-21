@@ -4,7 +4,7 @@ use gateway_runtime::{
 };
 use our_std::{convert::TryInto, str::FromStr};
 use pallet_cash::{
-    chains::{Chain, ChainAccount, ChainBlock, Ethereum},
+    chains::{Chain, ChainBlock, ChainStarport, Ethereum},
     types::{AssetInfo, Timestamp, ValidatorKeys, APR},
 };
 
@@ -164,7 +164,7 @@ fn testnet_genesis(
     assets: Vec<AssetInfo>,
     cash_yield: APR,
     last_yield_timestamp: Timestamp,
-    starports: Vec<ChainAccount>,
+    starports: Vec<ChainStarport>,
     genesis_blocks: Vec<ChainBlock>,
 ) -> GenesisConfig {
     GenesisConfig {

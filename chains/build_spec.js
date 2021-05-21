@@ -94,11 +94,13 @@ async function setAuthorities(chainSpec, chainConfig, opts) {
   chainSpec.genesis.runtime.palletSession.keys = sessionKeys;
 }
 
-async function setStarport(chainSpec, chainConfig, opts) {
+async function setStarports(chainSpec, chainConfig, opts) {
   let chainDeployment = await fetchChainDeployment(chainConfig.eth_network);
   let starportAddress = must(chainDeployment.Contracts, 'Starport');
-  // TODO: Set other properties
-  chainSpec.properties.eth_starport_address = starportAddress;
+
+  // TODO: Enable use case for new chain with starports in genesis.
+  //  We are missing deployment block info in (eth) deployment info currently.
+  chainSpec.genesis.runtime.palletCash.starports = [starportAddress];
 }
 
 async function setInitialYield(chainSpec, chainConfig, opts) {
@@ -200,7 +202,6 @@ async function buildSpec(opts) {
   await setAuthorities(chainSpec, chainConfig, opts);
   await setAssetInfo(chainSpec, chainConfig, opts);
   await setReporters(chainSpec, chainConfig, opts);
-  await setStarport(chainSpec, chainConfig, opts);
   await setInitialYield(chainSpec, chainConfig, opts);
 
   await writeFile(chain, 'chain-spec.json', JSON.stringify(chainSpec, null, 2));
