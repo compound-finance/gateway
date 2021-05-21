@@ -41,6 +41,10 @@ class Eth {
     return this.defaultFrom;
   }
 
+  async updateGenesisBlock() {
+    await this.blockInfo.update();
+  }
+
   genesisBlock() {
     return {
       Eth: {
