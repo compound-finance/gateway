@@ -369,6 +369,7 @@ fn prepare_augment_cash<T: Config>(
     mut st: State,
     recipient: ChainAccount,
     principal: CashPrincipalAmount,
+    from_external: bool,
 ) -> Result<State, Reason> {
     let recipient_cash_pre = st.get_cash_principal::<T>(recipient);
 
@@ -376,13 +377,6 @@ fn prepare_augment_cash<T: Config>(
         repay_and_supply_principal(recipient_cash_pre, principal)?;
 
     let recipient_cash_post = recipient_cash_pre.add_amount(principal)?;
-
-    let chain_id = recipient.chain_id();
-    let chain_cash_principal_post = st
-        .get_chain_cash_principal::<T>(chain_id)
-        .sub(principal)
-        .map_err(|_| Reason::NegativeChainCash)?;
-
     let total_cash_post = st
         .get_total_cash_principal::<T>()
         .sub(recipient_repay_principal)
@@ -390,7 +384,15 @@ fn prepare_augment_cash<T: Config>(
 
     st.set_cash_principal::<T>(recipient, recipient_cash_post);
     st.set_total_cash_principal::<T>(total_cash_post);
-    st.set_chain_cash_principal::<T>(chain_id, chain_cash_principal_post);
+
+    if from_external {
+        let chain_id = recipient.chain_id();
+        let chain_cash_principal_post = st
+            .get_chain_cash_principal::<T>(chain_id)
+            .sub(principal)
+            .map_err(|_| Reason::NegativeChainCash)?;
+        st.set_chain_cash_principal::<T>(chain_id, chain_cash_principal_post);
+    }
 
     Ok(st)
 }
@@ -399,6 +401,7 @@ fn prepare_reduce_cash<T: Config>(
     mut st: State,
     sender: ChainAccount,
     principal: CashPrincipalAmount,
+    to_external: bool,
 ) -> Result<State, Reason> {
     let sender_cash_pre = st.get_cash_principal::<T>(sender);
 
@@ -406,17 +409,19 @@ fn prepare_reduce_cash<T: Config>(
         withdraw_and_borrow_principal(sender_cash_pre, principal)?;
 
     let sender_cash_post = sender_cash_pre.sub_amount(principal)?;
-
-    let chain_id = sender.chain_id();
-    let chain_cash_principal_post = st.get_chain_cash_principal::<T>(chain_id).add(principal)?;
-
     let total_cash_post = st
         .get_total_cash_principal::<T>()
         .add(sender_borrow_principal)?;
 
     st.set_cash_principal::<T>(sender, sender_cash_post);
     st.set_total_cash_principal::<T>(total_cash_post);
-    st.set_chain_cash_principal::<T>(chain_id, chain_cash_principal_post);
+
+    if to_external {
+        let chain_id = sender.chain_id();
+        let chain_cash_principal_post =
+            st.get_chain_cash_principal::<T>(chain_id).add(principal)?;
+        st.set_chain_cash_principal::<T>(chain_id, chain_cash_principal_post);
+    }
 
     Ok(st)
 }
@@ -436,10 +441,12 @@ pub enum Effect {
     AugmentCash {
         recipient: ChainAccount,
         principal: CashPrincipalAmount,
+        from_external: bool,
     },
     ReduceCash {
         sender: ChainAccount,
         principal: CashPrincipalAmount,
+        to_external: bool,
     },
 }
 
@@ -459,10 +466,13 @@ impl Apply for Effect {
             Effect::AugmentCash {
                 recipient,
                 principal,
-            } => prepare_augment_cash::<T>(state, recipient, principal),
-            Effect::ReduceCash { sender, principal } => {
-                prepare_reduce_cash::<T>(state, sender, principal)
-            }
+                from_external,
+            } => prepare_augment_cash::<T>(state, recipient, principal, from_external),
+            Effect::ReduceCash {
+                sender,
+                principal,
+                to_external,
+            } => prepare_reduce_cash::<T>(state, sender, principal, to_external),
         }
     }
 }
@@ -545,11 +555,16 @@ impl CashPipeline {
         if sender == recipient {
             Err(Reason::SelfTransfer)?
         }
-        self.apply_effect::<T>(Effect::ReduceCash { sender, principal })?
-            .apply_effect::<T>(Effect::AugmentCash {
-                recipient,
-                principal,
-            })
+        self.apply_effect::<T>(Effect::ReduceCash {
+            sender,
+            principal,
+            to_external: false,
+        })?
+        .apply_effect::<T>(Effect::AugmentCash {
+            recipient,
+            principal,
+            from_external: false,
+        })
     }
 
     pub fn lock_cash<T: Config>(
@@ -560,6 +575,7 @@ impl CashPipeline {
         self.apply_effect::<T>(Effect::AugmentCash {
             recipient,
             principal,
+            from_external: true,
         })
     }
 
@@ -568,7 +584,11 @@ impl CashPipeline {
         sender: ChainAccount,
         principal: CashPrincipalAmount,
     ) -> Result<Self, Reason> {
-        self.apply_effect::<T>(Effect::ReduceCash { sender, principal })
+        self.apply_effect::<T>(Effect::ReduceCash {
+            sender,
+            principal,
+            to_external: true,
+        })
     }
 
     pub fn check_collateralized<T: Config>(
@@ -643,7 +663,8 @@ impl CashPipeline {
     }
 }
 
-/// Return CASH Principal post asset interest, and updated asset index
+/// Return CASH Principal including asset interest, and a new asset index,
+///  given a balance change, the previous position, and current market global indices.
 fn effect_of_asset_interest_internal(
     balance_old: Balance,
     balance_new: Balance,
@@ -827,12 +848,7 @@ mod tests {
                     .into_iter()
                     .collect(),
                     total_cash_principal: Some(quantity),
-                    chain_cash_principals: vec![(
-                        ChainId::Eth,
-                        CashPrincipalAmount::from_nominal("0")
-                    )]
-                    .into_iter()
-                    .collect(),
+                    chain_cash_principals: vec![].into_iter().collect(),
                 }
             );
         })
