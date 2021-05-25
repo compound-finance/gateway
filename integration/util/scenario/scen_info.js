@@ -1,10 +1,13 @@
 
 const baseScenInfo = {
-  eth_opts: {
-    provider: 'ganache', // [env=PROVIDER]
-    ganache: {
-      opts: {},
-      web3_port: null
+  chain_opts: {
+    eth: {
+      name: 'eth',
+      provider: 'ganache', // [env=PROVIDER]
+      ganache: {
+        opts: {},
+        web3_port: null
+      },
     },
   },
   default_actor: null,

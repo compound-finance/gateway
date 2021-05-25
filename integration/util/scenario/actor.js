@@ -6,12 +6,17 @@ const { lookupBy } = require('../util');
 const { CashToken } = require('./cash_token');
 
 class Actor {
-  constructor(name, ethAddress, chainKey, ctx) {
+  constructor(name, ethAddress, chainKey, chainName, ctx) {
     this.name = name;
     this.__ethAddress = ethAddress;
     this.chainKey = chainKey;
+    this.chainName = chainName;
     this.ctx = ctx;
     this.nextId = 0;
+  }
+
+  chain() {
+    return this.ctx.chains.find(this.chainName());
   }
 
   show() {
@@ -162,7 +167,7 @@ class Actor {
     };
 
     return await this.declare("lock", [amount, asset], async () => {
-      let tx = await this.ctx.starport.lock(this, amount, asset);
+      let tx = await asset.chain().starport.lock(this, amount, asset);
       let event;
       if (opts.awaitEvent) {
         event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
@@ -180,7 +185,7 @@ class Actor {
       ...opts
     };
     return await this.declare("lock", [amount, asset, "to", recipient], async () => {
-      let tx = await this.ctx.starport.lockTo(this, amount, asset, 'ETH', recipient);
+      let tx = await asset.chain().starport.lockTo(this, amount, asset, 'ETH', recipient);
       let event;
       if (opts.awaitEvent) {
         event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
@@ -275,15 +280,24 @@ function actorInfoMap(keyring) {
     },
     chuck: {
       key_uri: '//Charlie'
+    },
+    darlene: {
+      chainName: 'matic',
+      key_uri: '//Darlene'
     }
   };
 }
 
 async function buildActor(actorName, actorInfo, keyring, index, ctx) {
-  let ethAddress = ctx.eth.accounts[index + 1];
-  let chainKey = keyring.addFromUri(getInfoKey(actorInfo, 'key_uri', `actor ${actorName}`))
+  let chainName = 'eth';
+  if (actorInfo.chainName) {
+    chainName = actorInfo.chainName;
+  }
 
-  return new Actor(actorName, ethAddress, chainKey, ctx);
+  const chain = ctx.chains.find(chainName)
+  let ethAddress = chain.accounts[index + 1];
+  let chainKey = keyring.addFromUri(getInfoKey(actorInfo, 'key_uri', `actor ${actorName}`))
+  return new Actor(actorName, ethAddress, chainKey, chainName, ctx);
 }
 
 async function getActorsInfo(actorsInfoHash, keyring, ctx) {

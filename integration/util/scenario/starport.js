@@ -4,13 +4,15 @@ const { encodeCall } = require('../substrate');
 const web3 = require('web3');
 
 class Starport {
-  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx) {
+  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx, chain) {
     this.starport = starport;
     this.proxyAdmin = proxyAdmin;
     this.starportImpl = starportImpl;
     this.proxy = proxy;
     this.starportTopics = starportTopics;
     this.ctx = ctx;
+    this.chain = chain;
+    this.ctxKey = `${chain.name}Starport`
   }
 
   ethAddress() {
@@ -18,10 +20,12 @@ class Starport {
   }
 
   chainAddressStr() {
+    // xxx todo:wn parameterize by chain
     return `ETH:${this.ethAddress()}`;
   }
 
   chainAddress() {
+    // xxx todo:wn parameterize by chain
     return { Eth: this.ethAddress() };
   }
 
@@ -62,7 +66,7 @@ class Starport {
   async setSupplyCap(token, amount) {
     let weiAmount = token.toWeiAmount(amount);
 
-    return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.ctx.eth.root() });
+    return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.chain.root() });
   }
 
   async executeProposal(title, extrinsics, opts = {}) {
@@ -165,25 +169,26 @@ class Starport {
   }
 }
 
-async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
-  ctx.log("Deploying Starport...");
-  if (!ctx.cashToken) {
+async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashToken) {
+  ctx.log(`Deploying Starport to ${chain.name}...`);
+
+  if (!cashToken) {
     throw new Error(`Cannot deploy Starport without first deploying Cash Token`);
   }
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
   // Deploy Proxies and Starport
-  let proxyAdmin = ctx.cashToken.proxyAdmin;
-  let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
-  let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
+  let proxyAdmin = cashToken.proxyAdmin;
+  let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root()]);
+  let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
     starportImpl._address,
     proxyAdmin._address,
     "0x"
-  ], { from: ctx.eth.root() });
-  let starport = await ctx.eth.__getContractAt('Starport', proxy._address);
+  ], { from: chain.root() });
+  let starport = await chain.__getContractAt('Starport', proxy._address);
   if (validators.length > 0) {
-    await starport.methods.changeAuthorities(validators).send({ from: ctx.eth.root(), gas: 4_000_00 });
+    await starport.methods.changeAuthorities(validators).send({ from: chain.root(), gas: 4_000_00 });
   }
 
   let starportTopics = Object.fromEntries(starport
@@ -191,7 +196,7 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
     .filter(e => e.type === 'event')
     .map(e => [e.name, e.signature]));
 
-  return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
+  return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx, chain);
 }
 
 module.exports = {

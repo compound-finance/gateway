@@ -22,9 +22,10 @@ class BlockInfo {
   }
 }
 
-class Eth {
-  constructor(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx) {
-    this.ethInfo = ethInfo;
+class Chain {
+  constructor(chainInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx) {
+    this.chainInfo = chainInfo;
+    this.name = chainInfo.name;
     this.web3 = web3;
     this.web3Url = web3Url;
     this.accounts = accounts;
@@ -199,14 +200,36 @@ class Eth {
   }
 }
 
-async function buildEth(ethInfo, ctx) {
-  let provider = ctx.__provider() || ethInfo.provider;
+class Chains {
+  constructor(chains, ctx) {
+    this.chains = chains;
+    this.ctx = ctx;
+  }
+
+  all() {
+    return Object.values(this.chains);
+  }
+
+  find(chainName) {
+    return this.chains[chainName]
+  }
+
+  attachDeployments(deployments) {
+    deployments.all().forEach(deployment => {
+      deployment.chain.starport = deployment.starport;
+      deployment.chain.cashToken = deployment.cashToken;
+    });
+  }
+}
+
+async function buildChain(chainInfo, ctx) {
+  let provider = chainInfo.provider;
   let web3;
   let ganacheServer; // Keep track for teardown
   let web3Url;
 
   if (provider === 'ganache') {
-    let ganacheOpts = ethInfo.ganache.opts;
+    let ganacheOpts = chainInfo.ganache.opts;
     if (ctx.__blockTime() !== null) {
       ganacheOpts.blockTime = ctx.__blockTime();
     }
@@ -214,7 +237,7 @@ async function buildEth(ethInfo, ctx) {
     ganacheServer = ganache.server(ganacheOpts);
     let ganacheProvider = ganacheServer.provider;
 
-    web3Port = ethInfo.ganache.web3_port || genPort();
+    web3Port = chainInfo.ganache.web3_port || genPort();
     web3Url = `http://localhost:${web3Port}`;
 
     // Start web3 server
@@ -230,15 +253,27 @@ async function buildEth(ethInfo, ctx) {
   // We'll enumerate accounts early so we don't need to repeat often.
   let accounts = await web3.eth.personal.getAccounts();
 
-  let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
+  let version = chainInfo.version ? ctx.versions.mustFind(chainInfo.version) : ctx.versions.current;
 
   let blockInfo = new BlockInfo(web3, ctx);
   await blockInfo.update();
 
-  return new Eth(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
+  return new Chain(chainInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
+}
+
+async function buildChains(chainsInfo, ctx) {
+  const chainsList = await Promise.all(
+      Object.values(chainsInfo)
+          .map(chainInfo => buildChain(chainInfo, ctx))
+  )
+  // maybe a clearer/easier way to do that
+  const chains = chainsList.reduce((acc, chain) => {acc[chain.name] = chain; return acc;}, {})
+
+  return new Chains(chains, ctx);
 }
 
 module.exports = {
-  buildEth,
-  Eth
+  buildChain,
+  buildChains,
+  Eth: Chain
 };
