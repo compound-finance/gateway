@@ -12,5 +12,6 @@
   "SessionKeys": {
     "aura": "[u8;32]",
     "grandpa": "[u8;32]"
-  }
+  },
+  "ChainStarport": "ChainAccount"
 }
