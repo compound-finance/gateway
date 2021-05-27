@@ -4,9 +4,10 @@ const { merge } = require('../util');
 const { declare } = require('./declare');
 
 const { baseScenInfo } = require('./scen_info');
-const { buildEth } = require('./eth');
+const { buildChains } = require('./chains');
 const { buildCashToken } = require('./cash_token');
 const { buildStarport } = require('./starport');
+const { buildDeployments } = require('./deployment');
 const { buildTokens } = require('./token');
 const { buildChainSpec } = require('./chain_spec');
 const { buildValidators } = require('./validator');
@@ -298,15 +299,18 @@ async function buildCtx(scenInfo={}) {
   ctx.log(`Building ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
   ctx.log(`test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   ctx.versions = await buildVersions(scenInfo.versions, ctx);
-  ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
+  ctx.chains = await buildChains(scenInfo.chain_opts, ctx);
+  aliasBy(ctx, ctx.chains.all(), 'name');
 
-  // Note: `3` below is the number of transactions we expect to occur between now and when
-  //       the Starport token is deployed.
-  //       That's now: deploy Proxy Admin (1), Cash Token Impl (2), Starport Impl (3), Proxy (4)
-  let starportAddress = await ctx.eth.getNextContractAddress(4);
+  ctx.deployments = await buildDeployments(scenInfo, ctx);
+  ctx.chains.attachDeployments(ctx.deployments);
+  aliasBy(ctx, ctx.deployments.all(), 'name');
+  aliasBy(ctx, ctx.deployments.starports(), 'ctxKey');
+  aliasBy(ctx, ctx.deployments.cashTokens(), 'ctxKey');
+  // xxx todo:wn for now including a convenient alias for eth deployment of starport and cashToken due to pervasive use
+  ctx.starport = ctx.ethStarport;
+  ctx.cashToken = ctx.ethCashToken;
 
-  ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
-  ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);
