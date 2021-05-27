@@ -78,8 +78,8 @@ async function prepareForUnlock(userName) {
   ]);
 }
 
-async function getLockedBalance() {
-  const name = "get_locked_balance";
+async function getDataFromStarport(scriptName, args = []) {
+  const name = scriptName;
 
   // Generate addressMap from import statements
   const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
@@ -93,33 +93,55 @@ async function getLockedBalance() {
     addressMap,
   });
 
-  const amount = await executeScript({
+  const value = await executeScript({
     code,
-    // [Starport, Address]
+    args
   });
-  return amount;
+  return value;
+
+}
+
+async function getLockedBalance() {
+  const name = "get_locked_balance";
+  return getDataFromStarport(name)
+}
+
+async function getAuthorities() {
+  const name = "get_authorities";
+  return getDataFromStarport(name)
+}
+
+async function getEraId() {
+  const name = "get_era_id";
+  return getDataFromStarport(name)
+}
+
+async function getFlowSupplyCap() {
+  const name = "get_flow_supply_cap";
+  return getDataFromStarport(name)
 }
 
 async function getAccountFlowBalance(userAddress) {
   const name = "get_account_flow_balance";
+  return getDataFromStarport(name, [[userAddress, Address]])
 
-  // Generate addressMap from import statements
-  const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
+  // // Generate addressMap from import statements
+  // const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
 
-  const addressMap = {
-    Starport,
-  };
+  // const addressMap = {
+  //   Starport,
+  // };
 
-  let code = await getScriptCode({
-    name,
-    addressMap,
-  });
+  // let code = await getScriptCode({
+  //   name,
+  //   addressMap,
+  // });
 
-  const amount = await executeScript({
-    code,
-    args: [[userAddress, Address]],
-  });
-  return amount;
+  // const amount = await executeScript({
+  //   code,
+  //   args: [[userAddress, Address]],
+  // });
+  // return amount;
 }
 
 async function depositFlowTokens(user, amount) {
@@ -132,72 +154,6 @@ async function depositFlowTokens(user, amount) {
     [amount, UFix64],
   ]);
   return lockRes;
-}
-
-async function getAuthorities() {
-  const name = "get_authorities";
-
-  // Generate addressMap from import statements
-  const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
-
-  const addressMap = {
-    Starport,
-  };
-
-  let code = await getScriptCode({
-    name,
-    addressMap,
-  });
-
-  const authorities = await executeScript({
-    code,
-    // [Starport, Address]
-  });
-  return authorities;
-}
-
-async function getEraId() {
-  const name = "get_era_id";
-
-  // Generate addressMap from import statements
-  const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
-
-  const addressMap = {
-    Starport,
-  };
-
-  let code = await getScriptCode({
-    name,
-    addressMap,
-  });
-
-  const eraId = await executeScript({
-    code,
-    // [Starport, Address]
-  });
-  return eraId;
-}
-
-async function getFlowSupplyCap() {
-  const name = "get_flow_supply_cap";
-
-  // Generate addressMap from import statements
-  const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
-
-  const addressMap = {
-    Starport,
-  };
-
-  let code = await getScriptCode({
-    name,
-    addressMap,
-  });
-
-  const supplyCap = await executeScript({
-    code,
-    // [Starport, Address]
-  });
-  return supplyCap;
 }
 
 describe("Starport Tests", () => {
