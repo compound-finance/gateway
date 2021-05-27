@@ -125,23 +125,6 @@ async function getAccountFlowBalance(userAddress) {
   const name = "get_account_flow_balance";
   return getDataFromStarport(name, [[userAddress, Address]])
 
-  // // Generate addressMap from import statements
-  // const Starport = await getContractAddress(STARPORT_CONTRACT_NAME);
-
-  // const addressMap = {
-  //   Starport,
-  // };
-
-  // let code = await getScriptCode({
-  //   name,
-  //   addressMap,
-  // });
-
-  // const amount = await executeScript({
-  //   code,
-  //   args: [[userAddress, Address]],
-  // });
-  // return amount;
 }
 
 async function depositFlowTokens(user, amount) {
