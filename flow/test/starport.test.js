@@ -52,6 +52,32 @@ async function getAddressMap() {
   };
 }
 
+async function prepareForUnlock(userName) {
+  const user = await getAccountAddress(userName);
+  const Alice = await getAccountAddress("Alice");
+
+  await deployStarport();
+
+  const address = await getAddressMap();
+
+  // Set supply caps
+  const newSupplyCap = "1000.0";
+  await runTransaction("starport/set_supply_cap_admin", address.Starport, [
+    [newSupplyCap, UFix64],
+  ]);
+
+  // User deposits Flow token to Starport
+  await depositFlowTokens(user, "100.000000");
+
+  const authorities = [
+    "b82a83577dd93a351d980dc8e55b378480ac552f7e83d66548a14219e10b52a5a7bb4840b50bfdf68df0e27b2a130a6bed4f5b695ad2e8b628be5b51e41aa6b9",
+    "52165a32bd7bf883837a96b9dbec1a004d3a44f43eac2eba2ff9e6940364b64733cd20dd80d66d367de8bcf1875bfb0b2a7c9beb451572c451d6a6882c72677f",
+  ];
+  await runTransaction("starport/change_authorities_admin", address.Starport, [
+    [authorities, fArray(fString)],
+  ]);
+}
+
 async function getLockedBalance() {
   const name = "get_locked_balance";
 
@@ -128,7 +154,6 @@ async function getAuthorities() {
     // [Starport, Address]
   });
   return authorities;
-
 }
 
 async function getEraId() {
@@ -190,12 +215,10 @@ describe("Starport Tests", () => {
     const address = await getAddressMap();
 
     // Set supply caps
-    const newSupplyCap = "1000.0"
-    await runTransaction(
-      "starport/set_supply_cap_admin",
-      address.Starport,
-      [[newSupplyCap, UFix64]]
-    );
+    const newSupplyCap = "1000.0";
+    await runTransaction("starport/set_supply_cap_admin", address.Starport, [
+      [newSupplyCap, UFix64],
+    ]);
 
     const Alice = await getAccountAddress("Alice");
     const aliceAmount = "100.000000";
@@ -231,36 +254,10 @@ describe("Starport Tests", () => {
   });
 
   test("# Unlock tokens by notice", async () => {
-    const Charlie = await getAccountAddress("Charlie");
-
-    await deployStarport();
+    // Prepare Starport for execting `Unlock` notice
+    await prepareForUnlock("Charlie");
 
     const address = await getAddressMap();
-
-    // Check era id storage field
-    const eraIdBefore = await getEraId();
-    expect(eraIdBefore).toEqual(0)
-
-    // Set supply caps
-    const newSupplyCap = "1000.0"
-    await runTransaction(
-      "starport/set_supply_cap_admin",
-      address.Starport,
-      [[newSupplyCap, UFix64]]
-    );
-
-    // Charlie deposits Flow token to Starport
-    await depositFlowTokens(Charlie, "100.000000");
-
-    const authorities = [
-      "b82a83577dd93a351d980dc8e55b378480ac552f7e83d66548a14219e10b52a5a7bb4840b50bfdf68df0e27b2a130a6bed4f5b695ad2e8b628be5b51e41aa6b9",
-      "52165a32bd7bf883837a96b9dbec1a004d3a44f43eac2eba2ff9e6940364b64733cd20dd80d66d367de8bcf1875bfb0b2a7c9beb451572c451d6a6882c72677f",
-    ];
-    await runTransaction(
-      "starport/change_authorities_admin",
-      address.Starport,
-      [[authorities, fArray(fString)]]
-    );
 
     const noticeEraId = 1;
     const noticeEraIndex = 0;
@@ -271,7 +268,7 @@ describe("Starport Tests", () => {
     ];
 
     // Unlock tokens to the given address
-    const toAddress = '0xf3fcd2c1a78f5eee';
+    const toAddress = "0xf3fcd2c1a78f5eee";
     const amount = "10.0";
 
     const userBalanceBefore = Number(await getAccountFlowBalance(toAddress));
@@ -302,7 +299,7 @@ describe("Starport Tests", () => {
 
     // Check `eraId` after notice was executed
     const eraIdAfter = await getEraId();
-    expect(eraIdAfter).toEqual(1)
+    expect(eraIdAfter).toEqual(1);
   });
 
   test("# Unlock tokens by admin", async () => {
@@ -314,12 +311,10 @@ describe("Starport Tests", () => {
     const address = await getAddressMap();
 
     // Set supply caps
-    const newSupplyCap = "1000.0"
-    await runTransaction(
-      "starport/set_supply_cap_admin",
-      address.Starport,
-      [[newSupplyCap, UFix64]]
-    );
+    const newSupplyCap = "1000.0";
+    await runTransaction("starport/set_supply_cap_admin", address.Starport, [
+      [newSupplyCap, UFix64],
+    ]);
 
     // Charlie deposits Flow token to Starport
     await depositFlowTokens(Pete, "100.000000");
@@ -356,7 +351,7 @@ describe("Starport Tests", () => {
 
     // Check authorities storage field
     const authoritiesBefore = await getAuthorities();
-    expect(authoritiesBefore).toEqual([])
+    expect(authoritiesBefore).toEqual([]);
 
     const address = await getAddressMap();
 
@@ -372,7 +367,7 @@ describe("Starport Tests", () => {
 
     // Check authorities storage field
     const authoritiesAdmin = await getAuthorities();
-    expect(authoritiesAdmin).toEqual(authorities)
+    expect(authoritiesAdmin).toEqual(authorities);
 
     const noticeEraId = 1;
     const noticeEraIndex = 0;
@@ -404,8 +399,7 @@ describe("Starport Tests", () => {
 
     // Check authorities storage field
     const authoritiesAfter = await getAuthorities();
-    expect(authoritiesAfter).toEqual(newAuthorities)
-
+    expect(authoritiesAfter).toEqual(newAuthorities);
   });
 
   test("# Change authorities by admin", async () => {
@@ -415,7 +409,7 @@ describe("Starport Tests", () => {
 
     // Check authorities storage field
     const authoritiesBefore = await getAuthorities();
-    expect(authoritiesBefore).toEqual([])
+    expect(authoritiesBefore).toEqual([]);
 
     const authorities = [
       "6f39d97fbb1a537d154a999636a083e2f85bc6815b7599609eb50d50f534f7773ff29ccf13022ca039edfdb7b0efc79bcc766d5f989c67c009e14a6f0526b6aa",
@@ -433,7 +427,7 @@ describe("Starport Tests", () => {
 
     // Check authorities storage field
     const authoritiesAfter = await getAuthorities();
-    expect(authoritiesAfter).toEqual(authorities)
+    expect(authoritiesAfter).toEqual(authorities);
   });
 
   test("# Set supply cap by notice", async () => {
@@ -453,17 +447,17 @@ describe("Starport Tests", () => {
 
     // Check authorities storage field
     const authoritiesAdmin = await getAuthorities();
-    expect(authoritiesAdmin).toEqual(authorities)
+    expect(authoritiesAdmin).toEqual(authorities);
 
     const noticeEraId = 1;
     const noticeEraIndex = 0;
     const parentHex = "";
     const signatures = [
       "7044170bba842f04364cabf8d3b365894f387247546cac68e90ad381d629dc215715397d1f2f44a6bdd6575b9d2d7f30e1fea54739f60decd9a249e6dae63361",
-      "5947a87c87e66e5fa61f22d5734ca7a2d7491da4250f22b083976a9f0e14a965b58e10cf4c9d5e1e19377ff58b14b33feb6a5fc085da5578fd0bef773a269e7e"
+      "5947a87c87e66e5fa61f22d5734ca7a2d7491da4250f22b083976a9f0e14a965b58e10cf4c9d5e1e19377ff58b14b33feb6a5fc085da5578fd0bef773a269e7e",
     ];
 
-    const newSupplyCap = "1000.0"
+    const newSupplyCap = "1000.0";
     const setSupplyCapRes = await runTransaction(
       "starport/set_supply_cap_notice",
       address.Starport,
@@ -476,14 +470,13 @@ describe("Starport Tests", () => {
       ]
     );
 
-    const supplyCapEvent = setSupplyCapRes.events[0].data
+    const supplyCapEvent = setSupplyCapRes.events[0].data;
 
-    expect(supplyCapEvent.asset).toEqual("FLOW")
-    expect(Number(supplyCapEvent.supplyCap)).toEqual(Number(newSupplyCap))
+    expect(supplyCapEvent.asset).toEqual("FLOW");
+    expect(Number(supplyCapEvent.supplyCap)).toEqual(Number(newSupplyCap));
 
-    const setSupplyCap = await getFlowSupplyCap()
-    expect(Number(setSupplyCap)).toEqual(Number(newSupplyCap))
-
+    const setSupplyCap = await getFlowSupplyCap();
+    expect(Number(setSupplyCap)).toEqual(Number(newSupplyCap));
   });
 
   test("# Set supply cap", async () => {
@@ -491,22 +484,22 @@ describe("Starport Tests", () => {
 
     const address = await getAddressMap();
 
-    const supplyCap = await getFlowSupplyCap()
-    expect(Number(supplyCap)).toEqual(0.0)
+    const supplyCap = await getFlowSupplyCap();
+    expect(Number(supplyCap)).toEqual(0.0);
 
-    const newSupplyCap = "100.0"
+    const newSupplyCap = "100.0";
     const supplyCapRes = await runTransaction(
       "starport/set_supply_cap_admin",
       address.Starport,
       [[newSupplyCap, UFix64]]
     );
 
-    const supplyCapEvent = supplyCapRes.events[0].data
-    expect(supplyCapEvent.asset).toEqual("FLOW")
-    expect(Number(supplyCapEvent.supplyCap)).toEqual(100.0)
+    const supplyCapEvent = supplyCapRes.events[0].data;
+    expect(supplyCapEvent.asset).toEqual("FLOW");
+    expect(Number(supplyCapEvent.supplyCap)).toEqual(100.0);
 
-    const setSupplyCap = await getFlowSupplyCap()
-    expect(Number(setSupplyCap)).toEqual(Number(newSupplyCap))
+    const setSupplyCap = await getFlowSupplyCap();
+    expect(Number(setSupplyCap)).toEqual(Number(newSupplyCap));
   });
 
   test("# Set supply cap and lock tokens", async () => {
@@ -514,15 +507,13 @@ describe("Starport Tests", () => {
 
     const address = await getAddressMap();
 
-    const supplyCap = await getFlowSupplyCap()
-    expect(Number(supplyCap)).toEqual(0.0)
+    const supplyCap = await getFlowSupplyCap();
+    expect(Number(supplyCap)).toEqual(0.0);
 
-    const newSupplyCap = "100.0"
-    await runTransaction(
-      "starport/set_supply_cap_admin",
-      address.Starport,
-      [[newSupplyCap, UFix64]]
-    );
+    const newSupplyCap = "100.0";
+    await runTransaction("starport/set_supply_cap_admin", address.Starport, [
+      [newSupplyCap, UFix64],
+    ]);
 
     // An attempt to deposit more than supply cap allows
     const Sofia = await getAccountAddress("Sofia");
@@ -530,11 +521,138 @@ describe("Starport Tests", () => {
 
     // Alice deposits Flow token to Starport
     try {
-      await depositFlowTokens(Sofia, sofiaAmount)
-      // This statement should not be reached
-      expect(false).toBeTruthy()
-    } catch(err) {
-      expect(err.includes("Supply Cap Exceeded")).toBeTruthy()
+      await depositFlowTokens(Sofia, sofiaAmount);
+    } catch (err) {
+      expect(err.includes("Supply Cap Exceeded")).toBeTruthy();
     }
+    expect.hasAssertions();
+  });
+
+  test("# Notice validation error, already invoked", async () => {
+    // Prepare Starport for execting `Unlock` notice
+    await prepareForUnlock("Scott");
+
+    const address = await getAddressMap();
+
+    const noticeEraId = 1;
+    const noticeEraIndex = 0;
+    const parentHex = "";
+    const signatures = [
+      "f8661ebbbe0cc415063a6027fadf6d78b883b88f0ea3b7a15d839b126aa85b55b273e2aeb777a07d04288b432897409e50d4cbadb28f4cf072c5bd3b9220d30e",
+      "701e292593ef04dacc9d35090182b831197fbae7b900585d822b901aa05df75ff505e167a3e2504cc2a0bd928507eaa3e81b9dfbd6878ec9d2e121f0b69537c8",
+    ];
+
+    // Unlock tokens to the given address
+    const toAddress = "0xf3fcd2c1a78f5eee";
+    const amount = "10.0";
+
+    await runTransaction(
+      "starport/unlock_flow_tokens_notice",
+      address.Starport,
+      [
+        [noticeEraId, UInt256],
+        [noticeEraIndex, UInt256],
+        [parentHex, fString],
+        [signatures, fArray(fString)],
+        [toAddress, Address],
+        [amount, UFix64],
+      ]
+    );
+
+    // An attempt to execute the same notice twice
+    const unlockErrRes = await runTransaction(
+      "starport/unlock_flow_tokens_notice",
+      address.Starport,
+      [
+        [noticeEraId, UInt256],
+        [noticeEraIndex, UInt256],
+        [parentHex, fString],
+        [signatures, fArray(fString)],
+        [toAddress, Address],
+        [amount, UFix64],
+      ]
+    );
+    // Check emitted error
+    const unlockErrEvent = unlockErrRes.events[0].data;
+    expect(unlockErrEvent.noticeEraId).toEqual(noticeEraId);
+    expect(unlockErrEvent.noticeEraIndex).toEqual(noticeEraIndex);
+    expect(unlockErrEvent.error).toEqual("Notice replay");
+  });
+
+  test("# Notice validation error, invalid signatures", async () => {
+    // Prepare Starport for execting `Unlock` notice
+    await prepareForUnlock("Adam");
+
+    const address = await getAddressMap();
+
+    const noticeEraId = 1;
+    const noticeEraIndex = 0;
+    const parentHex = "";
+    const signatures = [
+      "d8661ebbbe0cc415063a6027fadf6d78b883b88f0ea3b7a15d839b126aa85b55b273e2aeb777a07d04288b432897409e50d4cbadb28f4cf072c5bd3b9220d30e",
+      "f01e292593ef04dacc9d35090182b831197fbae7b900585d822b901aa05df75ff505e167a3e2504cc2a0bd928507eaa3e81b9dfbd6878ec9d2e121f0b69537c8",
+    ];
+
+    // Unlock tokens to the given address
+    const toAddress = "0xf3fcd2c1a78f5eee";
+    const amount = "10.0";
+
+    const unlockRes = await runTransaction(
+      "starport/unlock_flow_tokens_notice",
+      address.Starport,
+      [
+        [noticeEraId, UInt256],
+        [noticeEraIndex, UInt256],
+        [parentHex, fString],
+        [signatures, fArray(fString)],
+        [toAddress, Address],
+        [amount, UFix64],
+      ]
+    );
+
+    const unlockErrEvent = unlockRes.events[0].data;
+    expect(unlockErrEvent.noticeEraId).toEqual(noticeEraId);
+    expect(unlockErrEvent.noticeEraIndex).toEqual(noticeEraIndex);
+    expect(unlockErrEvent.error).toEqual("Signatures are incorrect");
+  });
+
+  test("# Notice validation error, invalid era", async () => {
+    // Prepare Starport for execting `Unlock` notice
+    await prepareForUnlock("Emily");
+
+    const address = await getAddressMap();
+
+    const noticeEraId = 3;
+    const noticeEraIndex = 0;
+    const parentHex = "";
+    const signatures = [
+      "79fd383f27b4bb2a853e9bd968f81ae4b47c0aeecdd5f62f2ff3f2f18028c4409587e2d701c6707cb1c98ff0c39d7506146d6234466b4e6475a978aeb7bb0a98",
+      "7654e3c9761c589df7e5fe0c325b73273eb8b1ed9a68ec40985ce8aa8b67445bd322a321340815ccb5befe5c5ce22c74c1a8b44e8137cd5b55d2b5b40c1618bf",
+    ];
+
+    // Unlock tokens to the given address
+    const toAddress = "0x179b6b1cb6755e31";
+    const amount = "10.0";
+
+    const unlockErrRes = await runTransaction(
+      "starport/unlock_flow_tokens_notice",
+      address.Starport,
+      [
+        [noticeEraId, UInt256],
+        [noticeEraIndex, UInt256],
+        [parentHex, fString],
+        [signatures, fArray(fString)],
+        [toAddress, Address],
+        [amount, UFix64],
+      ]
+    );
+
+    // Check emitted error
+    const unlockErrEvent = unlockErrRes.events[0].data;
+    expect(unlockErrEvent.noticeEraId).toEqual(noticeEraId);
+    expect(unlockErrEvent.noticeEraIndex).toEqual(noticeEraIndex);
+    expect(unlockErrEvent.error).toEqual(
+      "Notice must use existing era or start next era"
+    );
   });
 });
