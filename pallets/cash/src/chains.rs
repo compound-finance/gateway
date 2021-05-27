@@ -422,7 +422,7 @@ impl ChainBlocks {
         }
     }
 
-    pub fn filter_already_signed(
+    pub fn filter_already_supported(
         self,
         signer: &ValidatorIdentity,
         pending_blocks: Vec<ChainBlockTally>,
@@ -434,7 +434,7 @@ impl ChainBlocks {
                     .into_iter()
                     .filter(|block| {
                         !pending_blocks.iter().any(|t| {
-                            t.block.hash() == ChainHash::Eth(block.hash) && t.has_signer(signer)
+                            t.block.hash() == ChainHash::Eth(block.hash) && t.has_supporter(signer)
                         })
                     })
                     .collect(),
@@ -541,10 +541,12 @@ impl ChainBlockTally {
 
     pub fn add_support(&mut self, validator: &ValidatorKeys) {
         self.support.insert(validator.substrate_id.clone());
+        self.dissent.remove(&validator.substrate_id);
     }
 
     pub fn add_dissent(&mut self, validator: &ValidatorKeys) {
         self.dissent.insert(validator.substrate_id.clone());
+        self.support.remove(&validator.substrate_id);
     }
 
     pub fn has_enough_support(&self, validator_set: &SignersSet) -> bool {
@@ -555,9 +557,9 @@ impl ChainBlockTally {
         has_super_majority(&self.dissent, validator_set)
     }
 
-    pub fn has_signer(&self, validator_id: &ValidatorIdentity) -> bool {
+    pub fn has_supporter(&self, validator_id: &ValidatorIdentity) -> bool {
         // note that these set types are not optimized and inefficient
-        self.support.contains(&validator_id) || self.dissent.contains(&validator_id)
+        self.support.contains(&validator_id)
     }
 }
 
@@ -1043,7 +1045,7 @@ mod tests {
     }
 
     #[test]
-    fn test_chain_blocks_filter_already_signed() {
+    fn test_chain_blocks_filter_already_suppported() {
         let signer = sp_core::crypto::AccountId32::new([7u8; 32]);
         let blocks = ChainBlocks::Eth(vec![
             EthereumBlock {
@@ -1073,13 +1075,51 @@ mod tests {
         }];
 
         assert_eq!(
-            blocks.filter_already_signed(&signer, pending_blocks),
+            blocks.filter_already_supported(&signer, pending_blocks),
             ChainBlocks::Eth(vec![EthereumBlock {
                 hash: [1u8; 32],
                 parent_hash: [0u8; 32],
                 number: 1,
                 events: vec![],
             }])
+        )
+    }
+
+    #[test]
+    fn test_chain_blocks_filter_already_suppported_not() {
+        let signer = sp_core::crypto::AccountId32::new([7u8; 32]);
+        let blocks = ChainBlocks::Eth(vec![
+            EthereumBlock {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            },
+            EthereumBlock {
+                hash: [2u8; 32],
+                parent_hash: [1u8; 32],
+                number: 2,
+                events: vec![],
+            },
+        ]);
+
+        let pending_blocks = vec![ChainBlockTally {
+            block: ChainBlock::Eth(EthereumBlock {
+                hash: [2u8; 32],
+                // dont matter:
+                parent_hash: [0u8; 32],
+                number: 0,
+                events: vec![],
+            }),
+            support: SignersSet::new(),
+            dissent: [signer.clone()].iter().cloned().collect(),
+        }];
+
+        assert_eq!(
+            blocks
+                .clone()
+                .filter_already_supported(&signer, pending_blocks),
+            blocks
         )
     }
 

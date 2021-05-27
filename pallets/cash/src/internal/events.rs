@@ -110,7 +110,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             last_block.number() + 1 + slack,
             starport,
         )?
-        .filter_already_signed(&me.substrate_id, pending_blocks);
+        .filter_already_supported(&me.substrate_id, pending_blocks);
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
