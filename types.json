@@ -194,6 +194,7 @@
       "Dot": "Vec<(Polkadot__Chain__Address,Polkadot__Chain__Signature)>"
     }
   },
+  "ChainStarport": "ChainAccount",
   "ChangeAuthorityNotice": {
     "_enum": {
       "Eth": "ChangeAuthorityNoticeEth"
