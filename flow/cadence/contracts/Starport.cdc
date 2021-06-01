@@ -12,17 +12,17 @@ pub contract Starport {
     // Event that is emitted when tokens are unlocked by Gateway
     pub event Unlock(account: Address, amount: UFix64, asset: String)
 
-    // Event that is emitted when locked Flow tokens are withdrawn
-    pub event TokensWithdrawn(asset: String, amount: UFix64)
-
     // Event that is emitted when a set of authorities is changed
     pub event ChangeAuthorities(newAuthorities: [String])
 
-    // Event that is emitted when notice is incorrect
-    pub event NoticeError(noticeEraId: UInt256, noticeEraIndex: UInt256, error: String)
-
     // Event that is emitted when new supply cap for an asset is set
     pub event NewSupplyCap(asset: String, supplyCap: UFix64)
+
+    // Event that is emitted when locked Flow tokens are withdrawn
+    pub event TokensWithdrawn(asset: String, amount: UFix64)
+
+    // Event that is emitted when notice is incorrect
+    pub event NoticeError(noticeEraId: UInt256, noticeEraIndex: UInt256, error: String)
 
     // Private vault with public deposit function
     access(self) var vault: @FlowToken.Vault
@@ -236,7 +236,10 @@ pub contract Starport {
 
     // Validates notice's signatures, invocation status and era ids
     // @note Side effects: notice invocation status and eraId storage values can be changed
-    access(self) fun isValidNotice(noticeEraId: UInt256, noticeEraIndex: UInt256, message: [UInt8], signatures: [String]): Bool {
+    access(self) fun isValidNotice(noticeEraId: UInt256,
+                                   noticeEraIndex: UInt256,
+                                   message: [UInt8],
+                                   signatures: [String]): Bool {
         // Check validity of signatures for the notice
         let isSigValid = self.checkNoticeSignerAuthorized(message: message, signatures: signatures)
         if !isSigValid {
@@ -369,11 +372,11 @@ pub contract Starport {
         self.authorities = []
         self.eraId = UInt256(0)
         self.invokedNotices = []
+        self.supplyCaps = {}
         // `unlock` method name hex encoded
         self.unlockHex = "756e6c6f636b"
         // `changeAuthorities` method name hex encoded
         self.changeAuthoritiesHex = "6368616e6765417574686f726974696573"
-        self.supplyCaps = {}
         self.setSupplyCapHex = "736574537570706c79436170"
         // `FLOW` asset name in hex
         self.flowAssetHex = "464c4f57"
