@@ -72,6 +72,9 @@
     "units": "Units"
   },
   "Bips": "u128",
+  "BlockLength": {
+    "max": "PerDispatchClass_u32"
+  },
   "CashAmount": "Uint",
   "CashExtractionNotice": {
     "_enum": {
@@ -98,25 +101,26 @@
   "CashQuantity": "Quantity",
   "ChainAccount": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "Gateway__Chain__Address",
       "Eth": "Ethereum__Chain__Address",
       "Dot": "Polkadot__Chain__Address"
     }
   },
   "ChainAccountSignature": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "ChainAccountSignatureGate",
       "Eth": "ChainAccountSignatureEth",
       "Dot": "ChainAccountSignatureDot"
     }
   },
   "ChainAccountSignatureDot": "(Polkadot__Chain__Address,Polkadot__Chain__Signature)",
   "ChainAccountSignatureEth": "(Ethereum__Chain__Address,Ethereum__Chain__Signature)",
+  "ChainAccountSignatureGate": "(Gateway__Chain__Address,Gateway__Chain__Signature)",
   "ChainAsset": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "Reserved",
       "Eth": "Ethereum__Chain__Address",
-      "Dot": "Polkadot__Chain__Address"
+      "Dot": "Reserved"
     }
   },
   "ChainBlock": {
@@ -127,14 +131,12 @@
   },
   "ChainBlockEvent": {
     "_enum": {
-      "Reserved": "",
       "Eth": "ChainBlockEventEth"
     }
   },
   "ChainBlockEventEth": "(ChainBlockNumber,Ethereum__Chain__Event)",
   "ChainBlockEvents": {
     "_enum": {
-      "Reserved": "",
       "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>"
     }
   },
@@ -146,27 +148,25 @@
   },
   "ChainBlocks": {
     "_enum": {
-      "Reserved": "",
       "Eth": "Vec<Ethereum__Chain__Block>"
     }
   },
   "ChainHash": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "Gateway__Chain__Hash",
       "Eth": "Ethereum__Chain__Hash",
       "Dot": "Polkadot__Chain__Hash"
     }
   },
   "ChainId": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "",
       "Eth": "",
       "Dot": ""
     }
   },
   "ChainReorg": {
     "_enum": {
-      "Reserved": "",
       "Eth": "ChainReorgEth"
     }
   },
@@ -182,14 +182,14 @@
   },
   "ChainSignature": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "Gateway__Chain__Signature",
       "Eth": "Ethereum__Chain__Signature",
       "Dot": "Polkadot__Chain__Signature"
     }
   },
   "ChainSignatureList": {
     "_enum": {
-      "Reserved": "",
+      "Gate": "Reserved",
       "Eth": "Vec<(Ethereum__Chain__Address,Ethereum__Chain__Signature)>",
       "Dot": "Vec<(Polkadot__Chain__Address,Polkadot__Chain__Signature)>"
     }
@@ -324,6 +324,16 @@
     "next_cash_index": "Ethereum__Chain__CashIndex",
     "next_cash_yield_start": "Ethereum__Chain__Timestamp"
   },
+  "Gateway__Chain__Address": "[u8; 32]",
+  "Gateway__Chain__Amount": "u128",
+  "Gateway__Chain__Block": "()",
+  "Gateway__Chain__CashIndex": "u128",
+  "Gateway__Chain__Event": "()",
+  "Gateway__Chain__Hash": "[u8; 32]",
+  "Gateway__Chain__PublicKey": "[u8; 64]",
+  "Gateway__Chain__Rate": "u128",
+  "Gateway__Chain__Signature": "[u8; 65]",
+  "Gateway__Chain__Timestamp": "u64",
   "GovernanceResult": {
     "_enum": {
       "FailedToDecodeCall": "",
@@ -404,7 +414,12 @@
     }
   },
   "Oracle__Timestamp": "u64",
-  "Polkadot__Chain__Address": "[u8; 20]",
+  "PerDispatchClass_u32": {
+    "normal": "u32",
+    "operational": "u32",
+    "mandatory": "u32"
+  },
+  "Polkadot__Chain__Address": "[u8; 32]",
   "Polkadot__Chain__Amount": "u128",
   "Polkadot__Chain__Block": "()",
   "Polkadot__Chain__CashIndex": "u128",
@@ -505,6 +520,7 @@
   "ReasonNoticeMissing": "(ChainId,NoticeId)",
   "Reporter": "[u8; 20]",
   "ReporterSet": "Vec<Reporter>",
+  "Reserved": "()",
   "SessionIndex": "u32",
   "SessionKeys": {
     "aura": "[u8;32]",
