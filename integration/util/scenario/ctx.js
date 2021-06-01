@@ -68,10 +68,13 @@ class Ctx {
     return process.env['LOG'] || this.scenInfo['log_level'];
   }
 
+  __deepColor() {
+    return !!process.env['DEEP_COLOR'];
+  }
+
   __abort(msg) {
-    console.error(msg);
     this.error(msg);
-    process.exit(1);
+    throw(msg);
   }
 
   __linkValidator() {
@@ -86,15 +89,12 @@ class Ctx {
     return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'gateway');
   }
 
-  __target() {
-    if (this.__native() && this.__genesisVersion()) {
-      return this.versions.mustFind(this.__genesisVersion()).targetFile(os.platform(), os.arch());
-    }
-
-    return this.__buildTarget();
+  __wasmFile() {
+    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'gateway-runtime', 'gateway_runtime.wasm');
   }
 
   __native() {
+    // Note: currently freeze time requires native.
     return this.__freezeTime() || process.env['NATIVE'] || this.scenInfo['native'] || false;
   }
 
@@ -112,10 +112,6 @@ class Ctx {
       }
     }
     return null;
-  }
-
-  __wasmFile() {
-    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'gateway-runtime', 'gateway_runtime.compact.wasm');
   }
 
   __genesisVersion() {

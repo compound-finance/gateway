@@ -86,6 +86,14 @@ class Eth {
     }
   }
 
+  async stopMining() {
+    await this.sendAsync('miner_stop', []);
+  }
+
+  async startMining() {
+    await this.sendAsync('miner_start', []);
+  }
+
   async snapshot() {
     return await this.sendAsync('evm_snapshot');
   }
@@ -180,6 +188,10 @@ class Eth {
     return (await this.web3.eth.getBlock("pending")).timestamp;
   }
 
+  async getBlock(number) {
+    return (await this.web3.eth.getBlock(number));
+  }
+
   async proxyRead(proxy, field) {
     let hash = {
       implementation: '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc',
@@ -214,7 +226,7 @@ async function buildEth(ethInfo, ctx) {
     ganacheServer = ganache.server(ganacheOpts);
     let ganacheProvider = ganacheServer.provider;
 
-    web3Port = ethInfo.ganache.web3_port || genPort();
+    let web3Port = ethInfo.ganache.web3_port || genPort();
     web3Url = `http://localhost:${web3Port}`;
 
     // Start web3 server

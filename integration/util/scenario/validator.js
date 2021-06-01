@@ -4,6 +4,7 @@ const { genPort, getInfoKey } = require('../util');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { canConnectTo } = require('../net');
 const { instantiateInfo } = require('./scen_info');
+const { buildEthProxy } = require('./proxy');
 const fs = require('fs').promises;
 const os = require('os');
 const path = require('path');
@@ -32,6 +33,13 @@ async function loadRpc(ctx) {
   }
 }
 
+/* Note: I am unsure how `peer_id` is generated.
+   To get a new one, I simply run `gateway --node-key 0x0000000000000000000000000000000000000000000000000000000000000001` and then
+   look at the peer id listed in the start-up info and copy that here.
+
+   Note: for aura key `subkey inspect //Alice` for grandpa key `subkey inspect --scheme ed25519 //Alice`
+*/
+
 let validatorInfoMap = {
   'alice': {
     aura_key: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
@@ -39,10 +47,10 @@ let validatorInfoMap = {
     eth_private_key: "50f05592dc31bfc65a77c4cc80f2764ba8f9a7cce29c94a51fe2d70cb5599374",
     eth_account: "0x6a72a2f14577D9Cd0167801EFDd54a07B40d2b61",
     node_key: '0x0000000000000000000000000000000000000000000000000000000000000001',
-    peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp', // I have _no idea_ how this is generated (I just run a node with the node key and grab it)
+    peer_id: '12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp',
     spawn_args: ['--alice'],
     color: chalk.blue,
-    validator: true,
+    validator: true
   },
   'bob': {
     aura_key: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
@@ -53,7 +61,7 @@ let validatorInfoMap = {
     peer_id: '12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD', // I have _no idea_ how this is generated
     spawn_args: ['--bob'],
     color: chalk.green,
-    validator: true,
+    validator: true
   },
   'charlie': {
     aura_key: "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y",
@@ -64,18 +72,28 @@ let validatorInfoMap = {
     peer_id: '12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x', // I have _no idea_ how this is generated
     spawn_args: ['--charlie'],
     color: chalk.orange,
-    validator: true,
+    validator: true
+  },
+  'dave': {
+    aura_key: "5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy",
+    grandpa_key: "5ECTwv6cZ5nJQPk6tWfaTrEk8YH2L7X1VT4EL5Tx2ikfFwb7",
+    eth_private_key: "b288b81702345b64773f5fb16d1ca9d2f1d8caa7ab8a929d3ed0bca7643eaf51",
+    eth_account: "0xE9f8624d418E2bF20916f083AEc3b8F52A687844",
+    node_key: '0x0000000000000000000000000000000000000000000000000000000000000004',
+    peer_id: '12D3KooWSsChzF81YDUKpe9Uk5AHV5oqAaXAcWNSPYgoLauUk4st', // I have _no idea_ how this is generated
+    spawn_args: ['--dave'],
+    color: chalk.yellow,
+    validator: true
   }
 };
 
 // TODO: Standardize
-async function tmpFile(name) {
-  folder = await fs.mkdtemp(path.join(os.tmpdir()));
-  return path.join(folder, name);
+async function tmpDir(name) {
+  return await fs.mkdtemp(path.join(os.tmpdir()));
 }
 
 class Validator {
-  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, extraVersions, chainSpecFile) {
+  constructor(ctx, name, info, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, extraVersions, chainSpecFile, ethProxy, native, baseDir) {
     this.ctx = ctx;
     this.name = name;
     this.info = info;
@@ -93,11 +111,14 @@ class Validator {
     this.version = version;
     this.extraVersions = extraVersions;
     this.chainSpecFile = chainSpecFile;
+    this.ethProxy = ethProxy;
     this.wsProvider = null;
     this.api = null;
     this.ps = null;
     this.bootnodes = null;
     this.freezeTimeFile = null;
+    this.native = native;
+    this.baseDir = baseDir;
   }
 
   async currentTime() {
@@ -141,39 +162,52 @@ class Validator {
     }
   }
 
+  colorName() {
+    return this.colorize(this.name);
+  }
+
+  log(text) {
+    if (this.ctx.__deepColor()) {
+      this.ctx.log(this.colorize(`[${this.name}] ${text}`));
+    } else {
+      this.ctx.log(`[${this.colorName()}] ${text}`);
+    }
+  }
+
+  async hardfork(version) {
+    this.log(`Restarting for hard-fork to version ${version.name()}`);
+    await this.teardown();
+    this.version = version;
+    this.native = true;
+    await this.ctx.sleep(60000);
+    await this.start();
+    this.log(`Completed hard-fork to version ${version.name()}`);
+  }
+
   async start(peers=[]) {
-    this.bootnodes = peers.map((peer) => {
-      return ['--reserved-nodes', peer];
-    }).flat();
+    if (this.ethProxy) {
+      await this.ethProxy.start();
+    }
+
+    if (!this.bootnodes) {
+      this.bootnodes = peers.map((peer) => {
+        return ['--reserved-nodes', peer];
+      }).flat();
+    }
 
     let env = {
       ...this.spawnOpts,
       ETH_KEY: this.ethPrivateKey,
     };
 
-    let versioning = [];
-    if (this.version) {
-      versioning = [
-        "--wasm-runtime-overrides",
-        this.version.releasePath(),
-      ];
-    }
-
-    this.version = this.version || this.ctx.genesisVersion();
-
-    let executionArgs = [];
-    if (this.ctx.__native()) {
-      // TODO: Consider setting native versions better per node
-      executionArgs = ['--execution', 'Native'];
-    } else {
-      // Scen did not specify execution. Only force WASM if we're on a non-current version
-      if (!this.version.isCurr()) {
-        executionArgs = ['--execution', 'Wasm'];
-      }
-    }
+    let executionArgs = [
+      '--execution', this.native ? 'Native' : 'Wasm',
+      /*'--wasm-runtime-overrides', this.version.wasmDir()*/
+    ];
+    let target = this.version.targetFile(os.platform(), os.arch());
 
     if (this.ctx.__freezeTime()) {
-      this.freezeTimeFile = await tmpFile("freeze_time.txt");;
+      this.freezeTimeFile = path.join(this.baseDir, "freeze_time.txt");
       await fs.writeFile(this.freezeTimeFile, this.ctx.__freezeTime().toString());
       env.FREEZE_TIME = this.freezeTimeFile;
     }
@@ -181,23 +215,26 @@ class Validator {
     this.ctx.log(`Validator Env: ${JSON.stringify(env)}`);
 
     let newCliArgs = [];
+    let ethRpcUrl = this.ethProxy ? this.ethProxy.serverUrl() : this.ctx.eth.web3Url;
     if (this.version.supports('full-cli-args')) {
       newCliArgs = [
-        '--eth-rpc-url', this.ctx.eth.web3Url,
+        '--eth-rpc-url', ethRpcUrl,
         '--eth-key-id', "my_eth_key_id",
         '--miner', `Eth:${this.ethAccount}`,
         '--opf-url', this.ctx.__opfUrl(),
       ];
     } else {
-      env['ETH_RPC_URL'] = this.ctx.eth.web3Url;
+      env['ETH_RPC_URL'] = ethRpcUrl;
       env['ETH_KEY_ID'] = "my_eth_key_id";
       env['MINER'] = `Eth:${this.ethAccount}`;
       env['OPF_URL'] = this.ctx.__opfUrl();
     }
 
-    let ps = spawnValidator(this.ctx, this.colorize(this.name), [
+    let ps = spawnValidator(this, this.ctx, target, [
       '--chain',
       this.chainSpecFile,
+      '--base-path',
+      this.baseDir,
       '--rpc-methods',
       'Unsafe',
       '--rpc-port',
@@ -206,14 +243,12 @@ class Validator {
       this.wsPort,
       '--port',
       this.p2pPort,
-      '--tmp',
       '--no-mdns',
       '--node-key',
       this.nodeKey,
       ...newCliArgs,
-      '-lruntime=debug,gateway=debug,pallet_cash=debug,ethereum_client=debug',
+      '-lexecutor=trace,runtime=trace,gateway=debug,pallet_cash=debug',
       '--reserved-only',
-      ...versioning,
       ...executionArgs,
       ...this.bootnodes,
       ...this.extraArgs,
@@ -287,6 +322,10 @@ class Validator {
   async teardown() {
     this.teardownApi();
 
+    if (this.ethProxy) {
+      await this.ethProxy.teardown();
+    }
+
     if (this.ps) {
       this.ps.kill('SIGTERM'); // Kill gateway node
       this.ps = null;
@@ -358,27 +397,27 @@ class Validators {
   }
 }
 
-function spawnValidator(ctx, name, args = [], opts = {}) {
-  ctx.log(`Starting validator node ${ctx.__target()} with args ${JSON.stringify(args)}`)
+function spawnValidator(validator, ctx, target, args = [], opts = {}) {
+  validator.log(`Starting validator node: ${target} ${args.join(" ")}`)
 
-  let proc = child_process.spawn(ctx.__target(), args, opts);
+  let proc = child_process.spawn(target, args, opts);
 
   proc.stdout.on('data', (data) => {
-    ctx.log(`${name} [stdout]: ${data}`);
+    validator.log(`[stdout]: ${data}`);
   });
 
   proc.stderr.on('data', (data) => {
-    ctx.error(`${name} [stdout]: ${data}`);
+    validator.log(`[stdout]: ${data}`);
   });
 
   proc.on('close', (code) => {
-    ctx.log(`${name} child process exited with code ${code}`);
+    validator.log(`child process exited with code ${code}`);
   });
 
   return proc;
 }
 
-function buildValidator(validatorName, validatorInfo, ctx) {
+async function buildValidator(validatorName, validatorInfo, ctx) {
   ctx.log(`Starting Validator ${validatorName}...`);
 
   let rpcPort = validatorInfo.rpc_port || genPort();
@@ -398,11 +437,15 @@ function buildValidator(validatorName, validatorInfo, ctx) {
     throw new Error(`Must initialize chain spec before starting validator`);
   }
 
-  let version = validatorInfo.version ? ctx.versions.mustFind(validatorInfo.version) : null;
+  let version = validatorInfo.version ? ctx.versions.mustFind(validatorInfo.version) : ctx.genesisVersion();
   let extraVersions = validatorInfo.extraVersions ? validatorInfo.extraVersions.map((version) => ctx.versions.mustFind(version)) : [];
   let chainSpecFile = ctx.chainSpec.file();
+  let ethProxy = validatorInfo.eth_proxy ? await buildEthProxy(validatorInfo.eth_proxy, ctx) : null;
+  let native = validatorInfo.native || ctx.__native();
 
-  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, extraVersions, chainSpecFile);
+  let baseDir = await tmpDir();
+
+  return new Validator(ctx, validatorName, validatorInfo, rpcPort, p2pPort, wsPort, nodeKey, peerId, logLevel, spawnOpts, extraArgs, validatorArgs, ethPrivateKey, ethAccount, version, extraVersions, chainSpecFile, ethProxy, native, baseDir);
 }
 
 async function getValidatorsInfo(validatorsInfoHash, ctx) {
@@ -413,8 +456,8 @@ async function buildValidators(validatorsInfoHash, ctx) {
   ctx.log("Starting Validators...");
 
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
-  let validatorsList = await validatorsInfo.map(([validatorName, validatorInfo]) =>
-    buildValidator(validatorName, validatorInfo, ctx));
+  let validatorsList = await Promise.all(validatorsInfo.map(([validatorName, validatorInfo]) =>
+    buildValidator(validatorName, validatorInfo, ctx)));
 
   let validators = new Validators(validatorsList, ctx);
   await validators.start();

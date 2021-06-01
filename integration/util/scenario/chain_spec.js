@@ -104,7 +104,7 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
 }
 
 async function tmpFile(name) {
-  folder = await fs.mkdtemp(path.join(os.tmpdir()));
+  let folder = await fs.mkdtemp(path.join(os.tmpdir()));
   return path.join(folder, name);
 }
 
@@ -112,7 +112,7 @@ async function tmpFile(name) {
 async function buildChainSpec(chainSpecInfo, validatorsInfoHash, tokenInfoHash, ctx) {
   let chainSpecFile = chainSpecInfo.use_temp ?
     await tmpFile('chainSpec.json') : path.join(__dirname, '..', '..', 'chainSpec.json');
-  let target = ctx.__target();
+  let target = ctx.__buildTarget(); // TODO: We should use genesis version, right?
   ctx.log('[CHAINSPEC] Scenario chain_spec.json: ' + chainSpecFile);
   let chainSpecJson;
   try {
