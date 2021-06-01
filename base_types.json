@@ -14,4 +14,12 @@
     "grandpa": "[u8;32]"
   },
   "ChainStarport": "ChainAccount"
+  "BlockLength": {
+    "max": "PerDispatchClass_u32"
+  },
+  "PerDispatchClass_u32": {
+    "normal": "u32",
+    "operational": "u32",
+    "mandatory": "u32"
+  }
 }

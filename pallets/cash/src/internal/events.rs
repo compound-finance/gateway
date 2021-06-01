@@ -57,6 +57,7 @@ pub fn risk_adjusted_value<T: Config>(
         .checked_sub(block_event.block_number())
         .ok_or(Reason::Unreachable)?;
     match block_event {
+        ChainBlockEvent::Reserved => panic!("reserved"),
         ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
             EthereumEvent::Lock { asset, amount, .. } => {
                 let quantity = get_quantity::<T>(ChainAsset::Eth(*asset), *amount)?;
@@ -96,6 +97,7 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
 
 /// Perform the next step of tracking events from an underlying chain.
 pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
+    log!("track_chain_events_on'ing");
     let starport = get_starport::<T>(chain_id)?;
     let me = get_current_validator::<T>()?;
     let last_block = get_last_block::<T>(chain_id)?;

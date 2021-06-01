@@ -9,6 +9,7 @@ const baseScenInfo = {
         web3_port: null
       },
     },
+    block_number: 'latest',
   },
   default_actor: null,
   actors: ["ashley", "bert", "chuck"],

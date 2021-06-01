@@ -209,6 +209,7 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
     log!("apply_chain_event_internal(event): {:?}", event);
 
     match event {
+        ChainBlockEvent::Reserved => panic!("reserved"),
         ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
             ethereum_client::EthereumEvent::Lock {
                 asset,
@@ -269,6 +270,7 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
     log!("unapply_chain_event_internal(event): {:?}", event);
 
     match event {
+        ChainBlockEvent::Reserved => panic!("reserved"),
         ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
             ethereum_client::EthereumEvent::Lock {
                 asset,

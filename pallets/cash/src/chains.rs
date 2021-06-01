@@ -3,8 +3,8 @@ use ethereum_client::{EthereumBlock, EthereumEvent};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
-    collections::btree_set::BTreeSet, iter::Iterator, str::FromStr, vec, Debuggable, Deserialize,
-    RuntimeDebug, Serialize,
+    collections::btree_set::BTreeSet, iter::Iterator, log, str::FromStr, vec, Debuggable,
+    Deserialize, RuntimeDebug, Serialize,
 };
 use types_derive::{type_alias, Types};
 
@@ -15,6 +15,7 @@ use crate::{
 };
 
 /// Used to reserve enum variant fields for future use.
+#[type_alias]
 type Reserved = ();
 
 /// Type for representing the selection of an underlying chain.
@@ -551,6 +552,21 @@ impl ChainBlockTally {
 
     pub fn has_supporter(&self, validator_id: &ValidatorIdentity) -> bool {
         // note that these set types are not optimized and inefficient
+        log!(
+            "has_supporter: {:?} {:?} {:?} {:?}",
+            self.block,
+            validator_id,
+            self.support
+                .clone()
+                .into_iter()
+                .map(|x| <[u8; 32]>::from(x))
+                .collect::<Vec<_>>(),
+            self.dissent
+                .clone()
+                .into_iter()
+                .map(|x| <[u8; 32]>::from(x))
+                .collect::<Vec<_>>()
+        );
         self.support.contains(&validator_id)
     }
 }
@@ -590,18 +606,21 @@ impl ChainReorgTally {
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlockEvent {
+    Reserved,
     Eth(ChainBlockNumber, <Ethereum as Chain>::Event),
 }
 
 impl ChainBlockEvent {
     pub fn chain_id(&self) -> ChainId {
         match self {
+            ChainBlockEvent::Reserved => panic!("reserved"),
             ChainBlockEvent::Eth(..) => ChainId::Eth,
         }
     }
 
     pub fn block_number(&self) -> ChainBlockNumber {
         match self {
+            ChainBlockEvent::Reserved => panic!("reserved"),
             ChainBlockEvent::Eth(block_num, _) => *block_num,
         }
     }
@@ -614,6 +633,7 @@ impl ChainBlockEvent {
 /// Type for describing a set of events coming from an underlying chain.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlockEvents {
+    Reserved,
     Eth(Vec<(ChainBlockNumber, <Ethereum as Chain>::Event)>),
 }
 
@@ -630,6 +650,7 @@ impl ChainBlockEvents {
     /// Determine the number of events in this queue.
     pub fn len(&self) -> usize {
         match self {
+            ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
         }
     }
@@ -637,6 +658,7 @@ impl ChainBlockEvents {
     /// Push the events from block onto this queue of events.
     pub fn push(&mut self, block: &ChainBlock) {
         match self {
+            ChainBlockEvents::Reserved => panic!("unreachable"),
             ChainBlockEvents::Eth(eth_block_events) => match block {
                 ChainBlock::Eth(eth_block) => {
                     for event in eth_block.events.iter() {
@@ -653,6 +675,7 @@ impl ChainBlockEvents {
         F: FnMut(&ChainBlockEvent) -> bool,
     {
         match self {
+            ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.retain(|(b, e)| f(&ChainBlockEvent::Eth(*b, e.clone())));
             }
@@ -662,7 +685,9 @@ impl ChainBlockEvents {
     /// Find the index of the given event on this queue, or none.
     pub fn position(&self, event: &ChainBlockEvent) -> Option<usize> {
         match self {
+            ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => match event {
+                ChainBlockEvent::Reserved => panic!("unreachable"),
                 ChainBlockEvent::Eth(block_num, eth_block) => eth_block_events
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *eth_block),
@@ -673,6 +698,7 @@ impl ChainBlockEvents {
     /// Remove the event at the given position.
     pub fn remove(&mut self, pos: usize) {
         match self {
+            ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.remove(pos);
             }

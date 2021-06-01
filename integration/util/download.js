@@ -3,15 +3,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
-
-function getOptions(url) {
-  let u = new URL(url);
-  return {
-    host: u.hostname,
-    path: u.pathname + u.search,
-    port: u.port || (u.protocol === 'https:' ? 443 : 80),
-  };
-}
+const { getOptions } = require('./net');
 
 function download(url, path, options = {}, handle = null) {
   let requestOptions = {

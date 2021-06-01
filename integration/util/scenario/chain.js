@@ -18,8 +18,13 @@ function hexByte(x) {
 }
 
 class Chain {
-  constructor(ctx) {
+  constructor(viaApi, ctx) {
+    this.viaApi = viaApi;
     this.ctx = ctx;
+  }
+
+  via(viaApi) {
+    return new Chain(viaApi, this.ctx)
   }
 
   toSS58 (arr) {
@@ -38,7 +43,7 @@ class Chain {
   }
 
   api() {
-    return this.ctx.getApi();
+    return this.viaApi || this.ctx.getApi();
   }
 
   async waitForEvent(pallet, eventName, onFinalize = true, failureEvent = null) {
@@ -257,11 +262,12 @@ class Chain {
   }
 
   async getSemVer() {
+    let semVer = await this.getRuntimeVersion();
     let {
       authoringVersion,
       specVersion,
       implVersion
-    } = await this.getRuntimeVersion();
+    } = semVer;
 
     return [authoringVersion, specVersion, implVersion];
   }
@@ -345,7 +351,7 @@ class Chain {
 
 
 function buildChain(ctx) {
-  return new Chain(ctx);
+  return new Chain(null, ctx);
 }
 
 module.exports = {
