@@ -89,16 +89,33 @@ class CashToken extends Token {
 async function buildCashToken(cashTokenInfo, ctx, owner) {
   ctx.log("Deploying cash token...");
 
-  let proxyAdmin = await ctx.eth.__deploy('ProxyAdmin', [], { from: ctx.eth.root() });
-  let cashImpl = await ctx.eth.__deploy('CashToken', [owner]);
-  let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
-    cashImpl._address,
-    proxyAdmin._address,
-    cashImpl.methods.initialize(ctx.__initialYield(), ctx.__initialYieldStart()).encodeABI()
-  ], { from: ctx.eth.root() });
-  let cashToken = await ctx.eth.__getContractAt('CashToken', proxy._address);
+  if (cashTokenInfo.existing) {
+    // Use existing Starport information
+    ['proxy_admin', 'proxy', 'cash_token', 'cash_impl'].forEach((key) => {
+      if (!cashTokenInfo.existing[key]) {
+        throw new Error(`Existing Cash Token missing property: ${key}`);
+      }
+    });
 
-  return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, ctx);
+    let proxyAdmin = cashTokenInfo.existing.proxy_admin;
+    let proxy = await ctx.eth.__getContractAt('TransparentUpgradeableProxy', cashTokenInfo.existing.proxy);
+    let cashToken = await ctx.eth.__getContractAt('CashToken', cashTokenInfo.existing.cash_token);
+    let cashImpl = await ctx.eth.__getContractAt('CashToken', cashTokenInfo.existing.cash_impl);
+
+    // TODO: Owner?
+    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, ctx);
+  } else {
+    let proxyAdmin = await ctx.eth.__deploy('ProxyAdmin', [], { from: ctx.eth.root() });
+    let cashImpl = await ctx.eth.__deploy('CashToken', [owner]);
+    let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
+      cashImpl._address,
+      proxyAdmin._address,
+      cashImpl.methods.initialize(ctx.__initialYield(), ctx.__initialYieldStart()).encodeABI()
+    ], { from: ctx.eth.root() });
+    let cashToken = await ctx.eth.__getContractAt('CashToken', proxy._address);
+
+    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, ctx);
+  }
 }
 
 module.exports = {

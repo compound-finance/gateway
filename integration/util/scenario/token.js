@@ -292,7 +292,12 @@ async function buildToken(ticker, tokenInfo, ctx) {
   ctx.log(`Deploying ${ticker}...`);
 
   let owner = ctx.eth.defaultFrom;
-  let tokenContract = await ctx.eth.__deployFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, { from: owner });
+  let tokenContract;
+  if (tokenInfo.address) {
+    tokenContract = await ctx.eth.__getContractAtFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.address, { from: owner });
+  } else {
+    tokenContract = await ctx.eth.__deployFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, { from: owner });
+  }
   if (typeof (tokenInfo.afterDeploy) === 'function') {
     await tokenInfo.afterDeploy(tokenContract, owner);
   }
@@ -334,7 +339,7 @@ async function buildTokens(tokensInfoHash, scenInfo, ctx) {
 
   let etherToken = new EtherToken(scenInfo.eth_liquidity_factor, ctx);
   tokens.push(etherToken);
-  if (scenInfo.eth_supply_cap) {
+  if (!!scenInfo.eth_supply_cap) {
     await etherToken.setSupplyCap(scenInfo.eth_supply_cap);
   }
   tokens.push(ctx.cashToken);

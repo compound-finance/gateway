@@ -173,25 +173,46 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
-  // Deploy Proxies and Starport
-  let proxyAdmin = ctx.cashToken.proxyAdmin;
-  let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
-  let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
-    starportImpl._address,
-    proxyAdmin._address,
-    "0x"
-  ], { from: ctx.eth.root() });
-  let starport = await ctx.eth.__getContractAt('Starport', proxy._address);
-  if (validators.length > 0) {
-    await starport.methods.changeAuthorities(validators).send({ from: ctx.eth.root(), gas: 4_000_00 });
+  if (starportInfo.existing) {
+    // Use existing Starport information
+    ['proxy_admin', 'proxy', 'starport', 'starport_impl'].forEach((key) => {
+      if (!starportInfo.existing[key]) {
+        throw new Error(`Existing Starport missing property: ${key}`);
+      }
+    });
+
+    let proxyAdmin = starportInfo.existing.proxy_admin;
+    let proxy = await ctx.eth.__getContractAt('TransparentUpgradeableProxy', starportInfo.existing.proxy);
+    let starport = await ctx.eth.__getContractAt('Starport', starportInfo.existing.starport);
+    let starportImpl = await ctx.eth.__getContractAt('Starport', starportInfo.existing.starport_impl);
+    // TODO: Allow versioning?
+    let starportTopics = Object.fromEntries(starport
+      ._jsonInterface
+      .filter(e => e.type === 'event')
+      .map(e => [e.name, e.signature]));
+
+    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
+  } else {
+    // Deploy Proxies and Starport
+    let proxyAdmin = ctx.cashToken.proxyAdmin;
+    let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
+    let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
+      starportImpl._address,
+      proxyAdmin._address,
+      "0x"
+    ], { from: ctx.eth.root() });
+    let starport = await ctx.eth.__getContractAt('Starport', proxy._address);
+    if (validators.length > 0) {
+      await starport.methods.changeAuthorities(validators).send({ from: ctx.eth.root(), gas: 4_000_00 });
+    }
+
+    let starportTopics = Object.fromEntries(starport
+      ._jsonInterface
+      .filter(e => e.type === 'event')
+      .map(e => [e.name, e.signature]));
+
+    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
   }
-
-  let starportTopics = Object.fromEntries(starport
-    ._jsonInterface
-    .filter(e => e.type === 'event')
-    .map(e => [e.name, e.signature]));
-
-  return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
 }
 
 module.exports = {
