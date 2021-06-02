@@ -46,7 +46,7 @@ pub enum EthereumClientError {
     NoResult,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Deserialize, Serialize, RuntimeDebug, PartialEq)]
 pub struct ResponseError {
     pub message: Option<String>,
     pub code: Option<i64>,
@@ -83,7 +83,7 @@ pub struct GetLogsResponse {
 }
 
 #[allow(non_snake_case)]
-#[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, RuntimeDebug, PartialEq)]
 pub struct TransactionObject {
     pub blockHash: Option<String>,
     pub blockNumber: Option<String>,
@@ -103,7 +103,7 @@ pub struct TransactionObject {
 }
 
 #[allow(non_snake_case)]
-#[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, RuntimeDebug, PartialEq)]
 pub struct BlockObject {
     pub difficulty: Option<String>,
     pub extraData: Option<String>,
@@ -127,7 +127,7 @@ pub struct BlockObject {
     pub uncles: Option<Vec<String>>,
 }
 
-#[derive(Deserialize, RuntimeDebug, PartialEq)]
+#[derive(Deserialize, Serialize, RuntimeDebug, PartialEq)]
 pub struct BlockResponse {
     pub id: Option<u64>,
     pub result: Option<BlockObject>,
