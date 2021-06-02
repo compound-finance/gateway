@@ -15,6 +15,7 @@ targets = ['x86_64-unknown-linux-gnu']
 codec = { package = 'parity-scale-codec', version = '2.0.0', default-features = false, features = ['derive'] }
 serde = { version = '1.0.125', features = ['derive'], default-features = false }
 serde_json = { version = '1.0.64', features=['alloc'], default-features = false}
+async-trait = { version = "0.1.48", optional = true }
 
 num-bigint = { default-features = false, version = '0.3' }
 num-traits = { default-features = false, version = '0.2' }
@@ -28,17 +29,17 @@ hex-literal = {version = '0.3.1', default-features = false}
 libsecp256k1 = { version = '0.3.2', default-features = false, features = ['hmac'] }
 tiny-keccak = { version = '2.0.0', features = ['keccak'], default-features = false }
 
-sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'compound' }
-sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound'  }
-sp-tracing = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound', optional = true }
-frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'compound' }
+sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'jflatow/compound' }
+sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound'  }
+sp-tracing = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound', optional = true }
+frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'jflatow/compound' }
 
 pallet-oracle = { path = '../oracle', default-features = false }
 runtime-interfaces = { path = '../runtime-interfaces', default-features = false }
@@ -51,7 +52,7 @@ types-derive = { path = '../../types-derive' }
 
 [dev-dependencies]
 env_logger = "*"
-frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'compound'}
+frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound'}
 serial_test = "*"
 test-env-log = "*"
 
@@ -72,6 +73,7 @@ std = [
     'our-std/std',
     'pallet-session/std',
     'pallet-oracle/std',
+    'async-trait',
 ]
 runtime-debug = ['our-std/runtime-debug']
 runtime-benchmarks = ['frame-benchmarking']
