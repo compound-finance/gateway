@@ -10,7 +10,7 @@ version = '1.0.0'
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-wasm-builder = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+substrate-wasm-builder = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 [dependencies]
 codec = { package = 'parity-scale-codec', version = '2.0.0' }
@@ -18,33 +18,33 @@ hex-literal = { version = '0.3.1', optional = true }
 serde = { version = '1.0.125', features = ['derive'], optional = true }
 
 # Substrate dependencies
-frame-executive = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-system-rpc-runtime-api = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+frame-executive = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-support = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-system-rpc-runtime-api = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
-sp-api = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-block-builder = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-consensus-aura = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-offchain = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-transaction-pool = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-version = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+sp-api = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-block-builder = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-consensus-aura = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-inherents = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-offchain = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-transaction-pool = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-version = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 # Used only for runtime benchmarking
-frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound', optional = true }
-frame-system-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound', optional = true }
+frame-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound', optional = true }
+frame-system-benchmarking = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound', optional = true }
 
 # Other pallets
-pallet-aura = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-pallet-grandpa = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-pallet-randomness-collective-flip = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+pallet-aura = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+pallet-grandpa = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+pallet-randomness-collective-flip = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+pallet-session = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 # Local dependencies
 pallet-cash = { path = '../pallets/cash', default-features = false }

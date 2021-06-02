@@ -16,7 +16,7 @@ name = 'gateway'
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-build-script-utils = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+substrate-build-script-utils = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 [dependencies]
 hex = "0.4.2"
@@ -32,47 +32,48 @@ serde_json = { version = "1.0.64", features=["alloc"] } # XXX 128 bit also arbit
 wasm-timer = "0.2"
 
 # Substrate dependencies
-frame-support = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-chain-spec = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-client-api = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-cli = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-client-db = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-core = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-consensus = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-consensus = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-consensus-epochs = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-consensus-slots = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-finality-grandpa = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-finality-grandpa-rpc = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-finality-grandpa = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-executor = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-inherents = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-keystore = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-keystore = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-network = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-runtime = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-service = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-telemetry = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-transaction-pool = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-transaction-pool = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+frame-support = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-system = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-chain-spec = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-client-api = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-cli = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-client-db = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-core = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-consensus = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-consensus = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-consensus-epochs = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-consensus-slots = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-finality-grandpa = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-finality-grandpa-rpc = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-finality-grandpa = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-executor = { features = ['wasmtime'], git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-inherents = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-keystore = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-keystore = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-network = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-runtime = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-service = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-telemetry = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-timestamp = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-transaction-pool = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-transaction-pool = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 # These dependencies are used for the node's RPCs
-sc-rpc = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-api = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-rpc-api = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-blockchain = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-chain-spec = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-block-builder = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-basic-authorship = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-sync-state-rpc = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-substrate-frame-rpc-system = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+sc-rpc = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-api = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-rpc-api = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-blockchain = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-chain-spec = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-block-builder = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-basic-authorship = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-sync-state-rpc = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+substrate-frame-rpc-system = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 # Used only for runtime benchmarking
-frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-frame-benchmarking-cli = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound', optional = true }
+frame-benchmarking = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-benchmarking-cli = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound', optional = true }
 
 # Local dependencies
 ethereum-client = { path = '../ethereum-client' }
@@ -89,10 +90,10 @@ types-derive = { path = '../types-derive' }
 [dev-dependencies]
 tempfile = "3.1.0"
 
-sc-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-keyring = { git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sc-service-test = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
-sp-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+sc-consensus-aura = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-keyring = { git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sc-service-test = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+sp-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 [features]
 default = ['with-parity-db']
