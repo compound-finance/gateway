@@ -1,10 +1,8 @@
 use crate::{oracle, validate_trx, Call, Config, Module};
-use codec::Decode;
-use codec::Encode;
+use codec::{Decode, Encode};
+use frame_support::inherent::ProvideInherent;
 use our_std::{log, RuntimeDebug};
-#[cfg(feature = "std")]
-use sp_inherents::ProvideInherentData;
-use sp_inherents::{InherentData, InherentIdentifier, IsFatalError, ProvideInherent};
+use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::{transaction_validity::TransactionSource, RuntimeString};
 
 /// The identifier for the miner inherent.
@@ -46,29 +44,22 @@ impl InherentError {
     }
 }
 
-/// Auxiliary trait to extract miner inherent data.
-pub trait OracleInherentData {
-    /// Get oracle inherent data.
-    fn oracle_inherent_data(&self) -> Result<InherentPriceData, sp_inherents::Error>;
-}
-
-impl OracleInherentData for InherentData {
-    fn oracle_inherent_data(&self) -> Result<InherentPriceData, sp_inherents::Error> {
-        self.get_data(&INHERENT_IDENTIFIER) // TODO: Do we need to convert or anything?
-            .and_then(|r| r.ok_or_else(|| "Oracle inherent data not found".into()))
-    }
-}
-
 /// Provide open price feed prices.
 #[cfg(feature = "std")]
 pub struct InherentDataProvider;
 
 #[cfg(feature = "std")]
-impl ProvideInherentData for InherentDataProvider {
-    fn inherent_identifier(&self) -> &'static InherentIdentifier {
-        &INHERENT_IDENTIFIER
-    }
+impl std::ops::Deref for InherentDataProvider {
+    type Target = ();
 
+    fn deref(&self) -> &Self::Target {
+        &()
+    }
+}
+
+#[cfg(feature = "std")]
+#[async_trait::async_trait]
+impl sp_inherents::InherentDataProvider for InherentDataProvider {
     fn provide_inherent_data(
         &self,
         inherent_data: &mut InherentData,
@@ -80,8 +71,21 @@ impl ProvideInherentData for InherentDataProvider {
         }
     }
 
-    fn error_to_string(&self, error: &[u8]) -> Option<String> {
-        InherentError::try_from(&INHERENT_IDENTIFIER, error).map(|e| format!("{:?}", e))
+    async fn try_handle_error(
+        &self,
+        identifier: &InherentIdentifier,
+        error: &[u8],
+    ) -> Option<Result<(), sp_inherents::Error>> {
+        if *identifier != INHERENT_IDENTIFIER {
+            return None;
+        }
+
+        match InherentError::try_from(&INHERENT_IDENTIFIER, error)? {
+            e => Some(Err(sp_inherents::Error::Application(Box::from(format!(
+                "{:?}",
+                e
+            ))))),
+        }
     }
 }
 
