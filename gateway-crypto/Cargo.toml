@@ -19,7 +19,7 @@ tokio = { version = "0.2", optional = true, default-features = false, features =
 bytes = { version = "0.5.0", optional = true }
 der-parser = { version = "5.0.0", optional = true }
 
-sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'compound' }
+sp-core = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 
 our-std = { path = "../our-std", default-features = false }
 

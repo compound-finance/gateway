@@ -1,11 +1,7 @@
 use crate::{chains::ChainAccount, Call, Config, Miner, Module};
-#[cfg(feature = "std")]
-use codec::Decode;
-use codec::Encode;
-use frame_support::storage::StorageValue;
-#[cfg(feature = "std")]
-use sp_inherents::ProvideInherentData;
-use sp_inherents::{InherentData, InherentIdentifier, IsFatalError, ProvideInherent};
+use codec::{Decode, Encode};
+use frame_support::{inherent::ProvideInherent, storage::StorageValue};
+use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeString;
 
 /// The identifier for the miner inherent.
@@ -41,47 +37,56 @@ impl InherentError {
     }
 }
 
-/// Auxiliary trait to extract miner inherent data.
-pub trait MinerInherentData {
-    /// Get miner inherent data.
-    fn miner_inherent_data(&self) -> Result<InherentType, sp_inherents::Error>;
-}
-
-impl MinerInherentData for InherentData {
-    fn miner_inherent_data(&self) -> Result<InherentType, sp_inherents::Error> {
-        self.get_data(&INHERENT_IDENTIFIER) // TODO: Do we need to convert or anything?
-            .and_then(|r| r.ok_or_else(|| "Miner inherent data not found".into()))
-    }
-}
-
-/// Provide duration since unix epoch in millisecond for timestamp inherent.
+/// Provide chosen miner address.
 #[cfg(feature = "std")]
 pub struct InherentDataProvider;
 
 #[cfg(feature = "std")]
-impl ProvideInherentData for InherentDataProvider {
-    fn inherent_identifier(&self) -> &'static InherentIdentifier {
-        &INHERENT_IDENTIFIER
-    }
+impl std::ops::Deref for InherentDataProvider {
+    type Target = ();
 
+    fn deref(&self) -> &Self::Target {
+        &()
+    }
+}
+
+#[cfg(feature = "std")]
+#[async_trait::async_trait]
+impl sp_inherents::InherentDataProvider for InherentDataProvider {
     fn provide_inherent_data(
         &self,
         inherent_data: &mut InherentData,
     ) -> Result<(), sp_inherents::Error> {
         let miner_address_str = runtime_interfaces::validator_config_interface::get_miner_address()
-            .ok_or("no miner address")?;
+            .ok_or(sp_inherents::Error::Application(Box::from(
+                "no miner address",
+            )))?;
 
-        let miner_address = our_std::str::from_utf8(&miner_address_str)
-            .map_err(|_| "invalid miner address bytes")?;
+        let miner_address = our_std::str::from_utf8(&miner_address_str).map_err(|_| {
+            sp_inherents::Error::Application(Box::from("invalid miner address bytes"))
+        })?;
 
-        let chain_account: ChainAccount =
-            our_std::str::FromStr::from_str(miner_address).map_err(|_| "invalid miner address")?;
+        let chain_account: ChainAccount = our_std::str::FromStr::from_str(miner_address)
+            .map_err(|_| sp_inherents::Error::Application(Box::from("invalid miner address")))?;
 
         inherent_data.put_data(INHERENT_IDENTIFIER, &chain_account)
     }
 
-    fn error_to_string(&self, error: &[u8]) -> Option<String> {
-        InherentError::try_from(&INHERENT_IDENTIFIER, error).map(|e| format!("{:?}", e))
+    async fn try_handle_error(
+        &self,
+        identifier: &InherentIdentifier,
+        error: &[u8],
+    ) -> Option<Result<(), sp_inherents::Error>> {
+        if *identifier != INHERENT_IDENTIFIER {
+            return None;
+        }
+
+        match InherentError::try_from(&INHERENT_IDENTIFIER, error)? {
+            e => Some(Err(sp_inherents::Error::Application(Box::from(format!(
+                "{:?}",
+                e
+            ))))),
+        }
     }
 }
 
