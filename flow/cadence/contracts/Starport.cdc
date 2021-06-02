@@ -169,11 +169,11 @@ pub contract Starport {
         emit Unlock(account: toAddress, amount: amount, asset: "FLOW")
     }
 
-    access(self) fun buildUnlockMessage(noticeEraId: UInt256,
-                                        noticeEraIndex: UInt256,
-                                        parentNoticeHex: String,
-                                        toAddress: Address,
-                                        amount: UFix64): [UInt8] {
+    pub fun buildUnlockMessage(noticeEraId: UInt256,
+                               noticeEraIndex: UInt256,
+                               parentNoticeHex: String,
+                               toAddress: Address,
+                               amount: UFix64): [UInt8] {
         let message = self.unlockHex.decodeHex()
                .concat(noticeEraId.toBigEndianBytes())
                .concat(noticeEraIndex.toBigEndianBytes())
@@ -303,12 +303,10 @@ pub contract Starport {
         emit ChangeAuthorities(newAuthorities: newAuthorities)
     }
 
-    access(self) fun buildChangeAuthoritiesMessage(
-        noticeEraId: UInt256,
-        noticeEraIndex: UInt256,
-        parentNoticeHex: String,
-        newAuthorities: [String]
-       ): [UInt8] {
+    pub fun buildChangeAuthoritiesMessage(noticeEraId: UInt256,
+                                          noticeEraIndex: UInt256,
+                                          parentNoticeHex: String,
+                                          newAuthorities: [String]): [UInt8] {
             var message = self.changeAuthoritiesHex.decodeHex()
                 .concat(noticeEraId.toBigEndianBytes())
                 .concat(noticeEraIndex.toBigEndianBytes())
@@ -347,10 +345,10 @@ pub contract Starport {
         Starport.supplyCaps["FLOW"] = supplyCap;
     }
 
-    access(self) fun buildSetSupplyCapMessage(noticeEraId: UInt256,
-                                        noticeEraIndex: UInt256,
-                                        parentNoticeHex: String,
-                                        supplyCap: UFix64): [UInt8] {
+    pub fun buildSetSupplyCapMessage(noticeEraId: UInt256,
+                                     noticeEraIndex: UInt256,
+                                     parentNoticeHex: String,
+                                     supplyCap: UFix64): [UInt8] {
         let message = self.setSupplyCapHex.decodeHex()
                .concat(noticeEraId.toBigEndianBytes())
                .concat(noticeEraIndex.toBigEndianBytes())

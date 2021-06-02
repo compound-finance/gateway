@@ -15,9 +15,10 @@ Flow Emulator is bundled with Flow CLI. You can find instructions on how to inst
 https://docs.onflow.org/flow-cli/
 
 ### Run tests
-```yarn install```
 
-```yarn test```
+`yarn install`
+
+`yarn test`
 
 ### Afterword
 

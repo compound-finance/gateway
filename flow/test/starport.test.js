@@ -10,6 +10,7 @@ import { getAccountAddress } from "flow-js-testing/dist/utils/account";
 import {
   UFix64,
   UInt256,
+  UInt8,
   String as fString,
   Array as fArray,
   Address,
@@ -17,6 +18,7 @@ import {
 import { mintFlow } from "flow-js-testing/dist";
 import { getScriptCode } from "flow-js-testing/dist/utils/file";
 import { executeScript } from "flow-js-testing/dist/utils/interaction";
+import { signWithKey } from "./flow.signer";
 
 const basePath = path.resolve(__dirname, "../cadence");
 const STARPORT_CONTRACT_NAME = "Starport";
@@ -95,36 +97,81 @@ async function getDataFromStarport(scriptName, args = []) {
 
   const value = await executeScript({
     code,
-    args
+    args,
   });
   return value;
-
 }
 
 async function getLockedBalance() {
   const name = "get_locked_balance";
-  return getDataFromStarport(name)
+  return getDataFromStarport(name);
 }
 
 async function getAuthorities() {
   const name = "get_authorities";
-  return getDataFromStarport(name)
+  return getDataFromStarport(name);
 }
 
 async function getEraId() {
   const name = "get_era_id";
-  return getDataFromStarport(name)
+  return getDataFromStarport(name);
 }
 
 async function getFlowSupplyCap() {
   const name = "get_flow_supply_cap";
-  return getDataFromStarport(name)
+  return getDataFromStarport(name);
 }
 
 async function getAccountFlowBalance(userAddress) {
   const name = "get_account_flow_balance";
-  return getDataFromStarport(name, [[userAddress, Address]])
+  return getDataFromStarport(name, [[userAddress, Address]]);
+}
 
+async function buildUnlockMessage(
+  noticeEraId,
+  noticeEraIndex,
+  parentNoticeHex,
+  toAddress,
+  amount
+) {
+  const name = "build_unlock_message";
+  return getDataFromStarport(name, [
+    [noticeEraId, UInt256],
+    [noticeEraIndex, UInt256],
+    [parentNoticeHex, fString],
+    [toAddress, Address],
+    [amount, UFix64],
+  ]);
+}
+
+async function buildChangeAuthoritiesMessage(
+  noticeEraId,
+  noticeEraIndex,
+  parentNoticeHex,
+  newAuthorities
+) {
+  const name = "build_change_authorities_message";
+  return getDataFromStarport(name, [
+    [noticeEraId, UInt256],
+    [noticeEraIndex, UInt256],
+    [parentNoticeHex, fString],
+    [newAuthorities, fArray(fString)],
+  ]);
+}
+
+async function buildSetSupplyCapMessage(
+  noticeEraId,
+  noticeEraIndex,
+  parentNoticeHex,
+  supplyCap
+) {
+  const name = "build_set_supply_cap_message";
+  return getDataFromStarport(name, [
+    [noticeEraId, UInt256],
+    [noticeEraIndex, UInt256],
+    [parentNoticeHex, fString],
+    [supplyCap, UFix64],
+  ]);
 }
 
 async function depositFlowTokens(user, amount) {
@@ -201,14 +248,23 @@ describe("Starport Tests", () => {
     const noticeEraId = 1;
     const noticeEraIndex = 0;
     const parentHex = "";
-    const signatures = [
-      "f8661ebbbe0cc415063a6027fadf6d78b883b88f0ea3b7a15d839b126aa85b55b273e2aeb777a07d04288b432897409e50d4cbadb28f4cf072c5bd3b9220d30e",
-      "701e292593ef04dacc9d35090182b831197fbae7b900585d822b901aa05df75ff505e167a3e2504cc2a0bd928507eaa3e81b9dfbd6878ec9d2e121f0b69537c8",
-    ];
 
     // Unlock tokens to the given address
     const toAddress = "0xf3fcd2c1a78f5eee";
     const amount = "10.0";
+
+    const unlockMessage = await buildUnlockMessage(
+      noticeEraId,
+      noticeEraIndex,
+      parentHex,
+      toAddress,
+      amount
+    );
+    // Sign the message with Authority 1 private key
+    const signature1 = signWithKey("57566b147fb5431230d8ac3ecf0432993b26510bbc82c8c7f6bae56705dfb3ea", unlockMessage)
+    // Sign the message with Authority 2 private key
+    const signature2 = signWithKey("ae732bb18cbb6705e6f63fa4ccfb89afd8169181bb39482d857102b3dca4fe67", unlockMessage)
+    const signatures = [signature1, signature2]
 
     const userBalanceBefore = Number(await getAccountFlowBalance(toAddress));
     const unlockRes = await runTransaction(
