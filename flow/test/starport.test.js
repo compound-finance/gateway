@@ -26,15 +26,15 @@ const STARPORT_CONTRACT_NAME = "Starport";
 const AUTHORITIES_DATA = [
   {
     publicKey:
-      "b82a83577dd93a351d980dc8e55b378480ac552f7e83d66548a14219e10b52a5a7bb4840b50bfdf68df0e27b2a130a6bed4f5b695ad2e8b628be5b51e41aa6b9",
+      "3668a8e41cfede2cbfd40dae4b22cff39c8795b53194b5a921d1d5d41fda370f26c37e4de564f780a95d6253e20e0866c5fe6b418b7ade867e2f1119a216716c",
     privateKey:
-      "57566b147fb5431230d8ac3ecf0432993b26510bbc82c8c7f6bae56705dfb3ea",
+      "b3a88b1465c1f27b42485b8b178828ba34636d88b1edf2a45606d23872072454"
   },
   {
     publicKey:
-      "52165a32bd7bf883837a96b9dbec1a004d3a44f43eac2eba2ff9e6940364b64733cd20dd80d66d367de8bcf1875bfb0b2a7c9beb451572c451d6a6882c72677f",
+      "f1e35032c15c4107ab7e1e876236d8024b9db84e4f70605097987933179c730cb00f4b4b9961494d2b83b0573b179d1a9a7db7ab2e0517de3c41411a17b50f8e",
     privateKey:
-      "ae732bb18cbb6705e6f63fa4ccfb89afd8169181bb39482d857102b3dca4fe67",
+      "c262abe9b55cdc2c3ca961583774fcefa25a0a36915bd8c48008c5951c938484",
   },
 ];
 
@@ -723,4 +723,5 @@ describe("Starport Tests", () => {
       "Notice must use existing era or start next era"
     );
   });
+
 });

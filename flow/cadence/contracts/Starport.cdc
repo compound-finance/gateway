@@ -194,7 +194,7 @@ pub contract Starport {
             let keylist = Crypto.KeyList()
             let publicKey = PublicKey(
                 publicKey: authority.decodeHex(),
-                signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+                signatureAlgorithm: SignatureAlgorithm.ECDSA_Secp256k1
             )
 
             keylist.add(
