@@ -78,7 +78,9 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
         }
       };
 
+      let i = 1;
       async function expectStuck(actor) {
+        console.log(`DFR expectStuck ${i++} ${actor.name}`);
         let lastProcessedBlock0 = (await actor.api.query.cash.lastProcessedBlock('Eth')).toJSON();
         let pendingChainBlocks0 = (await actor.api.query.cash.pendingChainBlocks('Eth')).toJSON();
 
@@ -110,6 +112,8 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
       }
 
       async function expectUnstuck(actor) {
+        console.log(`DFR expectUnstuck ${i++} ${actor.name}`);
+
         let lastProcessedBlock1 = (await actor.api.query.cash.lastProcessedBlock('Eth')).toJSON();
         let pendingChainBlocks1 = (await actor.api.query.cash.pendingChainBlocks('Eth')).toJSON();
 
@@ -139,7 +143,7 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
       charlie.ethProxy.clear(); // Give Charlie and Dave the correct block #1 data
       dave.ethProxy.clear();
 
-      await sleep(20000); // Let Charlie and Dave try to fix, but m10 bug prevents
+      await sleep(60000); // Let Charlie and Dave try to fix, but m10 bug prevents
 
       await expectStuck(alice); // Everyone is stuck
       await expectStuck(bob);
@@ -151,21 +155,23 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
         charlie.hardfork(curr),
       ]);
 
-      await sleep(20000); // Let some things happen
+      await sleep(60000); // Let some things happen
 
       await expectStuck(alice);
-      await expectStuck(bob);
-      await expectStuck(charlie);
+      await expectUnstuck(bob); // TODO: Check
+      await expectUnstuck(charlie); // TODO: Check
       await expectStuck(dave);
 
       await dave.hardfork(curr); // Rotate Dave, which should now make the hard-fork a reality
 
-      await sleep(40000); // Let some things happen
+      await sleep(60000); // Let some things happen
 
       await expectStuck(alice); // TODO: Maybe an issue?
       await expectUnstuck(bob);
       await expectUnstuck(charlie);
+      console.log("aaabc1");
       await expectUnstuck(dave);
+      console.log("aaabc2");
 
       await eventTracker.teardown(); // Now rotate Alice to make sure all is well with the final node
       await alice.hardfork(curr);
