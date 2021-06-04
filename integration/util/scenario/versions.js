@@ -5,6 +5,7 @@ const { constants } = require('fs');
 const { TypeRegistry } = require('@polkadot/types');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
 
 function releaseUrl(repoUrl, version, file) {
   return `${repoUrl}/releases/download/${version}/${file}`;
@@ -140,7 +141,11 @@ class Version {
     return releaseContractsInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
-  targetFile(platform, arch) {
+  targetFile() {
+    return this.targetFileFor(os.platform(), os.arch());
+  }
+
+  targetFileFor(platform, arch) {
     return releaseTargetInfo(this.ctx.__repoUrl(), this.version, platform, arch, this).path;
   }
 
