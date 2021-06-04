@@ -75,7 +75,6 @@ class Proxy {
   async teardown() {
     if (this.server) {
       await new Promise((resolve, reject) => {
-        console.log("closing server...");
         this.server.close(resolve);
       });
     }

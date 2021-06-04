@@ -216,11 +216,12 @@ class Ctx {
     return promise;
   }
 
-  async until(cond, opts = {}) {
+  async __until(cond, opts = {}) {
     let options = {
       delay: 5000,
       retries: null,
       message: null,
+      console: false,
       ...opts
     };
 
@@ -230,7 +231,12 @@ class Ctx {
       return;
     } else {
       if (options.message) {
-        this.log(options.message);
+        let msg = typeof(options.message) === 'function' ? await options.message() : options.message;
+        if (console) {
+          console.log(msg);
+        } else {
+          this.log(msg);
+        }
       }
       await this.__sleep(options.delay + start - new Date());
       return await this.until(cond, {
@@ -290,16 +296,20 @@ function aliasBy(ctx, iterator, key) {
 async function buildCtx(scenInfo={}) {
   scenInfo = merge(baseScenInfo, scenInfo);
   let ctx = new Ctx(scenInfo);
+  ctx.until = ctx.__until.bind(ctx);
   ctx.logger = await buildLogger(ctx);
   ctx.log(`Building ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
   ctx.log(`test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   ctx.versions = await buildVersions(scenInfo.versions, ctx);
   ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
 
-  // Note: `3` below is the number of transactions we expect to occur between now and when
-  //       the Starport token is deployed.
-  //       That's now: deploy Proxy Admin (1), Cash Token Impl (2), Starport Impl (3), Proxy (4)
-  let starportAddress = await ctx.eth.getNextContractAddress(4);
+  let starportAddress = null;
+  if (ctx.eth.ganacheServer) {
+    // Note: `3` below is the number of transactions we expect to occur between now and when
+    //       the Starport token is deployed.
+    //       That's now: deploy Proxy Admin (1), Cash Token Impl (2), Starport Impl (3), Proxy (4)
+    starportAddress = await ctx.eth.getNextContractAddress(4);
+  }
 
   ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
   ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);

@@ -5,16 +5,17 @@ const { readContractsFile, deployContract, getContractAt } = require('../ethereu
 const { genPort } = require('../util');
 
 class BlockInfo {
-  constructor(web3, ctx) {
+  constructor(web3, blockNumber, ctx) {
     this.web3 = web3;
     this.ctx = ctx;
     this.hash = null;
     this.parentHash = null;
     this.number = null;
+    this.blockNumber = blockNumber;
   }
 
   async update() {
-    let block = await this.web3.eth.getBlock('latest');
+    let block = await this.web3.eth.getBlock(this.blockNumber);
 
     this.hash = block.hash;
     this.parentHash = block.parentHash;
@@ -216,6 +217,7 @@ async function buildEth(ethInfo, ctx) {
   let web3;
   let ganacheServer; // Keep track for teardown
   let web3Url;
+  let accounts;
 
   if (provider === 'ganache') {
     let ganacheOpts = ethInfo.ganache.opts;
@@ -234,17 +236,18 @@ async function buildEth(ethInfo, ctx) {
     ganacheServer.listen(web3Port);
 
     web3 = new Web3(ganacheProvider, null, { transactionConfirmationBlocks: 1 });
+
+    // We'll enumerate accounts early so we don't need to repeat often.
+    accounts = await web3.eth.personal.getAccounts();
   } else {
     web3Url = provider;
     web3 = new Web3(provider);
+    accounts = ["0x0000000000000000000000000000000000000000"];
   }
-
-  // We'll enumerate accounts early so we don't need to repeat often.
-  let accounts = await web3.eth.personal.getAccounts();
 
   let version = ethInfo.version ? ctx.versions.mustFind(ethInfo.version) : ctx.versions.current;
 
-  let blockInfo = new BlockInfo(web3, ctx);
+  let blockInfo = new BlockInfo(web3, ethInfo.block_number, ctx);
   await blockInfo.update();
 
   return new Eth(ethInfo, web3, web3Url, accounts, blockInfo, ganacheServer, version, ctx);
