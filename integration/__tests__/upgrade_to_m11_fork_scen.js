@@ -1,18 +1,9 @@
 const { buildScenarios } = require('../util/scenario');
-const { decodeCall, getEventData } = require('../util/substrate');
-const { bytes32, encodeULEB128Hex, inspect } = require('../util/util');
-const { getNotice } = require('../util/substrate');
 
-let scen_info = {
-  tokens: [
-    { token: 'usdc', balances: { ashley: 1000 } }
-  ]
-};
-
-buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
+buildScenarios('Upgrade to m11 fork', [
   {
     only: true, // Currently CI doesnt have native binaries
-    name: "Upgrade from m10 to m10 delta via hard fork",
+    name: "Upgrade from m10 to m11 via fork",
     info: {
       versions: ['m10'],
       genesis_version: 'm10',
@@ -38,7 +29,7 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
         }
       },
     },
-    scenario: async ({ api, alice, ashley, bob, charlie, dave, chain, curr, eventTracker, m9, m10, eth, keyring, sleep, starport, usdc, validators }) => {
+    scenario: async ({ api, alice, ashley, bob, charlie, dave, chain, chainSpec, curr, eventTracker, m9, m10, eth, keyring, sleep, starport, usdc, validators }) => {
       // What we want is half of the nodes to vote A, and half to vote B, and then consolidate on A
       // So we're going to fake out two nodes and then try to reconcile by upgrading to the newest m10 code.
 
@@ -130,6 +121,13 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
         proxy.clearHold();
       });
 
+      await Promise.all([
+        alice.hardfork(curr),
+        bob.hardfork(curr),
+        charlie.hardfork(curr),
+        dave.hardfork(curr),
+      ]);
+
       /*** Actual Test ***/
 
       eth.startMining();
@@ -146,34 +144,30 @@ buildScenarios('Upgrade to m10\' hard-fork', scen_info, [
       await expectStuck(charlie);
       await expectStuck(dave);
 
-      await Promise.all([ // Rotate just two nodes, which shouldn't be enought to hard-fork
-        bob.hardfork(curr),
-        charlie.hardfork(curr),
-      ]);
+      // TODO: Write a test where some nodes don't actually upgrade before the code substitute takes effect
 
-      await sleep(20000); // Let some things happen
+      expect(await chain.via(alice).getSemVer()).toEqual([1, 10, 1]);
+      expect(await chain.via(bob).getSemVer()).toEqual([1, 10, 1]);
+      expect(await chain.via(charlie).getSemVer()).toEqual([1, 10, 1]);
+      expect(await chain.via(dave).getSemVer()).toEqual([1, 10, 1]);
 
-      await expectStuck(alice);
-      await expectStuck(bob);
-      await expectStuck(charlie);
-      await expectStuck(dave);
+      console.log("getting block");
+      let blockNumber = await chain.getBlockNumber();
+      console.log({blockNumber});
+      await chainSpec.addSubstitute(blockNumber + 10, curr);
+      await chainSpec.generate();
+      await chain.untilBlock(blockNumber + 20);
 
-      await dave.hardfork(curr); // Rotate Dave, which should now make the hard-fork a reality
-
-      await sleep(40000); // Let some things happen
-
-      await expectStuck(alice); // TODO: Maybe an issue?
+      console.log("checking unstuck");
+      await expectUnstuck(alice);
       await expectUnstuck(bob);
       await expectUnstuck(charlie);
       await expectUnstuck(dave);
 
-      await eventTracker.teardown(); // Now rotate Alice to make sure all is well with the final node
-      await alice.hardfork(curr);
-      await eventTracker.start();
-
-      await sleep(20000);
-
-      await expectUnstuck(alice);
+      expect(await chain.via(alice).getSemVer()).toEqual([1, 11, 1]);
+      expect(await chain.via(bob).getSemVer()).toEqual([1, 11, 1]);
+      expect(await chain.via(charlie).getSemVer()).toEqual([1, 11, 1]);
+      expect(await chain.via(dave).getSemVer()).toEqual([1, 11, 1]);
     }
   }
 ]);
