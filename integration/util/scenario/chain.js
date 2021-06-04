@@ -23,7 +23,8 @@ class Chain {
     this.ctx = ctx;
   }
 
-  via(viaApi) {
+  via(validatorOrApi) {
+    let viaApi = validatorOrApi.api ? validatorOrApi.api : validatorOrApi;
     return new Chain(viaApi, this.ctx)
   }
 
@@ -325,7 +326,29 @@ class Chain {
   }
 
   async newBlock() {
-    await this.ctx.eventTracker.newBlock();
+    return await this.ctx.eventTracker.newBlock();
+  }
+
+  async getBlockHeader() {
+    return (await this.api().rpc.chain.getHeader()).toJSON();
+  }
+
+  async getBlockNumber() {
+    let header = await this.getBlockHeader();
+    console.log({header});
+    return header.number;
+  }
+
+  async untilBlock(number) {
+    await this.ctx.until(async () => {
+      const blockNum = await this.getBlockNumber();
+      if (blockNum < number) {
+        this.ctx.log(`Waiting for block=${number}, curr=${blockNum}`);
+        return false;
+      } else {
+        return true;
+      }
+    }, { delay: 1000 });
   }
 
   async waitUntilSession(target) {

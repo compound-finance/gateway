@@ -174,12 +174,13 @@ class Validator {
     }
   }
 
+  // !!!
   async hardfork(version) {
     this.log(`Restarting for hard-fork to version ${version.name()}`);
     await this.teardown();
     this.version = version;
     this.native = true;
-    await this.ctx.sleep(60000);
+    await this.ctx.sleep(20000);
     await this.start();
     this.log(`Completed hard-fork to version ${version.name()}`);
   }
@@ -204,7 +205,7 @@ class Validator {
       '--execution', this.native ? 'Native' : 'Wasm',
       /*'--wasm-runtime-overrides', this.version.wasmDir()*/
     ];
-    let target = this.version.targetFile(os.platform(), os.arch());
+    let target = this.version.targetFile();
 
     if (this.ctx.__freezeTime()) {
       this.freezeTimeFile = path.join(this.baseDir, "freeze_time.txt");
