@@ -20,7 +20,7 @@
     "postinstall": "cat /dev/null > node_modules/source-map-support/register.js",
     "test": "PROFILE=release QUIET_SCENARIOS=true node --experimental-vm-modules node_modules/.bin/jest",
     "build": "yarn build:ethereum && yarn build:cargo",
-    "build:ethereum": "(cd ../ethereum && yarn compile)",
+    "build:ethereum": "(cd ../ethereum && yarn && yarn compile)",
     "build:cargo": "WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly build --release --features integration && echo \"removing compact for now, todo: fix this\" && rm ../target/release/wbuild/gateway-runtime/*compact*",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
