@@ -1,5 +1,5 @@
 // Update new authorities addresses
-import Starport from 0xf8d6e0586b0a20c7
+import Starport from 0xc8873a26b148ed14
 
 transaction(supplyCap: UFix64) {
      let admin: &Starport.Administrator

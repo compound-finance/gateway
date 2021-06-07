@@ -1,7 +1,9 @@
 // Lock Flow Tokens
-import FlowToken from 0x0ae53cb6e3f42a79
-import FungibleToken from 0xee82856bf20e2aa6
-import Starport from 0xf8d6e0586b0a20c7
+// import FlowToken from 0x0ae53cb6e3f42a79
+// import FungibleToken from 0xee82856bf20e2aa6
+import FungibleToken from 0x9a0766d93b6608b7
+import FlowToken from 0x7e60df042a9c0868
+import Starport from 0xc8873a26b148ed14
 
 transaction(lockAmount: UFix64) {
     // let tokenAdmin: &FlowToken.Administrator

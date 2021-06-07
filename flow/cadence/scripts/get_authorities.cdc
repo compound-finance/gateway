@@ -1,6 +1,6 @@
 // This script reads a set of Starport authoritites
 
-import Starport from 0xf8d6e0586b0a20c7
+import Starport from 0xc8873a26b148ed14
 
 pub fun main(): [String] {
 
