@@ -5,7 +5,7 @@
   "license": "GPL-3.0",
   "dependencies": {
     "@ethersproject/wallet": "^5.0.9",
-    "eth-saddle": "^0.1.23"
+    "eth-saddle": "latest"
   },
   "scripts": {
     "postinstall": "cd node_modules/solidity-parser-antlr && yarn install && yarn build",
