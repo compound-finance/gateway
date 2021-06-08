@@ -46,10 +46,13 @@ pub use pallet_timestamp::Call as TimestampCall;
 use our_std::warn;
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
+    core::BTreeMap,
     portfolio::Portfolio,
     rates::APR,
     reason::Reason,
-    types::{AssetAmount, AssetBalance, AssetInfo, Balance, CashIndex, CashPrincipal},
+    types::{
+        AssetAmount, AssetBalance, AssetInfo, Balance, CashIndex, CashPrincipal, ValidatorKeys,
+    },
 };
 use pallet_oracle::{ticker::Ticker, types::AssetPrice};
 
@@ -572,12 +575,20 @@ impl_runtime_apis! {
             Cash::get_accounts()
         }
 
+        fn get_asset_meta() -> Result<(BTreeMap<String, u32>, BTreeMap<String, u32>, u32, u32), Reason> {
+          Cash::get_asset_meta()
+        }
+
         fn get_accounts_liquidity() -> Result<Vec<(ChainAccount, String)>, Reason> {
             Cash::get_accounts_liquidity()
         }
 
         fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
             Cash::get_portfolio(account)
+        }
+
+        fn get_validator_info() -> Result<(Vec<ValidatorKeys>, Vec<(ChainAccount, String)>), Reason> {
+            Cash::get_validator_info()
         }
     }
 

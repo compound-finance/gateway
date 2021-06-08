@@ -1,3 +1,14 @@
+// Note: The substrate build requires these be re-exported.
+pub use our_std::{
+    cmp::{max, min},
+    collections::btree_map::BTreeMap,
+    collections::btree_set::BTreeSet,
+    convert::{TryFrom, TryInto},
+    fmt, result,
+    result::Result,
+    str,
+};
+
 use crate::{
     chains::{
         self, Chain, ChainAccount, ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents,
@@ -11,21 +22,19 @@ use crate::{
         AssetAmount, AssetBalance, Balance, CashPrincipalAmount, GovernanceResult, NoticeId,
         SignersSet, Timestamp, ValidatorKeys,
     },
-    AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
-    IngressionQueue, LastProcessedBlock, Pallet, Starports, SupportedAssets, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets, Validators,
+    AssetBalances, AssetsWithNonZeroBalance, CashIndex, CashPrincipals, CashYield, Config, Event,
+    GlobalCashIndex, IngressionQueue, LastProcessedBlock, Pallet, Starports, SupportedAssets,
+    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 use codec::Decode;
 use frame_support::{
-    storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
+    sp_runtime::traits::Convert,
+    storage::{
+        IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
+    },
     traits::UnfilteredDispatchable,
 };
-
-#[cfg(any(not(feature = "freeze-time"), not(feature = "std")))]
-use sp_runtime::traits::Convert;
-
-pub use our_std::{fmt, result};
 
 // Public helper functions //
 
@@ -96,16 +105,59 @@ pub fn get_cash_data<T: Config>() -> Result<(CashIndex, CashPrincipalAmount), Re
     Ok((GlobalCashIndex::get(), TotalCashPrincipal::get()))
 }
 
-/// Return the current borrow and supply rates for the asset.
+/// Return all ChainAccounts with any holdings
 pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
-    let info: Vec<ChainAccount> = CashPrincipals::iter()
+    let chain_asset_holders: BTreeSet<ChainAccount> = AssetsWithNonZeroBalance::iter()
         .map(|p| p.0)
-        .collect::<Vec<ChainAccount>>();
-    Ok(info)
+        .collect::<BTreeSet<ChainAccount>>();
+
+    let cash_holders: BTreeSet<ChainAccount> = CashPrincipals::iter()
+        .map(|p| p.0)
+        .collect::<BTreeSet<ChainAccount>>();
+
+    let all_holders: Vec<ChainAccount> = cash_holders
+        .union(&chain_asset_holders)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    Ok(all_holders)
+}
+
+pub fn get_asset_meta<T: Config>(
+) -> Result<(BTreeMap<String, u32>, BTreeMap<String, u32>, u32, u32), Reason> {
+    let mut asset_suppliers: BTreeMap<String, u32> = BTreeMap::new();
+    let mut asset_borrowers: BTreeMap<String, u32> = BTreeMap::new();
+    let mut aggregate_suppliers_set: BTreeSet<String> = BTreeSet::new();
+
+    let mut aggregate_borrowers_set: BTreeSet<String> = BTreeSet::new();
+
+    for (chain_asset, chain_account, balance) in AssetBalances::iter() {
+        if balance > 0 {
+            let num = asset_suppliers
+                .entry(String::from(chain_asset))
+                .or_insert(0);
+            *num += 1;
+            aggregate_suppliers_set.insert(String::from(chain_account));
+        } else if balance < 0 {
+            let num = asset_borrowers
+                .entry(String::from(chain_asset))
+                .or_insert(0);
+            *num += 1;
+            aggregate_borrowers_set.insert(String::from(chain_account));
+        }
+    }
+
+    Ok((
+        asset_suppliers,
+        asset_borrowers,
+        aggregate_suppliers_set.len() as u32,
+        aggregate_borrowers_set.len() as u32,
+    ))
 }
 
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
+    // TODO: does this actually touch all accounts...?
     let mut info: Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
         .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
         .collect::<Vec<(ChainAccount, AssetBalance)>>();
@@ -348,6 +400,24 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
 mod tests {
     use crate::factor::Factor;
     use crate::tests::*;
+
+    #[test]
+    fn test_get_accounts() -> Result<(), Reason> {
+        let jared = ChainAccount::from_str("Eth:0x18c8F1222083997405F2E482338A4650ac02e1d6")?;
+        let geoff = ChainAccount::from_str("Eth:0x8169522c2c57883e8ef80c498aab7820da539806")?;
+        new_test_ext().execute_with(|| {
+            AssetsWithNonZeroBalance::insert(&jared, &Uni, ());
+            AssetsWithNonZeroBalance::insert(&jared, &Wbtc, ());
+
+            // geoff only cash
+            CashPrincipals::insert(&geoff, CashPrincipal::from_nominal("1"));
+
+            let accounts: Vec<ChainAccount> = super::get_accounts::<Test>()?;
+            assert_eq!(accounts, vec![jared, geoff]);
+
+            Ok(())
+        })
+    }
 
     #[test]
     fn test_compute_cash_principal_per() -> Result<(), Reason> {
