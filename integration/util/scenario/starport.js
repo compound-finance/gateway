@@ -4,12 +4,13 @@ const { encodeCall } = require('../substrate');
 const web3 = require('web3');
 
 class Starport {
-  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx, chain) {
+  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain) {
     this.starport = starport;
     this.proxyAdmin = proxyAdmin;
     this.starportImpl = starportImpl;
     this.proxy = proxy;
     this.starportTopics = starportTopics;
+    this.cashToken = cashToken;
     this.ctx = ctx;
     this.chain = chain;
     this.ctxKey = `${chain.name}Starport`
@@ -139,7 +140,7 @@ class Starport {
   }
 
   async upgradeTo(version) {
-    let newImpl = await this.ctx.eth.__deploy('Starport', [this.ctx.cashToken.ethAddress(), this.ctx.eth.root()], { version });
+    let newImpl = await this.ctx.eth.__deploy('Starport', [this.cashToken.ethAddress(), this.ctx.eth.root()], { version });
     await this.upgrade(newImpl);
   }
 
@@ -196,11 +197,11 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashT
       .filter(e => e.type === 'event')
       .map(e => [e.name, e.signature]));
 
-    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
+    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain);
   } else {
     // Deploy Proxies and Starport
-    let proxyAdmin = ctx.cashToken.proxyAdmin;
-    let starportImpl = await chain.__deploy('Starport', [ctx.cashToken.ethAddress(), chain.root()]);
+    let proxyAdmin = cashToken.proxyAdmin;
+    let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root()]);
     let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
       starportImpl._address,
       proxyAdmin._address,
@@ -216,7 +217,7 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashT
       .filter(e => e.type === 'event')
       .map(e => [e.name, e.signature]));
 
-    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
+    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain);
   }
 }
 

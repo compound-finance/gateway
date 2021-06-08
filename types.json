@@ -23,6 +23,12 @@
     "symbol": "Symbol",
     "ticker": "String"
   },
+  "ApiAssetMeta": {
+    "supplier_counts": "BTreeMap<String,u32>",
+    "borrower_counts": "BTreeMap<String,u32>",
+    "combined_supplier_count": "u32",
+    "combined_borrower_count": "u32"
+  },
   "ApiCashData": {
     "balance": "String",
     "cash_yield": "String",
@@ -51,6 +57,11 @@
     "positions": "Vec<(ChainAsset,String)>"
   },
   "ApiRates": "(ApiAPR,ApiAPR)",
+  "ApiValidators": {
+    "current_block": "String",
+    "current_validators": "Vec<(String,String)>",
+    "miner_payouts": "Vec<(ChainAccount,String)>"
+  },
   "AssetAmount": "Uint",
   "AssetBalance": "Int",
   "AssetIndex": "Uint",
@@ -125,18 +136,19 @@
   },
   "ChainBlock": {
     "_enum": {
-      "Reserved": "",
       "Eth": "Ethereum__Chain__Block"
     }
   },
   "ChainBlockEvent": {
     "_enum": {
+      "Reserved": "",
       "Eth": "ChainBlockEventEth"
     }
   },
   "ChainBlockEventEth": "(ChainBlockNumber,Ethereum__Chain__Event)",
   "ChainBlockEvents": {
     "_enum": {
+      "Reserved": "",
       "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>"
     }
   },
@@ -296,7 +308,8 @@
       "NoRpcUrl": "",
       "NoStarportAddress": "",
       "EthereumClientError": "EthereumClientError",
-      "ErrorDecodingHex": ""
+      "ErrorDecodingHex": "",
+      "InvalidBlockchain": ""
     }
   },
   "ExtractionNotice": {

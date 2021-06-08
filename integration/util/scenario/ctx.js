@@ -310,6 +310,7 @@ async function buildCtx(scenInfo={}) {
   aliasBy(ctx, ctx.deployments.all(), 'name');
   aliasBy(ctx, ctx.deployments.starports(), 'ctxKey');
   aliasBy(ctx, ctx.deployments.cashTokens(), 'ctxKey');
+
   // xxx todo:wn for now including a convenient alias for eth deployment of starport and cashToken due to pervasive use
   ctx.starport = ctx.ethStarport;
   ctx.cashToken = ctx.ethCashToken;
