@@ -11,11 +11,13 @@ use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 
 use pallet_cash::{
     chains::{ChainAccount, ChainAsset},
+    core::BTreeMap,
     portfolio::Portfolio,
     rates::APR,
     reason::Reason,
-    types::{AssetAmount, AssetBalance, AssetInfo, InterestRateModel, Symbol},
+    types::{AssetAmount, AssetBalance, AssetInfo, InterestRateModel, Symbol, ValidatorKeys},
 };
+
 use pallet_cash_runtime_api::CashApi as CashRuntimeApi;
 use pallet_oracle::types::AssetPrice;
 
@@ -42,6 +44,14 @@ pub struct ApiAssetData {
     borrow_rate: String,
     liquidity_factor: String,
     price: String,
+}
+
+#[derive(Deserialize, Serialize, Types)]
+pub struct ApiAssetMeta {
+    supplier_counts: BTreeMap<String, u32>,
+    borrower_counts: BTreeMap<String, u32>,
+    combined_supplier_count: u32,
+    combined_borrower_count: u32,
 }
 
 #[derive(Deserialize, Serialize, Types)]
@@ -85,6 +95,13 @@ pub struct ApiPortfolio {
     positions: Vec<(ChainAsset, String)>,
 }
 
+#[derive(Deserialize, Serialize, Types)]
+pub struct ApiValidators {
+    current_block: String,
+    current_validators: Vec<(String, String)>,
+    miner_payouts: Vec<(ChainAccount, String)>,
+}
+
 /// Converts a runtime trap into an RPC error.
 fn runtime_err(err: impl std::fmt::Debug) -> RpcError {
     RpcError {
@@ -112,6 +129,9 @@ pub trait GatewayRpcApi<BlockHash> {
         assets: ChainAsset,
         at: Option<BlockHash>,
     ) -> RpcResult<ApiAssetData>;
+
+    #[rpc(name = "gateway_assetmeta")]
+    fn chain_assets_meta(&self, at: Option<BlockHash>) -> RpcResult<ApiAssetMeta>;
 
     #[rpc(name = "gateway_cashdata")]
     fn gateway_cashdata(
@@ -147,6 +167,9 @@ pub trait GatewayRpcApi<BlockHash> {
         account: ChainAccount,
         at: Option<BlockHash>,
     ) -> RpcResult<ApiPortfolio>;
+
+    #[rpc(name = "gateway_validators")]
+    fn validators(&self, at: Option<BlockHash>) -> RpcResult<ApiValidators>;
 }
 
 pub struct GatewayRpcHandler<C, B> {
@@ -235,7 +258,6 @@ where
             .get_price(&at, "CASH".to_string())
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-
         let (cash_index, total_principal, total_cash) = api
             .get_cash_data(&at)
             .map_err(runtime_err)?
@@ -343,6 +365,22 @@ where
         Ok(accounts) // XXX try_into?
     }
 
+    fn chain_assets_meta(&self, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetMeta> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+        let (supplier_counts, borrower_counts, combined_suppliers, combined_borrowers) = api
+            .get_asset_meta(&at)
+            .map_err(runtime_err)?
+            .map_err(chain_err)?;
+
+        Ok(ApiAssetMeta {
+            supplier_counts: supplier_counts,
+            borrower_counts: borrower_counts,
+            combined_supplier_count: combined_suppliers,
+            combined_borrower_count: combined_borrowers,
+        })
+    }
+
     fn chain_account_liquidities(
         &self,
         at: Option<<B as BlockT>::Hash>,
@@ -377,6 +415,33 @@ where
         Ok(ApiPortfolio {
             cash: format!("{}", result.cash.value),
             positions: positions_lite,
+        })
+    }
+
+    fn validators(&self, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiValidators> {
+        let api = self.client.runtime_api();
+        let hash = at.unwrap_or_else(|| self.client.info().best_hash);
+        let at = BlockId::hash(hash.clone());
+        let current_block = self
+            .client
+            .number(hash)
+            .unwrap_or_else(|_| None)
+            .unwrap_or_else(|| self.client.info().best_number);
+
+        let (validator_keys, miner_payouts): (Vec<ValidatorKeys>, Vec<(ChainAccount, String)>) =
+            api.get_validator_info(&at)
+                .map_err(runtime_err)?
+                .map_err(chain_err)?;
+
+        let readable_validator_keys = validator_keys
+            .iter()
+            .map(|v| (format!("{}", v.substrate_id), hex::encode(v.eth_address)))
+            .collect();
+
+        Ok(ApiValidators {
+            current_block: current_block.to_string(),
+            current_validators: readable_validator_keys,
+            miner_payouts: miner_payouts,
         })
     }
 }
