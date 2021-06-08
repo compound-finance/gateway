@@ -105,7 +105,7 @@ async function buildCashToken(cashTokenInfo, ctx, owner, chain) {
     let cashImpl = await chain.__getContractAt('CashToken', cashTokenInfo.existing.cash_impl);
 
     // TODO: Owner?
-    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, ctx);
+    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, chain.name, ctx);
   } else {
     let proxyAdmin = await chain.__deploy('ProxyAdmin', [], { from: chain.root() });
     let cashImpl = await chain.__deploy('CashToken', [owner]);
@@ -116,7 +116,7 @@ async function buildCashToken(cashTokenInfo, ctx, owner, chain) {
     ], { from: chain.root() });
     let cashToken = await chain.__getContractAt('CashToken', proxy._address);
 
-    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, ctx);
+    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, chain.name, ctx);
   }
 }
 

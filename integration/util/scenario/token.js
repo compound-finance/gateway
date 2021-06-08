@@ -368,7 +368,7 @@ async function buildTokens(tokensInfoHash, scenInfo, ctx) {
   if (!!scenInfo.eth_supply_cap) {
     await etherToken.setSupplyCap(scenInfo.eth_supply_cap);
   }
-  tokens.push(ctx.cashToken);
+  tokens.push(ctx.ethCashToken);
 
   return new Tokens(tokens, ctx);
 }
