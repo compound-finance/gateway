@@ -1,0 +1,7 @@
+gateway:
+  language: rust
+  deps:
+    - run: apt install -y git clang curl libssl-dev pkg-config
+    - run: rustup target add wasm32-unknown-unknown --toolchain nightly
+    - run: cd pallets/cash && cargo +nightly build --release
+    - run: cd pallets/oracle && cargo +nightly build --release
