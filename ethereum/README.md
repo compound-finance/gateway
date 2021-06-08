@@ -11,7 +11,7 @@ yarn install
 
 ## Compiling Contracts
 
-You will need `solc` 8.0.1 to be installed and available as `solc`. See solc and saddle documentation for choosing a compiler binary.
+You will need `solc` 0.8.1 to be installed and available as `solc`. See solc and saddle documentation for choosing a compiler binary.
 
 ```sh
 yarn compile
