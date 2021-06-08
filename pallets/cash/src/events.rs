@@ -15,6 +15,7 @@ pub enum EventError {
     NoStarportAddress,
     EthereumClientError(EthereumClientError),
     ErrorDecodingHex,
+    InvalidBlockchain,
 }
 
 /// Fetch a block from the underlying chain.
@@ -70,9 +71,15 @@ fn fetch_eth_blocks(
 ) -> Result<ChainBlocks, EventError> {
     debug!("Fetching Eth Blocks [{}-{}]", from, to);
     let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
-    for block_number in from..to {
+    for block_number in from..=to {
         match fetch_eth_block(block_number, eth_starport_address) {
             Ok(block) => {
+                // if this is not the  first block we queried, confrm its parent hash matches
+                if let Some(last) = acc.last() {
+                    if last.hash != block.parent_hash {
+                        return Err(EventError::InvalidBlockchain);
+                    }
+                }
                 acc.push(block);
             }
             Err(EventError::EthereumClientError(EthereumClientError::NoResult)) => {
@@ -84,4 +91,59 @@ fn fetch_eth_blocks(
         }
     }
     Ok(ChainBlocks::Eth(acc))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::events::*;
+    use crate::tests::*;
+    use sp_core::offchain::testing;
+    use sp_core::offchain::{OffchainDbExt, OffchainWorkerExt};
+
+    #[test]
+    fn test_fetch_chain_blocks_eth_returns_proper_blocks() -> Result<(), Reason> {
+        // XXX should this use new_test_ext_with_http_calls?
+        let blocks_to_return = vec![
+            ethereum_client::EthereumBlock {
+                hash: [1u8; 32],
+                parent_hash: [0u8; 32],
+                number: 1,
+                events: vec![],
+            },
+            ethereum_client::EthereumBlock {
+                hash: [2u8; 32],
+                parent_hash: [1u8; 32],
+                number: 2,
+                events: vec![],
+            },
+        ];
+
+        let fetch_from = blocks_to_return[0].number;
+        let fetch_to = blocks_to_return[blocks_to_return.len() - 1].number;
+        const STARPORT_ADDR: [u8; 20] = [1; 20];
+
+        let (offchain, offchain_state) = testing::TestOffchainExt::new();
+        let mut t = sp_io::TestExternalities::default();
+
+        t.register_extension(OffchainDbExt::new(offchain.clone()));
+        t.register_extension(OffchainWorkerExt::new(offchain));
+
+        gen_mock_responses(offchain_state, blocks_to_return.clone(), STARPORT_ADDR);
+
+        t.execute_with(|| {
+            let fetched_blocks = fetch_eth_blocks(fetch_from, fetch_to, &STARPORT_ADDR).unwrap();
+
+            match fetched_blocks {
+                ChainBlocks::Eth(blocks) => {
+                    for (expected, actual) in blocks_to_return.iter().zip(blocks.iter()) {
+                        assert_eq!(actual.hash, expected.hash);
+                        assert_eq!(actual.parent_hash, expected.parent_hash);
+                        assert_eq!(actual.number, expected.number);
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
 }
