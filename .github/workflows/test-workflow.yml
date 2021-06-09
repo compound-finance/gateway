@@ -22,7 +22,7 @@ jobs:
 
       - name: Cargo fmt
         run: |
-          NIGHTLY=nightly-2021-03-24
+          NIGHTLY=nightly-2021-06-01
           rustup install $NIGHTLY
           rustup component add rustfmt --toolchain $NIGHTLY
           cargo +$NIGHTLY fmt -- --check
@@ -229,32 +229,17 @@ jobs:
         run: |
           ./scripts/get_substrate.sh --fast
 
-      - name: Install yarn ethereum dependencies
-        run: cd ethereum && yarn install
-
-      - name: Install integration test ethereum dependencies
-        run: cd integration && yarn install
-
       - name: Install solc
         run: |
           sudo wget https://github.com/ethereum/solidity/releases/download/v0.8.1/solc-static-linux -O /usr/local/bin/solc
           sudo chmod +x /usr/local/bin/solc
 
-      - name: Compile Ethereum contracts
-        run: |
-          cd ethereum
-          yarn compile
-
-      - name: Build Gateway
-        run: |
-          WASM_BUILD_RUSTFLAGS='--cfg feature="integration"' cargo build --release --features integration
+      - name: Install integration test dependencies and build
+        run: cd integration && yarn && yarn build
 
       - name: Run Integration Test
         timeout-minutes: 40
-        run: |
-          set -eo pipefail
-          cd integration
-          sudo PROFILE=release QUIET_SCENARIOS=true npx jest --ci --reporters=default --reporters=jest-junit
+        run: cd integration && sudo yarn test --ci --reporters=default --reporters=jest-junit
 
       - name: Prepublish Integration results
         if: always()
