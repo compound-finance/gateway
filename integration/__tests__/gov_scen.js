@@ -12,7 +12,7 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     name: "Update Interest Rate Model by Governance",
     scenario: async ({ api, zrx, chain, starport }) => {
       let newKink = {
-        Kink: {
+        kink: {
           zero_rate: 100,
           kink_rate: 500,
           kink_utilization: 80,

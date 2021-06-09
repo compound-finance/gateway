@@ -78,8 +78,8 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       });
       expect(event).toMatchChainEvent({
         AssetAmount: 100000000,
-        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
-        ChainAsset: { Eth: usdc.ethAddress().toLowerCase() }
+        ChainAccount: { eth: ashley.ethAddress().toLowerCase() },
+        ChainAsset: { eth: usdc.ethAddress().toLowerCase() }
       });
     }
   },
@@ -96,8 +96,8 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       });
       expect(event).toMatchChainEvent({
         AssetAmount: "0x0000000000000000002386f26fc10000",
-        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
-        ChainAsset: { Eth: ether.ethAddress().toLowerCase() }
+        ChainAccount: { eth: ashley.ethAddress().toLowerCase() },
+        ChainAsset: { eth: ether.ethAddress().toLowerCase() }
       });
     }
   },

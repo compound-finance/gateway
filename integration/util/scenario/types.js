@@ -2,15 +2,15 @@ const Web3Utils = require('web3-utils');
 const ABICoder = require('web3-eth-abi');
 
 function getNoticeChainId(notice) {
-  if (notice.Notice.ExtractionNotice && notice.Notice.ExtractionNotice.Eth) {
+  if (notice.Notice.extractionNotice && notice.Notice.extractionNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.CashExtractionNotice && notice.Notice.CashExtractionNotice.Eth) {
+  } else if (notice.Notice.cashExtractionNotice && notice.Notice.cashExtractionNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.FutureYieldNotice && notice.Notice.FutureYieldNotice.Eth) {
+  } else if (notice.Notice.futureYieldNotice && notice.Notice.futureYieldNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.SetSupplyCapNotice && notice.Notice.SetSupplyCapNotice.Eth) {
+  } else if (notice.Notice.setSupplyCapNotice && notice.Notice.setSupplyCapNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.ChangeAuthorityNotice && notice.Notice.ChangeAuthorityNotice.Eth) {
+  } else if (notice.Notice.changeAuthorityNotice && notice.Notice.changeAuthorityNotice.eth) {
     return 'Eth';
   } else {
     throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
