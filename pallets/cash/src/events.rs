@@ -15,7 +15,6 @@ pub enum EventError {
     NoStarportAddress,
     EthereumClientError(EthereumClientError),
     ErrorDecodingHex,
-    InvalidBlockchain,
 }
 
 /// Fetch a block from the underlying chain.
@@ -71,15 +70,9 @@ fn fetch_eth_blocks(
 ) -> Result<ChainBlocks, EventError> {
     debug!("Fetching Eth Blocks [{}-{}]", from, to);
     let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
-    for block_number in from..=to {
+    for block_number in from..to {
         match fetch_eth_block(block_number, eth_starport_address) {
             Ok(block) => {
-                // if this is not the  first block we queried, confrm its parent hash matches
-                if let Some(last) = acc.last() {
-                    if last.hash != block.parent_hash {
-                        return Err(EventError::InvalidBlockchain);
-                    }
-                }
                 acc.push(block);
             }
             Err(EventError::EthereumClientError(EthereumClientError::NoResult)) => {
@@ -119,7 +112,7 @@ mod tests {
         ];
 
         let fetch_from = blocks_to_return[0].number;
-        let fetch_to = blocks_to_return[blocks_to_return.len() - 1].number;
+        let fetch_to = blocks_to_return[blocks_to_return.len() - 1].number + 1;
         const STARPORT_ADDR: [u8; 20] = [1; 20];
 
         let (offchain, offchain_state) = testing::TestOffchainExt::new();
