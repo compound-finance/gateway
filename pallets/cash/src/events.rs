@@ -68,7 +68,7 @@ fn fetch_eth_blocks(
     to: ChainBlockNumber,
     eth_starport_address: &[u8; 20],
 ) -> Result<ChainBlocks, EventError> {
-    debug!("Fetching Eth Blocks [{}-{}]", from, to);
+    debug!("Fetching Eth Blocks [{}-{})", from, to);
     let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
     for block_number in from..to {
         match fetch_eth_block(block_number, eth_starport_address) {

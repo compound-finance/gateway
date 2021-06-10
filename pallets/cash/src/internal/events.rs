@@ -262,8 +262,8 @@ pub fn formulate_reorg<T: Config>(
     chunk_size: u32,
 ) -> Result<ChainReorg, Reason> {
     let starport = get_starport::<T>(chain_id)?;
-    let mut reverse_blocks: Vec<ChainBlock> = vec![];
-    let mut drawrof_blocks: Vec<ChainBlock> = vec![];
+    let mut reverse_blocks: Vec<ChainBlock> = vec![]; // reverse blocks in correct order
+    let mut drawrof_blocks: Vec<ChainBlock> = vec![]; // forward blocks in reverse order
     let mut reverse_hashes = BTreeSet::<ChainHash>::new();
     let mut reverse_blocks_hash_next = Some(last_block.hash());
     let mut drawrof_blocks_number_next = true_block.number().checked_add(1); // exclusive
@@ -289,7 +289,7 @@ pub fn formulate_reorg<T: Config>(
             None => Vec::new(),
         };
 
-        // its an error if we can't make progress pulling more forward or reverse blocks
+        // it's an error if we can't make progress pulling more forward or reverse blocks
         if reverse_blocks_next.len() == 0 && drawrof_blocks_next.len() == 0 {
             return Err(Reason::CannotFormulateReorg);
         }
