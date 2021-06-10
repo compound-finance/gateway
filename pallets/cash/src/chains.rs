@@ -552,21 +552,6 @@ impl ChainBlockTally {
 
     pub fn has_supporter(&self, validator_id: &ValidatorIdentity) -> bool {
         // note that these set types are not optimized and inefficient
-        log!(
-            "has_supporter: {:?} {:?} {:?} {:?}",
-            self.block,
-            validator_id,
-            self.support
-                .clone()
-                .into_iter()
-                .map(|x| <[u8; 32]>::from(x))
-                .collect::<Vec<_>>(),
-            self.dissent
-                .clone()
-                .into_iter()
-                .map(|x| <[u8; 32]>::from(x))
-                .collect::<Vec<_>>()
-        );
         self.support.contains(&validator_id)
     }
 }
