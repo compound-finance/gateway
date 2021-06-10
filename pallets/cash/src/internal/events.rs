@@ -124,7 +124,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             true_block, last_block
         );
         let pending_reorgs = PendingChainReorgs::get(chain_id);
-        let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block)?;
+        let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block, REORG_CHUNK_SIZE)?;
         if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
             submit_chain_reorg::<T>(&reorg)
         } else {
@@ -259,23 +259,28 @@ pub fn formulate_reorg<T: Config>(
     chain_id: ChainId,
     last_block: &ChainBlock,
     true_block: &ChainBlock,
+    chunk_size: u32,
 ) -> Result<ChainReorg, Reason> {
     let starport = get_starport::<T>(chain_id)?;
-    let mut reverse_blocks: Vec<ChainBlock> = vec![];
-    let mut drawrof_blocks: Vec<ChainBlock> = vec![];
+    let mut reverse_blocks: Vec<ChainBlock> = vec![]; // reverse blocks in correct order
+    let mut drawrof_blocks: Vec<ChainBlock> = vec![]; // forward blocks in reverse order
     let mut reverse_hashes = BTreeSet::<ChainHash>::new();
-    let mut last_block_hash = Some(last_block.hash());
-    let mut true_block_number = Some(true_block.number());
+    let mut reverse_blocks_hash_next = Some(last_block.hash());
+    let mut drawrof_blocks_number_next = true_block.number().checked_add(1); // exclusive
     let common_ancestor = 'search: loop {
-        // note that `drawrof_blocks_next` could be built directly in reverse order
-        let reverse_blocks_next = match last_block_hash {
-            Some(hash) => recall_chain_blocks::<T>(hash, REORG_CHUNK_SIZE)?,
+        // fetch the next batch of blocks, going backwards further each time
+        //  these are the reverse_blocks used by the reorg in the expected order
+        let reverse_blocks_next = match reverse_blocks_hash_next {
+            Some(hash) => recall_chain_blocks::<T>(hash, chunk_size)?,
             None => Vec::new(),
         };
-        let drawrof_blocks_next = match true_block_number {
+
+        // note that `drawrof_blocks_next` *could* be built directly in reverse order
+        //  these are the forward_blocks used by the reorg, but backwards
+        let drawrof_blocks_next = match drawrof_blocks_number_next {
             Some(number) => fetch_chain_blocks(
                 true_block.chain_id(),
-                number.saturating_sub(REORG_CHUNK_SIZE as u64),
+                number.saturating_sub(chunk_size as u64),
                 number,
                 starport,
             )?
@@ -283,15 +288,22 @@ pub fn formulate_reorg<T: Config>(
             .collect_rev(),
             None => Vec::new(),
         };
+
+        // it's an error if we can't make progress pulling more forward or reverse blocks
         if reverse_blocks_next.len() == 0 && drawrof_blocks_next.len() == 0 {
             return Err(Reason::CannotFormulateReorg);
         }
-        last_block_hash = reverse_blocks_next.last().map(|b| b.parent_hash());
-        true_block_number = drawrof_blocks_next.last().map(|b| b.number());
+
+        // be sure to pick up where we left off on the next go round
+        reverse_blocks_hash_next = reverse_blocks_next.last().map(|b| b.parent_hash());
+        drawrof_blocks_number_next = drawrof_blocks_next.last().map(|b| b.number());
+
+        // just add all the reverse blocks to the full list, and index their hashes
         for block in reverse_blocks_next {
             reverse_blocks.push(block.clone());
             reverse_hashes.insert(block.hash());
         }
+
         // note that the following is correct if the original blocks are at the same height
         //  however that fact also makes this entire algorithm obsolete / inefficient
         //   we can simply compare parents at the same height one at a time
@@ -536,13 +548,15 @@ mod tests {
     #[test]
     fn test_formulate_reorg() -> Result<(), Reason> {
         new_test_ext().execute_with(|| {
+            // XXX add a test for multiple chunks
+            const CHUNK: u64 = REORG_CHUNK_SIZE as u64;
             const STARPORT_ADDR: [u8; 20] = [0x77; 20];
 
             // mock the exact chunk of blocks in fetch_eth_blocks in the order they are called
-            let common_ancestor_idx = (params::REORG_CHUNK_SIZE - 1) as u64;
-            let last_block_idx = (params::REORG_CHUNK_SIZE) as u64;
+            let common_ancestor_idx = CHUNK - 1;
+            let last_block_idx = CHUNK;
             let mut prev_blocks: Vec<EthereumBlock> =
-                gen_old_blocks(0, common_ancestor_idx.clone(), 100);
+                gen_old_blocks(last_block_idx - CHUNK + 1, common_ancestor_idx, 100);
             let reorg_hash = [5; 32];
             let ancestor_hash = [3; 32];
             let true_block_hash = [8; 32];
@@ -557,7 +571,7 @@ mod tests {
             let last_block = ethereum_client::EthereumBlock {
                 hash: reorg_hash.clone(),
                 parent_hash: commmon_ancestor_block.hash,
-                number: last_block_idx.clone(),
+                number: last_block_idx,
                 events: vec![],
             };
 
@@ -591,6 +605,7 @@ mod tests {
                     ChainId::Eth,
                     &ChainBlock::Eth(last_block.clone()),
                     &ChainBlock::Eth(true_block.clone()),
+                    CHUNK as u32,
                 )
                 .unwrap();
                 match reorg {

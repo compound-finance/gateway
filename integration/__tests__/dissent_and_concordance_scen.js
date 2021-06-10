@@ -88,24 +88,45 @@ buildScenarios('dissent and concordance', scen_info, [
           events: []
         });
 
-        expect(pendingChainBlocks0[0]).toEqual({
-          block: {
-            eth: {
-              hash: block1.hash,
-              parent_hash: block0.hash,
-              number: 1,
-              events: []
-            }
-          },
-          support: [
-            '0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
-          ],
-          dissent: [
-            '0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20',
-            '0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22'
-          ]
-        });
+        if (pendingChainBlocks0[0].block.eth.hash == block1.hash) {
+          expect(pendingChainBlocks0[0]).toEqual({
+            block: {
+              eth: {
+                hash: block1.hash,
+                parent_hash: block0.hash,
+                number: 1,
+                events: []
+              }
+            },
+            support: [
+              '0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48',
+              '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
+            ],
+            dissent: [
+              '0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20',
+              '0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22'
+            ]
+          });
+        } else {
+          expect(pendingChainBlocks0[0]).toEqual({
+            block: {
+              eth: {
+                hash: badBlock1.result.hash,
+                parent_hash: block0.hash,
+                number: 1,
+                events: []
+              }
+            },
+            dissent: [
+              '0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48',
+              '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
+            ],
+            support: [
+              '0x306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20',
+              '0x90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22'
+            ]
+          });
+        }
       }
 
       async function expectUnstuck(actor) {
@@ -135,21 +156,17 @@ buildScenarios('dissent and concordance', scen_info, [
 
       eth.startMining();
 
-      await sleep(10000); // Mine enough blocks to reach dissent
-      charlie.ethProxy.clear(); // Give Charlie and Dave the correct block #1 data
-      dave.ethProxy.clear();
+      await sleep(15000); // Mine enough blocks to reach dissent
 
-      await sleep(5000)
       await expectStuck(alice); // Everyone is stuck
       await expectStuck(bob);
       await expectStuck(charlie);
       await expectStuck(dave);
 
-
       charlie.ethProxy.clear(); // Give Charlie and Dave the correct block #1 data
       dave.ethProxy.clear();
 
-      await sleep(10000); // Let some things happen
+      await sleep(40000); // Let some things happen
 
       await expectUnstuck(alice); // TODO: Maybe an issue?
       await expectUnstuck(bob);
