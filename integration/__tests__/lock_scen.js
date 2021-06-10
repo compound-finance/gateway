@@ -114,7 +114,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       });
       // Note: we don't differentiate between the two "ChainAccount" arguments here.
       expect(event).toMatchChainEvent({
-        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
+        ChainAccount: { eth: ashley.ethAddress().toLowerCase() },
       });
       let data = getEventData(event);
       expect(data.CashPrincipalAmount).toBeCloseTo(99999996, -1); // TODO: Check this better
