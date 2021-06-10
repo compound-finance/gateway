@@ -23,16 +23,6 @@ let now = Date.now();
 buildScenarios('Lock Scenarios', lock_scen_info, [
   {
     name: 'Lock Collateral',
-    info: {
-      validators: {
-        alice: {
-          eth_proxy: true,
-        },
-        bob: {
-          eth_proxy: true,
-        }
-      }
-    },
     scenario: async ({ ashley, usdc, chain }) => {
       await ashley.lock(100, usdc);
       expect(await ashley.tokenBalance(usdc)).toEqual(900);

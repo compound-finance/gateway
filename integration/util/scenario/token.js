@@ -365,7 +365,7 @@ async function buildTokens(tokensInfoHash, scenInfo, ctx) {
 
   let etherToken = new EtherToken(scenInfo.eth_liquidity_factor, ctx);
   tokens.push(etherToken);
-  if (!!scenInfo.eth_supply_cap) {
+  if (scenInfo.eth_supply_cap) {
     await etherToken.setSupplyCap(scenInfo.eth_supply_cap);
   }
   tokens.push(ctx.ethCashToken);

@@ -55,6 +55,7 @@ fn fetch_eth_block(
     number: ChainBlockNumber,
     eth_starport_address: &[u8; 20],
 ) -> Result<EthereumBlock, EventError> {
+    debug!("Fetching Eth Block {}", number);
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
         .ok_or(EventError::NoRpcUrl)?;
     let eth_block = ethereum_client::get_block(&eth_rpc_url, eth_starport_address, number)
