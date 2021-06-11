@@ -9,9 +9,6 @@ let lock_scen_info = {
 
 buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
   {
-    info: {
-      block_time: 1
-    },
     name: 'Re-org Lock Collateral and Lock Different Amount',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth, logger }) => {
       let snapshotId = await eth.snapshot();
@@ -35,9 +32,6 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
     }
   },
   {
-    info: {
-      block_time: 1
-    },
     name: 'Re-org Lock Collateral but Send Away Elsewhere',
     scenario: async ({ ashley, bert, usdc, chain, snapshot, starport, eth, logger }) => {
       let snapshotId = await eth.snapshot();
@@ -66,45 +60,26 @@ buildScenarios('Chain Re-organization Scenarios', lock_scen_info, [
     only: true, // TODO FIX SCEN
     name: 'Re-org with Identical Tx',
     scenario: async ({ ashley, bert, ether, chain, snapshot, starport, eth, sleep }) => {
-      console.log("aab0");
       let crazyLock = await eth.__deploy('CrazyLock', [starport.ethAddress()]);
-      console.log("aab1");
-      let now = Date.now() / 1000;
-      console.log("aab2");
-      let nowEven = now - (now % 2);
-      let nowOdd = nowEven + 1;
 
       let snapshotId = await eth.snapshot();
-      console.log("aab3");
-      await eth.mine(1, nowEven);
-      console.log("aab4", ashley.ethAddress(), {value: "1000000000000000000", from: ashley.ethAddress()});
-      let tx0 = await crazyLock.methods.crazyLock(ashley.ethAddress()).send({value: "1000000000000000000", from: ashley.ethAddress()});
-      console.log("aab5");
+      let tx0 = await crazyLock.methods.crazyLock(ashley.ethAddress()).send({value: 0.1e18, from: ashley.ethAddress()});
       await eth.mine(20);
-      console.log("aab6");
       await chain.waitForEthProcessEvent('cash', ether.lockEventName());
-      console.log("aab7");
 
       expect(await ashley.chainBalance(ether)).toEqual(0.1);
       expect(await starport.tokenBalance(ether)).toEqual(0.1);
 
       // Now it's time for the re-org
-      console.log("aab8");
       await eth.restore(snapshotId);
-      console.log("aab9");
-      await eth.mine(1, nowOdd);
-      console.log("aab10");
-      let tx1 = await crazyLock.methods.crazyLock(ashley.ethAddress()).send({value: 0.1e18, from: ashley.ethAddress()});
-      console.log("aab11");
+      let tx1 = await crazyLock.methods.halt().send({from: bert.ethAddress()});
+      let tx2 = await crazyLock.methods.crazyLock(ashley.ethAddress()).send({value: 0.1e18, from: ashley.ethAddress()});
       await eth.mine(20);
-      console.log("aab12");
+      await chain.blocks(5);
       await chain.waitForEvent('cash', 'ReorgRevertLocked');
-      console.log("aab13");
 
       // Show that the transaction itself is the same
-      expect(tx0.transactionHash).toEqual(tx1.transactionHash);
-      expect(tx0.blockNumber).toEqual(tx1.blockNumber);
-      expect(tx0.transactionIndex).toEqual(tx1.transactionIndex);
+      expect(tx0.transactionHash).toEqual(tx2.transactionHash);
 
       expect(await ashley.chainBalance(ether)).toEqual(0);
       expect(await starport.tokenBalance(ether)).toEqual(0);
