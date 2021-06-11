@@ -9397,6 +9397,7 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "logos",
+ "our-std",
 ]
 
 [[package]]

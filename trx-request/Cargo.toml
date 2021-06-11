@@ -8,4 +8,10 @@ edition = "2018"
 logos = "0.12"
 hex = "0.4.2"
 
+our-std = { path = '../our-std', default-features = false }
+
 [features]
+default = ["std"]
+std = [
+    "our-std/std",
+]

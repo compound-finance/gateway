@@ -524,7 +524,6 @@ mod tests {
     use super::*;
     use crate::tests::*;
     use ethereum_client::EthereumBlock;
-    use params;
     use sp_core::offchain::testing;
     use sp_core::offchain::{OffchainDbExt, OffchainWorkerExt};
 

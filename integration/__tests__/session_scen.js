@@ -41,7 +41,7 @@ buildScenarios('Session Scenarios', session_scen_info, [
     }
   },
   {
-    skip: true, // TODO FIX SCEN
+    only: true, // TODO FIX SCEN
     name: "Add New Authority with Session Keys",
     scenario: async ({ api, alice, bob, chain, starport, validators, keyring }) => {
       // Spin up new validator Charlie and add to auth set

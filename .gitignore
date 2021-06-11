@@ -23,6 +23,7 @@ ops/deployment*
 
 # Just for integration test
 node_modules
+integration/.repl_history
 integration/chainSpec.json
 integration/*.xml
 

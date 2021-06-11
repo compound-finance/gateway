@@ -5,7 +5,8 @@ mod hex_util;
 mod lex;
 use lex::{lex, Token};
 use logos::Lexer;
-use std::convert::TryInto;
+
+use our_std::convert::TryInto;
 
 pub type Amount = u128;
 
@@ -17,6 +18,7 @@ pub enum MaxAmount {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Chain {
+    Gate,
     Eth,
 }
 
@@ -28,6 +30,7 @@ pub enum Asset {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Account {
+    Gate([u8; 32]),
     Eth([u8; 20]),
 }
 
@@ -43,7 +46,8 @@ pub enum ParseError<'a> {
     NotImplemented,
     LexError(&'a str),
     InvalidAmount,
-    InvalidAddress,
+    InvalidAccount,
+    InvalidAsset,
     InvalidArgs(&'static str, usize, usize),
     UnknownFunction(&'a str),
     InvalidExpression,
@@ -68,13 +72,28 @@ fn parse_max_amount<'a>(t: &Token) -> Result<MaxAmount, ParseError<'a>> {
 
 fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     match chain {
+        "Gate" => Ok(Chain::Gate),
         "Eth" => Ok(Chain::Eth),
         _ => Err(ParseError::InvalidChain(chain)),
     }
 }
 
+fn parse_gate_address<'a>(account: &'a str) -> Result<[u8; 32], ParseError<'a>> {
+    // TODO: handle SS58 encoded addresses as well
+    if let Some(stripped) = account.strip_prefix("0x") {
+        let decoded: Vec<u8> =
+            hex::decode(stripped).map_err(|_| ParseError::InvalidChainAccount(Chain::Gate))?;
+        let address: [u8; 32] = decoded
+            .try_into()
+            .map_err(|_| ParseError::InvalidChainAccount(Chain::Gate))?;
+        Ok(address)
+    } else {
+        Err(ParseError::InvalidChainAccount(Chain::Gate))?
+    }
+}
+
 fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
-    if &account[0..2] != "0x" {
+    if account.len() < 2 || &account[0..2] != "0x" {
         Err(ParseError::InvalidChainAccount(Chain::Eth))?;
     }
 
@@ -89,12 +108,14 @@ fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
 
 fn parse_chain_account<'a>(chain: Chain, address: &'a str) -> Result<Account, ParseError<'a>> {
     match chain {
+        Chain::Gate => Ok(Account::Gate(parse_gate_address(address)?)),
         Chain::Eth => Ok(Account::Eth(parse_eth_address(address)?)),
     }
 }
 
 fn parse_chain_asset<'a>(chain: Chain, address: &'a str) -> Result<Asset, ParseError<'a>> {
     match chain {
+        Chain::Gate => Err(ParseError::InvalidAsset),
         Chain::Eth => Ok(Asset::Eth(parse_eth_address(address)?)),
     }
 }
@@ -105,18 +126,18 @@ fn parse_account<'a>(t: &Token<'a>) -> Result<Account, ParseError<'a>> {
             let chain = parse_chain(chain_str)?;
             Ok(parse_chain_account(chain, account_str)?)
         }
-        _ => Err(ParseError::InvalidAddress),
+        _ => Err(ParseError::InvalidAccount),
     }
 }
 
 fn parse_asset<'a>(t: &Token<'a>) -> Result<Asset, ParseError<'a>> {
     match t {
         Token::Identifier("Cash") | Token::Identifier("CASH") => Ok(Asset::Cash),
-        Token::Pair(Some((chain_str, account_str))) => {
+        Token::Pair(Some((chain_str, asset_str))) => {
             let chain = parse_chain(chain_str)?;
-            Ok(parse_chain_asset(chain, account_str)?)
+            Ok(parse_chain_asset(chain, asset_str)?)
         }
-        _ => Err(ParseError::InvalidAddress),
+        _ => Err(ParseError::InvalidAsset),
     }
 }
 
@@ -205,107 +226,117 @@ pub fn parse_request<'a>(request: &'a str) -> Result<TrxRequest, ParseError<'a>>
 mod tests {
     use crate::*;
 
-    const ALAN: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-    const ETH: [u8; 20] = [
-        238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
-        238, 238,
-    ];
+    const ALAN: [u8; 20] = [1; 20];
+    const BERT: [u8; 32] = [2; 32];
+    const ETH: [u8; 20] = [238; 20];
 
     macro_rules! parse_tests {
-    ($($name:ident: $input:expr => $exp:expr,)*) => {
-    $(
-        #[test]
-        fn $name() {
-          assert_eq!(
-            $exp,
-            parse_request($input)
-          )
+        ($($name:ident: $input:expr => $exp:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    assert_eq!(
+                        $exp,
+                        parse_request($input)
+                    )
+                }
+            )*
         }
-    )*
     }
-  }
 
     parse_tests! {
-      parse_fail_lex_error:
+        parse_fail_lex_error:
         "(fricassée)" => Err(ParseError::LexError("é")),
-      parse_fail_invalid_expression:
+        parse_fail_invalid_expression:
         "hello" => Err(ParseError::InvalidExpression),
-      parse_fail_unknown_function:
+        parse_fail_unknown_function:
         "(MyFun 3 Eth:0x55)" => Err(ParseError::UnknownFunction("MyFun")),
-      parse_extract:
+        parse_extract:
         "(Extract 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          MaxAmount::Amount(3),
-          Asset::Eth(ETH),
-          Account::Eth(ALAN)
+            MaxAmount::Amount(3),
+            Asset::Eth(ETH),
+            Account::Eth(ALAN)
         )),
-      parse_extract_cash_in_caps:
+        parse_extract_cash_in_caps:
         "(Extract 3 CASH Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          MaxAmount::Amount(3),
-          Asset::Cash,
-          Account::Eth(ALAN)
+            MaxAmount::Amount(3),
+            Asset::Cash,
+            Account::Eth(ALAN)
         )),
-      parse_extract_cash_in_camel:
+        parse_extract_cash_in_camel:
         "(Extract 3 Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          MaxAmount::Amount(3),
-          Asset::Cash,
-          Account::Eth(ALAN)
+            MaxAmount::Amount(3),
+            Asset::Cash,
+            Account::Eth(ALAN)
         )),
-      parse_extract_hex:
+        parse_extract_hex:
         "(Extract 0x0100 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          MaxAmount::Amount(256),
-          Asset::Eth(ETH),
-          Account::Eth(ALAN)
+            MaxAmount::Amount(256),
+            Asset::Eth(ETH),
+            Account::Eth(ALAN)
         )),
-      parse_extract_max:
+        parse_extract_max:
         "(Extract Max Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          MaxAmount::Max,
-          Asset::Cash,
-          Account::Eth(ALAN)
+            MaxAmount::Max,
+            Asset::Cash,
+            Account::Eth(ALAN)
         )),
-      parse_extract_max_caps:
+        parse_extract_max_caps:
         "(Extract MAX Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Extract(
-          MaxAmount::Max,
-          Asset::Cash,
-          Account::Eth(ALAN)
+            MaxAmount::Max,
+            Asset::Cash,
+            Account::Eth(ALAN)
         )),
-      parse_transfer:
+        parse_transfer:
         "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Transfer(
-          MaxAmount::Amount(3),
-          Asset::Eth(ETH),
-          Account::Eth(ALAN)
+            MaxAmount::Amount(3),
+            Asset::Eth(ETH),
+            Account::Eth(ALAN)
         )),
-      parse_transfer_max:
+        parse_fail_transfer_gate_asset:
+        "(Transfer 3 Gate:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAsset),
+        parse_fail_transfer_gate_account_tiny:
+        "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Gate:0)" => Err(ParseError::InvalidChainAccount(Chain::Gate)),
+        parse_fail_transfer_gate_account_short:
+        "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Gate:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Gate)),
+        parse_transfer_gate:
+        "(Transfer 3 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Gate:0x0202020202020202020202020202020202020202020202020202020202020202)" => Ok(TrxRequest::Transfer(
+            MaxAmount::Amount(3),
+            Asset::Eth(ETH),
+            Account::Gate(BERT)
+        )),
+        parse_transfer_max:
         "(Transfer Max Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Transfer(
-          MaxAmount::Max,
-          Asset::Eth(ETH),
-          Account::Eth(ALAN)
+            MaxAmount::Max,
+            Asset::Eth(ETH),
+            Account::Eth(ALAN)
         )),
-      parse_liquidate_amount:
+        parse_liquidate_amount:
         "(Liquidate 55 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Cash Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Liquidate(
-          MaxAmount::Amount(55),
-          Asset::Eth(ETH),
-          Asset::Cash,
-          Account::Eth(ALAN)
+            MaxAmount::Amount(55),
+            Asset::Eth(ETH),
+            Asset::Cash,
+            Account::Eth(ALAN)
         )),
-      parse_liquidate_max:
+        parse_liquidate_max:
         "(Liquidate Max Cash Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Ok(TrxRequest::Liquidate(
-          MaxAmount::Max,
-          Asset::Cash,
-          Asset::Eth(ETH),
-          Account::Eth(ALAN)
+            MaxAmount::Max,
+            Asset::Cash,
+            Asset::Eth(ETH),
+            Account::Eth(ALAN)
         )),
-      // TODO: Should we prohibit non-Cash from being Maxable?
-      parse_fail_no_zero_ex:
+        // TODO: Should we prohibit non-Cash from being Maxable?
+        parse_fail_no_zero_ex:
         "(Extract 3 Eth:xxeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
-      parse_fail_invalid_amount_invalid:
+        parse_fail_invalid_amount_invalid:
         "(Extract hi Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
-      parse_fail_invalid_amount_too_large_int:
+        parse_fail_invalid_amount_too_large_int:
         "(Extract 340282366920938463463374607431768211456 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
-      parse_fail_invalid_amount_too_large_hex:
+        parse_fail_invalid_amount_too_large_hex:
         "(Extract 0xffffffffffffffffffffffffffffffff00 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidAmount),
-      parse_fail_invalid_asset:
+        parse_fail_invalid_asset:
         "(Extract 5 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeff Eth:0x0101010101010101010101010101010101010101)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
-      parse_fail_invalid_recipient:
+        parse_fail_invalid_recipient:
         "(Extract 5 Eth:0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee Eth:0x0101010101010101010101010101010101010101ff)" => Err(ParseError::InvalidChainAccount(Chain::Eth)),
     }
 }
