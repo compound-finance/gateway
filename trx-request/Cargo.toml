@@ -8,4 +8,8 @@ edition = "2018"
 logos = "0.12"
 hex = "0.4.2"
 
+sp-core = { default-features = false, features = ['full_crypto'], git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+
+our-std = { path = '../our-std', default-features = false }
+
 [features]

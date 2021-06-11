@@ -5,7 +5,8 @@ mod hex_util;
 mod lex;
 use lex::{lex, Token};
 use logos::Lexer;
-use std::convert::TryInto;
+use sp_core::crypto::AccountId32;
+use our_std::{convert::TryInto, str::FromStr};
 
 pub type Amount = u128;
 
@@ -17,6 +18,7 @@ pub enum MaxAmount {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Chain {
+    Gate,
     Eth,
 }
 
@@ -28,6 +30,7 @@ pub enum Asset {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Account {
+    Gate([u8; 32]),
     Eth([u8; 20]),
 }
 
@@ -43,7 +46,8 @@ pub enum ParseError<'a> {
     NotImplemented,
     LexError(&'a str),
     InvalidAmount,
-    InvalidAddress,
+    InvalidAccount,
+    InvalidAsset,
     InvalidArgs(&'static str, usize, usize),
     UnknownFunction(&'a str),
     InvalidExpression,
@@ -68,8 +72,16 @@ fn parse_max_amount<'a>(t: &Token) -> Result<MaxAmount, ParseError<'a>> {
 
 fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     match chain {
+        "Gate" => Ok(Chain::Gate),
         "Eth" => Ok(Chain::Eth),
         _ => Err(ParseError::InvalidChain(chain)),
+    }
+}
+
+fn parse_gate_address<'a>(account: &'a str) -> Result<[u8; 32], ParseError<'a>> {
+    match AccountId32::from_str(account) {
+        Ok(account_id) => Ok(account_id.into()),
+        Err(_) => Err(ParseError::InvalidChainAccount(Chain::Gate)),
     }
 }
 
@@ -89,12 +101,14 @@ fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
 
 fn parse_chain_account<'a>(chain: Chain, address: &'a str) -> Result<Account, ParseError<'a>> {
     match chain {
+        Chain::Gate => Ok(Account::Gate(parse_gate_address(address)?)),
         Chain::Eth => Ok(Account::Eth(parse_eth_address(address)?)),
     }
 }
 
 fn parse_chain_asset<'a>(chain: Chain, address: &'a str) -> Result<Asset, ParseError<'a>> {
     match chain {
+        Chain::Gate => Err(ParseError::InvalidAsset),
         Chain::Eth => Ok(Asset::Eth(parse_eth_address(address)?)),
     }
 }
@@ -105,18 +119,18 @@ fn parse_account<'a>(t: &Token<'a>) -> Result<Account, ParseError<'a>> {
             let chain = parse_chain(chain_str)?;
             Ok(parse_chain_account(chain, account_str)?)
         }
-        _ => Err(ParseError::InvalidAddress),
+        _ => Err(ParseError::InvalidAccount),
     }
 }
 
 fn parse_asset<'a>(t: &Token<'a>) -> Result<Asset, ParseError<'a>> {
     match t {
         Token::Identifier("Cash") | Token::Identifier("CASH") => Ok(Asset::Cash),
-        Token::Pair(Some((chain_str, account_str))) => {
+        Token::Pair(Some((chain_str, asset_str))) => {
             let chain = parse_chain(chain_str)?;
-            Ok(parse_chain_asset(chain, account_str)?)
+            Ok(parse_chain_asset(chain, asset_str)?)
         }
-        _ => Err(ParseError::InvalidAddress),
+        _ => Err(ParseError::InvalidAsset),
     }
 }
 
