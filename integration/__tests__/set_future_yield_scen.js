@@ -7,7 +7,6 @@ let set_future_yield_scen_info = {
 
 buildScenarios('Set Future Yield Scenarios', set_future_yield_scen_info, [
   {
-    only: true, // TODO FIX SCEN
     name: 'Set a future yield',
     scenario: async ({ api, ashley, cash, chain, starport, zrx }) => {
       expect(await cash.nextCashYieldStart(zrx)).toEqual('0');
