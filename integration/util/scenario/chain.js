@@ -18,8 +18,14 @@ function hexByte(x) {
 }
 
 class Chain {
-  constructor(ctx) {
+  constructor(viaApi, ctx) {
+    this.viaApi = viaApi;
     this.ctx = ctx;
+  }
+
+  via(validatorOrApi) {
+    let viaApi = validatorOrApi.api ? validatorOrApi.api : validatorOrApi;
+    return new Chain(viaApi, this.ctx)
   }
 
   toSS58 (arr) {
@@ -38,7 +44,7 @@ class Chain {
   }
 
   api() {
-    return this.ctx.getApi();
+    return this.viaApi || this.ctx.getApi();
   }
 
   async waitForEvent(pallet, eventName, onFinalize = true, failureEvent = null) {
@@ -257,11 +263,12 @@ class Chain {
   }
 
   async getSemVer() {
+    let semVer = await this.getRuntimeVersion();
     let {
       authoringVersion,
       specVersion,
       implVersion
-    } = await this.getRuntimeVersion();
+    } = semVer;
 
     return [authoringVersion, specVersion, implVersion];
   }
@@ -319,7 +326,33 @@ class Chain {
   }
 
   async newBlock() {
-    await this.ctx.eventTracker.newBlock();
+    return await this.ctx.eventTracker.newBlock();
+  }
+
+  async getBlockHeader() {
+    return (await this.api().rpc.chain.getHeader()).toJSON();
+  }
+
+  async getBlockNumber() {
+    let header = await this.getBlockHeader();
+    return header.number;
+  }
+
+  async blocks(n) {
+    const blockNum = await this.getBlockNumber();
+    return await this.untilBlock(blockNum + n);
+  }
+
+  async untilBlock(number) {
+    await this.ctx.until(async () => {
+      const blockNum = await this.getBlockNumber();
+      if (blockNum < number) {
+        this.ctx.log(`Waiting for block=${number}, curr=${blockNum}`);
+        return false;
+      } else {
+        return true;
+      }
+    }, { delay: 1000 });
   }
 
   async waitUntilSession(target) {
@@ -345,7 +378,7 @@ class Chain {
 
 
 function buildChain(ctx) {
-  return new Chain(ctx);
+  return new Chain(null, ctx);
 }
 
 module.exports = {

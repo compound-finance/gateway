@@ -1,7 +1,7 @@
 use our_std::convert::TryInto;
 
 pub fn decode_hex(data: &String) -> Option<Vec<u8>> {
-    if data.len() < 2 || &data[0..2] != "0x" {
+    if data.len() < 2 || !data.starts_with("0x") {
         None
     } else {
         hex::decode(&data[2..]).ok()
@@ -28,7 +28,7 @@ pub fn parse_word(val_opt: Option<String>) -> Option<[u8; 32]> {
 //       and then padding.
 // Note: this is an internal function and does not parse the hex digits themselves
 fn pad(val: String) -> Option<String> {
-    if val.len() > 66 || val.len() < 2 || &val[0..2] != "0x" {
+    if val.len() > 66 || val.len() < 2 || !val.starts_with("0x") {
         None
     } else {
         let mut s = String::with_capacity(64);
@@ -64,6 +64,7 @@ mod tests {
         assert_eq!(decode_hex(&String::from("")), None);
         assert_eq!(decode_hex(&String::from("0")), None);
         assert_eq!(decode_hex(&String::from("0xr")), None);
+        assert_eq!(decode_hex(&String::from("0💙")), None);
         assert_eq!(decode_hex(&String::from("0x💙")), None);
         assert_eq!(decode_hex(&String::from("0x💙💙")), None);
         assert_eq!(decode_hex(&String::from("0xṰ̺̺̕o͞ ̷i̲̬͇̪͙n̝̗͕v̟̜̘̦͟o̶̙̰̠k")), None);

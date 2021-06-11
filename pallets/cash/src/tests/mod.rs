@@ -1,12 +1,15 @@
 #![allow(non_upper_case_globals)]
 
 pub use codec::{Decode, Encode};
+use ethereum_client::encode_block_hex;
 pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 pub use hex_literal::hex;
 pub use our_std::convert::TryInto;
 pub use our_std::{iter::FromIterator, str::FromStr};
+use parking_lot::RwLock;
 pub use sp_core::crypto::AccountId32;
-pub use sp_core::offchain::testing;
+use sp_core::offchain::testing;
+use std::sync::Arc;
 
 pub mod assets;
 pub mod common;
@@ -24,6 +27,8 @@ pub use crate::{
 };
 
 use test_env_log::test;
+
+pub type SysEvent = frame_system::Event<Test>;
 
 #[macro_export]
 macro_rules! bal {
@@ -198,6 +203,70 @@ pub fn b_receive_chain_reorg(reorg: &ChainReorg) -> Result<(), DispatchError> {
 pub fn all_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchError> {
     a_receive_chain_blocks(blocks)?;
     b_receive_chain_blocks(blocks)
+}
+
+pub fn gen_mock_responses(
+    state: Arc<RwLock<testing::OffchainState>>,
+    blocks: Vec<ethereum_client::EthereumBlock>,
+    starport_address: <Ethereum as Chain>::Address,
+) {
+    let mut s = state.write();
+    for block in blocks {
+        let block_str = encode_block_hex(block.number);
+
+        let get_block_params: Vec<serde_json::Value> = vec![block_str.clone().into(), true.into()];
+
+        let get_block_data = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": get_block_params,
+            "id":1
+        });
+
+        let get_block_result = serde_json::json!({
+            "result": {
+                "hash":format!("0x{}", hex::encode(&block.hash[..])),
+                "number": block_str,
+                "parentHash": format!("0x{}", hex::encode(&block.parent_hash[..])),
+            }
+        });
+
+        let get_block = testing::PendingRequest {
+            method: "POST".into(),
+            uri: "https://ropsten-eth.compound.finance".into(),
+            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            body: serde_json::to_vec(&get_block_data).unwrap(),
+            response: Some(serde_json::to_vec(&get_block_result).unwrap()),
+            sent: true,
+            ..Default::default()
+        };
+
+        let get_logs_params = vec![serde_json::json!({
+            "address": format!("0x{}", ::hex::encode(&starport_address[..])),
+            "fromBlock": &block_str,
+            "toBlock": &block_str,
+        })];
+
+        let get_logs_data = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_getLogs",
+            "params": get_logs_params,
+            "id":1
+        });
+
+        let get_logs = testing::PendingRequest {
+            method: "POST".into(),
+            uri: "https://ropsten-eth.compound.finance".into(),
+            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            body: serde_json::to_vec(&get_logs_data).unwrap(),
+            response: Some(br#"{"jsonrpc":"2.0","id":1,"result":[{"address":"0xd905abba1c5ea48c0598be9f3f8ae31290b58613","blockHash":"0xc94ceed3c8c68f09b1c7be28f594cc6fb01f9cdd7b68f3bf516cab9e89486fcf","blockNumber":"0x9928cb","data":"0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000","logIndex":"0x58","removed":false,"topics":["0xc459acef3ffe957663bb49d644b20d0c790bcb41573893752a72ba6f023b9386","0x000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x000000000000000000000000d3a38d4bd07b87e4516f30ee46cfe8ec4e8b73a4","0xd3a38d4bd07b87e4516f30ee46cfe8ec4e8b73a4000000000000000000000000"],"transactionHash":"0xbae1c242aea30e9ae20cb6c37e2f2d08982e31b42bf3d7dbde6466396abb360e","transactionIndex":"0x24"}]}"#.to_vec()),
+            sent: true,
+            ..Default::default()
+        };
+
+        s.expect_request(get_block);
+        s.expect_request(get_logs);
+    }
 }
 
 #[test]

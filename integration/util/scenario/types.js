@@ -2,18 +2,18 @@ const Web3Utils = require('web3-utils');
 const ABICoder = require('web3-eth-abi');
 
 function getNoticeChainId(notice) {
-  if (notice.Notice.ExtractionNotice && notice.Notice.ExtractionNotice.Eth) {
+  if (notice.Notice.extractionNotice && notice.Notice.extractionNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.CashExtractionNotice && notice.Notice.CashExtractionNotice.Eth) {
+  } else if (notice.Notice.cashExtractionNotice && notice.Notice.cashExtractionNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.FutureYieldNotice && notice.Notice.FutureYieldNotice.Eth) {
+  } else if (notice.Notice.futureYieldNotice && notice.Notice.futureYieldNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.SetSupplyCapNotice && notice.Notice.SetSupplyCapNotice.Eth) {
+  } else if (notice.Notice.setSupplyCapNotice && notice.Notice.setSupplyCapNotice.eth) {
     return 'Eth';
-  } else if (notice.Notice.ChangeAuthorityNotice && notice.Notice.ChangeAuthorityNotice.Eth) {
+  } else if (notice.Notice.changeAuthorityNotice && notice.Notice.changeAuthorityNotice.eth) {
     return 'Eth';
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
+    throw `Unknown notice chain in getNoticeChainId: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
@@ -28,8 +28,8 @@ function encodeNoticeWith(notice, signature, args) {
 }
 
 function encodeNotice(notice) {
-  if (notice.ExtractionNotice && notice.ExtractionNotice.Eth) {
-    let ethNotice = notice.ExtractionNotice.Eth;
+  if (notice.extractionNotice && notice.extractionNotice.eth) {
+    let ethNotice = notice.extractionNotice.eth;
 
     return encodeNoticeWith(
       ethNotice,
@@ -108,23 +108,23 @@ function encodeNotice(notice) {
       [ethNotice.new_authorities]
     );
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
+    throw `Unknown notice chain in encodeNotice: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
 function getNoticeParentHash(notice) {
-  if (notice.ExtractionNotice && notice.ExtractionNotice.Eth) {
-    return notice.ExtractionNotice.Eth.parent;
-  } else if (notice.CashExtractionNotice && notice.CashExtractionNotice.Eth) {
-    return notice.CashExtractionNotice.Eth.parent;
-  } else if (notice.FutureYieldNotice && notice.FutureYieldNotice.Eth) {
-    return notice.FutureYieldNotice.Eth.parent;
-  } else if (notice.SetSupplyCapNotice && notice.SetSupplyCapNotice.Eth) {
-    return notice.SetSupplyCapNotice.Eth.parent;
-  } else if (notice.ChangeAuthorityNotice && notice.ChangeAuthorityNotice.Eth) {
-    return notice.ChangeAuthorityNotice.Eth.parent;
+  if (notice.extractionNotice && notice.extractionNotice.eth) {
+    return notice.extractionNotice.eth.parent;
+  } else if (notice.cashExtractionNotice && notice.cashExtractionNotice.eth) {
+    return notice.cashExtractionNotice.eth.parent;
+  } else if (notice.futureYieldNotice && notice.futureYieldNotice.eth) {
+    return notice.futureYieldNotice.eth.parent;
+  } else if (notice.setSupplyCapNotice && notice.setSupplyCapNotice.eth) {
+    return notice.setSupplyCapNotice.eth.parent;
+  } else if (notice.changeAuthorityNotice && notice.changeAuthorityNotice.eth) {
+    return notice.changeAuthorityNotice.eth.parent;
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
+    throw `Unknown notice chain in getNoticeParentHash: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
@@ -140,21 +140,21 @@ function getNoticeId(notice) {
   } else if (notice.ChangeAuthorityNotice) {
     return notice.ChangeAuthorityNotice.id;
   } else {
-    throw `Unknown notice chain: ${JSON.stringify(notice.Notice)}`;
+    throw `Unknown notice chain in getNoticeId: ${JSON.stringify(notice.Notice)}`;
   }
 }
 
 function getRawHash(hash) {
-  if (hash.Comp) {
-    return hash.Comp;
-  } else if (hash.Eth) {
-    return hash.Eth;
-  } else if (hash.Dot) {
-    return hash.Dot;
-  } else if (hash.Sol) {
-    return hash.Sol;
-  } else if (hash.Tez) {
-    return hash.Tez;
+  if (hash.comp) {
+    return hash.comp;
+  } else if (hash.eth) {
+    return hash.eth;
+  } else if (hash.dot) {
+    return hash.dot;
+  } else if (hash.sol) {
+    return hash.sol;
+  } else if (hash.tez) {
+    return hash.tez;
   } else {
     throw new Error(`Unknown hash: ${JSON.stringify(hash)}`);
   }

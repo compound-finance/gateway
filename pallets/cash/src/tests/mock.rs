@@ -1,11 +1,10 @@
 use crate::{self as pallet_cash, *};
 use codec::alloc::sync::Arc;
-use pallet_oracle;
 use parking_lot::RwLock;
 use sp_core::{
     offchain::{
         testing::{self, OffchainState, PoolState},
-        OffchainExt, TransactionPoolExt,
+        OffchainDbExt, OffchainWorkerExt, TransactionPoolExt,
     },
     H256,
 };
@@ -13,8 +12,8 @@ use sp_runtime::{
     generic, impl_opaque_keys,
     testing::{Header, TestXt, UintAuthorityId},
     traits::{
-        BlakeTwo256, Block as BlockT, ConvertInto, Extrinsic as ExtrinsicT, IdentifyAccount,
-        IdentityLookup, OpaqueKeys, Verify,
+        BlakeTwo256, ConvertInto, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup,
+        OpaqueKeys, Verify,
     },
     MultiAddress, MultiSignature as Signature,
 };
@@ -84,11 +83,11 @@ frame_support::construct_runtime!(
     NodeBlock = Block,
     UncheckedExtrinsic = UncheckedExtrinsic,
     {
-        System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-        Oracle: pallet_oracle::{Module, Call, Config, Storage, Event, Inherent},
-        Cash: pallet_cash::{Module, Call, Config, Storage, Event, Inherent},
-        Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
+        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+        Oracle: pallet_oracle::{Pallet, Call, Config, Storage, Event, Inherent},
+        Cash: pallet_cash::{Pallet, Call, Config, Storage, Event, Inherent},
+        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>},
     }
 );
 
@@ -119,6 +118,7 @@ impl frame_system::Config for Test {
     type AccountData = ();
     type OnNewAccount = ();
     type OnKilledAccount = ();
+    type OnSetCode = ();
     type SystemWeightInfo = ();
     type SS58Prefix = SS58Prefix;
 }
@@ -204,7 +204,8 @@ pub fn new_test_ext_with_http_calls(
     // XXX
     // let mut test_externalities: sp_io::TestExternalities = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
     let mut test_externalities = sp_io::TestExternalities::default();
-    test_externalities.register_extension(OffchainExt::new(offchain));
+    test_externalities.register_extension(OffchainDbExt::new(offchain.clone()));
+    test_externalities.register_extension(OffchainWorkerExt::new(offchain));
     test_externalities.register_extension(TransactionPoolExt::new(pool));
 
     {

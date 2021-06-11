@@ -1,3 +1,14 @@
+// Note: The substrate build requires these be re-exported.
+pub use our_std::{
+    cmp::{max, min},
+    collections::btree_map::BTreeMap,
+    collections::btree_set::BTreeSet,
+    convert::{TryFrom, TryInto},
+    fmt, result,
+    result::Result,
+    str,
+};
+
 use crate::{
     chains::{
         self, Chain, ChainAccount, ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents,
@@ -11,19 +22,19 @@ use crate::{
         AssetAmount, AssetBalance, Balance, CashPrincipalAmount, GovernanceResult, NoticeId,
         SignersSet, Timestamp, ValidatorKeys,
     },
-    AssetBalances, CashIndex, CashPrincipals, CashYield, Config, Event, GlobalCashIndex,
-    IngressionQueue, LastProcessedBlock, Module, Starports, SupportedAssets, TotalBorrowAssets,
-    TotalCashPrincipal, TotalSupplyAssets, Validators,
+    AssetBalances, AssetsWithNonZeroBalance, CashIndex, CashPrincipals, CashYield, Config, Event,
+    GlobalCashIndex, IngressionQueue, LastProcessedBlock, Pallet, Starports, SupportedAssets,
+    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 use codec::Decode;
-use frame_support::traits::UnfilteredDispatchable;
 use frame_support::{
     sp_runtime::traits::Convert,
-    storage::{IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue},
+    storage::{
+        IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
+    },
+    traits::UnfilteredDispatchable,
 };
-
-pub use our_std::{fmt, result};
 
 // Public helper functions //
 
@@ -47,7 +58,7 @@ pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
 /// Return the recent timestamp (from the timestamp pallet).
 #[cfg(not(all(feature = "freeze-time", feature = "std")))]
 pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
-    let ts = <pallet_timestamp::Module<T>>::get();
+    let ts = <pallet_timestamp::Pallet<T>>::get();
     let time = T::TimeConverter::convert(ts);
     if time > 0 {
         return Ok(time);
@@ -57,7 +68,7 @@ pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
 
 /// Return the event ingression queue for the underlying chain.
 pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents, Reason> {
-    Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)))
+    Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)?))
 }
 
 /// Return the last processed block for the underlying chain, or the initial one for the starport.
@@ -94,16 +105,59 @@ pub fn get_cash_data<T: Config>() -> Result<(CashIndex, CashPrincipalAmount), Re
     Ok((GlobalCashIndex::get(), TotalCashPrincipal::get()))
 }
 
-/// Return the current borrow and supply rates for the asset.
+/// Return all ChainAccounts with any holdings
 pub fn get_accounts<T: Config>() -> Result<Vec<ChainAccount>, Reason> {
-    let info: Vec<ChainAccount> = CashPrincipals::iter()
+    let chain_asset_holders: BTreeSet<ChainAccount> = AssetsWithNonZeroBalance::iter()
         .map(|p| p.0)
-        .collect::<Vec<ChainAccount>>();
-    Ok(info)
+        .collect::<BTreeSet<ChainAccount>>();
+
+    let cash_holders: BTreeSet<ChainAccount> = CashPrincipals::iter()
+        .map(|p| p.0)
+        .collect::<BTreeSet<ChainAccount>>();
+
+    let all_holders: Vec<ChainAccount> = cash_holders
+        .union(&chain_asset_holders)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    Ok(all_holders)
+}
+
+pub fn get_asset_meta<T: Config>(
+) -> Result<(BTreeMap<String, u32>, BTreeMap<String, u32>, u32, u32), Reason> {
+    let mut asset_suppliers: BTreeMap<String, u32> = BTreeMap::new();
+    let mut asset_borrowers: BTreeMap<String, u32> = BTreeMap::new();
+    let mut aggregate_suppliers_set: BTreeSet<String> = BTreeSet::new();
+
+    let mut aggregate_borrowers_set: BTreeSet<String> = BTreeSet::new();
+
+    for (chain_asset, chain_account, balance) in AssetBalances::iter() {
+        if balance > 0 {
+            let num = asset_suppliers
+                .entry(String::from(chain_asset))
+                .or_insert(0);
+            *num += 1;
+            aggregate_suppliers_set.insert(String::from(chain_account));
+        } else if balance < 0 {
+            let num = asset_borrowers
+                .entry(String::from(chain_asset))
+                .or_insert(0);
+            *num += 1;
+            aggregate_borrowers_set.insert(String::from(chain_account));
+        }
+    }
+
+    Ok((
+        asset_suppliers,
+        asset_borrowers,
+        aggregate_suppliers_set.len() as u32,
+        aggregate_borrowers_set.len() as u32,
+    ))
 }
 
 /// Return the current borrow and supply rates for the asset.
 pub fn get_accounts_liquidity<T: Config>() -> Result<Vec<(ChainAccount, AssetBalance)>, Reason> {
+    // TODO: does this actually touch all accounts...?
     let mut info: Vec<(ChainAccount, AssetBalance)> = CashPrincipals::iter()
         .map(|a| (a.0.clone(), get_liquidity::<T>(a.0).unwrap().value))
         .collect::<Vec<(ChainAccount, AssetBalance)>>();
@@ -207,6 +261,7 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
     log!("apply_chain_event_internal(event): {:?}", event);
 
     match event {
+        ChainBlockEvent::Reserved => panic!("reserved"),
         ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
             ethereum_client::EthereumEvent::Lock {
                 asset,
@@ -259,7 +314,6 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
                 result.to_vec(),
             ),
         },
-        _ => Err(Reason::Unreachable),
     }
 }
 
@@ -268,6 +322,7 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
     log!("unapply_chain_event_internal(event): {:?}", event);
 
     match event {
+        ChainBlockEvent::Reserved => panic!("reserved"),
         ChainBlockEvent::Eth(_block_num, eth_event) => match eth_event {
             ethereum_client::EthereumEvent::Lock {
                 asset,
@@ -296,7 +351,6 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
 
             _ => Ok(()),
         },
-        _ => Err(Reason::Unreachable),
     }
 }
 
@@ -337,7 +391,7 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
         })
         .collect();
 
-    <Module<T>>::deposit_event(Event::ExecutedGovernance(results));
+    <Pallet<T>>::deposit_event(Event::ExecutedGovernance(results));
 
     Ok(())
 }
@@ -346,6 +400,24 @@ pub fn dispatch_extrinsics_internal<T: Config>(extrinsics: Vec<Vec<u8>>) -> Resu
 mod tests {
     use crate::factor::Factor;
     use crate::tests::*;
+
+    #[test]
+    fn test_get_accounts() -> Result<(), Reason> {
+        let jared = ChainAccount::from_str("Eth:0x18c8F1222083997405F2E482338A4650ac02e1d6")?;
+        let geoff = ChainAccount::from_str("Eth:0x8169522c2c57883e8ef80c498aab7820da539806")?;
+        new_test_ext().execute_with(|| {
+            AssetsWithNonZeroBalance::insert(&jared, &Uni, ());
+            AssetsWithNonZeroBalance::insert(&jared, &Wbtc, ());
+
+            // geoff only cash
+            CashPrincipals::insert(&geoff, CashPrincipal::from_nominal("1"));
+
+            let accounts: Vec<ChainAccount> = super::get_accounts::<Test>()?;
+            assert_eq!(accounts, vec![jared, geoff]);
+
+            Ok(())
+        })
+    }
 
     #[test]
     fn test_compute_cash_principal_per() -> Result<(), Reason> {
@@ -405,7 +477,7 @@ mod tests {
     fn test_get_recent_timestamp() {
         new_test_ext().execute_with(|| {
             let expected = 123;
-            <pallet_timestamp::Module<Test>>::set_timestamp(expected);
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(expected);
             let actual = get_recent_timestamp::<Test>().unwrap();
             assert_eq!(actual, expected);
         });

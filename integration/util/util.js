@@ -1,5 +1,10 @@
 const { log, error } = require('../util/log');
 const Web3Utils = require('web3-utils');
+const util = require('util');
+
+function inspect(...args) {
+  console.log(util.inspect(args, { showHidden: false, depth: null }));
+}
 
 function genPort() {
   // TODO: Actually check port is free?
@@ -132,6 +137,7 @@ module.exports = {
   concatArray,
   genPort,
   getInfoKey,
+  inspect,
   intervalToSeconds,
   keccak256: Web3Utils.keccak256,
   lookupBy,

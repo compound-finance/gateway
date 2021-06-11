@@ -91,16 +91,33 @@ class CashToken extends Token {
 async function buildCashToken(cashTokenInfo, ctx, owner, chain) {
   ctx.log(`Deploying cash token to ${chain.name}...`);
 
-  let proxyAdmin = await chain.__deploy('ProxyAdmin', [], { from: chain.root() });
-  let cashImpl = await chain.__deploy('CashToken', [owner]);
-  let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
-    cashImpl._address,
-    proxyAdmin._address,
-    cashImpl.methods.initialize(ctx.__initialYield(), ctx.__initialYieldStart()).encodeABI()
-  ], { from: chain.root() });
-  let cashToken = await chain.__getContractAt('CashToken', proxy._address);
+  if (cashTokenInfo.existing) {
+    // Use existing Starport information
+    ['proxy_admin', 'proxy', 'cash_token', 'cash_impl'].forEach((key) => {
+      if (!cashTokenInfo.existing[key]) {
+        throw new Error(`Existing Cash Token missing property: ${key}`);
+      }
+    });
 
-  return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, chain.name, ctx);
+    let proxyAdmin = cashTokenInfo.existing.proxy_admin;
+    let proxy = await chain.__getContractAt('TransparentUpgradeableProxy', cashTokenInfo.existing.proxy);
+    let cashToken = await chain.__getContractAt('CashToken', cashTokenInfo.existing.cash_token);
+    let cashImpl = await chain.__getContractAt('CashToken', cashTokenInfo.existing.cash_impl);
+
+    // TODO: Owner?
+    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, chain.name, ctx);
+  } else {
+    let proxyAdmin = await chain.__deploy('ProxyAdmin', [], { from: chain.root() });
+    let cashImpl = await chain.__deploy('CashToken', [owner]);
+    let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
+      cashImpl._address,
+      proxyAdmin._address,
+      cashImpl.methods.initialize(ctx.__initialYield(), ctx.__initialYieldStart()).encodeABI()
+    ], { from: chain.root() });
+    let cashToken = await chain.__getContractAt('CashToken', proxy._address);
+
+    return new CashToken(cashToken, proxyAdmin, cashImpl, proxy, cashTokenInfo.liquidity_factor, owner, chain.name, ctx);
+  }
 }
 
 

@@ -19,6 +19,31 @@ async function canConnectTo(host, port, timeout=5000) {
   });
 }
 
+function getOptions(url) {
+  let u = new URL(url);
+  return {
+    host: u.hostname,
+    path: u.pathname + u.search,
+    port: u.port || (u.protocol === 'https:' ? 443 : 80),
+  };
+}
+
+async function readRequest(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+
+    req.on('data', chunk => {
+      data += chunk;
+    });
+
+    req.on('end', () => {
+      resolve(data);
+    });
+  });
+}
+
 module.exports = {
-  canConnectTo
+  canConnectTo,
+  getOptions,
+  readRequest
 };

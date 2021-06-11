@@ -1,0 +1,24 @@
+
+[package]
+name = "pallet-cash-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pallet-cash = { path = ".." }
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "chain_account_from_str_fuzz"
+path = "fuzz_targets/chain_account_from_str_fuzz.rs"
+test = false
+doc = false

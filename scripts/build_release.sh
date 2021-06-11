@@ -3,6 +3,7 @@
 set -eo pipefail
 
 version="$1"
+machine=`node -e 'console.log(process.platform + "-" + process.arch)'`
 
 if [ -z "$version" ]; then
 	echo ""
@@ -51,11 +52,12 @@ wasm_checksum="$(node ./ethereum/scripts/utils/keccak.js "$wasm")"
 bin_checksum="$(node ./ethereum/scripts/utils/keccak.js "$bin")"
 
 mkdir -p "$release_dir"
+
 cp "$wasm" "$release_dir/gateway.wasm"
 echo "$wasm_checksum" > "$release_dir/gateway.wasm.checksum"
-# TODO: Check os/arch for real
-cp "$bin" "$release_dir/gateway-darwin-arm64"
-echo "$bin_checksum" > "$release_dir/gateway-darwin-arm64.checksum"
+
+cp "$bin" "$release_dir/gateway-$machine"
+echo "$bin_checksum" > "$release_dir/gateway-$machine.checksum"
 
 cp "$types" "$release_dir/types.json"
 cp "$rpc" "$release_dir/rpc.json"
@@ -64,8 +66,8 @@ cp "$contracts" "$release_dir/contracts.json"
 echo "Built release $version"
 echo "  wasm: $release_dir/gateway.wasm"
 echo "  wasm.checksum: $release_dir/gateway.wasm.checksum"
-echo "  bin: $release_dir/gateway-darwin-arm64"
-echo "  bin.checksum: $release_dir/gateway-darwin-arm64.checksum"
+echo "  bin: $release_dir/gateway-$machine"
+echo "  bin.checksum: $release_dir/gateway-$machine.checksum"
 echo "  types: $release_dir/types.json"
 echo "  rpc: $release_dir/rpc.json"
 echo "  contracts: $release_dir/contracts.json"
