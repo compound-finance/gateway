@@ -7,7 +7,7 @@ contract StarportHarness is Starport {
 
 	uint public counter;
 
-	constructor(ICash cash_, address admin_) Starport(cash_, admin_) {
+	constructor(ICash cash_, address admin_) Starport(cash_, admin_, "ETH", "ETH:") {
 	}
 
 	/// Harness to call `getQuorum`

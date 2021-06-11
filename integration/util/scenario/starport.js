@@ -206,21 +206,21 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashT
   } else {
     // Deploy Proxies and Starport
     let proxyAdmin = cashToken.proxyAdmin;
-    let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root()]);
+    let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root(), web3.utils.asciiToHex(chain.name.toUpperCase()), web3.utils.asciiToHex(`${chain.name.toUpperCase()}:`)]);
     let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
       starportImpl._address,
       proxyAdmin._address,
       "0x"
-    ], { from: chain.root() });
+    ], {from: chain.root()});
     let starport = await chain.__getContractAt('Starport', proxy._address);
     if (validators.length > 0) {
-      await starport.methods.changeAuthorities(validators).send({ from: chain.root(), gas: 4_000_00 });
+      await starport.methods.changeAuthorities(validators).send({from: chain.root(), gas: 4_000_00});
     }
 
     let starportTopics = Object.fromEntries(starport
-      ._jsonInterface
-      .filter(e => e.type === 'event')
-      .map(e => [e.name, e.signature]));
+        ._jsonInterface
+        .filter(e => e.type === 'event')
+        .map(e => [e.name, e.signature]));
 
     return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain);
   }

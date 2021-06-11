@@ -14,8 +14,8 @@ contract Starport {
 
     address immutable public admin;
     address constant public ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
-    bytes4 constant MAGIC_HEADER = "ETH:";
-    string constant ETH_CHAIN = "ETH";
+    bytes4 immutable chainIdHeader; // = "ETH:" on Ethereum
+    bytes32 immutable chainId; // = "ETH" on Ethereum
     address[] public authorities;
     mapping(address => uint) public supplyCaps;
 
@@ -35,9 +35,23 @@ contract Starport {
     event ExecuteProposal(string title, bytes[] extrinsics);
     event NewSupplyCap(address indexed asset, uint supplyCap);
 
-    constructor(ICash cash_, address admin_) {
+    constructor(ICash cash_, address admin_, bytes32 chainId_, bytes4 chainIdHeader_) {
         cash = cash_;
         admin = admin_;
+        chainId = chainId_;
+        chainIdHeader = chainIdHeader_;
+    }
+
+    function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
+        uint8 i = 0;
+        while(i < 32 && _bytes32[i] != 0) {
+            i++;
+        }
+        bytes memory bytesArray = new bytes(i);
+        for (i = 0; i < 32 && _bytes32[i] != 0; i++) {
+            bytesArray[i] = _bytes32[i];
+        }
+        return string(bytesArray);
     }
 
     /**
@@ -51,7 +65,7 @@ contract Starport {
      * @param asset The asset to lock in the Starport
      */
     function lock(uint amount, address asset) external {
-        lockTo(amount, asset, ETH_CHAIN, toBytes32(msg.sender));
+        lockTo(amount, asset, bytes32ToString(chainId), toBytes32(msg.sender));
     }
 
     /**
@@ -77,7 +91,7 @@ contract Starport {
      * @dev Use `lock` to lock CASH or collateral assets.
      */
     function lockEth() public payable {
-        lockEthTo(ETH_CHAIN, toBytes32(msg.sender));
+        lockEthTo(bytes32ToString(chainId), toBytes32(msg.sender));
     }
 
     /*
@@ -234,10 +248,10 @@ contract Starport {
         isNoticeInvoked[noticeHash] = true;
 
         require(notice.length >= 100, "Must have full header"); // 4 + 3 * 32
-        require(notice[0] == MAGIC_HEADER[0], "Invalid header[0]");
-        require(notice[1] == MAGIC_HEADER[1], "Invalid header[1]");
-        require(notice[2] == MAGIC_HEADER[2], "Invalid header[2]");
-        require(notice[3] == MAGIC_HEADER[3], "Invalid header[3]");
+        require(notice[0] == chainIdHeader[0], "Invalid header[0]");
+        require(notice[1] == chainIdHeader[1], "Invalid header[1]");
+        require(notice[2] == chainIdHeader[2], "Invalid header[2]");
+        require(notice[3] == chainIdHeader[3], "Invalid header[3]");
 
         (uint noticeEraId, uint noticeEraIndex, bytes32 noticeParent) =
             abi.decode(notice[4:100], (uint, uint, bytes32));
