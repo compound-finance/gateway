@@ -335,8 +335,12 @@ class Chain {
 
   async getBlockNumber() {
     let header = await this.getBlockHeader();
-    console.log({header});
     return header.number;
+  }
+
+  async blocks(n) {
+    const blockNum = await this.getBlockNumber();
+    return await this.untilBlock(blockNum + n);
   }
 
   async untilBlock(number) {

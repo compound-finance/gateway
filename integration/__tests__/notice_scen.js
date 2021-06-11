@@ -36,7 +36,6 @@ buildScenarios('Notice Scenarios', notice_scen_info, { beforeEach: lockUSDC }, [
     }
   },
   {
-    skip: true, // TODO FIX SCEN
     name: "Extract by Pulled Notice Chain",
     scenario: async ({ ashley, zrx, chain, starport }) => {
       let notice0 = getNotice(await ashley.extract(50, zrx));

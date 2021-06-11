@@ -58,7 +58,6 @@ buildScenarios('Gov Scenarios', gov_scen_info, [
     }
   },
   {
-    skip: true, // TODO FIX SCEN
     name: "Read Extrinsic from Event",
     scenario: async ({ api, zrx, chain, starport }) => {
       let newKink = {

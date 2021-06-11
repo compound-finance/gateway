@@ -178,7 +178,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/InsufficientLiquidity/);
+      await expect(bert.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/insufficientLiquidity/);
 
       let ashleyLiquidityAfter = await ashley.liquidity();
       let bertLiquidityAfter = await bert.liquidity();
@@ -196,7 +196,6 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     }
   },
   {
-    skip: true, // TODO FIX SCEN
     name: "Fails when liquidator tries to close more than total borrow",
     notes:
       `A simple replay of the collateral-for-collateral scenario, but Bert goes
@@ -209,7 +208,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(2.0, comp, usdc, ashley)).rejects.toThrow(/RepayTooMuch/);
+      await expect(bert.liquidate(2.0, comp, usdc, ashley)).rejects.toThrow(/repayTooMuch/);
 
       expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
@@ -230,7 +229,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/SufficientLiquidity/);
+      await expect(bert.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/sufficientLiquidity/);
 
       expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
@@ -254,7 +253,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       expect(await bert.chainBalance(usdc)).toEqual(0);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(0.5, comp, ether, ashley)).rejects.toThrow(/InsufficientCollateral/);
+      await expect(bert.liquidate(0.5, comp, ether, ashley)).rejects.toThrow(/insufficientCollateral/);
 
       expect(await ashley.chainBalance(usdc)).toBeCloseTo(600); // 600 Received
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1, 2); // -1 Borrowed
@@ -275,7 +274,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
     `,
     before: supplyUSDC_BorrowCOMP_ChangePrice,
     scenario: async ({ ashley, bert, bat, usdc, cash, comp, log }) => {
-      await expect(ashley.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/SelfTransfer/);
+      await expect(ashley.liquidate(0.5, comp, usdc, ashley)).rejects.toThrow(/selfTransfer/);
 
       expect(await ashley.chainBalance(usdc)).toBeCloseTo(600);
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
@@ -292,7 +291,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       await bert.lock(4000, bat);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(0.5, comp, comp, ashley)).rejects.toThrow(/InKindLiquidation/);
+      await expect(bert.liquidate(0.5, comp, comp, ashley)).rejects.toThrow(/inKindLiquidation/);
 
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1); // -1 Borrowed
       expect(await bert.chainBalance(comp)).toBeCloseTo(0); // -0.5 COMP Debt Assumed in Liquidation
@@ -309,7 +308,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       await bert.lock(4000, bat);
       expect(await bert.chainBalance(comp)).toEqual(0);
 
-      await expect(bert.liquidate(0.0005, comp, usdc, ashley)).rejects.toThrow(/MinTxValueNotMet/);
+      await expect(bert.liquidate(0.0005, comp, usdc, ashley)).rejects.toThrow(/minTxValueNotMet/);
 
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
       expect(await ashley.chainBalance(usdc)).toBeCloseTo(600);
@@ -327,7 +326,7 @@ buildScenarios('Liquidate Scenarios', liquidate_scen_info, [
       await ashley.lock(1, zrx);
       await bert.lock(4000, bat);
       expect(await bert.chainBalance(comp)).toEqual(0);
-      await expect(bert.liquidate(0.5, comp, zrx, ashley)).rejects.toThrow(/NoPrice/);
+      await expect(bert.liquidate(0.5, comp, zrx, ashley)).rejects.toThrow(/noPrice/);
       expect(await ashley.chainBalance(comp)).toBeCloseTo(-1);
       expect(await ashley.chainBalance(zrx)).toBeCloseTo(1);
       expect(await bert.chainBalance(comp)).toBeCloseTo(0);

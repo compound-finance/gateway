@@ -78,16 +78,19 @@ class Starport {
       ethOpts: {},
       ...opts,
     };
-
+    console.log("aa0020");
     let encodedCalls = extrinsics.map(encodeCall);
     let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root(), ...opts.ethOpts });
     let event;
+    console.log("aa0021");
     let notice;
     if (opts.awaitNotice) {
       notice = await this.ctx.chain.waitForNotice();
     }
+    console.log("aa0022");
     if (opts.awaitEvent) {
       event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
+      console.log("aa0023");
 
       if (opts.checkSuccess) {
         let [payload, govResult] = event.data[0][0];
@@ -130,7 +133,9 @@ class Starport {
   async invoke(notice, signaturePairs) {
     let encoded = notice.EncodedNotice;
     let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());
-    return await this.starport.methods.invoke(encoded, signatures).send({ from: this.ctx.eth.defaultFrom, gas: 5000000 });
+    let sendOpts = { from: this.ctx.eth.defaultFrom, gas: 5000000 };
+    console.log({sendOpts});
+    return await this.starport.methods.invoke(encoded, signatures).send(sendOpts);
   }
 
   async invokeChain(target, notices) {
