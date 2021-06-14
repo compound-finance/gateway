@@ -100,7 +100,19 @@ async function setStarports(chainSpec, chainConfig, opts) {
 
   // TODO: Enable use case for new chain with starports in genesis.
   //  We are missing deployment block info in (eth) deployment info currently.
-  chainSpec.genesis.runtime.palletCash.starports = [starportAddress];
+  chainSpec.genesis.runtime.palletCash.starports = [`ETH:${starportAddress}`];
+}
+
+async function setGenesisConfig(chainSpec, chainConfig, opts) {
+  let ethGenesisBlock = chainConfig.eth_genesis_block;
+
+  chainSpec.genesis.runtime.palletCash.genesisBlocks = [{
+      Eth: {
+        number: ethGenesisBlock.number,
+        hash: ethGenesisBlock.hash.slice(2),
+        parent_hash: ethGenesisBlock.parent_hash.slice(2),
+      }
+  }];
 }
 
 async function setInitialYield(chainSpec, chainConfig, opts) {
@@ -203,6 +215,8 @@ async function buildSpec(opts) {
   await setAssetInfo(chainSpec, chainConfig, opts);
   await setReporters(chainSpec, chainConfig, opts);
   await setInitialYield(chainSpec, chainConfig, opts);
+  await setStarports(chainSpec, chainConfig, opts);
+  await setGenesisConfig(chainSpec, chainConfig, opts);
 
   await writeFile(chain, 'chain-spec.json', JSON.stringify(chainSpec, null, 2));
 
