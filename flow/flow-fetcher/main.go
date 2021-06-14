@@ -1,15 +1,17 @@
 package main
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"os"
-	"github.com/toni/flow-fetcher/starport"
-	"github.com/onflow/flow-go-sdk/client"
 	"google.golang.org/grpc"
 	"log"
     "net/http"
 	"encoding/json"
+
+	"github.com/toni/flow-fetcher/starport"
+	"github.com/onflow/flow-go-sdk/client"
 )
 
 type FlowEventsInfo struct {
@@ -100,14 +102,19 @@ func EventsHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Re
 			return
 		}
 
-        // Try to decode the request body into the struct. If there is an error,
-        // respond to the client with the error message and a 400 status code.
+        // Try to decode the request body into FlowEventsInfo the struct.
 		var eventsInfo FlowEventsInfo
-        err := json.NewDecoder(r.Body).Decode(&eventsInfo)
+		err := decodeJSONBody(w, r, &eventsInfo)
         if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			var mr *malformedRequest
+            if errors.As(err, &mr) {
+				http.Error(w, mr.msg, mr.status)
+            } else {
+				log.Println(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+            }
 			return
-        }
+		}
 
 		// Fetch Lock events
 		events := getLockEvents(flowClient, eventsInfo)
