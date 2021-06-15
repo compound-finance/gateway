@@ -16,3 +16,10 @@ services:
         source: ./.local
         target: /root/.local
     command: bash -c "cargo build --release && ./target/release/gateway --dev --ws-external"
+
+  cross-compile:
+    build: .
+      args:
+        PULL_FROM: arm64v8/ubuntu:20.04
+    working_dir: /src
+    command: sh

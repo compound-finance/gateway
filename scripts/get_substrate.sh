@@ -33,7 +33,7 @@ if ! which rustup >/dev/null 2>&1; then
 	elif [ -f /etc/debian_version ]; then
 	    echo "Ubuntu/Debian Linux detected."
 	    $MAKE_ME_ROOT apt update
-	    $MAKE_ME_ROOT apt install -y cmake pkg-config libssl-dev git gcc build-essential git clang libclang-dev
+	    $MAKE_ME_ROOT apt install -y curl cmake pkg-config libssl-dev git gcc build-essential git clang libclang-dev
 	else
 	    echo "Unknown Linux distribution."
 	    echo "This OS is not supported with this script at present. Sorry."

@@ -34,6 +34,25 @@ cargo +nightly build --release
 
 Note that we require the rust `nightly` toolchain as we rely on unstable features (notably `const_generics`).
 
+#### Cross Compiling
+
+To cross compile for MacOS with M1 silicon use
+
+```bash
+rustup target add ?????
+```
+
+
+If you get an "Unsupported architecture" error you may need to update your xcode command line tools to the
+latest version. The method below is the most straightforward way to accomplish that.
+
+If you use XCode directly, make sure you update XCode. 
+
+```
+sudo rm -rf /Library/Developer/CommandLineTools
+sudo xcode-select --install
+```
+
 ## Test
 
 To test, run:
