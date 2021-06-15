@@ -3,8 +3,8 @@ use ethereum_client::{EthereumBlock, EthereumEvent};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
-    collections::btree_set::BTreeSet, iter::Iterator, log, str::FromStr, vec, Debuggable,
-    Deserialize, RuntimeDebug, Serialize,
+    collections::btree_set::BTreeSet, iter::Iterator, str::FromStr, vec, Debuggable, Deserialize,
+    RuntimeDebug, Serialize,
 };
 use types_derive::{type_alias, Types};
 

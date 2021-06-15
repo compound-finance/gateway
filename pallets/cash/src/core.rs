@@ -29,7 +29,6 @@ use crate::{
 
 use codec::Decode;
 use frame_support::{
-    sp_runtime::traits::Convert,
     storage::{
         IterableStorageDoubleMap, IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
     },
@@ -58,6 +57,7 @@ pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
 /// Return the recent timestamp (from the timestamp pallet).
 #[cfg(not(all(feature = "freeze-time", feature = "std")))]
 pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
+    use sp_runtime::traits::Convert;
     let ts = <pallet_timestamp::Pallet<T>>::get();
     let time = T::TimeConverter::convert(ts);
     if time > 0 {
