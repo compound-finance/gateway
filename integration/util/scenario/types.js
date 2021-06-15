@@ -45,8 +45,8 @@ function encodeNotice(notice) {
       },
       [ethNotice.asset, ethNotice.amount, ethNotice.account]
     );
-  } else if (notice.CashExtractionNotice && notice.CashExtractionNotice.Eth) {
-    let ethNotice = notice.CashExtractionNotice.Eth;
+  } else if (notice.cashExtractionNotice && notice.cashExtractionNotice.eth) {
+    let ethNotice = notice.cashExtractionNotice.eth;
 
     return encodeNoticeWith(
       ethNotice,
@@ -61,8 +61,8 @@ function encodeNotice(notice) {
       },
       [ethNotice.account, ethNotice.principal]
     );
-  } else if (notice.FutureYieldNotice && notice.FutureYieldNotice.Eth) {
-    let ethNotice = notice.FutureYieldNotice.Eth;
+  } else if (notice.futureYieldNotice && notice.futureYieldNotice.eth) {
+    let ethNotice = notice.futureYieldNotice.eth;
 
     return encodeNoticeWith(
       ethNotice,
@@ -78,8 +78,8 @@ function encodeNotice(notice) {
       },
       [ethNotice.next_cash_yield, ethNotice.next_cash_yield_start_at, ethNotice.next_cash_index]
     );
-  } else if (notice.SetSupplyCapNotice && notice.SetSupplyCapNotice.Eth) {
-    let ethNotice = notice.SetSupplyCapNotice.Eth;
+  } else if (notice.setSupplyCapNotice && notice.setSupplyCapNotice.eth) {
+    let ethNotice = notice.setSupplyCapNotice.eth;
 
     return encodeNoticeWith(
       ethNotice,
@@ -94,8 +94,8 @@ function encodeNotice(notice) {
       },
       [ethNotice.asset, ethNotice.amount]
     );
-  } else if (notice.ChangeAuthorityNotice && notice.ChangeAuthorityNotice.Eth) {
-    let ethNotice = notice.ChangeAuthorityNotice.Eth;
+  } else if (notice.changeAuthorityNotice && notice.changeAuthorityNotice.eth) {
+    let ethNotice = notice.changeAuthorityNotice.eth;
 
     return encodeNoticeWith(
       ethNotice,
@@ -108,6 +108,7 @@ function encodeNotice(notice) {
       [ethNotice.new_authorities]
     );
   } else {
+    console.log("raw notice is: ", notice);
     throw `Unknown notice chain in encodeNotice: ${JSON.stringify(notice.Notice)}`;
   }
 }
@@ -129,16 +130,16 @@ function getNoticeParentHash(notice) {
 }
 
 function getNoticeId(notice) {
-  if (notice.ExtractionNotice && notice.ExtractionNotice.Eth) {
-    return notice.ExtractionNotice.Eth.id;
-  } else if (notice.CashExtractionNotice) {
-    return notice.CashExtractionNotice.id;
-  } else if (notice.FutureYieldNotice) {
-    return notice.FutureYieldNotice.id;
-  } else if (notice.SetSupplyCapNotice) {
-    return notice.SetSupplyCapNotice.id;
-  } else if (notice.ChangeAuthorityNotice) {
-    return notice.ChangeAuthorityNotice.id;
+  if (notice.extractionNotice && notice.extractionNotice.eth) {
+    return notice.extractionNotice.eth.id;
+  } else if (notice.cashExtractionNotice) {
+    return notice.cashExtractionNotice.id;
+  } else if (notice.futureYieldNotice) {
+    return notice.futureYieldNotice.id;
+  } else if (notice.setSupplyCapNotice) {
+    return notice.setSupplyCapNotice.id;
+  } else if (notice.changeAuthorityNotice) {
+    return notice.changeAuthorityNotice.id;
   } else {
     throw `Unknown notice chain in getNoticeId: ${JSON.stringify(notice.Notice)}`;
   }
