@@ -65,6 +65,7 @@ runtime-benchmarks = [
     'pallet-timestamp/runtime-benchmarks',
     'sp-runtime/runtime-benchmarks',
 ]
+runtime-debug = ['our-std/runtime-debug']
 std = [
     'codec/std',
     'frame-executive/std',
@@ -92,4 +93,4 @@ std = [
     'sp-transaction-pool/std',
     'sp-version/std',
 ]
-runtime-debug = ['our-std/runtime-debug']
+

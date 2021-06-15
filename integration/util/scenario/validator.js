@@ -248,7 +248,7 @@ class Validator {
       '--node-key',
       this.nodeKey,
       ...newCliArgs,
-      '-lexecutor=trace,runtime=trace,gateway=debug,pallet_cash=debug',
+      '-laura=trace,executor=trace,runtime=trace,gateway=debug,pallet_cash=debug',
       '--reserved-only',
       ...executionArgs,
       ...this.bootnodes,
