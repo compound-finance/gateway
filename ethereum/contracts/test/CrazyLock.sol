@@ -6,20 +6,25 @@ import "../Starport.sol";
 contract CrazyLock {
   Starport public immutable starport;
 
-  event CrazyLockRun(bytes32 recipient32, uint ts, bool doLock);
+  event CrazyLockRun(bytes32 recipient32, bool doLock);
+
+  bool halted;
 
   constructor(address payable starport_) {
     starport = Starport(starport_);
+    halted = false;
+  }
+
+  function halt() public {
+    halted = true;
   }
 
   function crazyLock(address recipient) public payable {
-    uint ts = block.timestamp;
-    bool doLock = ts % 2 == 0;
     bytes32 recipient32 = starport.toBytes32(recipient);
 
-    emit CrazyLockRun(recipient32, ts, doLock);
+    emit CrazyLockRun(recipient32, halted);
 
-    if (doLock) {
+    if (!halted) {
       starport.lockEthTo{value: msg.value}("ETH", recipient32);
     }
   }

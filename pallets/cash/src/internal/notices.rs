@@ -717,7 +717,7 @@ mod tests {
                 _ => panic!("invalid signature"),
             };
             let notice_state = NoticeState::Pending {
-                signature_pairs: ChainSignatureList::Dot(vec![(signer, eth_signature)]),
+                signature_pairs: ChainSignatureList::Dot(vec![([0; 32], eth_signature)]),
             };
             NoticeStates::insert(chain_id, notice_id, notice_state);
             Notices::insert(chain_id, notice_id, notice);

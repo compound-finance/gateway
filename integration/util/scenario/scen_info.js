@@ -1,11 +1,15 @@
 
 const baseScenInfo = {
-  eth_opts: {
-    provider: 'ganache', // [env=PROVIDER]
-    ganache: {
-      opts: {},
-      web3_port: null
-    },
+  chain_opts: {
+    eth: {
+      name: 'eth',
+      provider: 'ganache', // [env=PROVIDER]
+      ganache: {
+        opts: {},
+        web3_port: null
+      },
+      block_number: 'latest'
+    }
   },
   default_actor: null,
   actors: ["ashley", "bert", "chuck"],
@@ -48,7 +52,7 @@ const baseScenInfo = {
   log_file: null, // write logs to file [env=LOG_FILE]
   native: false, // always run native code [env=NATIVE]
   freeze_time: false, // freeze time for precise interest testing (implies `native=true`) [env=FREEZE_TIME]
-  block_time: null, // use block time instead of auto-mining [env=BLOCK_TIME]
+  block_time: 1, // use block time instead of auto-mining [env=BLOCK_TIME]
 };
 
 // Helper function to take an info that might be

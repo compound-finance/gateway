@@ -1,12 +1,15 @@
-use frame_support::storage::{
-    IterableStorageDoubleMap, StorageDoubleMap, StorageMap, StorageValue,
+use frame_support::{
+    storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap, StorageValue},
+    traits::StoredMap,
 };
 use our_std::collections::btree_map::BTreeMap;
 use our_std::RuntimeDebug;
+use sp_core::crypto::AccountId32;
 
 use crate::{
     chains::{ChainAccount, ChainId},
     internal::balance_helpers::*,
+    params::MIN_PRINCIPAL_GATE,
     portfolio::Portfolio,
     reason::Reason,
     types::{
@@ -264,6 +267,24 @@ impl State {
             .iter()
             .for_each(|(account, cash_principal)| {
                 CashPrincipals::insert(account, cash_principal);
+
+                // Existential balance for Gateway accounts...
+                match account {
+                    ChainAccount::Gate(gate_address) => {
+                        // Note: Technically we could just inc_provider/dec_provider
+                        //  however we only want to do so when the state actually changes.
+                        //  For now we just inefficiently write to the StoredMap each time principal changes.
+                        // Also note: Technically these StoredMap calls can fail (though probably provably safe),
+                        //  which would presumably trigger the underlying panic this is meant to avoid.
+                        if cash_principal >= &MIN_PRINCIPAL_GATE {
+                            _ = T::AccountStore::insert(&AccountId32::new(*gate_address), ());
+                        } else {
+                            _ = T::AccountStore::remove(&AccountId32::new(*gate_address));
+                        }
+                    }
+
+                    _ => {}
+                }
             });
         if let Some(total_cash_principal_new) = self.total_cash_principal {
             TotalCashPrincipal::put(total_cash_principal_new);

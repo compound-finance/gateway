@@ -4,13 +4,16 @@ const { encodeCall } = require('../substrate');
 const web3 = require('web3');
 
 class Starport {
-  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx) {
+  constructor(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain) {
     this.starport = starport;
     this.proxyAdmin = proxyAdmin;
     this.starportImpl = starportImpl;
     this.proxy = proxy;
     this.starportTopics = starportTopics;
+    this.cashToken = cashToken;
     this.ctx = ctx;
+    this.chain = chain;
+    this.ctxKey = `${chain.name}Starport`
   }
 
   ethAddress() {
@@ -18,10 +21,12 @@ class Starport {
   }
 
   chainAddressStr() {
+    // xxx todo:wn parameterize by chain
     return `ETH:${this.ethAddress()}`;
   }
 
   chainAddress() {
+    // xxx todo:wn parameterize by chain
     return { Eth: this.ethAddress() };
   }
 
@@ -62,7 +67,7 @@ class Starport {
   async setSupplyCap(token, amount) {
     let weiAmount = token.toWeiAmount(amount);
 
-    return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.ctx.eth.root() });
+    return await this.starport.methods.setSupplyCap(token.ethAddress(), weiAmount).send({ from: this.chain.root() });
   }
 
   async executeProposal(title, extrinsics, opts = {}) {
@@ -73,16 +78,19 @@ class Starport {
       ethOpts: {},
       ...opts,
     };
-
+    console.log("aa0020");
     let encodedCalls = extrinsics.map(encodeCall);
     let result = await this.starport.methods.executeProposal(title, encodedCalls).send({ from: this.ctx.eth.root(), ...opts.ethOpts });
     let event;
+    console.log("aa0021");
     let notice;
     if (opts.awaitNotice) {
       notice = await this.ctx.chain.waitForNotice();
     }
+    console.log("aa0022");
     if (opts.awaitEvent) {
       event = await this.ctx.chain.waitForEthProcessEvent('cash', 'ExecutedGovernance');
+      console.log("aa0023");
 
       if (opts.checkSuccess) {
         let [payload, govResult] = event.data[0][0];
@@ -125,7 +133,9 @@ class Starport {
   async invoke(notice, signaturePairs) {
     let encoded = notice.EncodedNotice;
     let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());
-    return await this.starport.methods.invoke(encoded, signatures).send({ from: this.ctx.eth.defaultFrom, gas: 5000000 });
+    let sendOpts = { from: this.ctx.eth.defaultFrom, gas: 5000000 };
+    console.log({sendOpts});
+    return await this.starport.methods.invoke(encoded, signatures).send(sendOpts);
   }
 
   async invokeChain(target, notices) {
@@ -135,7 +145,7 @@ class Starport {
   }
 
   async upgradeTo(version) {
-    let newImpl = await this.ctx.eth.__deploy('Starport', [this.ctx.cashToken.ethAddress(), this.ctx.eth.root()], { version });
+    let newImpl = await this.ctx.eth.__deploy('Starport', [this.cashToken.ethAddress(), this.ctx.eth.root()], { version });
     await this.upgrade(newImpl);
   }
 
@@ -165,33 +175,55 @@ class Starport {
   }
 }
 
-async function buildStarport(starportInfo, validatorsInfoHash, ctx) {
-  ctx.log("Deploying Starport...");
-  if (!ctx.cashToken) {
+async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashToken) {
+  ctx.log(`Deploying Starport to ${chain.name}...`);
+
+  if (!cashToken) {
     throw new Error(`Cannot deploy Starport without first deploying Cash Token`);
   }
   let validatorsInfo = await getValidatorsInfo(validatorsInfoHash, ctx);
   let validators = validatorsInfo.map(([_, v]) => v.eth_account);
 
-  // Deploy Proxies and Starport
-  let proxyAdmin = ctx.cashToken.proxyAdmin;
-  let starportImpl = await ctx.eth.__deploy('Starport', [ctx.cashToken.ethAddress(), ctx.eth.root()]);
-  let proxy = await ctx.eth.__deploy('TransparentUpgradeableProxy', [
-    starportImpl._address,
-    proxyAdmin._address,
-    "0x"
-  ], { from: ctx.eth.root() });
-  let starport = await ctx.eth.__getContractAt('Starport', proxy._address);
-  if (validators.length > 0) {
-    await starport.methods.changeAuthorities(validators).send({ from: ctx.eth.root(), gas: 4_000_00 });
+  if (starportInfo.existing) {
+    // Use existing Starport information
+    ['proxy_admin', 'proxy', 'starport', 'starport_impl'].forEach((key) => {
+      if (!starportInfo.existing[key]) {
+        throw new Error(`Existing Starport missing property: ${key}`);
+      }
+    });
+
+    let proxyAdmin = starportInfo.existing.proxy_admin;
+    let proxy = await chain.__getContractAt('TransparentUpgradeableProxy', starportInfo.existing.proxy);
+    let starport = await chain.__getContractAt('Starport', starportInfo.existing.starport);
+    let starportImpl = await chain.__getContractAt('Starport', starportInfo.existing.starport_impl);
+    // TODO: Allow versioning?
+    let starportTopics = Object.fromEntries(starport
+      ._jsonInterface
+      .filter(e => e.type === 'event')
+      .map(e => [e.name, e.signature]));
+
+    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain);
+  } else {
+    // Deploy Proxies and Starport
+    let proxyAdmin = cashToken.proxyAdmin;
+    let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root()]);
+    let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
+      starportImpl._address,
+      proxyAdmin._address,
+      "0x"
+    ], { from: chain.root() });
+    let starport = await chain.__getContractAt('Starport', proxy._address);
+    if (validators.length > 0) {
+      await starport.methods.changeAuthorities(validators).send({ from: chain.root(), gas: 4_000_00 });
+    }
+
+    let starportTopics = Object.fromEntries(starport
+      ._jsonInterface
+      .filter(e => e.type === 'event')
+      .map(e => [e.name, e.signature]));
+
+    return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain);
   }
-
-  let starportTopics = Object.fromEntries(starport
-    ._jsonInterface
-    .filter(e => e.type === 'event')
-    .map(e => [e.name, e.signature]));
-
-  return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, ctx);
 }
 
 module.exports = {

@@ -68,8 +68,8 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       });
       expect(event).toMatchChainEvent({
         AssetAmount: 100000000,
-        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
-        ChainAsset: { Eth: usdc.ethAddress().toLowerCase() }
+        ChainAccount: { eth: ashley.ethAddress().toLowerCase() },
+        ChainAsset: { eth: usdc.ethAddress().toLowerCase() }
       });
     }
   },
@@ -86,8 +86,8 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       });
       expect(event).toMatchChainEvent({
         AssetAmount: "0x0000000000000000002386f26fc10000",
-        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
-        ChainAsset: { Eth: ether.ethAddress().toLowerCase() }
+        ChainAccount: { eth: ashley.ethAddress().toLowerCase() },
+        ChainAsset: { eth: ether.ethAddress().toLowerCase() }
       });
     }
   },
@@ -104,7 +104,7 @@ buildScenarios('Lock Scenarios', lock_scen_info, [
       });
       // Note: we don't differentiate between the two "ChainAccount" arguments here.
       expect(event).toMatchChainEvent({
-        ChainAccount: { Eth: ashley.ethAddress().toLowerCase() },
+        ChainAccount: { eth: ashley.ethAddress().toLowerCase() },
       });
       let data = getEventData(event);
       expect(data.CashPrincipalAmount).toBeCloseTo(99999996, -1); // TODO: Check this better

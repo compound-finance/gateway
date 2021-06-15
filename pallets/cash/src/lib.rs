@@ -18,6 +18,7 @@ use crate::{
     },
     notices::{Notice, NoticeId, NoticeState},
     portfolio::Portfolio,
+    symbol::CASH,
     types::{
         AssetAmount, AssetBalance, AssetIndex, AssetInfo, Balance, Bips, CashIndex, CashPrincipal,
         CashPrincipalAmount, CodeHash, EncodedNotice, GovernanceResult, InterestRateModel,
@@ -28,24 +29,25 @@ use crate::{
 use codec::alloc::string::String;
 use frame_support::{
     decl_event, decl_module, decl_storage, dispatch,
-    sp_runtime::traits::Convert,
     traits::{StoredMap, UnfilteredDispatchable},
     weights::{DispatchClass, GetDispatchInfo, Pays, Weight},
     Parameter,
 };
 use frame_system;
 use frame_system::{ensure_none, ensure_root, offchain::CreateSignedTransaction};
+use num_traits::Zero;
 use our_std::{
-    collections::btree_set::BTreeSet, convert::TryInto, debug, error, log, str, vec::Vec, warn,
-    Debuggable,
+    collections::btree_map::BTreeMap, collections::btree_set::BTreeSet, convert::TryInto, debug,
+    error, log, str, vec::Vec, warn, Debuggable,
 };
 use sp_core::crypto::AccountId32;
-use sp_runtime::transaction_validity::{
-    InvalidTransaction, TransactionSource, TransactionValidity,
+use sp_runtime::{
+    traits::Convert,
+    transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidity},
+    Percent,
 };
 
 use pallet_oracle;
-use pallet_oracle::ticker::Ticker;
 use pallet_session;
 use pallet_timestamp;
 use types_derive::type_alias;
@@ -201,9 +203,6 @@ decl_storage! {
         /// The asset metadata for each supported asset, which will also be synced with the starports.
         SupportedAssets get(fn asset): map hasher(blake2_128_concat) ChainAsset => Option<AssetInfo>;
 
-        /// Mapping of strings to tickers (valid tickers indexed by ticker string).
-        Tickers get(fn ticker): map hasher(blake2_128_concat) String => Option<Ticker>;
-
         /// Miner of the current block.
         Miner get(fn miner): Option<ChainAccount>;
 
@@ -241,10 +240,10 @@ decl_storage! {
         config(starports): Vec<ChainAccount>;
         config(genesis_blocks): Vec<ChainBlock>;
         build(|config| {
-            Module::<T>::initialize_assets(config.assets.clone());
-            Module::<T>::initialize_validators(config.validators.clone());
-            Module::<T>::initialize_starports(config.starports.clone());
-            Module::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
+            Pallet::<T>::initialize_assets(config.assets.clone());
+            Pallet::<T>::initialize_validators(config.validators.clone());
+            Pallet::<T>::initialize_starports(config.starports.clone());
+            Pallet::<T>::initialize_genesis_blocks(config.genesis_blocks.clone());
         })
     }
 }
@@ -383,13 +382,13 @@ impl<T: Config> pallet_session::SessionManager<SubstrateId> for Module<T> {
         // if starting the queued session
         if NextSessionIndex::get() == index && NextValidators::iter().count() != 0 {
             // delete existing validators
-            for kv in <Validators>::iter() {
-                <Validators>::take(&kv.0);
+            for validator in <Validators>::iter_values() {
+                <Validators>::take(&validator.substrate_id);
             }
             // push next validators into current validators
-            for (id, chain_keys) in <NextValidators>::iter() {
+            for (id, validator) in <NextValidators>::iter() {
                 <NextValidators>::take(&id);
-                <Validators>::insert(&id, chain_keys);
+                <Validators>::insert(&id, validator);
             }
         } else {
             ()
@@ -476,14 +475,21 @@ impl<T: Config> pallet_session::ShouldEndSession<T::BlockNumber> for Module<T> {
 }
 
 impl<T: Config> frame_support::traits::EstimateNextSessionRotation<T::BlockNumber> for Module<T> {
-    fn estimate_next_session_rotation(now: T::BlockNumber) -> Option<T::BlockNumber> {
-        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
-        Some(now + period - now % period)
+    fn average_session_length() -> T::BlockNumber {
+        T::BlockNumber::zero()
     }
 
-    // The validity of this weight depends on the implementation of `estimate_next_session_rotation`
-    fn weight(_now: T::BlockNumber) -> Weight {
-        0
+    fn estimate_current_session_progress(now: T::BlockNumber) -> (Option<Percent>, Weight) {
+        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+        (
+            Some(Percent::from_rational(now % period, period)),
+            Weight::zero(),
+        )
+    }
+
+    fn estimate_next_session_rotation(now: T::BlockNumber) -> (Option<T::BlockNumber>, Weight) {
+        let period: T::BlockNumber = <T>::BlockNumber::from(params::SESSION_PERIOD as u32);
+        (Some(now + period - now % period), Weight::zero())
     }
 }
 
@@ -691,18 +697,11 @@ impl<T: Config> Module<T> {
         if validators.is_empty() {
             warn!("Validators must be set in the genesis config");
         }
-        for validator_keys in validators {
-            log!("Adding validator with keys: {:?}", validator_keys);
-            assert!(
-                <Validators>::get(&validator_keys.substrate_id) == None,
-                "Duplicate validator keys in genesis config"
-            );
-            // XXX for Substrate 3
-            // assert!(
-            //     T::AccountStore::insert(&validator_keys.substrate_id, ()).is_ok(),
-            //     "Could not placate the substrate account existence thing"
-            // );
-            <Validators>::insert(&validator_keys.substrate_id, validator_keys.clone());
+        for validator in validators {
+            // Note: See pipeline commit for usage of T::AccountStore
+            log!("Adding validator: {:?}", validator);
+            <Validators>::insert(&validator.substrate_id, validator.clone());
+            assert!(T::AccountStore::insert(&validator.substrate_id, ()).is_ok());
         }
     }
 
@@ -788,9 +787,16 @@ impl<T: Config> Module<T> {
     pub fn get_assets() -> Result<Vec<AssetInfo>, Reason> {
         Ok(internal::assets::get_assets::<T>()?)
     }
+
     /// Get the rates for the given asset.
     pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
         Ok(core::get_accounts::<T>()?)
+    }
+
+    /// Get the user counts for the given asset.
+    pub fn get_asset_meta(
+    ) -> Result<(BTreeMap<String, u32>, BTreeMap<String, u32>, u32, u32), Reason> {
+        Ok(core::get_asset_meta::<T>()?)
     }
 
     /// Get the all liquidity
@@ -805,6 +811,28 @@ impl<T: Config> Module<T> {
     /// Get the portfolio for the given chain account.
     pub fn get_portfolio(account: ChainAccount) -> Result<Portfolio, Reason> {
         Ok(core::get_portfolio::<T>(account)?)
+    }
+
+    /// Get the active validators, and  sets
+    pub fn get_validator_info() -> Result<(Vec<ValidatorKeys>, Vec<(ChainAccount, String)>), Reason>
+    {
+        let validator_keys: Vec<ValidatorKeys> = Validators::iter().map(|(_, v)| v).collect();
+        let (cash_index, _) = core::get_cash_data::<T>()?;
+
+        let miner_earnings: Vec<(ChainAccount, String)> = MinerCumulative::iter()
+            .map(|(miner_address, miner_principal_amount)| {
+                let miner_principal: CashPrincipal = miner_principal_amount
+                    .try_into()
+                    .unwrap_or(CashPrincipal::from_nominal("0"));
+                let miner_balance = cash_index
+                    .cash_balance(miner_principal)
+                    .unwrap_or(Balance::from_nominal("0", CASH))
+                    .value
+                    .to_string();
+                (miner_address, miner_balance)
+            })
+            .collect();
+        Ok((validator_keys, miner_earnings))
     }
 }
 

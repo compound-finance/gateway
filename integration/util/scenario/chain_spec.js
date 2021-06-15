@@ -8,18 +8,48 @@ const { merge } = require('../util');
 const { getValidatorsInfo } = require('./validator');
 
 class ChainSpec {
-  constructor(chainSpecInfo, chainSpecFile, ctx) {
+  constructor(chainSpecInfo, validatorsInfoHash, tokenInfoHash, chainSpecFile, ctx) {
     this.chainSpecInfo = chainSpecInfo;
+    this.validatorsInfoHash = validatorsInfoHash;
+    this.tokenInfoHash = tokenInfoHash;
     this.chainSpecFile = chainSpecFile;
     this.ctx = ctx;
+    this.codeSubstitutes = {};
   }
 
   file() {
     return this.chainSpecFile;
   }
+
+  async addSubstitute(block, version) {
+    this.codeSubstitutes[`0x${block.toString(16)}`] = await version.wasm();
+  }
+
+  async generate() {
+    let target = this.ctx.genesisVersion().targetFile();
+    this.ctx.log('[CHAINSPEC] Scenario chain_spec.json: ' + this.chainSpecFile);
+    let chainSpecJson;
+    try {
+      let { error, stdout, stderr } =
+        await execFile(target, [
+          "build-spec",
+          "--disable-default-bootnode",
+          "--chain",
+          this.chainSpecInfo.base_chain
+        ], { maxBuffer: 100 * 1024 * 1024 }); // 100MB
+      chainSpecJson = stdout;
+    } catch (e) {
+      this.ctx.__abort(`Failed to spawn validator node. Try running \`cargo build --release\` (Missing ${target}, error=${e})`);
+    }
+
+    let originalChainSpec = JSON.parse(chainSpecJson);
+    let standardChainSpec = await baseChainSpec(this.codeSubstitutes, this.validatorsInfoHash, this.tokenInfoHash, this.ctx);
+    let finalChainSpec = merge(merge(originalChainSpec, standardChainSpec), this.chainSpecInfo.props);
+    await fs.writeFile(this.chainSpecFile, JSON.stringify(finalChainSpec, null, 2), 'utf8');
+  }
 }
 
-async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
+async function baseChainSpec(codeSubstitutes, validatorsInfoHash, tokensInfoHash, ctx) {
   let tokens = ctx.tokens;
   if (!tokens) {
     throw new Error(`Tokens required to build chain spec`);
@@ -81,6 +111,11 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
     cashGenesis.starports = [ctx.starport.chainAddressStr()];
   }
 
+  let extraSpec = {};
+  if (Object.keys(codeSubstitutes).length > 0) {
+    extraSpec.codeSubstitutes = codeSubstitutes;
+  }
+
   return {
     name: 'Integration Test Network',
     genesis: {
@@ -99,12 +134,13 @@ async function baseChainSpec(validatorsInfoHash, tokensInfoHash, ctx) {
           reporters
         }
       }
-    }
+    },
+    ...extraSpec
   };
 }
 
 async function tmpFile(name) {
-  folder = await fs.mkdtemp(path.join(os.tmpdir()));
+  let folder = await fs.mkdtemp(path.join(os.tmpdir()));
   return path.join(folder, name);
 }
 
@@ -112,28 +148,12 @@ async function tmpFile(name) {
 async function buildChainSpec(chainSpecInfo, validatorsInfoHash, tokenInfoHash, ctx) {
   let chainSpecFile = chainSpecInfo.use_temp ?
     await tmpFile('chainSpec.json') : path.join(__dirname, '..', '..', 'chainSpec.json');
-  let target = ctx.__target();
-  ctx.log('[CHAINSPEC] Scenario chain_spec.json: ' + chainSpecFile);
-  let chainSpecJson;
-  try {
-    let { error, stdout, stderr } =
-      await execFile(target, [
-        "build-spec",
-        "--disable-default-bootnode",
-        "--chain",
-        chainSpecInfo.base_chain
-      ], { maxBuffer: 100 * 1024 * 1024 }); // 100MB
-    chainSpecJson = stdout;
-  } catch (e) {
-    ctx.__abort(`Failed to spawn validator node. Try running \`cargo build --release\` (Missing ${target}, error=${e})`);
-  }
 
-  let originalChainSpec = JSON.parse(chainSpecJson);
-  let standardChainSpec = await baseChainSpec(validatorsInfoHash, tokenInfoHash, ctx);
-  let finalChainSpec = merge(merge(originalChainSpec, standardChainSpec), chainSpecInfo.props);
-  await fs.writeFile(chainSpecFile, JSON.stringify(finalChainSpec, null, 2), 'utf8');
+  let chainSpec = new ChainSpec(chainSpecInfo, validatorsInfoHash, tokenInfoHash, chainSpecFile, ctx);
 
-  return new ChainSpec(chainSpecInfo, chainSpecFile, ctx);
+  await chainSpec.generate();
+
+  return chainSpec;
 }
 
 module.exports = {

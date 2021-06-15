@@ -6,7 +6,7 @@ use crate::{
     reason::{MathError, Reason},
     require,
     types::{CashIndex, Timestamp},
-    CashYield, CashYieldNext, Config, Event, GlobalCashIndex, Module,
+    CashYield, CashYieldNext, Config, Event, GlobalCashIndex, Pallet,
 };
 use codec::{Decode, Encode};
 use frame_support::storage::StorageValue;
@@ -54,7 +54,7 @@ pub fn set_yield_next<T: Config>(
 
     CashYieldNext::put((next_yield, next_yield_start));
 
-    <Module<T>>::deposit_event(Event::SetYieldNext(next_yield, next_yield_start));
+    <Pallet<T>>::deposit_event(Event::SetYieldNext(next_yield, next_yield_start));
 
     internal::notices::dispatch_future_yield_notice::<T>(
         next_yield,
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn test_too_soon_to_next() {
         new_test_ext().execute_with(|| {
-            <pallet_timestamp::Module<Test>>::set_timestamp(500);
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(500);
             assert_eq!(
                 set_yield_next::<Test>(APR(100), 501),
                 Err(SetYieldNextError::NotEnoughTimeToSyncBeforeNext.into())
@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn test_too_soon_to_cancel() {
         new_test_ext().execute_with(|| {
-            <pallet_timestamp::Module<Test>>::set_timestamp(1);
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(1);
             CashYieldNext::put((APR(100), 500));
             assert_eq!(
                 set_yield_next::<Test>(APR(100), MIN_NEXT_SYNC_TIME + 1),
@@ -100,7 +100,7 @@ mod tests {
     fn test_set_yield_next() {
         new_test_ext().execute_with(|| {
             assert_eq!(CashYieldNext::get(), None);
-            <pallet_timestamp::Module<Test>>::set_timestamp(500);
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(500);
             assert_eq!(set_yield_next::<Test>(APR(100), 86400500), Ok(()));
             assert_eq!(CashYieldNext::get(), Some((APR(100), 86400500)));
 

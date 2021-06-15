@@ -5,6 +5,7 @@ const { constants } = require('fs');
 const { TypeRegistry } = require('@polkadot/types');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
 
 function releaseUrl(repoUrl, version, file) {
   return `${repoUrl}/releases/download/${version}/${file}`;
@@ -100,6 +101,10 @@ class Version {
     this.wasmReplacements = {};
   }
 
+  name() {
+    return this.version;
+  }
+
   matches(v) {
     return this.version === v || this.symbolized === v;
   }
@@ -114,6 +119,10 @@ class Version {
     return Object.entries(this.wasmReplacements).reduce((acc, [k, v]) => {
       return acc.replace(new RegExp(k.slice(2), 'i'), v.slice(2));
     }, wasm);
+  }
+
+  wasmDir() {
+    return path.dirname(this.wasmFile());
   }
 
   async hash() {
@@ -132,7 +141,11 @@ class Version {
     return releaseContractsInfo(this.ctx.__repoUrl(), this.version, this).path;
   }
 
-  targetFile(platform, arch) {
+  targetFile() {
+    return this.targetFileFor(os.platform(), os.arch());
+  }
+
+  targetFileFor(platform, arch) {
     return releaseTargetInfo(this.ctx.__repoUrl(), this.version, platform, arch, this).path;
   }
 
@@ -207,6 +220,10 @@ class CurrentVersion extends Version {
     super('curr', ctx);
   }
 
+  name() {
+    return 'current';
+  }
+
   async pull() {}
 
   wasmFile() {
@@ -222,7 +239,7 @@ class CurrentVersion extends Version {
   }
 
   targetFile(platform, arch) {
-    return this.ctx.__target();
+    return this.ctx.__buildTarget();
   }
 
   isCurr() {
@@ -231,15 +248,15 @@ class CurrentVersion extends Version {
 
   async check() {
     if (!await checkFile(this.wasmFile())) {
-      this.ctx.warn(`Missing wasm file at ${this.wasmFile()}`)
+      this.ctx.error(`Missing wasm file at ${this.wasmFile()}`)
     }
 
     if (!await checkFile(this.typesJson())) {
-      this.ctx.warn(`Missing types file at ${this.typesJson()}`)
+      this.ctx.error(`Missing types file at ${this.typesJson()}`)
     }
 
     if (!await checkFile(this.contractsFile())) {
-      this.ctx.warn(`Missing contracts file at ${this.contractsFile()}`)
+      this.ctx.error(`Missing contracts file at ${this.contractsFile()}`)
     }
 
     return true;

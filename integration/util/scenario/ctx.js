@@ -4,9 +4,10 @@ const { merge } = require('../util');
 const { declare } = require('./declare');
 
 const { baseScenInfo } = require('./scen_info');
-const { buildEth } = require('./eth');
+const { buildChains } = require('./chains');
 const { buildCashToken } = require('./cash_token');
 const { buildStarport } = require('./starport');
+const { buildDeployments } = require('./deployment');
 const { buildTokens } = require('./token');
 const { buildChainSpec } = require('./chain_spec');
 const { buildValidators } = require('./validator');
@@ -68,10 +69,13 @@ class Ctx {
     return process.env['LOG'] || this.scenInfo['log_level'];
   }
 
+  __deepColor() {
+    return !!process.env['DEEP_COLOR'];
+  }
+
   __abort(msg) {
-    console.error(msg);
     this.error(msg);
-    process.exit(1);
+    throw(msg);
   }
 
   __linkValidator() {
@@ -86,15 +90,12 @@ class Ctx {
     return process.env['CHAIN_BIN'] || this.scenInfo['target'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'gateway');
   }
 
-  __target() {
-    if (this.__native() && this.__genesisVersion()) {
-      return this.versions.mustFind(this.__genesisVersion()).targetFile(os.platform(), os.arch());
-    }
-
-    return this.__buildTarget();
+  __wasmFile() {
+    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'gateway-runtime', 'gateway_runtime.wasm');
   }
 
   __native() {
+    // Note: currently freeze time requires native.
     return this.__freezeTime() || process.env['NATIVE'] || this.scenInfo['native'] || false;
   }
 
@@ -112,10 +113,6 @@ class Ctx {
       }
     }
     return null;
-  }
-
-  __wasmFile() {
-    return process.env['WASM_FILE'] || this.scenInfo['wasm_file'] || path.join(__dirname, '..', '..', '..', 'target', this.__profile(), 'wbuild', 'gateway-runtime', 'gateway_runtime.compact.wasm');
   }
 
   __genesisVersion() {
@@ -220,11 +217,12 @@ class Ctx {
     return promise;
   }
 
-  async until(cond, opts = {}) {
+  async __until(cond, opts = {}) {
     let options = {
       delay: 5000,
       retries: null,
       message: null,
+      console: false,
       ...opts
     };
 
@@ -234,7 +232,12 @@ class Ctx {
       return;
     } else {
       if (options.message) {
-        this.log(options.message);
+        let msg = typeof(options.message) === 'function' ? await options.message() : options.message;
+        if (console) {
+          console.log(msg);
+        } else {
+          this.log(msg);
+        }
       }
       await this.__sleep(options.delay + start - new Date());
       return await this.until(cond, {
@@ -294,19 +297,24 @@ function aliasBy(ctx, iterator, key) {
 async function buildCtx(scenInfo={}) {
   scenInfo = merge(baseScenInfo, scenInfo);
   let ctx = new Ctx(scenInfo);
+  ctx.until = ctx.__until.bind(ctx);
   ctx.logger = await buildLogger(ctx);
   ctx.log(`Building ctx with scenInfo=${JSON.stringify(scenInfo, null, 2)}`);
   ctx.log(`test=${JSON.stringify(scenInfo.chain_spec, null, 2)}`);
   ctx.versions = await buildVersions(scenInfo.versions, ctx);
-  ctx.eth = await buildEth(scenInfo.eth_opts, ctx);
+  ctx.chains = await buildChains(scenInfo.chain_opts, ctx);
+  aliasBy(ctx, ctx.chains.all(), 'name');
 
-  // Note: `3` below is the number of transactions we expect to occur between now and when
-  //       the Starport token is deployed.
-  //       That's now: deploy Proxy Admin (1), Cash Token Impl (2), Starport Impl (3), Proxy (4)
-  let starportAddress = await ctx.eth.getNextContractAddress(4);
+  ctx.deployments = await buildDeployments(scenInfo, ctx);
+  ctx.chains.attachDeployments(ctx.deployments);
+  aliasBy(ctx, ctx.deployments.all(), 'name');
+  aliasBy(ctx, ctx.deployments.starports(), 'ctxKey');
+  aliasBy(ctx, ctx.deployments.cashTokens(), 'ctxKey');
 
-  ctx.cashToken = await buildCashToken(scenInfo.cash_token, ctx, starportAddress);
-  ctx.starport = await buildStarport(scenInfo.starport, scenInfo.validators, ctx);
+  // xxx todo:wn for now including a convenient alias for eth deployment of starport and cashToken due to pervasive use
+  ctx.starport = ctx.ethStarport;
+  ctx.cashToken = ctx.ethCashToken;
+
   ctx.actors = await buildActors(scenInfo.actors, scenInfo.default_actor, ctx);
   ctx.tokens = await buildTokens(scenInfo.tokens, scenInfo, ctx);
   ctx.chainSpec = await buildChainSpec(scenInfo.chain_spec, scenInfo.validators, scenInfo.tokens, ctx);

@@ -49,7 +49,7 @@ buildScenarios('Transfer Scenarios', transfer_scen_info, { beforeEach: lockUSDC 
       await ashley.transfer(2, cash, bert);
       await bert.transfer(1.985, cash, ashley);
       expect(await bert.cash()).toBeCloseTo(0.005, 4);
-      await expect(bert.transfer('Max', cash, chuck)).rejects.toThrow(/InsufficientCashForMaxTransfer/);
+      await expect(bert.transfer('Max', cash, chuck)).rejects.toThrow(/insufficientCashForMaxTransfer/);
       expect(await bert.cash()).toBeCloseTo(0.005, 4);
       expect(await chuck.cash()).toBeCloseTo(0, 4);
     }

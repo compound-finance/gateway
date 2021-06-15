@@ -4,7 +4,7 @@ const { lookupBy } = require('../util');
 const { descale } = require('../substrate');
 
 class Token {
-  constructor(ticker, symbol, name, decimals, priceTicker, liquidityFactor, token, owner, ctx) {
+  constructor(ticker, symbol, name, decimals, priceTicker, liquidityFactor, token, owner, chainName, ctx) {
     this.ticker = ticker;
     this.symbol = symbol;
     this.name = name;
@@ -13,7 +13,12 @@ class Token {
     this.liquidityFactor = liquidityFactor;
     this.token = token;
     this.owner = owner;
+    this.chainName = chainName;
     this.ctx = ctx;
+  }
+
+  chain() {
+    return this.ctx.chains.find(this.chainName);
   }
 
   ethAddress() {
@@ -70,10 +75,11 @@ class Token {
   }
 
   async setSupplyCap(tokenAmount) {
-    if (!this.ctx.starport) {
+    const chain = this.chain();
+    if (!chain || !chain.starport) {
       throw new Error(`Ctx: starport must be set before using set supply cap`);
     }
-    this.ctx.starport.setSupplyCap(this, tokenAmount);
+    chain.starport.setSupplyCap(this, tokenAmount);
   }
 
   async transfer(fromLookup, toLookup, tokenAmount) {
@@ -158,7 +164,7 @@ class Token {
 
 class EtherToken extends Token {
   constructor(liquidityFactor, ctx) {
-    super('ether', 'ETH', 'Ether', 18, 'ETH', liquidityFactor, null, null, ctx);
+    super('ether', 'ETH', 'Ether', 18, 'ETH', liquidityFactor, null, null, 'eth', ctx);
   }
 
   ethAddress() {
@@ -205,6 +211,16 @@ function tokenInfoMap(ctx) {
 
   return {
     zrx: {
+      chain: 'eth',
+      build: 'zrx.json',
+      contract: 'ZRXToken',
+      decimals: 18,
+      constructor_args: [],
+      supply_cap: 1000000,
+      liquidity_factor: 0.5,
+    },
+    maticZrx: {
+      chain: 'matic',
       build: 'zrx.json',
       contract: 'ZRXToken',
       decimals: 18,
@@ -213,6 +229,7 @@ function tokenInfoMap(ctx) {
       liquidity_factor: 0.5,
     },
     dai: {
+      chain: 'eth',
       build: 'dai.json',
       contract: 'Dai',
       decimals: 18,
@@ -221,6 +238,7 @@ function tokenInfoMap(ctx) {
       liquidity_factor: 0.8,
     },
     comp: {
+      chain: 'eth',
       build: 'compound.json',
       contract: 'Comp',
       decimals: 18,
@@ -229,6 +247,7 @@ function tokenInfoMap(ctx) {
       liquidity_factor: 0.75,
     },
     bat: {
+      chain: 'eth',
       build: 'bat.json',
       contract: 'BAToken',
       decimals: 18,
@@ -237,6 +256,7 @@ function tokenInfoMap(ctx) {
       liquidity_factor: 0.3,
     },
     wbtc: {
+      chain: 'eth',
       build: 'wbtc.json',
       contract: 'WBTC',
       decimals: 8,
@@ -246,6 +266,7 @@ function tokenInfoMap(ctx) {
       price_ticker: 'BTC',
     },
     usdc: {
+      chain: 'eth',
       build: 'FiatTokenV1.json',
       contract: 'FiatTokenV1',
       decimals: 6,
@@ -269,6 +290,7 @@ function tokenInfoMap(ctx) {
       }
     },
     fee: {
+      chain: 'eth',
       build: 'contracts.json',
       contract: 'FeeToken',
       decimals: 6,
@@ -289,10 +311,19 @@ function undec(tokenAmount, decimals) {
 }
 
 async function buildToken(ticker, tokenInfo, ctx) {
-  ctx.log(`Deploying ${ticker}...`);
+  ctx.log(`Deploying ${ticker} to ${tokenInfo.chain}...`);
+  const chain = ctx.chains.find(tokenInfo.chain);
+  if(!chain) {
+    throw new Error(`while initializing ${ticker} chain not found ${tokenInfo.chain}`)
+  }
 
-  let owner = ctx.eth.defaultFrom;
-  let tokenContract = await ctx.eth.__deployFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, { from: owner });
+  let owner = chain.defaultFrom;
+  let tokenContract;
+  if (tokenInfo.address) {
+    tokenContract = await chain.__getContractAtFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.address, { from: owner });
+  } else {
+    tokenContract = await chain.__deployFull(ctx.__getContractsFile(tokenInfo.build), tokenInfo.contract, tokenInfo.constructor_args, { from: owner });
+  }
   if (typeof (tokenInfo.afterDeploy) === 'function') {
     await tokenInfo.afterDeploy(tokenContract, owner);
   }
@@ -301,7 +332,7 @@ async function buildToken(ticker, tokenInfo, ctx) {
   let decimals = Number(await tokenContract.methods.decimals().call());
   let priceTicker = tokenInfo.price_ticker || symbol;
   let liquidityFactor = tokenInfo.liquidity_factor;
-  let token = new Token(ticker, symbol, name, decimals, priceTicker, liquidityFactor, tokenContract, owner, ctx);
+  let token = new Token(ticker, symbol, name, decimals, priceTicker, liquidityFactor, tokenContract, owner, tokenInfo.chain, ctx);
 
   if (tokenInfo.balances) {
     await Object.entries(tokenInfo.balances).reduce(async (acc, [actor, amount]) => {
@@ -319,7 +350,7 @@ async function buildToken(ticker, tokenInfo, ctx) {
 
 async function getTokensInfo(tokensInfoHash, ctx) {
   return await instantiateInfo(tokensInfoHash, 'Token', 'token', tokenInfoMap(ctx));
-};
+}
 
 async function buildTokens(tokensInfoHash, scenInfo, ctx) {
   ctx.log("Deploying Erc20 Tokens...");
@@ -337,7 +368,7 @@ async function buildTokens(tokensInfoHash, scenInfo, ctx) {
   if (scenInfo.eth_supply_cap) {
     await etherToken.setSupplyCap(scenInfo.eth_supply_cap);
   }
-  tokens.push(ctx.cashToken);
+  tokens.push(ctx.ethCashToken);
 
   return new Tokens(tokens, ctx);
 }
