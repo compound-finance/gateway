@@ -4,7 +4,7 @@ set -eo pipefail
 
 cargo build --release --features runtime-benchmarks
 
-./target/release/gateway benchmark \
+target/release/gateway benchmark \
     --execution wasm \
     --wasm-execution compiled \
     --pallet pallet_cash \

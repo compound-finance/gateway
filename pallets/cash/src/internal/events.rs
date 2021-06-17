@@ -669,12 +669,7 @@ mod tests {
                 events: vec![real_event.clone()],
             };
 
-            let reorg = ChainReorg::Eth {
-                from_hash: [5; 32],
-                to_hash: real_block_hash,
-                reverse_blocks: vec![reorg_block.clone()],
-                forward_blocks: vec![real_block.clone()],
-            };
+            let latest_hash = [10; 32];
 
             // mine dummy blocks to get past limit
             let blocks_3 = ChainBlocks::Eth(vec![
@@ -691,12 +686,19 @@ mod tests {
                     events: vec![],
                 },
                 ethereum_client::EthereumBlock {
-                    hash: [5; 32],
+                    hash: latest_hash,
                     parent_hash: [4; 32],
                     number: 5,
                     events: vec![],
                 },
             ]);
+
+            let reorg = ChainReorg::Eth {
+                from_hash: latest_hash,
+                to_hash: real_block_hash,
+                reverse_blocks: vec![reorg_block.clone()],
+                forward_blocks: vec![real_block.clone()],
+            };
 
             // apply the to-be reorg'd block and a dummy block so that it is ingressed, show that the event was applied
             assert_ok!(all_receive_chain_blocks(&ChainBlocks::Eth(vec![

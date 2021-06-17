@@ -30,6 +30,7 @@ const TKN_ADDR_BYTES: [u8; 20] = [1; 20];
 
 const ETH_ADDR: &str = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const ETH_BYTES: [u8; 20] = hex!("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE");
+const ETH_UNIT: Units = Units::from_ticker_str("ETH", 18);
 
 const ALICE_ADDRESS: &str = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const BOB_ADDRESS: &str = "0x59a055a3e566F5d9A9Ea1dA81aB375D5361D7c5e";
@@ -73,6 +74,55 @@ fn init_asset_balance(asset: ChainAsset, account: ChainAccount, balance: AssetBa
         );
     }
     AssetsWithNonZeroBalance::insert(account, asset, ());
+}
+
+fn construct_reorg(num_events: u32) -> (ChainReorg, ethereum_client::EthereumBlock) {
+    let mut events = vec![];
+
+    let event = ethereum_client::EthereumEvent::Lock {
+        asset: [238; 20],
+        sender: [3; 20],
+        chain: String::from("ETH"),
+        recipient: [4; 32],
+        amount: Quantity::from_nominal("10", ETH_UNIT).value,
+    };
+
+    for _i in 0..num_events {
+        events.push(event.clone());
+    }
+
+    let last_hash = [4; 32];
+    let chain_id = chains::ChainId::Eth;
+    let last_block = ethereum_client::EthereumBlock {
+        hash: last_hash,
+        parent_hash: [1; 32],
+        number: 1,
+        events: vec![],
+    };
+    LastProcessedBlock::insert(chain_id, ChainBlock::Eth(last_block));
+
+    let reorg_block = ethereum_client::EthereumBlock {
+        hash: [1; 32],
+        parent_hash: last_hash,
+        number: 2,
+        events: events.clone(),
+    };
+
+    let real_block = ethereum_client::EthereumBlock {
+        hash: [1; 32],
+        parent_hash: last_hash,
+        number: 2,
+        events: events,
+    };
+
+    let reorg = ChainReorg::Eth {
+        from_hash: last_hash,
+        to_hash: [1; 32],
+        reverse_blocks: vec![reorg_block.clone()],
+        forward_blocks: vec![real_block.clone()],
+    };
+
+    (reorg, reorg_block)
 }
 
 benchmarks! {
@@ -158,27 +208,67 @@ benchmarks! {
         assert_eq!(Cash::<T>::set_yield_next(RawOrigin::Root.into(), APR(100).into(), 86400500), Ok(()));
     }
 
-    // receive_chain_blocks {
-    //   let substrate_id = AccountId32::new([12u8; 32]);
-    //   let eth_address = <Ethereum as Chain>::signer_address().unwrap();
-    //   Validators::insert(
-    //       substrate_id.clone(),
-    //       ValidatorKeys {
-    //           substrate_id,
-    //           eth_address,
-    //       },
-    //   );
-    //   let dummy_last_block = ethereum_client::EthereumBlock {
-    //     hash: [0;32],
-    //     parent_hash: [0;32],
-    //     number: 1u64,
-    //     events: vec![]
-    //   };
-    //   LastProcessedBlock::insert(ChainId::Eth, dummy_last_block);
-    //   let blocks = ChainBlocks::Eth(vec![]);
-    //   let signature = ChainSignature::Eth(<Ethereum as Chain>::sign_message(&blocks.encode()).unwrap());
-    // }: {
-    //     assert_ok!(Cash::<T>::receive_chain_blocks(RawOrigin::None.into(), blocks, signature));
+    receive_chain_blocks {
+        let substrate_id = AccountId32::new([12u8; 32]);
+        let eth_address = <Ethereum as Chain>::signer_address().unwrap();
+        LastProcessedBlock::insert(
+            ChainId::Eth,
+            ChainBlock::Eth(
+                ethereum_client::EthereumBlock {
+                    hash: [22; 32],
+                    parent_hash: [1; 32],
+                    number: 0,
+                    events: vec![],
+                }
+            )
+        );
+        Validators::insert(
+            substrate_id.clone(),
+            ValidatorKeys {
+                substrate_id,
+                eth_address,
+            },
+        );
+        let blocks = ChainBlocks::Eth(vec![]);
+        let signature = ChainSignature::Eth(<Ethereum as Chain>::sign_message(&blocks.encode()).unwrap());
+    }: {
+        assert_ok!(Cash::<T>::receive_chain_blocks(RawOrigin::None.into(), blocks, signature));
+    }
+
+    receive_chain_reorg_pending {
+        let z in 1 .. 10;
+        // add 2 vals
+        let substrate_id = AccountId32::new([12u8; 32]);
+        Validators::insert(
+            substrate_id.clone(),
+            ValidatorKeys {
+                substrate_id,
+                eth_address: BOB_ADDRESS_BYTES,
+            },
+        );
+
+        Validators::insert(
+            AccountId32::new([13u8; 32]),
+            ValidatorKeys {
+                substrate_id: AccountId32::new([13u8; 32]),
+                eth_address: <Ethereum as Chain>::signer_address().unwrap(),
+            },
+        );
+
+        let (reorg, reorg_block) = construct_reorg(z);
+        let reorg_blocks = ChainBlocks::Eth(vec![reorg_block]);
+        let signature = ChainSignature::Eth(<Ethereum as Chain>::sign_message(&reorg_blocks.encode()).unwrap());
+        assert_ok!(Cash::<T>::receive_chain_blocks(RawOrigin::None.into(), reorg_blocks, signature));
+        let reorg_signature = ChainSignature::Eth(<Ethereum as Chain>::sign_message(&reorg.encode()).unwrap());
+    }: {
+        assert_ok!(Cash::<T>::receive_chain_reorg(RawOrigin::None.into(), reorg, reorg_signature));
+    } verify {
+        assert_eq!(PendingChainReorgs::get(ChainId::Eth).len(), 1);
+    }
+
+    // TODO
+    // receive_chain_reorg_applied {
+    // * sign chain reorg w all validators
     // }
 
     support_asset {
@@ -352,7 +442,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             initialize_storage();
             assert_ok!(test_benchmark_on_initialize::<Test>());
-            // assert_ok!(test_benchmark_receive_chain_blocks::<Test>());
+            assert_ok!(test_benchmark_receive_chain_blocks::<Test>());
+            assert_ok!(test_benchmark_receive_chain_reorg_pending::<Test>());
             assert_ok!(test_benchmark_publish_signature::<Test>());
             assert_ok!(test_benchmark_set_yield_next::<Test>());
             assert_ok!(test_benchmark_support_asset::<Test>());
