@@ -13,6 +13,7 @@ use crate::{
     types::{AssetPrice, Timestamp},
 };
 use crate::{Config, PriceReporters, PriceTimes, Prices, ORACLE_POLL_INTERVAL_BLOCKS};
+use our_std::convert::TryInto;
 use our_std::{collections::btree_map::BTreeMap, str::FromStr, vec::Vec, RuntimeDebug};
 
 /// A single decoded message from the price oracle
@@ -71,12 +72,13 @@ pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
         Err(OracleError::InvalidKind)?;
     }
 
-    let timestamp = abi_drain
+    let timestamp: u64 = abi_drain
         .next()
         .ok_or(OracleError::EthAbiParseError)?
         .to_uint()
         .ok_or(OracleError::EthAbiParseError)?
-        .as_u64();
+        .try_into()
+        .map_err(|_| OracleError::InvalidTimestamp)?;
 
     let key = abi_drain
         .next()
@@ -88,17 +90,19 @@ pub fn parse_message(message: &[u8]) -> Result<Message, OracleError> {
         Err(OracleError::InvalidTicker)?;
     }
 
-    // todo: it is critical to be aware of overflow during the call to as_u64 but it is not clear to me how to accomplish that
-    let value = abi_drain
+    let value: u64 = abi_drain
         .next()
         .ok_or(OracleError::EthAbiParseError)?
         .to_uint()
         .ok_or(OracleError::EthAbiParseError)?
-        .as_u64();
+        .try_into()
+        .map_err(|_| OracleError::InvalidValue)?;
 
     Ok(Message {
         kind,
-        timestamp: timestamp * 1000,
+        timestamp: timestamp
+            .checked_mul(1000)
+            .ok_or(OracleError::InvalidTimestamp)?,
         key,
         value,
     })
@@ -341,6 +345,196 @@ pub mod tests {
         assert_eq!(actual.signatures[2], "0x15a9e7019f2b45c5e64646df571ea944b544dbf9093fbe19e41afea68fa58d721e53449245eebea3f351dbdff4dff09cf303a335cb4455f0d3219f308d448483000000000000000000000000000000000000000000000000000000000000001c");
         assert_eq!(actual.timestamp, "1609340760");
     }
+    #[test]
+    fn test_parse_message_overflowing_timestamp() -> Result<(), OracleError> {
+        // This input contains a timestamp value of 1152921506190042496. This test checks that the
+        // `parse_message` won't crash on a `timestamp: timestamp * 1000,` calculation and will
+        // instead return an error of InvalidTimestamp (note that before this line panicked due
+        // to overflow in debug builds)
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp));
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64() -> Result<(), OracleError> {
+        // This panics as the decoded value exceeds U64 type.
+        // This is because the values are first decoded to U256 and then moved to U64
+        //
+        // Related sources:
+        // - definition of U256 - https://github.com/paritytech/parity-common/blob/primitive-types-v0.7.3/primitive-types/src/lib.rs#L38-L42
+        // - conversion to U64 with overflow checking - https://github.com/paritytech/parity-common/blob/uint-v0.8.5/uint/src/uint.rs#L519-L531
+        //
+        // So the panic is triggered on `.as_u64()` because the decoder decodes U256 and then converts it to U64 panicking on overflows.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_2() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_3() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_4() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_5() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_6() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_7() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_timestamp_exceeds_u64_8() -> Result<(), OracleError> {
+        // This is the same as `test_parse_message_timestamp_exceeds_u64` but here, the overflow happens with `value`.
+        let v = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 94, 93, 165, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 53, 112, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 112, 114, 105, 99, 101,
+            115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 3, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ];
+        let actual = parse_message(&v);
+        assert_eq!(actual, Err(OracleError::InvalidTimestamp)); // TODO/FIXME: add OracleError::InvalidTimestampValue or other?
+        Ok(())
+    }
+
+    // TODO/FIXME: Add a testcase for value exceeding u64 in parse_message
 
     #[test]
     fn test_recover() {
