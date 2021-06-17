@@ -47,8 +47,8 @@ buildScenarios('Session Scenarios', session_scen_info, [
       expect(await chain.getAuraAuthorites()).toEqual([alice.info.aura_key]);
     }
   },
+
   {
-    only: true, // TODO FIX SCEN
     name: "Add New Authority with Session Keys",
     scenario: async ({ api, alice, ashley, bob, cash, chain, starport, usdc, validators, keyring }) => {
       // Spin up new validator Charlie and add to auth set
@@ -63,7 +63,7 @@ buildScenarios('Session Scenarios', session_scen_info, [
       await ashley.lock(100, usdc);
       await ashley.transfer(1.01, cash, `Gate:${subToHex(keyring, charlieSubstrateId)}`);
 
-      await chain.setKeys(charlieSubstrateKey, charlieKeys);
+      await chain.setKeys(charlieSubstrateKey, [charlieKeys.aura, charlieKeys.grandpa]);
 
       const allAuthsRaw = [
         toValKeys(keyring, alice.info.aura_key, alice.info.eth_account),
@@ -93,8 +93,8 @@ buildScenarios('Session Scenarios', session_scen_info, [
       expect([...starportAuths]).toEqualSet([alice.info.eth_account, bob.info.eth_account, charlie.info.eth_account]);
     }
   },
+
   {
-    skip: true, // TODO FIX SCEN
     name: "Does Not Add Authority without Session Keys",
     scenario: async ({ api, alice, bob, chain, starport, validators, keyring }) => {
       // Spins up new validator charlie; doesn't add session keys. Change validators should fail.

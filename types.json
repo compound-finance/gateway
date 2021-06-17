@@ -1,4 +1,5 @@
 {
+  "AccountData": "()",
   "APR": "Uint",
   "AccountId32": "[u8;32]",
   "Address": "MultiAddress",

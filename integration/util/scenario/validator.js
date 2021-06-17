@@ -248,7 +248,7 @@ class Validator {
       '--node-key',
       this.nodeKey,
       ...newCliArgs,
-      '-laura=trace,executor=trace,runtime=trace,gateway=debug,pallet_cash=debug',
+      '-laura=info,executor=info,runtime=info,gateway=info,pallet_cash=info,session=info',
       '--reserved-only',
       ...executionArgs,
       ...this.bootnodes,
@@ -383,7 +383,7 @@ class Validators {
   }
 
   async addValidator(name, validatorInfoHash) {
-    let validatorInfo = validatorInfoMap[validatorInfoHash] || validatorInfo; // Allow passing 'charlie', etc
+    let validatorInfo = validatorInfoMap[validatorInfoHash] || validatorInfoHash; // Allow passing 'charlie', etc
     let newValidator = await buildValidator(name, validatorInfo, this.ctx);
     await Promise.all(this.all().map((validator) => validator.api.rpc.system.addReservedPeer(newValidator.asPeer())));
     let existingPeers = this.validators.map((validator) => validator.asPeer());
@@ -409,7 +409,7 @@ function spawnValidator(validator, ctx, target, args = [], opts = {}) {
   });
 
   proc.stderr.on('data', (data) => {
-    validator.log(`[stdout]: ${data}`);
+    validator.log(`[stderr]: ${data}`);
   });
 
   proc.on('close', (code) => {

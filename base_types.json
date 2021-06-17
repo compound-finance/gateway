@@ -1,4 +1,5 @@
 {
+  "AccountData": "()",
   "AccountId32": "[u8;32]",
   "Authorities": "Vec<AccountId32>",
   "Address": "MultiAddress",
