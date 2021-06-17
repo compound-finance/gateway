@@ -123,7 +123,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("gateway"),
     impl_name: create_runtime_str!("gateway"),
     authoring_version: 1,
-    spec_version: 11,
+    spec_version: 12,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
