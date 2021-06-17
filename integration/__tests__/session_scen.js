@@ -2,7 +2,9 @@ const { buildScenarios } = require('../util/scenario');
 const { decodeCall } = require('../util/substrate');
 
 let session_scen_info = {
-  tokens: [],
+  tokens: [
+    { token: 'usdc', balances: { ashley: 1000 } }
+  ],
   types: {
     'Balance': 'u64' // TODO: Check type
   }
@@ -14,6 +16,11 @@ function toValKeys(keyring, substrateId, ethAccount) {
     eth_address: ethAccount
   };
 };
+
+function subToHex(keyring, substrateId) {
+  const bytes = keyring.decodeAddress(substrateId);
+  return bytes.reduce((a, b) => a + b.toString(16).padStart(2, '0'), '0x');
+}
 
 buildScenarios('Session Scenarios', session_scen_info, [
   {
@@ -40,10 +47,10 @@ buildScenarios('Session Scenarios', session_scen_info, [
       expect(await chain.getAuraAuthorites()).toEqual([alice.info.aura_key]);
     }
   },
+
   {
-    skip: true, // TODO FIX SCEN
     name: "Add New Authority with Session Keys",
-    scenario: async ({ api, alice, bob, chain, starport, validators, keyring }) => {
+    scenario: async ({ api, alice, ashley, bob, cash, chain, starport, usdc, validators, keyring }) => {
       // Spin up new validator Charlie and add to auth set
       const charlie = await validators.addValidator("Charlie", 'charlie');
       console.log({charlie});
@@ -52,7 +59,11 @@ buildScenarios('Session Scenarios', session_scen_info, [
       const charlieSubstrateKey = keyring.createFromUri("//Charlie");
       const charlieSubstrateId = charlieSubstrateKey.address;
 
-      await chain.setKeys(charlieSubstrateKey, charlieKeys);
+      // Get Charlie some CASH so he can set session keys
+      await ashley.lock(100, usdc);
+      await ashley.transfer(1.01, cash, `Gate:${subToHex(keyring, charlieSubstrateId)}`);
+
+      await chain.setKeys(charlieSubstrateKey, [charlieKeys.aura, charlieKeys.grandpa]);
 
       const allAuthsRaw = [
         toValKeys(keyring, alice.info.aura_key, alice.info.eth_account),
@@ -82,8 +93,8 @@ buildScenarios('Session Scenarios', session_scen_info, [
       expect([...starportAuths]).toEqualSet([alice.info.eth_account, bob.info.eth_account, charlie.info.eth_account]);
     }
   },
+
   {
-    skip: true, // TODO FIX SCEN
     name: "Does Not Add Authority without Session Keys",
     scenario: async ({ api, alice, bob, chain, starport, validators, keyring }) => {
       // Spins up new validator charlie; doesn't add session keys. Change validators should fail.

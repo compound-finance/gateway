@@ -1130,4 +1130,21 @@ mod tests {
             );
         });
     }
+
+    #[test]
+    fn exec_trx_request_does_not_crash() {
+        new_test_ext().execute_with(|| {
+            let req_str = "(Extract 3000000 CASH Eth:0)";
+            let account = ChainAccount::Eth([20; 20]);
+            init_cash(account, CashPrincipal::from_nominal("4"));
+            let nonce = Some(0);
+            let res = exec_trx_request::<Test>(req_str, account, nonce);
+            assert_eq!(
+                res,
+                Err(Reason::TrxRequestParseError(
+                    TrxReqParseError::InvalidChainAccount
+                ))
+            );
+        });
+    }
 }

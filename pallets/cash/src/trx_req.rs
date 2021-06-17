@@ -8,6 +8,7 @@ use crate::{
 impl From<trx_request::Account> for ChainAccount {
     fn from(account: trx_request::Account) -> Self {
         match account {
+            trx_request::Account::Gate(gate_address) => ChainAccount::Gate(gate_address),
             trx_request::Account::Eth(eth_address) => ChainAccount::Eth(eth_address),
         }
     }
