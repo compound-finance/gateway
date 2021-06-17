@@ -108,7 +108,6 @@ function encodeNotice(notice) {
       [ethNotice.new_authorities]
     );
   } else {
-    console.log("raw notice is: ", notice);
     throw `Unknown notice chain in encodeNotice: ${JSON.stringify(notice.Notice)}`;
   }
 }
