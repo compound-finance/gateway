@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "@polkadot/api": "^4.14.2-4",
+    "@polkadot/api": "^4.14.2-5",
     "chalk": "^4.1.0",
     "ganache-core": "^2.13.2",
     "getopts": "^2.3.0",
@@ -26,6 +26,7 @@
   },
   "resolutions": {
     "solidity-parser-antlr": "https://github.com/solidity-parser/parser.git",
-    "**/source-map-support": "=0.5.19"
+    "**/source-map-support": "=0.5.19",
+    "@polkadot/api-derive": "npm:@compound-finance/polkadot-api-derive"
   }
 }
