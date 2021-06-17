@@ -1,4 +1,10 @@
-# New Event Ingression System [m10]
+# GATE Addresses [m12]
+
+This release is focused on the ability to send assets to GATE addresses. This allows us to create accounts past "existential deposits" and therefore allows validators to set their session keys again.
+
+* [Feature] Added ability to send assets to GATE addresses
+
+# New Event Ingression System [m11]
 
 This release introduces a new event ingression system. This system properly handles re-organizations of the Ethereum chain. Additionally, the system introduces a risk system to ingress high-value lock events with an exponential decay.
 
