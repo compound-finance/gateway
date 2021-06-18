@@ -40,6 +40,22 @@ macro_rules! debug {
 
 #[cfg(feature = "std")]
 #[macro_export]
+macro_rules! trace {
+    ($($arg:tt)*) => {{
+        $crate::log::log::trace!($($arg)*);
+    }}
+}
+
+#[cfg(not(feature = "std"))]
+#[macro_export]
+macro_rules! trace {
+    ($($arg:tt)*) => {{
+        $crate::log!($($arg)*);
+    }}
+}
+
+#[cfg(feature = "std")]
+#[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {{
         $crate::log::log::info!($($arg)*);

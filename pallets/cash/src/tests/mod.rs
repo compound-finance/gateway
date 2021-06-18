@@ -6,10 +6,8 @@ pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 pub use hex_literal::hex;
 pub use our_std::convert::TryInto;
 pub use our_std::{iter::FromIterator, str::FromStr};
-use parking_lot::RwLock;
 pub use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
-use std::sync::Arc;
 
 pub mod assets;
 pub mod common;
@@ -205,12 +203,11 @@ pub fn all_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchErro
     b_receive_chain_blocks(blocks)
 }
 
-pub fn gen_mock_responses(
-    state: Arc<RwLock<testing::OffchainState>>,
-    blocks: Vec<ethereum_client::EthereumBlock>,
+pub fn gen_mock_calls(
+    blocks: &[ethereum_client::EthereumBlock],
     starport_address: <Ethereum as Chain>::Address,
-) {
-    let mut s = state.write();
+) -> Vec<testing::PendingRequest> {
+    let mut calls = vec![];
     for block in blocks {
         let block_str = encode_block_hex(block.number);
 
@@ -264,9 +261,10 @@ pub fn gen_mock_responses(
             ..Default::default()
         };
 
-        s.expect_request(get_block);
-        s.expect_request(get_logs);
+        calls.push(get_block);
+        calls.push(get_logs);
     }
+    calls
 }
 
 #[test]
