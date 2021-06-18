@@ -106,7 +106,7 @@ pub(crate) fn combine_sig_and_recovery(
 ///
 /// Reference implementation https://github.com/MaiaVictor/eth-lib/blob/d959c54faa1e1ac8d474028ed1568c5dce27cc7a/src/account.js#L55
 /// This is called by web3.js https://github.com/ethereum/web3.js/blob/27c9679766bb4a965843e9bdaea575ea706202f1/packages/web3-eth-accounts/package.json#L18
-fn eth_sign(message: &[u8], private_key: &SecretKey, prepend_preamble: bool) -> SignatureBytes {
+pub fn eth_sign(message: &[u8], private_key: &SecretKey, prepend_preamble: bool) -> SignatureBytes {
     let hashed = eth_keccak_for_signature(message, prepend_preamble);
     // todo: there is something in this function that says "it is ok for the message to overflow.." that seems bad.
     let message = secp256k1::Message::parse(&hashed);
