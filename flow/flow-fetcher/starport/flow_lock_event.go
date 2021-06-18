@@ -23,12 +23,12 @@ func (evt FlowLockEvent) Recipient() *flow.Address {
 	return nil
 }
 
-func (evt FlowLockEvent) Amount() float64 {
+func (evt FlowLockEvent) Amount() uint64 {
 	// return float64(evt.Fields[2].(cadence.UFix64).ToGoValue().(uint64)) / 1e8 // ufixed 64 have 8 digits of precision
-	return float64(evt.Fields[2].(cadence.UFix64).ToGoValue().(uint64))
+	return evt.Fields[2].(cadence.UFix64).ToGoValue().(uint64)
 }
 
 func (evt FlowLockEvent) String() string {
-	return fmt.Sprintf("Lock event: asset: %s, recipient: %s, amount: %f",
+	return fmt.Sprintf("Lock event: asset: %s, recipient: %s, amount: %d",
 		evt.Asset(), evt.Recipient(), evt.Amount())
 }

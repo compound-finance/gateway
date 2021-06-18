@@ -66,9 +66,10 @@ func EventsHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Re
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		res := fmt.Sprintf("{\"result\":%s}", js)
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(js)
+		w.Write([]byte(res))
 	}
 }
 
@@ -103,29 +104,30 @@ func BlockHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Req
 		}
 
 		// Fetch Block info
-		events, err := getBlock(flowClient, blockInfo)
+		block, err := getBlock(flowClient, blockInfo)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		js, err := json.Marshal(events)
+		js, err := json.Marshal(block)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		res := fmt.Sprintf("{\"result\":%s}", js)
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(js)
+		w.Write([]byte(res))
 	}
 }
 
-func LatestBlockHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Request) {
+func LatestBlockNumberHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Request) {
 	if flowClient == nil {
 		panic("Flow client is not set")
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/latest_block" {
+		if r.URL.Path != "/latest_block_number" {
 			http.Error(w, "404 not found.", http.StatusNotFound)
 			return
 		}
@@ -141,14 +143,10 @@ func LatestBlockHandler(flowClient *client.Client) func(http.ResponseWriter, *ht
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		js, err := json.Marshal(latestBlock)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		res := fmt.Sprintf("{\"result\":%d}", latestBlock.Height)
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(js)
+		w.Write([]byte(res))
 	}
 }
 
@@ -183,7 +181,7 @@ func main() {
 	http.HandleFunc("/block", BlockHandler(flowClient))
 
 	// Add latest block handler
-	http.HandleFunc("/latest_block", LatestBlockHandler(flowClient))
+	http.HandleFunc("/latest_block_number", LatestBlockNumberHandler(flowClient))
 
 	// Start the server
 	flowServerPort := getEnv("FLOW_SERVER_PORT", "8089")

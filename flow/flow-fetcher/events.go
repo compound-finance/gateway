@@ -10,25 +10,24 @@ import (
 )
 
 type FlowEvent struct {
-	BlockId          string
-	BlockHeight      uint64
-	TransactionId    string
-	TransactionIndex int
-	EventIndex       int
-	Topic            string
+	BlockId          string `json:"blockId"`
+	BlockHeight      uint64 `json:"blockHeight"`
+	TransactionId    string `json:"transactionId"`
+	TransactionIndex int    `json:"transactionIndex"`
+	EventIndex       int    `json:"eventIndex"`
+	Topic            string `json:"topic"`
+	Data             string `json:"data"`
 }
 
-type LockEvent struct {
-	FlowEvent
-	// Lock specific fields
-	Asset     string
-	Recipient string
-	Amount    float64
-}
+// type LockData struct {
+// 	Asset     string  `json:"asset"`
+// 	Recipient string  `json:"recipient"`
+// 	Amount    float64 `json:"amount"`
+// }
 
-func getLockEvents(flowClient *client.Client, eventsInfo FlowEventsInfo) ([]LockEvent, error) {
+func getLockEvents(flowClient *client.Client, eventsInfo FlowEventsInfo) ([]FlowEvent, error) {
 	// fetch block events of Starport for the specified range of blocks
-	var events []LockEvent
+	var events []FlowEvent
 	blockEvents, err := flowClient.GetEventsForHeightRange(context.Background(), client.EventRangeQuery{
 		Type:        eventsInfo.Topic,
 		StartHeight: eventsInfo.StartHeight,
@@ -48,21 +47,21 @@ func getLockEvents(flowClient *client.Client, eventsInfo FlowEventsInfo) ([]Lock
 				lockEvent.TransactionID.String(), blockEvent.Height)
 
 			// Build Lock event result data
-			var eventRes = LockEvent{
-				FlowEvent: FlowEvent{
-					BlockId:          blockEvent.BlockID.String(),
-					BlockHeight:      blockEvent.Height,
-					TransactionId:    lockEvent.TransactionID.String(),
-					TransactionIndex: lockEvent.TransactionIndex,
-					EventIndex:       lockEvent.EventIndex,
-					Topic:            lockEvent.Type,
-				},
-
-				// Lock specific fields
-				Asset:     event.Asset(),
-				Recipient: event.Recipient().String(),
-				Amount:    event.Amount(),
+			var eventRes = FlowEvent{
+				BlockId:          blockEvent.BlockID.String(),
+				BlockHeight:      blockEvent.Height,
+				TransactionId:    lockEvent.TransactionID.String(),
+				TransactionIndex: lockEvent.TransactionIndex,
+				EventIndex:       lockEvent.EventIndex,
+				Topic:            lockEvent.Type,
+				Data:             fmt.Sprintf("{\"asset\":\"%s\",\"recipient\":\"%s\",\"amount\":%d}", event.Asset(), event.Recipient(), event.Amount()),
 			}
+
+			// // Lock specific fields
+			// Asset:     event.Asset(),
+			// Recipient: event.Recipient().String(),
+			// Amount:    event.Amount(),
+			// }
 			events = append(events, eventRes)
 		}
 	}

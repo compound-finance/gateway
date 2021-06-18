@@ -10,10 +10,10 @@ import (
 )
 
 type Block struct {
-	Id            string
-	ParentBlockId string
-	Height        uint64
-	Timestamp     string
+	BlockId       string `json:"blockId"`
+	ParentBlockId string `json:"parentBlockId"`
+	Height        uint64 `json:"height"`
+	Timestamp     string `json:"timestamp"`
 }
 
 func getLatestBlock(flowClient *client.Client) (Block, error) {
@@ -27,7 +27,7 @@ func getLatestBlock(flowClient *client.Client) (Block, error) {
 	fmt.Println("Latest block: ", latestBlock)
 
 	var blockRes = Block{
-		Id:            latestBlock.ID.String(),
+		BlockId:       latestBlock.ID.String(),
 		ParentBlockId: latestBlock.ParentID.String(),
 		Height:        latestBlock.Height,
 		Timestamp:     latestBlock.Timestamp.String(),
@@ -54,10 +54,10 @@ func getBlock(flowClient *client.Client, blockInfo FlowBlockInfo) (Block, error)
 		return Block{}, err
 	}
 
-	fmt.Println("Block {} for data {}: ", block, blockInfo)
+	fmt.Printf("Block %+v for data %+v:\n", block, blockInfo)
 
 	blockRes := Block{
-		Id:            block.ID.String(),
+		BlockId:       block.ID.String(),
 		ParentBlockId: block.ParentID.String(),
 		Height:        block.Height,
 		Timestamp:     block.Timestamp.String(),
