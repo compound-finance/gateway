@@ -595,11 +595,15 @@ decl_module! {
         fn offchain_worker(block_number: T::BlockNumber) {
             match internal::events::track_chain_events::<T>() {
                 Ok(()) => (),
+                Err(Reason::WorkerBusy) => {
+                    debug!("offchain_worker is still busy in track_chain_events");
+                }
                 Err(err) => {
                     error!("offchain_worker error during track_chain_events: {:?}", err);
                 }
             }
 
+            // XXX we need to 'lock' notices too right?
             match internal::notices::process_notices::<T>(block_number) {
                 (succ, skip, failures) => {
                     if succ > 0 || skip > 0 {

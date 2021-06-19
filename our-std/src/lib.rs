@@ -24,7 +24,6 @@ pub use sp_std::rc;
 pub use sp_std::result;
 pub use sp_std::slice;
 pub use sp_std::str;
-pub use sp_std::sync;
 pub use sp_std::vec;
 
 pub mod collections {
