@@ -26,13 +26,12 @@ use codec::Encode;
 use ethereum_client::EthereumEvent;
 use frame_support::storage::StorageMap;
 use frame_system::offchain::SubmitTransaction;
-use our_std::{
-    cmp::max,
-    collections::btree_set::BTreeSet,
-    convert::TryInto,
-    sync::atomic::{AtomicU8, Ordering},
+use our_std::{cmp::max, collections::btree_set::BTreeSet, convert::TryInto};
+use sp_core::offchain::Duration;
+use sp_runtime::offchain::{
+    storage::StorageValueRef,
+    storage_lock::{StorageLock, Time},
 };
-use sp_runtime::offchain::storage::StorageValueRef;
 
 trait CollectRev: Iterator {
     fn collect_rev(self) -> Vec<Self::Item>
@@ -86,18 +85,19 @@ pub fn risk_adjusted_value<T: Config>(
     }
 }
 
-static TRACK_CHAIN_EVENTS_LOCK: AtomicU8 = AtomicU8::new(0);
-
 /// Incrementally perform the next step of tracking events from all the underlying chains.
 pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
-    if TRACK_CHAIN_EVENTS_LOCK.fetch_add(1, Ordering::SeqCst) == 0 {
-        // Note: chains could be parallelized
-        let result = track_chain_events_on::<T>(ChainId::Eth);
-        TRACK_CHAIN_EVENTS_LOCK.store(0, Ordering::SeqCst);
-        result
-    } else {
-        Err(Reason::WorkerBusy)
-    }
+    let deadline = Duration::from_millis(120_000);
+    let mut lock = StorageLock::<Time>::with_deadline(b"cash::track_chain_events", deadline);
+    let result = match lock.try_lock() {
+        Ok(_guard) => {
+            // Note: chains could be parallelized
+            track_chain_events_on::<T>(ChainId::Eth)
+        }
+
+        _ => Err(Reason::WorkerBusy),
+    };
+    result
 }
 
 /// Perform the next step of tracking events from an underlying chain.
