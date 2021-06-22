@@ -4775,6 +4775,7 @@ dependencies = [
  "ethabi 12.0.0",
  "ethereum-client",
  "ethereum-types 0.11.0",
+ "flow-client",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

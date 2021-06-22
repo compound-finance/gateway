@@ -2,7 +2,7 @@ use codec::{Decode, Encode};
 use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
-use our_std::{debug, warn, error, info, Deserialize, RuntimeDebug, Serialize};
+use our_std::{debug, error, info, warn, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -33,7 +33,7 @@ pub enum FlowClientError {
     InvalidUTF8,
     JsonParseError,
     NoResult,
-    BadResponse
+    BadResponse,
 }
 
 // #[derive(Deserialize, RuntimeDebug, PartialEq)]
@@ -45,13 +45,13 @@ pub enum FlowClientError {
 #[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
 #[allow(non_snake_case)]
 pub struct LogObject {
-   blockId: Option<String>,
-   blockHeight: Option<FlowBlockNumber>,
-   transactionId: Option<String>,
-   transactionIndex: Option<u8>,
-   eventIndex: Option<u8>,
-   topic: Option<String>,
-   data: Option<String>,
+    blockId: Option<String>,
+    blockHeight: Option<FlowBlockNumber>,
+    transactionId: Option<String>,
+    transactionIndex: Option<u8>,
+    eventIndex: Option<u8>,
+    topic: Option<String>,
+    data: Option<String>,
 }
 
 #[derive(Deserialize, RuntimeDebug, PartialEq)]
@@ -102,11 +102,7 @@ fn deserialize_block_number_response(
 }
 
 // TODO think about optional data here???
-pub fn send_request(
-    server: &str,
-    path: &str,
-    data: &str,
-) -> Result<String, FlowClientError> {
+pub fn send_request(server: &str, path: &str, data: &str) -> Result<String, FlowClientError> {
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(FLOW_FETCH_DEADLINE));
     let request_url = format!("{}/{}", server, path);
 
@@ -143,7 +139,6 @@ pub fn send_request(
     Ok(String::from(body_str))
 }
 
-// {"topic": "A.c8873a26b148ed14.Starport.Lock", "startHeight": 34944396, "endHeight": 34944396}
 pub fn get_block(
     server: &str,
     flow_starport_address: &str,
@@ -158,7 +153,8 @@ pub fn get_block(
         "endHeight": block_num,
     });
     debug!("get_logs_params: {:?}", get_logs_params.clone());
-    let get_logs_response_str: String = send_request(server, "events", &get_logs_params.to_string())?;
+    let get_logs_response_str: String =
+        send_request(server, "events", &get_logs_params.to_string())?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
     let event_objects = get_logs_response
         .result
@@ -174,9 +170,7 @@ pub fn get_block(
 
     let mut events = Vec::with_capacity(event_objects.len());
     for ev_obj in event_objects {
-        let data = ev_obj
-            .data
-            .ok_or_else(|| FlowClientError::BadResponse)?;
+        let data = ev_obj.data.ok_or_else(|| FlowClientError::BadResponse)?;
         match events::decode_event(topic, &data) {
             Ok(event) => events.push(event),
             Err(events::EventError::UnknownEventTopic(topic)) => {
@@ -191,13 +185,18 @@ pub fn get_block(
 
     Ok(FlowBlock {
         blockId: block_obj.blockId.ok_or(FlowClientError::DecodeError)?,
-        parentBlockId: block_obj.parentBlockId.ok_or(FlowClientError::DecodeError)?,
+        parentBlockId: block_obj
+            .parentBlockId
+            .ok_or(FlowClientError::DecodeError)?,
         height: block_obj.height.ok_or(FlowClientError::DecodeError)?,
         events,
     })
 }
 
-pub fn get_block_object(server: &str, block_num: FlowBlockNumber) -> Result<BlockObject, FlowClientError> {
+pub fn get_block_object(
+    server: &str,
+    block_num: FlowBlockNumber,
+) -> Result<BlockObject, FlowClientError> {
     let get_block_params = serde_json::json!({
         "height": block_num,
     });
@@ -255,11 +254,17 @@ mod tests {
                 "https://mainnet-flow-fetcher",
                 "c8873a26b148ed14", // Starport address
                 34944396,
-                "Lock"
+                "Lock",
             );
             let block = result.unwrap();
-            assert_eq!(block.blockId, "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289");
-            assert_eq!(block.parentBlockId, "35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d");
+            assert_eq!(
+                block.blockId,
+                "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289"
+            );
+            assert_eq!(
+                block.parentBlockId,
+                "35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d"
+            );
             assert_eq!(block.height, 34944396);
 
             assert_eq!(
@@ -319,10 +324,19 @@ mod tests {
         t.execute_with(|| {
             let result = get_block_object("https://mainnet-flow-fetcher", 34944396);
             let block = result.unwrap();
-            assert_eq!(block.blockId, Some("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289".into()));
-            assert_eq!(block.parentBlockId, Some("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d".into()));
+            assert_eq!(
+                block.blockId,
+                Some("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289".into())
+            );
+            assert_eq!(
+                block.parentBlockId,
+                Some("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d".into())
+            );
             assert_eq!(block.height, Some(34944396));
-            assert_eq!(block.timestamp, Some("2021-06-09 21:16:57.510218679 +0000 UTC".into()));
+            assert_eq!(
+                block.timestamp,
+                Some("2021-06-09 21:16:57.510218679 +0000 UTC".into())
+            );
         });
     }
 
@@ -343,18 +357,22 @@ mod tests {
     }"#;
         let result = deserialize_get_logs_response(RESPONSE);
         let expected = GetLogsResponse {
-            result: Some(vec![
-                LogObject {
-                    blockId: Some(String::from("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289")),
-                    blockHeight: Some(34944396),
-                    transactionId: Some(String::from("f4d331583dd5ddc1e57e72ca02197d7ff365bde7b2ca9f3114d8c44d248d1c6c")),
-                    transactionIndex: Some(0),
-                    eventIndex: Some(2),
-                    topic: Some(String::from("A.c8873a26b148ed14.Starport.Lock")),
-                    data: Some(String::from("{\"asset\":\"FLOW\",\"recipient\":\"fc6346ab93540e97\",\"amount\":1000000000}"))
-                }
-            ]),
-           // error: None,
+            result: Some(vec![LogObject {
+                blockId: Some(String::from(
+                    "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289",
+                )),
+                blockHeight: Some(34944396),
+                transactionId: Some(String::from(
+                    "f4d331583dd5ddc1e57e72ca02197d7ff365bde7b2ca9f3114d8c44d248d1c6c",
+                )),
+                transactionIndex: Some(0),
+                eventIndex: Some(2),
+                topic: Some(String::from("A.c8873a26b148ed14.Starport.Lock")),
+                data: Some(String::from(
+                    "{\"asset\":\"FLOW\",\"recipient\":\"fc6346ab93540e97\",\"amount\":1000000000}",
+                )),
+            }]),
+            // error: None,
         };
         assert_eq!(result.unwrap(), expected)
     }
@@ -372,12 +390,16 @@ mod tests {
         let result = deserialize_get_block_by_number_response(RESPONSE);
         let expected = BlockResponse {
             result: Some(BlockObject {
-                blockId: Some(String::from("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289")),
-                parentBlockId: Some(String::from("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d")),
+                blockId: Some(String::from(
+                    "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289",
+                )),
+                parentBlockId: Some(String::from(
+                    "35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d",
+                )),
                 height: Some(34944396),
                 timestamp: Some(String::from("2021-06-09 21:16:57.510218679 +0000 UTC")),
             }),
-           // error: None,
+            // error: None,
         };
         assert_eq!(result.unwrap(), expected)
     }
@@ -388,7 +410,7 @@ mod tests {
         let result = deserialize_block_number_response(RESPONSE);
         let expected = BlockNumberResponse {
             result: Some(35705489),
-           // error: None,
+            // error: None,
         };
         assert_eq!(result.unwrap(), expected)
     }
