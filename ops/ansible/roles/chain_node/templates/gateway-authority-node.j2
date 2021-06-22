@@ -14,7 +14,7 @@ Environment="KEYRING_TYPE={{ keyring_type | default('IN_MEMORY') }}"
 Environment="MINER={{ miner }}"
 ExecStart={{ gateway_bin }} \
   --base-path {{ chain_data_dir }} \
-  --chain "{{ gateway_user_home }}/chainSpec.json" \
+  --chain {{ gateway_chain_spec_raw }} \
   --port 30333 \
   --ws-port 9944 \
   --ws-external \

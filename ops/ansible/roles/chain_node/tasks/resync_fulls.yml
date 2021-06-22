@@ -1,4 +1,3 @@
-
 - name: stop gateway service
   when: "'full_node' in group_names"
   become: true
@@ -11,7 +10,7 @@
   when: "'full_node' in group_names"
   shell: |
     set -o pipefail
-    {{ gateway_bin }} purge-chain -y --chain "{{ gateway_user_home }}/chainSpec.json" --base-path {{ chain_data_dir }}  --database paritydb-experimental
+    {{ gateway_bin }} purge-chain -y --chain {{ gateway_chain_spec_raw }} --base-path {{ chain_data_dir }}  --database paritydb-experimental
   args:
     executable: /bin/bash
   changed_when: False
@@ -22,13 +21,12 @@
   when: "'full_node' in group_names"
   vars:
     peers: "{{ groups['authority_node'] }}"
-  tags:
-    gateway-service
+  tags: gateway-service
 
-# - name: start gateway service
-#   when: "'full_node' in group_names"
-#   become: true
-#   systemd:
-#     name: gateway.service
-#     state: started
-#     daemon_reload: yes
+- name: start gateway service
+  when: "'full_node' in group_names"
+  become: true
+  systemd:
+    name: gateway.service
+    state: started
+    daemon_reload: yes
