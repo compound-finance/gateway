@@ -6,7 +6,7 @@ use hex_buffer_serde::{ConstHex, ConstHexForm};
 use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
 
-use our_std::{debug, error, info, warn, Deserialize, RuntimeDebug, Serialize};
+use our_std::{error, info, trace, warn, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -182,7 +182,7 @@ pub fn send_rpc(
         "id":1
     })
     .to_string();
-    debug!("RPC: {}", &data);
+    trace!("RPC: {}", &data);
 
     let request = http::Request::post(server, vec![data]);
 
@@ -209,7 +209,7 @@ pub fn send_rpc(
         warn!("No UTF8 body");
         EthereumClientError::InvalidUTF8
     })?;
-    debug!("RPC Response: {}", body_str.clone());
+    trace!("RPC Response: {}", body_str.clone());
 
     Ok(String::from(body_str))
 }
@@ -221,13 +221,13 @@ pub fn get_block(
 ) -> Result<EthereumBlock, EthereumClientError> {
     let block_str = encode_block_hex(block_num);
     let block_obj = get_block_object(server, &block_str)?;
-    debug!("eth_starport_address: {:X?}", &eth_starport_address[..]);
+    trace!("eth_starport_address: {:X?}", &eth_starport_address[..]);
     let get_logs_params = vec![serde_json::json!({
         "address": format!("0x{}", ::hex::encode(&eth_starport_address[..])),
         "fromBlock": &block_str,
         "toBlock": &block_str,
     })];
-    debug!("get_logs_params: {:?}", get_logs_params.clone());
+    trace!("get_logs_params: {:?}", get_logs_params.clone());
     let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
     let event_objects = get_logs_response
@@ -282,7 +282,7 @@ pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, Et
 pub fn get_latest_block_number(server: &str) -> Result<u64, EthereumClientError> {
     let response_str: String = send_rpc(server, "eth_blockNumber".into(), vec![])?;
     let response = deserialize_block_number_response(&response_str)?;
-    debug!("eth_blockNumber response: {:?}", response.result.clone());
+    trace!("eth_blockNumber response: {:?}", response.result.clone());
     parse_u64(Some(response.result.ok_or(EthereumClientError::NoResult)?))
         .ok_or(EthereumClientError::JsonParseError)
 }

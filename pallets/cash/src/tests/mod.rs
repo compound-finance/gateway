@@ -6,10 +6,8 @@ pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 pub use hex_literal::hex;
 pub use our_std::convert::TryInto;
 pub use our_std::{iter::FromIterator, str::FromStr};
-use parking_lot::RwLock;
 pub use sp_core::crypto::AccountId32;
 use sp_core::offchain::testing;
-use std::sync::Arc;
 
 pub mod assets;
 pub mod common;
@@ -131,6 +129,10 @@ pub fn premined_block() -> ethereum_client::EthereumBlock {
 }
 
 pub fn initialize_storage() {
+    initialize_storage_with_blocks(vec![ChainBlock::Eth(premined_block())]);
+}
+
+pub fn initialize_storage_with_blocks(genesis_blocks: Vec<ChainBlock>) {
     pallet_oracle::Module::<Test>::initialize_reporters(
         vec![
             "0x85615b076615317c80f14cbad6501eec031cd51c",
@@ -159,9 +161,8 @@ pub fn initialize_storage() {
     ]);
 
     CashModule::initialize_validators(vec![val_a(), val_b()]);
-
-    Starports::insert(ChainId::Eth, ChainAccount::Eth([0x77; 20]));
-    LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(premined_block()));
+    CashModule::initialize_starports(vec![ChainAccount::Eth([0x77; 20])]);
+    CashModule::initialize_genesis_blocks(genesis_blocks);
 }
 
 pub fn validator_a_sign(data: &[u8]) -> Result<ChainSignature, Reason> {
@@ -205,12 +206,11 @@ pub fn all_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchErro
     b_receive_chain_blocks(blocks)
 }
 
-pub fn gen_mock_responses(
-    state: Arc<RwLock<testing::OffchainState>>,
-    blocks: Vec<ethereum_client::EthereumBlock>,
+pub fn gen_mock_calls(
+    blocks: &[ethereum_client::EthereumBlock],
     starport_address: <Ethereum as Chain>::Address,
-) {
-    let mut s = state.write();
+) -> Vec<testing::PendingRequest> {
+    let mut calls = vec![];
     for block in blocks {
         let block_str = encode_block_hex(block.number);
 
@@ -264,9 +264,10 @@ pub fn gen_mock_responses(
             ..Default::default()
         };
 
-        s.expect_request(get_block);
-        s.expect_request(get_logs);
+        calls.push(get_block);
+        calls.push(get_logs);
     }
+    calls
 }
 
 #[test]

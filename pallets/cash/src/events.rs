@@ -91,12 +91,9 @@ fn fetch_eth_blocks(
 mod tests {
     use crate::events::*;
     use crate::tests::*;
-    use sp_core::offchain::testing;
-    use sp_core::offchain::{OffchainDbExt, OffchainWorkerExt};
 
     #[test]
     fn test_fetch_chain_blocks_eth_returns_proper_blocks() -> Result<(), Reason> {
-        // XXX should this use new_test_ext_with_http_calls?
         let blocks_to_return = vec![
             ethereum_client::EthereumBlock {
                 hash: [1u8; 32],
@@ -116,13 +113,8 @@ mod tests {
         let fetch_to = blocks_to_return[blocks_to_return.len() - 1].number + 1;
         const STARPORT_ADDR: [u8; 20] = [1; 20];
 
-        let (offchain, offchain_state) = testing::TestOffchainExt::new();
-        let mut t = sp_io::TestExternalities::default();
-
-        t.register_extension(OffchainDbExt::new(offchain.clone()));
-        t.register_extension(OffchainWorkerExt::new(offchain));
-
-        gen_mock_responses(offchain_state, blocks_to_return.clone(), STARPORT_ADDR);
+        let calls = gen_mock_calls(&blocks_to_return, STARPORT_ADDR);
+        let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
             let fetched_blocks = fetch_eth_blocks(fetch_from, fetch_to, &STARPORT_ADDR).unwrap();

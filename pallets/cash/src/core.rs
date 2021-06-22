@@ -23,8 +23,8 @@ use crate::{
         SignersSet, Timestamp, ValidatorKeys,
     },
     AssetBalances, AssetsWithNonZeroBalance, CashIndex, CashPrincipals, CashYield, Config, Event,
-    GlobalCashIndex, IngressionQueue, LastProcessedBlock, Pallet, Starports, SupportedAssets,
-    TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
+    FirstBlock, GlobalCashIndex, IngressionQueue, LastProcessedBlock, Pallet, Starports,
+    SupportedAssets, TotalBorrowAssets, TotalCashPrincipal, TotalSupplyAssets, Validators,
 };
 
 use codec::Decode;
@@ -71,9 +71,14 @@ pub fn get_event_queue<T: Config>(chain_id: ChainId) -> Result<ChainBlockEvents,
     Ok(IngressionQueue::get(chain_id).unwrap_or(ChainBlockEvents::empty(chain_id)?))
 }
 
-/// Return the last processed block for the underlying chain, or the initial one for the starport.
+/// Return the last processed block for the underlying chain.
+pub fn get_first_block<T: Config>(chain_id: ChainId) -> Result<ChainBlock, Reason> {
+    FirstBlock::get(chain_id).ok_or(Reason::MissingBlock)
+}
+
+/// Return the last processed block for the underlying chain.
 pub fn get_last_block<T: Config>(chain_id: ChainId) -> Result<ChainBlock, Reason> {
-    LastProcessedBlock::get(chain_id).ok_or(Reason::MissingLastBlock)
+    LastProcessedBlock::get(chain_id).ok_or(Reason::MissingBlock)
 }
 
 /// Return the current total borrow and total supply balances for the asset.
