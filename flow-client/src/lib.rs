@@ -24,7 +24,7 @@ pub struct FlowBlock {
     pub events: Vec<FlowEvent>,
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum FlowClientError {
     DecodeError,
     HttpIoError,

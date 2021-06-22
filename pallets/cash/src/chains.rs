@@ -366,39 +366,52 @@ impl FromStr for ChainId {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlock {
     Eth(<Ethereum as Chain>::Block),
+    Flow(<Flow as Chain>::Block),
 }
 
 impl ChainBlock {
     pub fn chain_id(&self) -> ChainId {
         match self {
             ChainBlock::Eth(_) => ChainId::Eth,
+            ChainBlock::Flow(_) => ChainId::Flow,
         }
     }
 
     pub fn hash(&self) -> ChainHash {
         match self {
             ChainBlock::Eth(block) => ChainHash::Eth(block.hash),
+            ChainBlock::Flow(block) => ChainHash::Flow(vec![block.blockId.as_bytes()]),
         }
     }
 
     pub fn parent_hash(&self) -> ChainHash {
         match self {
             ChainBlock::Eth(block) => ChainHash::Eth(block.parent_hash),
+            ChainBlock::Flow(block) => ChainHash::Flow(block.parentBlockId),
         }
     }
 
     pub fn number(&self) -> ChainBlockNumber {
         match self {
             ChainBlock::Eth(block) => block.number,
+            ChainBlock::Flow(block) => block.height,
         }
     }
 
-    pub fn events(&self) -> impl Iterator<Item = ChainBlockEvent> + '_ {
+    pub fn events(&self) -> Box<dyn Iterator<Item = ChainBlockEvent> + '_> {
         match self {
-            ChainBlock::Eth(block) => block
-                .events
-                .iter()
-                .map(move |e| ChainBlockEvent::Eth(block.number, e.clone())),
+            ChainBlock::Eth(block) => Box::new(
+                block
+                    .events
+                    .iter()
+                    .map(move |e| ChainBlockEvent::Eth(block.number, e.clone())),
+            ),
+            ChainBlock::Flow(block) => Box::new(
+                block
+                    .events
+                    .iter()
+                    .map(move |e| ChainBlockEvent::Flow(block.height, e.clone())),
+            ),
         }
     }
 }
@@ -407,30 +420,37 @@ impl ChainBlock {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlocks {
     Eth(Vec<<Ethereum as Chain>::Block>),
+    Flow(Vec<<Flow as Chain>::Block>),
 }
 
 impl ChainBlocks {
     pub fn chain_id(&self) -> ChainId {
         match self {
             ChainBlocks::Eth(_) => ChainId::Eth,
+            ChainBlocks::Flow(_) => ChainId::Flow,
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
             ChainBlocks::Eth(blocks) => blocks.len(),
+            ChainBlocks::Flow(blocks) => blocks.len(),
         }
     }
 
-    pub fn blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+    pub fn blocks(&self) -> Box<dyn Iterator<Item = ChainBlock> + '_> {
         match self {
-            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| ChainBlock::Eth(b.clone())),
+            ChainBlocks::Eth(blocks) => Box::new(blocks.iter().map(|b| ChainBlock::Eth(b.clone()))),
+            ChainBlocks::Flow(blocks) => {
+                Box::new(blocks.iter().map(|b| ChainBlock::Flow(b.clone())))
+            }
         }
     }
 
-    pub fn block_numbers(&self) -> impl Iterator<Item = u64> + '_ {
+    pub fn block_numbers(&self) -> Box<dyn Iterator<Item = u64> + '_> {
         match self {
-            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| b.number),
+            ChainBlocks::Eth(blocks) => Box::new(blocks.iter().map(|b| b.number)),
+            ChainBlocks::Flow(blocks) => Box::new(blocks.iter().map(|b| b.height)),
         }
     }
 
@@ -451,6 +471,17 @@ impl ChainBlocks {
                     })
                     .collect(),
             ),
+            ChainBlocks::Flow(blocks) => ChainBlocks::Flow(
+                blocks
+                    .into_iter()
+                    .filter(|block| {
+                        !pending_blocks.iter().any(|t| {
+                            t.block.hash() == ChainHash::Flow(block.blockId)
+                                && t.has_supporter(signer)
+                        })
+                    })
+                    .collect(),
+            ),
         }
     }
 }
@@ -459,6 +490,7 @@ impl From<ChainBlock> for ChainBlocks {
     fn from(block: ChainBlock) -> Self {
         match block {
             ChainBlock::Eth(block) => ChainBlocks::Eth(vec![block]),
+            ChainBlock::Flow(block) => ChainBlocks::Flow(vec![block]),
         }
     }
 }
@@ -611,6 +643,7 @@ impl ChainReorgTally {
 pub enum ChainBlockEvent {
     Reserved,
     Eth(ChainBlockNumber, <Ethereum as Chain>::Event),
+    Flow(ChainBlockNumber, <Flow as Chain>::Event),
 }
 
 impl ChainBlockEvent {
@@ -618,6 +651,7 @@ impl ChainBlockEvent {
         match self {
             ChainBlockEvent::Reserved => panic!("reserved"),
             ChainBlockEvent::Eth(..) => ChainId::Eth,
+            ChainBlockEvent::Flow(..) => ChainId::Flow,
         }
     }
 
@@ -625,6 +659,7 @@ impl ChainBlockEvent {
         match self {
             ChainBlockEvent::Reserved => panic!("reserved"),
             ChainBlockEvent::Eth(block_num, _) => *block_num,
+            ChainBlockEvent::Flow(block_num, _) => *block_num,
         }
     }
 
@@ -638,6 +673,7 @@ impl ChainBlockEvent {
 pub enum ChainBlockEvents {
     Reserved,
     Eth(Vec<(ChainBlockNumber, <Ethereum as Chain>::Event)>),
+    Flow(Vec<(ChainBlockNumber, <Flow as Chain>::Event)>),
 }
 
 impl ChainBlockEvents {
@@ -647,7 +683,7 @@ impl ChainBlockEvents {
             ChainId::Gate => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainBlockEvents::Eth(vec![])),
             ChainId::Dot => Err(Reason::NotImplemented),
-            ChainId::Flow => Err(Reason::NotImplemented),
+            ChainId::Flow => Ok(ChainBlockEvents::Flow(vec![])),
         }
     }
 
@@ -656,6 +692,7 @@ impl ChainBlockEvents {
         match self {
             ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
+            ChainBlockEvents::Flow(flow_block_events) => flow_block_events.len(),
         }
     }
 
@@ -667,6 +704,13 @@ impl ChainBlockEvents {
                 ChainBlock::Eth(eth_block) => {
                     for event in eth_block.events.iter() {
                         eth_block_events.push((eth_block.number, event.clone()));
+                    }
+                }
+            },
+            ChainBlockEvents::Flow(flow_block_events) => match block {
+                ChainBlock::Flow(flow_block) => {
+                    for event in flow_block.events.iter() {
+                        flow_block_events.push((flow_block.height, event.clone()));
                     }
                 }
             },
@@ -683,6 +727,9 @@ impl ChainBlockEvents {
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.retain(|(b, e)| f(&ChainBlockEvent::Eth(*b, e.clone())));
             }
+            ChainBlockEvents::Flow(flow_block_events) => {
+                flow_block_events.retain(|(b, e)| f(&ChainBlockEvent::Flow(*b, e.clone())));
+            }
         }
     }
 
@@ -696,6 +743,12 @@ impl ChainBlockEvents {
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *eth_block),
             },
+            ChainBlockEvents::Flow(flow_block_events) => match event {
+                ChainBlockEvent::Reserved => panic!("unreachable"),
+                ChainBlockEvent::Flow(block_num, flow_block) => flow_block_events
+                    .iter()
+                    .position(|(b, e)| *b == *block_num && *e == *flow_block),
+            },
         }
     }
 
@@ -705,6 +758,9 @@ impl ChainBlockEvents {
             ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.remove(pos);
+            }
+            ChainBlockEvents::Flow(flow_block_events) => {
+                flow_block_events.remove(pos);
             }
         }
     }
@@ -1033,13 +1089,13 @@ impl Chain for Flow {
     type Timestamp = u64;
 
     #[type_alias("Flow__Chain__")]
-    type Hash = [u8; 32];
+    type Hash = [u8; 64];
 
     #[type_alias("Flow__Chain__")]
-    type PublicKey = [u8; 64];
+    type PublicKey = ();
 
     #[type_alias("Flow__Chain__")]
-    type Signature = [u8; 65];
+    type Signature = ();
 
     #[type_alias("Flow__Chain__")]
     type Event = FlowEvent;
