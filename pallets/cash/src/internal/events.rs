@@ -5,28 +5,25 @@ use crate::{
         ChainSignature,
     },
     core::{
-        self, get_current_validator, get_event_queue, get_last_block, get_starport,
-        get_validator_set, recover_validator, validator_sign,
+        self, get_current_validator, get_event_queue, get_first_block, get_last_block,
+        get_starport, get_validator_set, recover_validator, validator_sign,
     },
     debug, error,
     events::{fetch_chain_block, fetch_chain_blocks},
     internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
-    params::{
-        INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MAX_EVENT_BLOCKS, MIN_EVENT_BLOCKS,
-        REORG_CHUNK_SIZE,
-    },
-    reason::Reason,
+    params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MAX_EVENT_BLOCKS, MIN_EVENT_BLOCKS},
+    reason::{MathError, Reason},
     require,
     types::{CashPrincipalAmount, Quantity, USDQuantity, USD},
-    warn, Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module,
-    PendingChainBlocks, PendingChainReorgs,
+    Call, Config, Event as EventT, IngressionQueue, LastProcessedBlock, Module, PendingChainBlocks,
+    PendingChainReorgs,
 };
 use codec::Encode;
 use ethereum_client::EthereumEvent;
 use frame_support::storage::StorageMap;
 use frame_system::offchain::SubmitTransaction;
-use our_std::{cmp::max, collections::btree_set::BTreeSet, convert::TryInto};
+use our_std::{cmp::max, convert::TryInto};
 use sp_core::offchain::Duration;
 use sp_runtime::offchain::{
     storage::StorageValueRef,
@@ -129,7 +126,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
             true_block, last_block
         );
         let pending_reorgs = PendingChainReorgs::get(chain_id);
-        let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block, REORG_CHUNK_SIZE)?;
+        let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block)?;
         if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
             submit_chain_reorg::<T>(&reorg)
         } else {
@@ -238,25 +235,13 @@ pub fn memorize_chain_blocks<T: Config>(blocks: &ChainBlocks) -> Result<(), Reas
 }
 
 /// Walk backwards through the locally stored blocks, in order to formulate a reorg path.
-pub fn recall_chain_blocks<T: Config>(
-    start_hash: ChainHash,
-    num_blocks: u32,
-) -> Result<Vec<ChainBlock>, Reason> {
-    let mut blocks: Vec<ChainBlock> = vec![];
-    let mut key = format!("cash::memorize_chain_blocks::{}", start_hash);
-    let mut krf = StorageValueRef::persistent(key.as_bytes());
-    for _ in 0..num_blocks {
-        match krf.get::<ChainBlock>() {
-            Some(Some(block)) => {
-                key = format!("cash::memorize_chain_blocks::{}", block.parent_hash());
-                krf = StorageValueRef::persistent(key.as_bytes());
-                blocks.push(block);
-            }
-
-            _ => break,
-        }
+pub fn recall_chain_block<T: Config>(hash: ChainHash) -> Result<ChainBlock, Reason> {
+    let key = format!("cash::memorize_chain_blocks::{}", hash);
+    let krf = StorageValueRef::persistent(key.as_bytes());
+    match krf.get::<ChainBlock>() {
+        Some(Some(block)) => Ok(block),
+        _ => Err(Reason::MissingBlock),
     }
-    Ok(blocks)
 }
 
 /// Try to form a path from the last block to the new true block.
@@ -264,78 +249,43 @@ pub fn formulate_reorg<T: Config>(
     chain_id: ChainId,
     last_block: &ChainBlock,
     true_block: &ChainBlock,
-    chunk_size: u32,
 ) -> Result<ChainReorg, Reason> {
     let starport = get_starport::<T>(chain_id)?;
+    let first_block = get_first_block::<T>(chain_id)?;
     let mut reverse_blocks: Vec<ChainBlock> = vec![]; // reverse blocks in correct order
     let mut drawrof_blocks: Vec<ChainBlock> = vec![]; // forward blocks in reverse order
-    let mut reverse_hashes = BTreeSet::<ChainHash>::new();
-    let mut reverse_blocks_hash_next = Some(last_block.hash());
-    let mut reverse_blocks_number_last = last_block.number();
-    let mut drawrof_blocks_number_next = true_block.number().checked_add(1); // exclusive
-    let common_ancestor = 'search: loop {
-        // fetch the next batch of blocks, going backwards further each time
-        //  these are the reverse_blocks used by the reorg in the expected order
-        let reverse_blocks_next = match reverse_blocks_hash_next {
-            Some(hash) => recall_chain_blocks::<T>(hash, chunk_size)?,
-            None => Vec::new(),
-        };
+    let mut reverse_block_next = last_block.clone();
+    let mut drawrof_block_next = true_block.clone();
 
-        // note that `drawrof_blocks_next` *could* be built directly in reverse order
-        //  these are the forward_blocks used by the reorg, but backwards
-        let drawrof_blocks_next = match drawrof_blocks_number_next {
-            Some(number) => fetch_chain_blocks(
-                true_block.chain_id(),
-                number.saturating_sub(chunk_size as u64),
-                number,
-                starport,
-            )?
-            .blocks()
-            .collect_rev(),
-            None => Vec::new(),
-        };
+    reverse_blocks.push(reverse_block_next.clone());
+    drawrof_blocks.push(drawrof_block_next.clone());
 
-        // be sure to pick up where we left off on the next go round
-        reverse_blocks_hash_next = reverse_blocks_next.last().map(|b| b.parent_hash());
-        drawrof_blocks_number_next = drawrof_blocks_next.last().map(|b| b.number());
-
-        // keep tabs on the earliest reverse block number we've seen, just in case
-        reverse_blocks_number_last = reverse_blocks_next
-            .last()
-            .map_or(reverse_blocks_number_last, |b| b.number());
-
-        // just add all the reverse blocks to the full list, and index their hashes
-        for block in reverse_blocks_next {
-            reverse_blocks.push(block.clone());
-            reverse_hashes.insert(block.hash());
+    loop {
+        // these blocks must be at the same height, or fail
+        if reverse_block_next.number() != drawrof_block_next.number() {
+            return Err(Reason::BlockMismatch);
         }
 
-        // note that the following is correct if the original blocks are at the same height
-        //  however that fact also makes this entire algorithm obsolete / inefficient
-        //   we can simply compare parents at the same height one at a time
-        //  but for this to be generally correct, we would need to recheck all `drawrof_blocks`
-        //   to see if any of their parent hashes are in the reverse set
-        for block in drawrof_blocks_next {
-            let parent_hash = block.parent_hash();
-            drawrof_blocks.push(block);
-            if reverse_hashes.contains(&parent_hash) {
-                break 'search Some(parent_hash);
-            }
+        let next_block_number = drawrof_block_next
+            .number()
+            .checked_sub(1)
+            .ok_or(MathError::Underflow)?;
+        reverse_block_next = recall_chain_block::<T>(reverse_block_next.parent_hash())?;
+        drawrof_block_next = fetch_chain_block(chain_id, next_block_number, starport)?;
+
+        reverse_blocks.push(reverse_block_next.clone());
+        drawrof_blocks.push(drawrof_block_next.clone());
+
+        // these blocks have a common ancestor, so we are done
+        if reverse_block_next.parent_hash() == drawrof_block_next.parent_hash() {
+            break;
         }
 
-        // if we do not have the information locally, we *cannot* find a common ancestor
-        //  we either give up, in which case we'll never again make progress on the chain
-        //  or assume the reorg only goes as far back as we got, which is what we do here
-        // note since its possible for these cases to occur
-        //  it may be slightly improvement to index forward hashes instead of reverse
-        if reverse_blocks_hash_next == None {
-            warn!(
-                "Unable to find a common ancestor, proceeding with reverse={:?} drawrof={:?}",
-                reverse_blocks, drawrof_blocks,
-            );
-            break 'search None;
+        // we do not have blocks before the first, which would have no impact
+        if reverse_block_next.number() == first_block.number() {
+            break;
         }
-    };
+    }
 
     match (last_block.hash(), true_block.hash()) {
         (ChainHash::Eth(from_hash), ChainHash::Eth(to_hash)) => Ok(ChainReorg::Eth {
@@ -343,17 +293,12 @@ pub fn formulate_reorg<T: Config>(
             to_hash,
             reverse_blocks: reverse_blocks
                 .into_iter()
-                .take_while(|b| match common_ancestor {
-                    Some(hash) => b.hash() != hash,
-                    None => true,
-                })
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
                 })
                 .collect(),
             forward_blocks: drawrof_blocks
                 .into_iter()
-                .take_while(|b| b.number() >= reverse_blocks_number_last)
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
                 })
@@ -570,108 +515,25 @@ mod tests {
 
     #[test]
     fn test_formulate_reorg() {
-        const CHUNK: u64 = REORG_CHUNK_SIZE as u64;
         const STARPORT_ADDR: [u8; 20] = [0x77; 20];
 
-        // mock the exact chunk of blocks in fetch_eth_blocks in the order they are called
-        let common_ancestor_idx = CHUNK - 1;
-        let last_block_idx = CHUNK;
-        let mut prev_blocks: Vec<EthereumBlock> =
-            gen_blocks(last_block_idx - CHUNK + 1, common_ancestor_idx, 0);
-        let reorg_hash = [5; 32];
-        let ancestor_hash = [3; 32];
-        let true_block_hash = [8; 32];
-
-        let commmon_ancestor_block = ethereum_client::EthereumBlock {
-            hash: ancestor_hash.clone(),
-            parent_hash: [100; 32],
-            number: common_ancestor_idx,
-            events: vec![],
-        };
-
-        let last_block = ethereum_client::EthereumBlock {
-            hash: reorg_hash.clone(),
-            parent_hash: commmon_ancestor_block.hash,
-            number: last_block_idx,
-            events: vec![],
-        };
-
-        prev_blocks.push(commmon_ancestor_block.clone());
-
-        let mut true_chain = prev_blocks.clone();
-
-        let true_block = ethereum_client::EthereumBlock {
-            hash: true_block_hash.clone(),
-            parent_hash: commmon_ancestor_block.hash,
-            number: last_block_idx,
-            events: vec![],
-        };
-
-        true_chain.push(true_block.clone());
-        prev_blocks.push(last_block.clone());
-
-        let calls = gen_mock_calls(&true_chain, STARPORT_ADDR);
-        let (mut t, _, _) = new_test_ext_with_http_calls(calls);
-
-        t.execute_with(|| {
-            initialize_storage();
-            memorize_chain_blocks::<Test>(&ChainBlocks::Eth(prev_blocks)).unwrap();
-            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(last_block.clone()));
-            let reorg = formulate_reorg::<Test>(
-                ChainId::Eth,
-                &ChainBlock::Eth(last_block.clone()),
-                &ChainBlock::Eth(true_block.clone()),
-                CHUNK as u32,
-            )
-            .unwrap();
-
-            match reorg {
-                ChainReorg::Eth {
-                    from_hash,
-                    to_hash,
-                    reverse_blocks,
-                    forward_blocks,
-                } => {
-                    assert_eq!(from_hash, reorg_hash);
-                    assert_eq!(to_hash, true_block_hash);
-                    assert_eq!(reverse_blocks, vec![last_block]);
-                    assert_eq!(
-                        forward_blocks.iter().map(|x| x.hash).collect::<Vec<_>>(),
-                        vec![true_block.hash]
-                    );
-                }
-            }
-        });
-    }
-
-    #[test]
-    fn test_formulate_reorg_multiple_chunks() {
-        const CHUNK: u64 = 5 as u64;
-        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
-
-        // mock the exact chunk of blocks in fetch_eth_blocks in the order they are called
         let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
         let new_chain: Vec<EthereumBlock> = gen_blocks(1, 10, 1);
         let common_ancestor_block = old_chain[0].clone();
         let last_block = old_chain.last().unwrap().clone();
         let true_block = new_chain.last().unwrap().clone();
 
-        let mut fetched_blocks = vec![];
-        fetched_blocks.extend_from_slice(&new_chain[4..9]);
-        fetched_blocks.push(common_ancestor_block);
-        fetched_blocks.extend_from_slice(&new_chain[0..4]);
+        let fetched_blocks = new_chain[0..8].iter().rev().cloned().collect::<Vec<_>>();
         let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
-            initialize_storage();
+            initialize_storage_with_blocks(vec![ChainBlock::Eth(common_ancestor_block)]);
             memorize_chain_blocks::<Test>(&ChainBlocks::Eth(old_chain.clone())).unwrap();
-            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(last_block.clone()));
             let reorg = formulate_reorg::<Test>(
                 ChainId::Eth,
                 &ChainBlock::Eth(last_block.clone()),
                 &ChainBlock::Eth(true_block.clone()),
-                CHUNK as u32,
             )
             .unwrap();
 
@@ -698,33 +560,81 @@ mod tests {
     }
 
     #[test]
-    fn test_formulate_reorg_missing_data() {
-        const CHUNK: u64 = 5 as u64;
+    fn test_formulate_reorg_height_mismatch() {
         const STARPORT_ADDR: [u8; 20] = [0x77; 20];
 
-        // mock the exact chunk of blocks in fetch_eth_blocks in the order they are called
+        let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
+        let new_chain: Vec<EthereumBlock> = gen_blocks(1, 9, 1);
+        let common_ancestor_block = old_chain[0].clone();
+        let last_block = old_chain.last().unwrap().clone();
+        let true_block = new_chain.last().unwrap().clone();
+
+        let fetched_blocks = vec![];
+        let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
+        let (mut t, _, _) = new_test_ext_with_http_calls(calls);
+
+        t.execute_with(|| {
+            initialize_storage_with_blocks(vec![ChainBlock::Eth(common_ancestor_block)]);
+            memorize_chain_blocks::<Test>(&ChainBlocks::Eth(vec![])).unwrap();
+            assert_eq!(
+                formulate_reorg::<Test>(
+                    ChainId::Eth,
+                    &ChainBlock::Eth(last_block.clone()),
+                    &ChainBlock::Eth(true_block.clone()),
+                ),
+                Err(Reason::BlockMismatch)
+            );
+        });
+    }
+
+    #[test]
+    fn test_formulate_reorg_missing_data() {
+        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
+
         let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
         let new_chain: Vec<EthereumBlock> = gen_blocks(1, 10, 1);
         let common_ancestor_block = old_chain[0].clone();
         let last_block = old_chain.last().unwrap().clone();
         let true_block = new_chain.last().unwrap().clone();
 
-        let mut fetched_blocks = vec![];
-        fetched_blocks.extend_from_slice(&new_chain[4..9]);
-        fetched_blocks.push(common_ancestor_block);
-        fetched_blocks.extend_from_slice(&new_chain[0..4]);
+        let fetched_blocks = new_chain[7..8].iter().rev().cloned().collect::<Vec<_>>();
         let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
-            initialize_storage();
+            initialize_storage_with_blocks(vec![ChainBlock::Eth(common_ancestor_block)]);
             memorize_chain_blocks::<Test>(&ChainBlocks::Eth(old_chain[8..10].to_vec())).unwrap();
-            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(last_block.clone()));
+            assert_eq!(
+                formulate_reorg::<Test>(
+                    ChainId::Eth,
+                    &ChainBlock::Eth(last_block.clone()),
+                    &ChainBlock::Eth(true_block.clone()),
+                ),
+                Err(Reason::MissingBlock)
+            );
+        });
+    }
+
+    #[test]
+    fn test_formulate_reorg_before_first() {
+        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
+
+        let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
+        let new_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 1);
+        let last_block = old_chain.last().unwrap().clone();
+        let true_block = new_chain.last().unwrap().clone();
+
+        let fetched_blocks = new_chain[0..9].iter().rev().cloned().collect::<Vec<_>>();
+        let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
+        let (mut t, _, _) = new_test_ext_with_http_calls(calls);
+
+        t.execute_with(|| {
+            initialize_storage_with_blocks(vec![ChainBlock::Eth(old_chain[0].clone())]);
+            memorize_chain_blocks::<Test>(&ChainBlocks::Eth(old_chain.clone())).unwrap();
             let reorg = formulate_reorg::<Test>(
                 ChainId::Eth,
                 &ChainBlock::Eth(last_block.clone()),
                 &ChainBlock::Eth(true_block.clone()),
-                CHUNK as u32,
             )
             .unwrap();
 
@@ -739,11 +649,11 @@ mod tests {
                     assert_eq!(to_hash, true_block.hash);
                     assert_eq!(
                         reverse_blocks,
-                        old_chain[8..10].iter().rev().cloned().collect::<Vec<_>>()
+                        old_chain.iter().rev().cloned().collect::<Vec<_>>()
                     );
                     assert_eq!(
                         forward_blocks.iter().map(|x| x.hash).collect::<Vec<_>>(),
-                        new_chain[7..9].iter().map(|x| x.hash).collect::<Vec<_>>()
+                        new_chain.iter().map(|x| x.hash).collect::<Vec<_>>()
                     );
                 }
             }

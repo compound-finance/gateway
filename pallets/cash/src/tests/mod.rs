@@ -129,6 +129,10 @@ pub fn premined_block() -> ethereum_client::EthereumBlock {
 }
 
 pub fn initialize_storage() {
+    initialize_storage_with_blocks(vec![ChainBlock::Eth(premined_block())]);
+}
+
+pub fn initialize_storage_with_blocks(genesis_blocks: Vec<ChainBlock>) {
     pallet_oracle::Module::<Test>::initialize_reporters(
         vec![
             "0x85615b076615317c80f14cbad6501eec031cd51c",
@@ -157,9 +161,8 @@ pub fn initialize_storage() {
     ]);
 
     CashModule::initialize_validators(vec![val_a(), val_b()]);
-
-    Starports::insert(ChainId::Eth, ChainAccount::Eth([0x77; 20]));
-    LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(premined_block()));
+    CashModule::initialize_starports(vec![ChainAccount::Eth([0x77; 20])]);
+    CashModule::initialize_genesis_blocks(genesis_blocks);
 }
 
 pub fn validator_a_sign(data: &[u8]) -> Result<ChainSignature, Reason> {

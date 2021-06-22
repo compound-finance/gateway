@@ -13,7 +13,6 @@ use types_derive::Types;
 /// Type for reporting failures for reasons outside of our control.
 #[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum Reason {
-    AssetExtractionNotSupported,
     AssetNotSupported,
     BadAccount,
     BadAddress,
@@ -26,6 +25,7 @@ pub enum Reason {
     BadUnits,
     ChainMismatch,
     HashMismatch,
+    BlockMismatch,
     CryptoError(CryptoError),
     EventError(EventError),
     FailedToSubmitExtrinsic,
@@ -71,7 +71,7 @@ pub enum Reason {
     TotalBorrowUnderflow,
     InsufficientCollateral,
     NegativeChainCash,
-    MissingLastBlock,
+    MissingBlock,
     StarportMissing,
     InvalidChainBlock,
 }
@@ -81,9 +81,6 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
         // XXX better way to assign codes?
         //  also we can use them to differentiate between inner type variants
         let (index, error, message) = match reason {
-            Reason::AssetExtractionNotSupported => {
-                (0, 99, "asset extraction not supported XXX temporary")
-            }
             Reason::AssetNotSupported => (0, 0, "asset not supported"),
             Reason::BadAccount => (1, 0, "bad account"),
             Reason::BadAddress => (1, 1, "bad address"),
@@ -96,6 +93,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::BadUnits => (1, 8, "bad units"),
             Reason::ChainMismatch => (2, 0, "chain mismatch"),
             Reason::HashMismatch => (2, 1, "hash mismatch"),
+            Reason::BlockMismatch => (2, 2, "block mismatch"),
             Reason::CryptoError(_) => (3, 0, "crypto error"),
             Reason::EventError(_) => (4, 0, "event error"),
             Reason::FailedToSubmitExtrinsic => (5, 0, "failed to submit extrinsic"),
@@ -143,7 +141,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
                 (37, 0, "borrower has insufficient collateral to seize")
             }
             Reason::NegativeChainCash => (38, 0, "chain cash underflow"),
-            Reason::MissingLastBlock => (39, 0, "last processed block not set"),
+            Reason::MissingBlock => (39, 0, "cannot find expected starport block"),
             Reason::StarportMissing => (40, 0, "starport address not set"),
             Reason::InvalidChainBlock => (41, 0, "invalid chain block"),
         };

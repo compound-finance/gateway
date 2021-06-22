@@ -220,7 +220,10 @@ decl_storage! {
         /// The mapping of ingression queue events, by chain.
         IngressionQueue get(fn ingression_queue): map hasher(blake2_128_concat) ChainId => Option<ChainBlockEvents>;
 
-        /// The mapping of last block number for which validators added events to the ingression queue, by chain.
+        /// The mapping of first blocks for which validators are to begin reading events from.
+        FirstBlock get(fn first_block): map hasher(blake2_128_concat) ChainId => Option<ChainBlock>;
+
+        /// The mapping of last blocks for which validators added events to the ingression queue, by chain.
         LastProcessedBlock get(fn last_processed_block): map hasher(blake2_128_concat) ChainId => Option<ChainBlock>;
 
         /// The mapping of worker tallies for each descendant block, on current fork of underlying chain.
@@ -662,6 +665,7 @@ decl_module! {
         pub fn set_genesis_block(origin, chain_block: ChainBlock) -> dispatch::DispatchResult {
             ensure_root(origin)?;
             log!("Setting last processed block to {:?}", chain_block);
+            FirstBlock::insert(chain_block.chain_id(), chain_block.clone());
             LastProcessedBlock::insert(chain_block.chain_id(), chain_block);
             Ok(())
         }
@@ -778,9 +782,10 @@ impl<T: Config> Module<T> {
         for genesis_block in genesis_blocks {
             log!("Adding Genesis Block {:?}", genesis_block);
             assert!(
-                LastProcessedBlock::get(genesis_block.chain_id()) == None,
+                FirstBlock::get(genesis_block.chain_id()) == None,
                 "Duplicate genesis block in genesis config"
             );
+            FirstBlock::insert(genesis_block.chain_id(), genesis_block.clone());
             LastProcessedBlock::insert(genesis_block.chain_id(), genesis_block);
         }
     }

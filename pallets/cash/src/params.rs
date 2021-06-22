@@ -51,6 +51,3 @@ pub const ERROR_WEIGHT: u64 = 100_000_000;
 
 /// The void account from whence miner CASH is transferred out of.
 pub const GATEWAY_VOID: ChainAccount = ChainAccount::Gate([0u8; 32]);
-
-/// Number of blocks to fetch at once when formulating reorg.
-pub const REORG_CHUNK_SIZE: u32 = 10;
