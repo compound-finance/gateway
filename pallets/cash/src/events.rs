@@ -19,6 +19,7 @@ pub enum EventError {
     EthereumClientError(EthereumClientError),
     FlowClientError(FlowClientError),
     ErrorDecodingHex,
+    NoFlowServerUrl,
 }
 
 /// Fetch a block from the underlying chain.
@@ -107,8 +108,8 @@ fn fetch_flow_block(
     flow_starport_address: &str,
 ) -> Result<FlowBlock, EventError> {
     debug!("Fetching Flow Block {}", number);
-    let flow_server_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
-        .ok_or(EventError::NoRpcUrl)?;
+    let flow_server_url = runtime_interfaces::validator_config_interface::get_flow_server_url()
+        .ok_or(EventError::NoFlowServerUrl)?;
     // TODO XXX Find a way to move topic out of here
     let flow_block =
         flow_client::get_block(&flow_server_url, flow_starport_address, number, "Lock")
@@ -116,7 +117,7 @@ fn fetch_flow_block(
     Ok(flow_block)
 }
 
-/// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
+/// Fetch blocks from the Flow Starport, return up to `slack` blocks to add to the event queue.
 fn fetch_flow_blocks(
     from: ChainBlockNumber,
     to: ChainBlockNumber,

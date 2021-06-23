@@ -8,6 +8,7 @@ use std::{str, sync::Mutex};
 pub struct ValidatorConfig {
     pub eth_key_id: String,
     pub eth_rpc_url: String,
+    pub flow_server_url: String,
     pub miner: String,
     pub opf_url: String,
 }
@@ -22,6 +23,7 @@ lazy_static! {
 pub fn initialize_validator_config(
     eth_key_id: Option<String>,
     eth_rpc_url: Option<String>,
+    flow_server_url: Option<String>,
     miner: Option<String>,
     opf_url: Option<String>,
 ) {
@@ -30,6 +32,7 @@ pub fn initialize_validator_config(
             *data_ref = Some(ValidatorConfig {
                 eth_key_id: eth_key_id.unwrap_or(ETH_KEY_ID_DEFAULT.to_owned()),
                 eth_rpc_url: eth_rpc_url.unwrap_or(ETH_RPC_URL_DEFAULT.to_owned()),
+                flow_server_url: flow_server_url.unwrap_or(FLOW_SERVER_URL_DEFAULT.to_owned()),
                 miner: miner.unwrap_or(MINER_DEFAULT.to_owned()),
                 opf_url: opf_url.unwrap_or(OPF_URL_DEFAULT.to_owned()),
             });
@@ -40,6 +43,7 @@ pub fn initialize_validator_config(
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
+const FLOW_SERVER_URL_ENV_VAR: &str = "FLOW_SERVER_URL";
 const MINER_ENV_VAR: &str = "MINER";
 const OPF_URL_ENV_VAR: &str = "OPF_URL";
 
@@ -47,6 +51,7 @@ const ETH_KEY_ID_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
 const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
 const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
+const FLOW_SERVER_URL_DEFAULT: &str = "http://localhost:8089/";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set
@@ -97,6 +102,24 @@ pub trait ValidatorConfigInterface {
         }
         // not set
         return Some(ETH_RPC_URL_DEFAULT.into());
+    }
+
+    /// Get the Flow events server URL
+    fn get_flow_server_url() -> Option<String> {
+        // check env override
+        if let Ok(flow_server_url) = std::env::var(FLOW_SERVER_URL_ENV_VAR) {
+            if flow_server_url.len() > 0 {
+                return Some(flow_server_url);
+            }
+        }
+        // check config
+        if let Ok(config) = VALIDATOR_CONFIG.lock() {
+            if let Some(inner) = config.as_ref() {
+                return Some(inner.flow_server_url.clone());
+            }
+        }
+        // not set
+        return Some(FLOW_SERVER_URL_DEFAULT.into());
     }
 
     /// Get the open price feed URLs
