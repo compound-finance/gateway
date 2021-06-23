@@ -475,19 +475,15 @@ impl ChainReorg {
         }
     }
 
-    pub fn reverse_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+    pub fn reverse_blocks(&self) -> ChainBlocks {
         match self {
-            ChainReorg::Eth { reverse_blocks, .. } => {
-                reverse_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
-            }
+            ChainReorg::Eth { reverse_blocks, .. } => ChainBlocks::Eth(reverse_blocks.to_vec()),
         }
     }
 
-    pub fn forward_blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+    pub fn forward_blocks(&self) -> ChainBlocks {
         match self {
-            ChainReorg::Eth { forward_blocks, .. } => {
-                forward_blocks.iter().map(|b| ChainBlock::Eth(b.clone()))
-            }
+            ChainReorg::Eth { forward_blocks, .. } => ChainBlocks::Eth(forward_blocks.to_vec()),
         }
     }
 

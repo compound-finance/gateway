@@ -28,6 +28,8 @@ use test_env_log::test;
 
 pub type SysEvent = frame_system::Event<Test>;
 
+pub const ETH_STARPORT_ADDR: [u8; 20] = [0x77; 20];
+
 #[macro_export]
 macro_rules! bal {
     ($string:expr, $units:expr) => {
@@ -161,7 +163,7 @@ pub fn initialize_storage_with_blocks(genesis_blocks: Vec<ChainBlock>) {
     ]);
 
     CashModule::initialize_validators(vec![val_a(), val_b()]);
-    CashModule::initialize_starports(vec![ChainAccount::Eth([0x77; 20])]);
+    CashModule::initialize_starports(vec![ChainStarport::Eth(ETH_STARPORT_ADDR)]);
     CashModule::initialize_genesis_blocks(genesis_blocks);
 }
 

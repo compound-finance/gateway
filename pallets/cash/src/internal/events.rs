@@ -128,6 +128,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
         let pending_reorgs = PendingChainReorgs::get(chain_id);
         let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block)?;
         if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
+            memorize_chain_blocks::<T>(&reorg.forward_blocks())?;
             submit_chain_reorg::<T>(&reorg)
         } else {
             debug!("Worker already submitted... waiting");
@@ -456,7 +457,7 @@ pub fn receive_chain_reorg<T: Config>(
         // if we have enough support, perform actual reorg
         // for each block going backwards
         //  remove events from queue, or unapply them if already applied
-        for block in tally.reorg.reverse_blocks() {
+        for block in tally.reorg.reverse_blocks().blocks() {
             for event in block.events() {
                 // Note: this could be made significantly more efficient
                 //  at the cost of significant complexity
@@ -470,7 +471,7 @@ pub fn receive_chain_reorg<T: Config>(
 
         // for each block going forwards
         //  add events to event queue, advance the block, and process a round of events
-        for block in tally.reorg.forward_blocks() {
+        for block in tally.reorg.forward_blocks().blocks() {
             event_queue.push(&block);
             last_block = block.clone();
             ingress_queue::<T>(&last_block, &mut event_queue)?;
@@ -495,10 +496,10 @@ mod tests {
     use crate::tests::*;
     use ethereum_client::EthereumBlock;
 
-    fn gen_blocks(start_block: u64, end_block: u64, pad: u8) -> Vec<EthereumBlock> {
+    fn gen_blocks(start_block: u64, until_block: u64, pad: u8) -> Vec<EthereumBlock> {
         let mut hash = [0u8; 32];
         let mut v: Vec<ethereum_client::EthereumBlock> = vec![];
-        for i in start_block..end_block {
+        for i in start_block..until_block {
             let parent_hash = hash;
             let mut hashvec = i.to_le_bytes().to_vec();
             hashvec.extend_from_slice(&[pad; 24]);
@@ -514,17 +515,41 @@ mod tests {
     }
 
     #[test]
-    fn test_formulate_reorg() {
-        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
-
+    fn test_track_chain_events_on_eth_reorg_and_back() {
         let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
         let new_chain: Vec<EthereumBlock> = gen_blocks(1, 10, 1);
         let common_ancestor_block = old_chain[0].clone();
         let last_block = old_chain.last().unwrap().clone();
         let true_block = new_chain.last().unwrap().clone();
 
+        let mut fetched_blocks = new_chain[0..9].iter().rev().cloned().collect::<Vec<_>>();
+        fetched_blocks.extend(old_chain[1..10].iter().rev().cloned());
+        let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
+        let (mut t, _, _) = new_test_ext_with_http_calls(calls);
+
+        t.execute_with(|| {
+            initialize_storage_with_blocks(vec![ChainBlock::Eth(common_ancestor_block)]);
+
+            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(last_block));
+            memorize_chain_blocks::<Test>(&ChainBlocks::Eth(old_chain.clone())).unwrap();
+            track_chain_events_on::<Test>(ChainId::Eth).unwrap();
+
+            LastProcessedBlock::insert(ChainId::Eth, ChainBlock::Eth(true_block));
+            track_chain_events_on::<Test>(ChainId::Eth).unwrap();
+        });
+    }
+
+    #[test]
+    fn test_formulate_reorg() {
+        let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
+        let new_chain: Vec<EthereumBlock> = gen_blocks(1, 10, 1);
+        let common_ancestor_block = old_chain[0].clone();
+        let last_block = old_chain.last().unwrap().clone();
+        let true_block = new_chain.last().unwrap().clone();
+
+        // new_chain blocks -> 1...9, excluding true block -> 1...8 -> indices 0..8
         let fetched_blocks = new_chain[0..8].iter().rev().cloned().collect::<Vec<_>>();
-        let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
+        let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
@@ -561,8 +586,6 @@ mod tests {
 
     #[test]
     fn test_formulate_reorg_height_mismatch() {
-        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
-
         let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
         let new_chain: Vec<EthereumBlock> = gen_blocks(1, 9, 1);
         let common_ancestor_block = old_chain[0].clone();
@@ -570,7 +593,7 @@ mod tests {
         let true_block = new_chain.last().unwrap().clone();
 
         let fetched_blocks = vec![];
-        let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
+        let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
@@ -589,8 +612,6 @@ mod tests {
 
     #[test]
     fn test_formulate_reorg_missing_data() {
-        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
-
         let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
         let new_chain: Vec<EthereumBlock> = gen_blocks(1, 10, 1);
         let common_ancestor_block = old_chain[0].clone();
@@ -598,7 +619,7 @@ mod tests {
         let true_block = new_chain.last().unwrap().clone();
 
         let fetched_blocks = new_chain[7..8].iter().rev().cloned().collect::<Vec<_>>();
-        let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
+        let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
@@ -617,15 +638,13 @@ mod tests {
 
     #[test]
     fn test_formulate_reorg_before_first() {
-        const STARPORT_ADDR: [u8; 20] = [0x77; 20];
-
         let old_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 0);
         let new_chain: Vec<EthereumBlock> = gen_blocks(0, 10, 1);
         let last_block = old_chain.last().unwrap().clone();
         let true_block = new_chain.last().unwrap().clone();
 
         let fetched_blocks = new_chain[0..9].iter().rev().cloned().collect::<Vec<_>>();
-        let calls = gen_mock_calls(&fetched_blocks, STARPORT_ADDR);
+        let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
