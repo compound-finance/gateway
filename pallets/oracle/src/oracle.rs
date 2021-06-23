@@ -16,6 +16,8 @@ use crate::{Config, PriceReporters, PriceTimes, Prices, ORACLE_POLL_INTERVAL_BLO
 use our_std::convert::TryInto;
 use our_std::{collections::btree_map::BTreeMap, str::FromStr, vec::Vec, RuntimeDebug};
 
+pub const MAX_PRICE_FUTURE_MS: Timestamp = 100000u64;//100 seconds
+
 /// A single decoded message from the price oracle
 #[derive(PartialEq, Eq, RuntimeDebug)]
 pub struct Message {
@@ -206,6 +208,8 @@ pub fn get_and_check_parsed_price<T: Config>(
     if let Some(last_updated) = PriceTimes::get(&ticker) {
         if parsed.timestamp <= last_updated {
             Err(OracleError::StalePrice)?;
+        } else if parsed.timestamp - last_updated > MAX_PRICE_FUTURE_MS {
+            Err(OracleError::TimestampTooHigh)?;
         }
     }
 
@@ -273,6 +277,7 @@ pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Ora
 pub mod tests {
     use super::*;
     use gateway_crypto::eth_signature_from_bytes;
+    use crate::{tests::*};
 
     pub static API_RESPONSE_TEST_DATA: &str = r#"
     {
@@ -327,6 +332,41 @@ pub mod tests {
         assert_eq!(actual, expected);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_check_price_future_timestamp() {
+        new_test_ext().execute_with(|| {
+            let ticker = Ticker::new("ETH");
+            PriceTimes::insert(ticker, 0);
+
+            let kind = ethabi::Token::String(String::from("prices"));
+            let timestamp = ethabi::Token::Uint((MAX_PRICE_FUTURE_MS + 1).into());
+            let key = ethabi::Token::String(String::from("ETH"));
+            let value = ethabi::Token::Uint(100u64.into());
+
+            let v = ethabi::encode(&vec![kind, timestamp, key, value]);
+
+            assert_eq!(get_and_check_parsed_price::<Test>(&v), Err(OracleError::TimestampTooHigh));
+        });
+    }
+
+
+    #[test]
+    fn test_check_price_happy_path() {
+        new_test_ext().execute_with(|| {
+            let ticker = Ticker::new("ETH");
+            PriceTimes::insert(ticker, 0);
+
+            let kind = ethabi::Token::String(String::from("prices"));
+            let timestamp = ethabi::Token::Uint((1).into());
+            let key = ethabi::Token::String(String::from("ETH"));
+            let value = ethabi::Token::Uint(100u64.into());
+
+            let v = ethabi::encode(&vec![kind, timestamp, key, value]);
+
+            assert_ok!(get_and_check_parsed_price::<Test>(&v));
+        });
     }
 
     fn get_parsed_test_case() -> OpenPriceFeedApiResponse {
