@@ -380,7 +380,7 @@ impl ChainBlock {
     pub fn hash(&self) -> ChainHash {
         match self {
             ChainBlock::Eth(block) => ChainHash::Eth(block.hash),
-            ChainBlock::Flow(block) => ChainHash::Flow(vec![block.blockId.as_bytes()]),
+            ChainBlock::Flow(block) => ChainHash::Flow(block.blockId),
         }
     }
 
@@ -706,6 +706,8 @@ impl ChainBlockEvents {
                         eth_block_events.push((eth_block.number, event.clone()));
                     }
                 }
+                // Added to make it compile, doesn't look good
+                ChainBlock::Flow(_) => panic!("unreachable"),
             },
             ChainBlockEvents::Flow(flow_block_events) => match block {
                 ChainBlock::Flow(flow_block) => {
@@ -713,6 +715,8 @@ impl ChainBlockEvents {
                         flow_block_events.push((flow_block.height, event.clone()));
                     }
                 }
+                // Added to make it compile, doesn't look good
+                ChainBlock::Eth(_) => panic!("unreachable"),
             },
         }
     }
@@ -742,12 +746,16 @@ impl ChainBlockEvents {
                 ChainBlockEvent::Eth(block_num, eth_block) => eth_block_events
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *eth_block),
+                // Added to make it compile, doesn't look good
+                ChainBlockEvent::Flow(_, _) => panic!("unreachable"),
             },
             ChainBlockEvents::Flow(flow_block_events) => match event {
                 ChainBlockEvent::Reserved => panic!("unreachable"),
                 ChainBlockEvent::Flow(block_num, flow_block) => flow_block_events
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *flow_block),
+                // Added to make it compile, doesn't look good
+                ChainBlockEvent::Eth(_, _) => panic!("unreachable"),
             },
         }
     }
@@ -1104,7 +1112,7 @@ impl Chain for Flow {
     type Block = FlowBlock;
 
     fn zero_hash() -> Self::Hash {
-        [0u8; 32]
+        [0u8; 64]
     }
 
     fn hash_bytes(_data: &[u8]) -> Self::Hash {

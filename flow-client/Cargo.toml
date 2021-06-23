@@ -15,6 +15,7 @@ sp-core = { default-features = false, git = 'https://github.com/compound-finance
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 sp-runtime-interface = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+hex-buffer-serde = { version = "0.3.0", default-features = false, features = ['alloc', 'const_len'] }
 
 our-std = { path = '../our-std', default-features = false }
 

@@ -1,8 +1,9 @@
 use codec::{Decode, Encode};
+use hex_buffer_serde::{ConstHex, ConstHexForm};
+use our_std::convert::TryInto;
+use our_std::{debug, error, info, warn, Deserialize, RuntimeDebug, Serialize};
 use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
-
-use our_std::{debug, error, info, warn, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -12,14 +13,22 @@ pub use crate::events::FlowEvent;
 #[type_alias]
 pub type FlowBlockNumber = u64;
 
+#[type_alias]
+pub type FlowHash = [u8; 64];
+
 const FLOW_FETCH_DEADLINE: u64 = 10_000;
 
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 #[allow(non_snake_case)]
 pub struct FlowBlock {
-    pub blockId: String,
-    pub parentBlockId: String,
+    // XXX TODO check if I need ConstHexForm
+    #[serde(with = "ConstHexForm")]
+    pub blockId: FlowHash,
+    // pub blockId: [u8; 64],
+    #[serde(with = "ConstHexForm")]
+    pub parentBlockId: FlowHash,
+    // pub parentBlockId: [u8; 64],
     pub height: FlowBlockNumber,
     pub events: Vec<FlowEvent>,
 }
@@ -184,10 +193,18 @@ pub fn get_block(
     }
 
     Ok(FlowBlock {
-        blockId: block_obj.blockId.ok_or(FlowClientError::DecodeError)?,
+        blockId: block_obj
+            .blockId
+            .ok_or(FlowClientError::DecodeError)?
+            .as_bytes()
+            .try_into()
+            .map_err(|_| FlowClientError::DecodeError)?,
         parentBlockId: block_obj
             .parentBlockId
-            .ok_or(FlowClientError::DecodeError)?,
+            .ok_or(FlowClientError::DecodeError)?
+            .as_bytes()
+            .try_into()
+            .map_err(|_| FlowClientError::DecodeError)?,
         height: block_obj.height.ok_or(FlowClientError::DecodeError)?,
         events,
     })

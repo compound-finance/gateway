@@ -314,6 +314,7 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
                 result.to_vec(),
             ),
         },
+        ChainBlockEvent::Flow(_block_num, _flow_event) => panic!("not implemented"),
     }
 }
 
@@ -351,6 +352,7 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
 
             _ => Ok(()),
         },
+        ChainBlockEvent::Flow(_block_num, _flow_event) => panic!("not implemented"),
     }
 }
 
