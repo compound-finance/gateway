@@ -29,8 +29,8 @@
 
 - name: compile gateway
   command:
-    cmd: '{{ cargo_bin }} +nightly build --release'
-    chdir: '{{ gateway_home }}'
+    cmd: "{{ cargo_bin }} build --release" # appropriate nightly is rustup default
+    chdir: "{{ gateway_home }}"
   async: 3600
   poll: 0
   register: gateway

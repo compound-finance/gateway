@@ -22,6 +22,7 @@ ExecStart={{ gateway_bin }} \
   --rpc-methods Unsafe \
   --rpc-external \
   --no-mdns \
+  --log pallet_cash=debug \
   --node-key-file {{ node_key_priv_file }} \
   {% for bootnode_multi_addr in peers -%}
   --bootnodes {{ bootnode_multi_addr }} \

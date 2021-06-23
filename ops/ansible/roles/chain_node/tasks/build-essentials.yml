@@ -1,14 +1,13 @@
-
 - name: ensure a list of packages installed
   apt:
     pkg: "{{ packages }}"
     state: present
     update_cache: true
-  become: 'yes'
+  become: "yes"
 
 - name: check for rustup
   stat:
-    path: '{{ rustup_home }}'
+    path: "{{ rustup_home }}"
   changed_when: false
   register: rustup_home_binary
 
@@ -16,23 +15,26 @@
   block:
     - name: download rustup-init...
       get_url:
-        url: '{{ rustup_init_url }}'
+        url: "{{ rustup_init_url }}"
         dest: /tmp/rustup-init
         mode: 0755
 
     - name: install rust...
       command: /tmp/rustup-init -y
       args:
-        creates: '{{ rustup_home }}'
+        creates: "{{ rustup_home }}"
 
     - name: install stable rust
-      command: '{{ rustup_home }} default stable'
+      command: "{{ rustup_home }} default stable"
 
     - name: install nightly toolchain
-      command: '{{ rustup_home }} toolchain install nightly'
+      command: "{{ rustup_home }} toolchain install nightly-2021-05-24"
 
     - name: install wasm
-      command: '{{ rustup_home }} target add wasm32-unknown-unknown --toolchain nightly'
+      command: "{{ rustup_home }} target add wasm32-unknown-unknown --toolchain nightly-2021-05-24"
+
+    - name: default to nightly rust
+      command: "{{ rustup_home }} default nightly-2021-05-24"
 
   always:
     - name: clean rustup

@@ -1,4 +1,3 @@
-
 rustup_init_url: https://sh.rustup.rs
 cargo_home: "{{ ansible_env.HOME }}/.cargo"
 cargo_bin_dir: "{{ cargo_home }}/bin"
@@ -7,4 +6,4 @@ subkey_bin: "{{ cargo_bin_dir }}/subkey"
 rustup_home: "{{ cargo_home }}/bin/rustup"
 gateway_home: "{{ ansible_env.HOME }}/gateway"
 gateway_bin: "{{ ansible_env.HOME }}/gateway/target/release/gateway"
-gateway_chain_spec_raw: "{{ ansible_env.HOME }}/chains/testnet/chain-spec-raw.json"
+gateway_chain_spec_raw: "{{ ansible_env.HOME }}/gateway/chains/testnet/chain-spec-raw.json"
