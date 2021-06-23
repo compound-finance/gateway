@@ -18,17 +18,20 @@ pub enum MaxAmount {
 #[derive(PartialEq, Eq, Debug)]
 pub enum Chain {
     Eth,
+    Flow,
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Asset {
     Cash,
     Eth([u8; 20]),
+    Flow([u8; 16]),
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Account {
     Eth([u8; 20]),
+    Flow([u8; 16]),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -69,6 +72,7 @@ fn parse_max_amount<'a>(t: &Token) -> Result<MaxAmount, ParseError<'a>> {
 fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     match chain {
         "Eth" => Ok(Chain::Eth),
+        "Flow" => Ok(Chain::Flow),
         _ => Err(ParseError::InvalidChain(chain)),
     }
 }
@@ -87,15 +91,27 @@ fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
     Ok(chain_account)
 }
 
+fn parse_flow_address<'a>(account: &'a str) -> Result<[u8; 16], ParseError<'a>> {
+    let account_vec: Vec<u8> =
+        hex::decode(&account[..]).map_err(|_| ParseError::InvalidChainAccount(Chain::Flow))?;
+    let chain_account: [u8; 16] = account_vec
+        .try_into()
+        .map_err(|_| ParseError::InvalidChainAccount(Chain::Flow))?;
+
+    Ok(chain_account)
+}
+
 fn parse_chain_account<'a>(chain: Chain, address: &'a str) -> Result<Account, ParseError<'a>> {
     match chain {
         Chain::Eth => Ok(Account::Eth(parse_eth_address(address)?)),
+        Chain::Flow => Ok(Account::Flow(parse_flow_address(address)?)),
     }
 }
 
 fn parse_chain_asset<'a>(chain: Chain, address: &'a str) -> Result<Asset, ParseError<'a>> {
     match chain {
         Chain::Eth => Ok(Asset::Eth(parse_eth_address(address)?)),
+        Chain::Flow => Ok(Asset::Flow(parse_flow_address(address)?)),
     }
 }
 

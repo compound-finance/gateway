@@ -9,6 +9,7 @@ impl From<trx_request::Account> for ChainAccount {
     fn from(account: trx_request::Account) -> Self {
         match account {
             trx_request::Account::Eth(eth_address) => ChainAccount::Eth(eth_address),
+            trx_request::Account::Flow(flow_address) => ChainAccount::Flow(flow_address),
         }
     }
 }
@@ -19,6 +20,9 @@ impl From<trx_request::Asset> for CashOrChainAsset {
             trx_request::Asset::Cash => CashOrChainAsset::Cash,
             trx_request::Asset::Eth(eth_address) => {
                 CashOrChainAsset::ChainAsset(ChainAsset::Eth(eth_address))
+            }
+            trx_request::Asset::Flow(flow_address) => {
+                CashOrChainAsset::ChainAsset(ChainAsset::Flow(flow_address))
             }
         }
     }
