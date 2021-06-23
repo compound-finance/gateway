@@ -1,5 +1,6 @@
 use codec::{Decode, Encode};
-use our_std::{Deserialize, Serialize, RuntimeDebug};
+use our_std::convert::TryInto;
+use our_std::{Deserialize, RuntimeDebug, Serialize};
 
 use types_derive::Types;
 
@@ -14,17 +15,16 @@ struct Lock {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types, Serialize, Deserialize)]
 pub enum FlowEvent {
     Lock {
-        asset: String,
-       // sender: String,
-        recipient: String,
+        asset: [u8; 16],
+        // sender: String,
+        recipient: [u8; 16],
         amount: u128,
-    }
-    // NoticeInvoked {
-    //     era_id: u32,
-    //     era_index: u32,
-    //     notice_hash: [u8; 32],
-    //     result: Vec<u8>,
-    // },
+    }, // NoticeInvoked {
+       //     era_id: u32,
+       //     era_index: u32,
+       //     notice_hash: [u8; 32],
+       //     result: Vec<u8>,
+       // }
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -40,13 +40,21 @@ pub fn decode_event(topic: &str, data: &str) -> Result<FlowEvent, EventError> {
             let event = event_res.map_err(|_| EventError::ErrorParsingData)?;
 
             Ok(FlowEvent::Lock {
-                asset: event.asset,
+                asset: event
+                    .asset
+                    .as_bytes()
+                    .try_into()
+                    .map_err(|_| EventError::ErrorParsingData)?,
                 // sender: event.sender,
-                recipient: event.recipient,
+                recipient: event
+                    .recipient
+                    .as_bytes()
+                    .try_into()
+                    .map_err(|_| EventError::ErrorParsingData)?,
                 amount: event.amount,
             })
         }
-        _ => Err(EventError::UnknownEventTopic(topic.to_string()))
+        _ => Err(EventError::UnknownEventTopic(topic.to_string())),
     }
 }
 

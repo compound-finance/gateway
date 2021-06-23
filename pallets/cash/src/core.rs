@@ -314,7 +314,21 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
                 result.to_vec(),
             ),
         },
-        ChainBlockEvent::Flow(_block_num, _flow_event) => panic!("not implemented"),
+        ChainBlockEvent::Flow(_block_num, flow_event) => match flow_event {
+            flow_client::FlowEvent::Lock {
+                asset,
+                // sender,
+                // chain,
+                recipient,
+                amount,
+            } => internal::lock::lock_internal::<T>(
+                internal::assets::get_asset::<T>(ChainAsset::Flow(*asset))?,
+                ChainAccount::Flow(*recipient),
+                ChainAccount::Flow(*recipient),
+                // chains::get_chain_account(chain.to_string(), *recipient)?,
+                internal::assets::get_quantity::<T>(ChainAsset::Flow(*asset), *amount)?,
+            ),
+        },
     }
 }
 
@@ -352,6 +366,7 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
 
             _ => Ok(()),
         },
+        // XXX toni - not sure it's needed for Flow, since there are no reorgs
         ChainBlockEvent::Flow(_block_num, _flow_event) => panic!("not implemented"),
     }
 }

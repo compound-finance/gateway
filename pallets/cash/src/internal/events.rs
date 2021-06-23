@@ -88,10 +88,12 @@ pub fn risk_adjusted_value<T: Config>(
 /// Incrementally perform the next step of tracking events from all the underlying chains.
 pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     let mut lock = StorageLock::<Time>::new(b"cash::track_chain_events");
+    // XXX TODO optimize results here
     let result = match lock.try_lock() {
         Ok(_guard) => {
             // Note: chains could be parallelized
-            track_chain_events_on::<T>(ChainId::Eth)
+            track_chain_events_on::<T>(ChainId::Eth);
+            track_chain_events_on::<T>(ChainId::Flow)
         }
 
         _ => Err(Reason::WorkerBusy),
