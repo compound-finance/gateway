@@ -16,7 +16,7 @@ use crate::{Config, PriceReporters, PriceTimes, Prices, ORACLE_POLL_INTERVAL_BLO
 use our_std::convert::TryInto;
 use our_std::{collections::btree_map::BTreeMap, str::FromStr, vec::Vec, RuntimeDebug};
 
-pub const MAX_PRICE_FUTURE_MS: Timestamp = 100000u64;//100 seconds
+pub const MAX_PRICE_FUTURE_MS: Timestamp = 100000u64; //100 seconds
 
 /// A single decoded message from the price oracle
 #[derive(PartialEq, Eq, RuntimeDebug)]
@@ -276,8 +276,8 @@ pub fn process_prices<T: Config>(block_number: T::BlockNumber) -> Result<(), Ora
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::tests::*;
     use gateway_crypto::eth_signature_from_bytes;
-    use crate::{tests::*};
 
     pub static API_RESPONSE_TEST_DATA: &str = r#"
     {
@@ -347,10 +347,12 @@ pub mod tests {
 
             let v = ethabi::encode(&vec![kind, timestamp, key, value]);
 
-            assert_eq!(get_and_check_parsed_price::<Test>(&v), Err(OracleError::TimestampTooHigh));
+            assert_eq!(
+                get_and_check_parsed_price::<Test>(&v),
+                Err(OracleError::TimestampTooHigh)
+            );
         });
     }
-
 
     #[test]
     fn test_check_price_happy_path() {
