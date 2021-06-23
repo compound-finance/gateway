@@ -241,17 +241,35 @@ The goal is to not break things on release.
 Releases should be cut from the `develop` (default) branch on [Github](https://github.com/compound-finance/gateway).
 For now, here's the manual process we follow for cutting releases:
 
+### Bump Spec Version
+
+First increment the spec version in `runtime/src/lib.rs`.
+
 ### Build Release Artifacts
 
-First build the release artifacts using the included script:
+Build the release artifacts using the included script:
 
 ```
 $ scripts/build_release.sh <MILESTONE TAG>
 ```
 
-Where `<MILESTONE TAG>` should be a sequentially increasing counter beginning with `m`, e.g. `m7`, `m8`, `m9`.
+Where `<MILESTONE TAG>` should be a sequentially increasing counter beginning with `m`, followed by the spec version, e.g. `m7`, `m8`, `m9`.
+
+### Update Chain Spec
+
+Note: this is *only* necessary if you are deploying a new chain, the chain spec is defined at genesis.
+
+The WASM blob in the chain spec should be updated via:
+
+```
+$ CHAIN_BIN=target/<MILESTONE TAG>/gateway-<PLATFORM> chains/build_spec.js -s -c testnet
+```
+
+Where `<PLATFORM>` is your local platform used to name the binary build.
 
 ### Upload Release Artifacts
+
+The changes above should be committed to the `develop` branch and included in the version that is tagged in the repository below.
 
 Draft a [new release on GitHub](https://github.com/compound-finance/gateway/releases/new).
 Tag it with the appropriate milestone tag.
