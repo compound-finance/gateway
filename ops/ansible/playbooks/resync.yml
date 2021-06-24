@@ -6,4 +6,5 @@
     - include_role:
         name: chain_node
         tasks_from: purge-and-restart
-      
+
+        

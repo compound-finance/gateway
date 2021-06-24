@@ -14,7 +14,7 @@ Environment="KEYRING_TYPE={{ keyring_type | default('IN_MEMORY') }}"
 Environment="MINER={{ miner }}"
 ExecStart={{ gateway_bin }} \
   --base-path {{ chain_data_dir }} \
-  --chain "{{ gateway_user_home }}/chainSpec.json" \
+  --chain {{ gateway_chain_spec_raw }} \
   --port 30333 \
   --ws-port 9944 \
   --ws-external \
@@ -22,6 +22,7 @@ ExecStart={{ gateway_bin }} \
   --rpc-methods Unsafe \
   --rpc-external \
   --no-mdns \
+  --log pallet_cash=debug \
   --node-key-file {{ node_key_priv_file }} \
   {% for bootnode_multi_addr in peers -%}
   --bootnodes {{ bootnode_multi_addr }} \

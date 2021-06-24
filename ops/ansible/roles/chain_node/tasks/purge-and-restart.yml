@@ -5,19 +5,20 @@
     name: gateway.service
     state: stopped
 
-- name: bring chain spec
-  become: true
-  ansible.builtin.copy:
-    src: "{{ chain_spec }}"
-    dest: "{{ gateway_user_home }}/chainSpec.json"
-    owner: gateway
-    mode: '0644'
+# chainspecs have gotten much more stable
+# - name: bring chain spec
+#   become: true
+#   ansible.builtin.copy:
+#     src: "{{ chain_spec }}"
+#     dest: "{{ gateway_chain_spec_raw }}"
+#     owner: gateway
+#     mode: '0644'
 
 - name: purge chain
   become: true
   shell: |
     set -o pipefail
-    {{ gateway_bin }} purge-chain -y --chain "{{ gateway_user_home }}/chainSpec.json" --base-path {{ chain_data_dir }}  --database paritydb
+    {{ gateway_bin }} purge-chain -y --chain {{ gateway_chain_spec_raw }} --base-path {{ chain_data_dir }}  --database paritydb-experimental
   args:
     executable: /bin/bash
   changed_when: False
@@ -29,8 +30,7 @@
   vars:
     peers: "{{ bootnodes }}"
     authority: "{{ authority }}"
-  tags:
-    gateway-service
+  tags: gateway-service
 
 - name: reinstall Gateway systemd unit file (full node)
   template: src=gateway-full-node.j2 dest=/etc/systemd/system/gateway.service
@@ -38,8 +38,7 @@
   when: "'full_node' in group_names"
   vars:
     peers: "{{ groups['authority_node'] }}"
-  tags:
-    gateway-service
+  tags: gateway-service
 
 - name: start gateway service
   become: true
