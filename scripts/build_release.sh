@@ -35,7 +35,7 @@ contracts="./ethereum/.build/contracts.json"
 
 echo "*** Building release gateway ***"
 
-cargo +nightly build --release
+cargo +nightly build --release --features runtime-debug
 
 bin="./target/release/gateway"
 types="./types.json"
