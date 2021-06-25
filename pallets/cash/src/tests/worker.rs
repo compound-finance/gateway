@@ -10,24 +10,6 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x1",false],"id":1}"#.to_vec(),
-            response: Some(tests::testdata::json_responses::GET_BLOCK_BY_NUMBER_1.to_vec()),
-            sent: true,
-            ..Default::default()
-        },
-        testing::PendingRequest {
-            method: "POST".into(),
-            uri: "https://ropsten-eth.compound.finance".to_string(),
-            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","fromBlock":"0x1","toBlock":"0x1"}],"id":1}"#.to_vec(),
-            response: Some(testdata::json_responses::GET_LOGS_1.to_vec()),
-            sent: true,
-            ..Default::default()
-        },
-        testing::PendingRequest {
-            method: "POST".into(),
-            uri: "https://ropsten-eth.compound.finance".to_string(),
-            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
             body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2",false],"id":1}"#.to_vec(),
             response: Some(tests::testdata::json_responses::GET_BLOCK_BY_NUMBER_2.to_vec()),
             sent: true,
@@ -47,6 +29,24 @@ fn test_offchain_worker() {
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
             body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3",false],"id":1}"#.to_vec(),
+            response: Some(tests::testdata::json_responses::GET_BLOCK_BY_NUMBER_3.to_vec()),
+            sent: true,
+            ..Default::default()
+        },
+        testing::PendingRequest {
+            method: "POST".into(),
+            uri: "https://ropsten-eth.compound.finance".to_string(),
+            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","fromBlock":"0x3","toBlock":"0x3"}],"id":1}"#.to_vec(),
+            response: Some(testdata::json_responses::GET_LOGS_3.to_vec()),
+            sent: true,
+            ..Default::default()
+        },
+        testing::PendingRequest {
+            method: "POST".into(),
+            uri: "https://ropsten-eth.compound.finance".to_string(),
+            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x4",false],"id":1}"#.to_vec(),
             response: Some(tests::testdata::json_responses::NO_RESULT.to_vec()),
             sent: true,
             ..Default::default()
@@ -71,10 +71,10 @@ fn test_offchain_worker() {
 
         if let mock::Call::Cash(crate::Call::receive_chain_blocks(blocks, _signature)) = ex1.call {
             assert_eq!(blocks.chain_id(), ChainId::Eth);
-            assert_eq!(blocks.len(), 1);
+            assert_eq!(blocks.len(), 2);
             match blocks {
                 ChainBlocks::Eth(blocks) => {
-                    let block = &blocks[0];
+                    let block = &blocks[1];
                     assert_eq!(block.events.len(), 3);
 
                     let event = &block.events[1];

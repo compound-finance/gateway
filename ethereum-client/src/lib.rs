@@ -244,11 +244,11 @@ pub fn get_block(
     }
 
     Ok(EthereumBlock {
-        hash: parse_word(block_obj.hash).ok_or_else(|| parse_error(&get_logs_response_str[..]))?,
+        hash: parse_word(block_obj.hash).ok_or_else(|| parse_error("bad hash"))?,
         parent_hash: parse_word(block_obj.parentHash)
-            .ok_or_else(|| parse_error(&get_logs_response_str[..]))?,
+            .ok_or_else(|| parse_error("bad parent hash"))?,
         number: parse_u64(block_obj.number)
-            .ok_or_else(|| parse_error(&get_logs_response_str[..]))?,
+            .ok_or_else(|| parse_error("bad block number"))?,
         events,
     })
 }
