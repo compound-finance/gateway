@@ -130,7 +130,6 @@ class Starport {
     let encoded = notice.EncodedNotice;
     let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());
     let sendOpts = { from: this.ctx.eth.defaultFrom, gas: 5000000 };
-    console.log({sendOpts});
     return await this.starport.methods.invoke(encoded, signatures).send(sendOpts);
   }
 
