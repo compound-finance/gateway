@@ -215,6 +215,7 @@ pub fn gen_mock_calls(
     let mut calls = vec![];
     for block in blocks {
         let block_str = encode_block_hex(block.number);
+        let block_hash_str = format!("0x{}", hex::encode(block.hash));
 
         let get_block_params: Vec<serde_json::Value> = vec![block_str.clone().into(), false.into()];
 
@@ -245,8 +246,7 @@ pub fn gen_mock_calls(
 
         let get_logs_params = vec![serde_json::json!({
             "address": format!("0x{}", ::hex::encode(&starport_address[..])),
-            "fromBlock": &block_str,
-            "toBlock": &block_str,
+            "blockHash": block_hash_str,
         })];
 
         let get_logs_data = serde_json::json!({

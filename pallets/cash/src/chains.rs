@@ -383,6 +383,14 @@ impl ChainBlock {
                 .map(move |e| ChainBlockEvent::Eth(block.number, e.clone())),
         }
     }
+
+    pub fn concat(self, chain_blocks: ChainBlocks) -> Result<ChainBlocks, Reason> {
+        match (self, chain_blocks) {
+            (ChainBlock::Eth(block), ChainBlocks::Eth(blocks)) => {
+                Ok(ChainBlocks::Eth([vec![block], blocks].concat()))
+            }
+        }
+    }
 }
 
 /// Type for describing a set of blocks coming from an underlying chain.

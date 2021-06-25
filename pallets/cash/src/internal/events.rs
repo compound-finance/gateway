@@ -102,29 +102,41 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     let starport = get_starport::<T>(chain_id)?;
     let me = get_current_validator::<T>()?;
     let last_block = get_last_block::<T>(chain_id)?;
-    let true_block = fetch_chain_block(chain_id, last_block.number(), starport)?;
-    if last_block.hash() == true_block.hash() {
+    let next_block_number = last_block
+        .number()
+        .checked_add(1)
+        .ok_or(MathError::Overflow)?;
+    let next_block = fetch_chain_block(chain_id, next_block_number, starport)?;
+    if last_block.hash() == next_block.parent_hash() {
         debug!(
-            "Worker sees the same fork: true={:?} last={:?}",
-            true_block, last_block
+            "Worker sees the same fork: next={:?} last={:?}",
+            next_block, last_block
         );
         let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue) as u64;
-        let blocks = fetch_chain_blocks(
-            chain_id,
-            last_block.number() + 1,
-            last_block.number() + 1 + slack,
-            starport,
-        )?
-        .filter_already_supported(&me.substrate_id, pending_blocks);
+        let blocks = next_block
+            .concat(fetch_chain_blocks(
+                chain_id,
+                next_block_number
+                    .checked_add(1)
+                    .ok_or(MathError::Overflow)?,
+                next_block_number
+                    .checked_add(1)
+                    .ok_or(MathError::Overflow)?
+                    .checked_add(slack)
+                    .ok_or(MathError::Overflow)?,
+                starport,
+            )?)?
+            .filter_already_supported(&me.substrate_id, pending_blocks);
         memorize_chain_blocks::<T>(&blocks)?;
         submit_chain_blocks::<T>(&blocks)
     } else {
         debug!(
-            "Worker sees a different fork: true={:?} last={:?}",
-            true_block, last_block
+            "Worker sees a different fork: next={:?} last={:?}",
+            next_block, last_block
         );
+        let true_block = fetch_chain_block(chain_id, last_block.number(), starport)?;
         let pending_reorgs = PendingChainReorgs::get(chain_id);
         let reorg = formulate_reorg::<T>(chain_id, &last_block, &true_block)?;
         if !reorg.is_already_signed(&me.substrate_id, pending_reorgs) {
@@ -522,7 +534,19 @@ mod tests {
         let last_block = old_chain.last().unwrap().clone();
         let true_block = new_chain.last().unwrap().clone();
 
-        let mut fetched_blocks = new_chain[0..9].iter().rev().cloned().collect::<Vec<_>>();
+        let mut fetched_blocks = vec![EthereumBlock {
+            hash: [10u8; 32],
+            parent_hash: true_block.hash,
+            number: 10,
+            events: vec![],
+        }];
+        fetched_blocks.extend(new_chain[0..9].iter().rev().cloned().collect::<Vec<_>>());
+        fetched_blocks.push(EthereumBlock {
+            hash: [10u8; 32],
+            parent_hash: last_block.hash,
+            number: 10,
+            events: vec![],
+        });
         fetched_blocks.extend(old_chain[1..10].iter().rev().cloned());
         let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
