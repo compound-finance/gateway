@@ -203,8 +203,7 @@ pub fn get_block(
     let block_obj = get_block_object(server, &block_str)?;
     let get_logs_params = vec![serde_json::json!({
         "address": format!("0x{}", ::hex::encode(&eth_starport_address[..])),
-        "fromBlock": &block_str,
-        "toBlock": &block_str,
+        "blockHash": &block_obj.hash
     })];
     debug!("get_logs_params: {:?}", get_logs_params.clone());
     let get_logs_response_str: String = send_rpc(server, "eth_getLogs".into(), get_logs_params)?;
@@ -297,7 +296,7 @@ mod tests {
                     method: "POST".into(),
                     uri: "https://mainnet-eth.compound.finance".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-                    body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x3a275655586a049fe860be867d10cdae2ffc0f33","fromBlock":"0x506","toBlock":"0x506"}],"id":1}"#.to_vec(),
+                    body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x3a275655586a049fe860be867d10cdae2ffc0f33","blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a"}],"id":1}"#.to_vec(),
                     response: Some(br#"{"jsonrpc":"2.0","id":1,"result":[{"address":"0xd905abba1c5ea48c0598be9f3f8ae31290b58613","blockHash":"0xc94ceed3c8c68f09b1c7be28f594cc6fb01f9cdd7b68f3bf516cab9e89486fcf","blockNumber":"0x9928cb","data":"0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000","logIndex":"0x58","removed":false,"topics":["0xc459acef3ffe957663bb49d644b20d0c790bcb41573893752a72ba6f023b9386","0x000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x000000000000000000000000d3a38d4bd07b87e4516f30ee46cfe8ec4e8b73a4","0xd3a38d4bd07b87e4516f30ee46cfe8ec4e8b73a4000000000000000000000000"],"transactionHash":"0xbae1c242aea30e9ae20cb6c37e2f2d08982e31b42bf3d7dbde6466396abb360e","transactionIndex":"0x24"}]}"#.to_vec()),
                     sent: true,
                     ..Default::default()

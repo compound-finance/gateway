@@ -19,7 +19,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","fromBlock":"0x1","toBlock":"0x1"}],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a"}],"id":1}"#.to_vec(),
             response: Some(testdata::json_responses::GET_LOGS_1.to_vec()),
             sent: true,
             ..Default::default()
@@ -37,7 +37,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","fromBlock":"0x2","toBlock":"0x2"}],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x7777777777777777777777777777777777777777","blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a"}],"id":1}"#.to_vec(),
             response: Some(testdata::json_responses::GET_LOGS_2.to_vec()),
             sent: true,
             ..Default::default()
