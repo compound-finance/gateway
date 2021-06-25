@@ -24,17 +24,20 @@
       args:
         creates: "{{ rustup_home }}"
 
-    - name: install stable rust
-      command: "{{ rustup_home }} default stable"
+- name: check for nightly
+  shell: "{{ rustup_home }} default"
+  register: installed_version 
 
+- when: not "{{ rust_version }} in installed_version"
+  block:
     - name: install nightly toolchain
-      command: "{{ rustup_home }} toolchain install nightly-2021-05-24"
+      command: "{{ rustup_home }} toolchain install {{ rust_version }}"
 
     - name: install wasm
-      command: "{{ rustup_home }} target add wasm32-unknown-unknown --toolchain nightly-2021-05-24"
+      command: "{{ rustup_home }} target add wasm32-unknown-unknown --toolchain {{ rust_version }}"
 
     - name: default to nightly rust
-      command: "{{ rustup_home }} default nightly-2021-05-24"
+      command: "{{ rustup_home }} default {{ rust_version }}"
 
   always:
     - name: clean rustup
