@@ -2,37 +2,40 @@
 extern crate lazy_static;
 
 use gateway_crypto::CryptoError;
+use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::{str, sync::Mutex};
 
 #[derive(Clone, Debug)]
 pub struct ValidatorConfig {
-    pub eth_key_id: String,
-    pub eth_rpc_url: String,
-    pub miner: String,
-    pub opf_url: String,
+    pub map: HashMap<String, String>,
 }
 
 pub type PriceFeedData = (Vec<(Vec<u8>, Vec<u8>)>, u64);
 
 lazy_static! {
+    static ref VALIDATOR_CONFIG_DEFAULTS: Mutex<ValidatorConfig> = Mutex::new(ValidatorConfig {
+        map: HashMap::from_iter([
+            (
+                ETH_KEY_ID_ENV_VAR.to_string(),
+                ETH_KEY_ID_DEFAULT.to_string()
+            ),
+            (
+                ETH_RPC_URL_ENV_VAR.to_string(),
+                ETH_RPC_URL_DEFAULT.to_string()
+            ),
+            (MINER_ENV_VAR.to_string(), MINER_DEFAULT.to_string()),
+            (OPF_URL_ENV_VAR.to_string(), OPF_URL_DEFAULT.to_string())
+        ])
+    });
     static ref VALIDATOR_CONFIG: Mutex<Option<ValidatorConfig>> = Mutex::new(None);
     static ref PRICE_FEED_DATA: Mutex<Option<PriceFeedData>> = Mutex::new(None);
 }
 
-pub fn initialize_validator_config(
-    eth_key_id: Option<String>,
-    eth_rpc_url: Option<String>,
-    miner: Option<String>,
-    opf_url: Option<String>,
-) {
+pub fn initialize_validator_config(map: HashMap<String, String>) {
     match VALIDATOR_CONFIG.lock() {
         Ok(mut data_ref) => {
-            *data_ref = Some(ValidatorConfig {
-                eth_key_id: eth_key_id.unwrap_or(ETH_KEY_ID_DEFAULT.to_owned()),
-                eth_rpc_url: eth_rpc_url.unwrap_or(ETH_RPC_URL_DEFAULT.to_owned()),
-                miner: miner.unwrap_or(MINER_DEFAULT.to_owned()),
-                opf_url: opf_url.unwrap_or(OPF_URL_DEFAULT.to_owned()),
-            });
+            *data_ref = Some(ValidatorConfig { map });
         }
         _ => (), // XXX todo: log?
     };
@@ -48,6 +51,27 @@ const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
 const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
 const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 
+fn validator_config_interface_get_internal(key: &str) -> Option<String> {
+    // check env override
+    if let Ok(eth_key_id_from_env) = std::env::var(key) {
+        if eth_key_id_from_env.len() > 0 {
+            return Some(eth_key_id_from_env);
+        }
+    }
+    // check config
+    if let Ok(config) = VALIDATOR_CONFIG.lock() {
+        if let Some(inner) = config.as_ref() {
+            return inner.map.get(key).map(Clone::clone);
+        }
+    }
+    // try default
+    if let Ok(default) = VALIDATOR_CONFIG_DEFAULTS.lock() {
+        return default.map.get(key).map(Clone::clone);
+    }
+    // out of chances
+    return None;
+}
+
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set
 /// by each validator separately corresponding to their HSM configuration and key ID that they
@@ -60,79 +84,32 @@ const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 /// are integral to the system from validator specific values that otherwise would be intermingled.
 #[sp_runtime_interface::runtime_interface]
 pub trait ValidatorConfigInterface {
+    /// Generic get function for validator specific configuration
+    fn get(key: &str) -> Option<String> {
+        validator_config_interface_get_internal(key)
+    }
+
     /// Get the Key ID for the Ethereum key.
     ///
     /// Downstream this is used to feed the keyring for signing and obtaining the corresponding
     /// public key.
     fn get_eth_key_id() -> Option<Vec<u8>> {
-        // check env override
-        if let Ok(eth_key_id_from_env) = std::env::var(ETH_KEY_ID_ENV_VAR) {
-            if eth_key_id_from_env.len() > 0 {
-                return Some(eth_key_id_from_env.into());
-            }
-        }
-        // check config
-        if let Ok(config) = VALIDATOR_CONFIG.lock() {
-            if let Some(inner) = config.as_ref() {
-                return Some(inner.eth_key_id.clone().into());
-            }
-        }
-        // not set
-        return Some(ETH_KEY_ID_DEFAULT.into());
+        validator_config_interface_get_internal(ETH_KEY_ID_ENV_VAR).map(Into::into)
     }
 
     /// Get the Ethereum node RPC URL
     fn get_eth_rpc_url() -> Option<String> {
-        // check env override
-        if let Ok(eth_rpc_url) = std::env::var(ETH_RPC_URL_ENV_VAR) {
-            if eth_rpc_url.len() > 0 {
-                return Some(eth_rpc_url);
-            }
-        }
-        // check config
-        if let Ok(config) = VALIDATOR_CONFIG.lock() {
-            if let Some(inner) = config.as_ref() {
-                return Some(inner.eth_rpc_url.clone());
-            }
-        }
-        // not set
-        return Some(ETH_RPC_URL_DEFAULT.into());
+        validator_config_interface_get_internal(ETH_RPC_URL_ENV_VAR)
     }
 
     /// Get the open price feed URLs
     fn get_opf_url() -> Option<String> {
-        // check env override
-        if let Ok(opf_url) = std::env::var(OPF_URL_ENV_VAR) {
-            if opf_url.len() > 0 {
-                return Some(opf_url);
-            }
-        }
-        // check config
-        if let Ok(config) = VALIDATOR_CONFIG.lock() {
-            if let Some(inner) = config.as_ref() {
-                return Some(inner.opf_url.clone());
-            }
-        }
-        // not set
-        return Some(OPF_URL_DEFAULT.into());
+        validator_config_interface_get_internal(OPF_URL_ENV_VAR)
     }
 
     /// Get the Miner address
     fn get_miner_address() -> Option<Vec<u8>> {
-        // check env override
-        if let Ok(miner) = std::env::var(MINER_ENV_VAR) {
-            if miner.len() > 0 {
-                return Some(miner.into());
-            }
-        }
-        // check config
-        if let Ok(config) = VALIDATOR_CONFIG.lock() {
-            if let Some(inner) = config.as_ref() {
-                return Some(inner.miner.clone().into());
-            }
-        }
-        // not set
-        return Some(MINER_DEFAULT.into());
+        validator_config_interface_get_internal(MINER_ENV_VAR).map(Into::into)
     }
 }
 
