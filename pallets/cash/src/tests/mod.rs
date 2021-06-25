@@ -216,7 +216,7 @@ pub fn gen_mock_calls(
     for block in blocks {
         let block_str = encode_block_hex(block.number);
 
-        let get_block_params: Vec<serde_json::Value> = vec![block_str.clone().into(), true.into()];
+        let get_block_params: Vec<serde_json::Value> = vec![block_str.clone().into(), false.into()];
 
         let get_block_data = serde_json::json!({
             "jsonrpc": "2.0",

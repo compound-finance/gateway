@@ -10,7 +10,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x1",true],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x1",false],"id":1}"#.to_vec(),
             response: Some(tests::testdata::json_responses::GET_BLOCK_BY_NUMBER_1.to_vec()),
             sent: true,
             ..Default::default()
@@ -28,7 +28,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2",true],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2",false],"id":1}"#.to_vec(),
             response: Some(tests::testdata::json_responses::GET_BLOCK_BY_NUMBER_2.to_vec()),
             sent: true,
             ..Default::default()
@@ -46,7 +46,7 @@ fn test_offchain_worker() {
             method: "POST".into(),
             uri: "https://ropsten-eth.compound.finance".to_string(),
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
-            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3",true],"id":1}"#.to_vec(),
+            body: br#"{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3",false],"id":1}"#.to_vec(),
             response: Some(tests::testdata::json_responses::NO_RESULT.to_vec()),
             sent: true,
             ..Default::default()

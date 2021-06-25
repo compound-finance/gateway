@@ -26,23 +26,6 @@ pub mod json_responses {
          "stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6",
          "timestamp":"0x5aae89b9",
          "totalDifficulty":"0xa91291ae5c752d4885",
-         "transactions":[{
-           "blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8a",
-           "blockNumber":"0x1",
-           "from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2",
-           "gas":"0x186a0",
-           "gasPrice":"0x153005ce00",
-           "hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c",
-           "input":"0x",
-           "nonce":"0x6740d",
-           "r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91",
-           "s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706",
-           "v":"0x25",
-           "to":"0x1d53de4d66110689bf494a110e859f3a6d15661f",
-           "transactionIndex":"0x0",
-           "type":"0x0",
-           "value":"0x453aa4214124000"
-          }],
          "transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610",
          "uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}
     }"#;
@@ -68,23 +51,6 @@ pub mod json_responses {
          "stateRoot":"0x40b48fa241b8f9749af10a5dd1dfb8db245ba94cbb4969ab5c5b905a6adfe5f6",
          "timestamp":"0x5aae89b9",
          "totalDifficulty":"0xa91291ae5c752d4885",
-         "transactions":[{
-           "blockHash":"0x61314c1c6837e15e60c5b6732f092118dd25e3ec681f5e089b3a9ad2374e5a8b",
-           "blockNumber":"0x2",
-           "from":"0x22b84d5ffea8b801c0422afe752377a64aa738c2",
-           "gas":"0x186a0",
-           "gasPrice":"0x153005ce00",
-           "hash":"0x94859e5d00b6bc572f877eaae906c0093eb22267d2d84d720ac90627fc63147c",
-           "input":"0x",
-           "nonce":"0x6740d",
-           "r":"0x5fc50bea42bc3d8c5f47790b92fbd79fa296f90fea4d35f1621001f6316a1b91",
-           "s":"0x774a47ca2112dd815f3bda90d537dfcdab0082f6bfca7262f91df258addf5706",
-           "v":"0x25",
-           "to":"0x1d53de4d66110689bf494a110e859f3a6d15661f",
-           "transactionIndex":"0x0",
-           "type":"0x0",
-           "value":"0x453aa4214124000"
-          }],
          "transactionsRoot":"0xa46bb7bc06d4ad700df4100095fecd5a5af2994b6d1d24162ded673b7d485610",
          "uncles":["0x5e7dde2e3811b5881a062c8b2ff7fd14687d79745e2384965d73a9df3fb0b4a8"]}
     }"#;
