@@ -4,13 +4,17 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct GatewayCmd {
-    // collect args after -- like cargo, eg cargo run -- --help for generic key-value configuration
-    // expected format is --eth-key-id abcdefg --miner 123456789
-    // OR
-    // ETH_KEY_ID abcdefg MINER 123456789
-    // equals = linking not supported as in --eth-key-id=abcdefg
-    #[structopt()]
-    pub args: Vec<String>,
+    #[structopt(long = "gateway-args", help = "set validator specific settings")]
+    /// The currently available options are
+    ///
+    /// ETH_KEY_ID
+    /// ETH_RPC_URL
+    /// MINER
+    /// OPF_URL
+    ///
+    /// example ./gateway .... --gateway-args eth-key-id abc/def-ghi eth-rpc-url https... miner 0xeeee....ee opf_url https..
+    ///
+    pub gateway_args: Vec<String>,
 }
 
 impl GatewayCmd {
@@ -20,19 +24,19 @@ impl GatewayCmd {
     }
 
     pub fn parse_cli_mapping(self) -> HashMap<String, String> {
-        if self.args.len() % 2 != 0 {
+        if self.gateway_args.len() % 2 != 0 {
             // note it is ok to panic here because this is a critical part of the booting up
             // process of the node and is not expected to result in a bad state
             panic!("odd number of arguments provided to gateway key value pair configuration.")
         }
 
-        let mut return_value = HashMap::with_capacity(self.args.len() / 2);
+        let mut return_value = HashMap::with_capacity(self.gateway_args.len() / 2);
 
-        for i in (0..self.args.len()).step_by(2) {
-            let raw_key = &self.args[i];
+        for i in (0..self.gateway_args.len()).step_by(2) {
+            let raw_key = &self.gateway_args[i];
             // note - we don't worry about going out of bounds because we know we
             // have an even number of elements from above
-            let value = &self.args[i + 1];
+            let value = &self.gateway_args[i + 1];
 
             let key = GatewayCmd::kebab_with_leading_dashes_to_screaming_snake(raw_key);
 
@@ -89,7 +93,7 @@ pub mod test {
     use super::GatewayCmd;
 
     #[test]
-    fn test_kebab_with_leading_dashes_to_screaming_snake() {
+    fn test_kebab_to_screaming_snake() {
         assert_eq!(
             GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("--abc-def-ghi"),
             "ABC_DEF_GHI".to_string()
@@ -141,7 +145,7 @@ pub mod test {
             "expected opf url".into(),
         ]);
 
-        let unit_under_test = GatewayCmd { args };
+        let unit_under_test = GatewayCmd { gateway_args: args };
 
         let mut actual = unit_under_test.parse_cli_mapping();
 

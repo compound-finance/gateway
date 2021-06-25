@@ -53,9 +53,9 @@ const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 
 fn validator_config_interface_get_internal(key: &str) -> Option<String> {
     // check env override
-    if let Ok(eth_key_id_from_env) = std::env::var(key) {
-        if eth_key_id_from_env.len() > 0 {
-            return Some(eth_key_id_from_env);
+    if let Ok(value_from_env) = std::env::var(key) {
+        if value_from_env.len() > 0 {
+            return Some(value_from_env);
         }
     }
     // check config

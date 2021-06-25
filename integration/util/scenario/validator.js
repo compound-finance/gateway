@@ -221,14 +221,21 @@ class Validator {
     let ethRpcUrl = this.ethProxy ? this.ethProxy.serverUrl() : this.ctx.eth.web3Url;
     if (this.version.supports('full-cli-args')) {
       if (this.version.supports('generic-cli-args')) {
-        newCliArgs.push('--')
+        newCliArgs = [
+          '--gateway-args',
+          'eth-rpc-url', ethRpcUrl,
+          'eth-key-id', "my_eth_key_id",
+          'miner', `Eth:${this.ethAccount}`,
+          'opf-url', this.ctx.__opfUrl(),
+        ];
+      } else {
+        newCliArgs = [
+          '--eth-rpc-url', ethRpcUrl,
+          '--eth-key-id', "my_eth_key_id",
+          '--miner', `Eth:${this.ethAccount}`,
+          '--opf-url', this.ctx.__opfUrl(),
+        ];
       }
-      newCliArgs.push(...[
-        '--eth-rpc-url', ethRpcUrl,
-        '--eth-key-id', "my_eth_key_id",
-        '--miner', `Eth:${this.ethAccount}`,
-        '--opf-url', this.ctx.__opfUrl(),
-      ]);
     } else {
       env['ETH_RPC_URL'] = ethRpcUrl;
       env['ETH_KEY_ID'] = "my_eth_key_id";
