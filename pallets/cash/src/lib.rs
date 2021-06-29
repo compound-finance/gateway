@@ -54,7 +54,6 @@ use types_derive::type_alias;
 extern crate lazy_static;
 
 pub mod chains;
-pub mod converters;
 pub mod core;
 pub mod events;
 pub mod factor;
