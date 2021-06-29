@@ -13,6 +13,7 @@ use frame_support::{
 };
 use frame_system::{ensure_none, offchain::CreateSignedTransaction};
 use our_std::log;
+use pallet_timestamp;
 use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity,
 };
@@ -32,7 +33,9 @@ mod tests;
 pub const ORACLE_POLL_INTERVAL_BLOCKS: u32 = 10;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
-pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+pub trait Config:
+    frame_system::Config + CreateSignedTransaction<Call<Self>> + pallet_timestamp::Config
+{
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event> + Into<<Self as frame_system::Config>::Event>;
 
@@ -41,6 +44,10 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
         + Parameter
         + UnfilteredDispatchable<Origin = Self::Origin>
         + GetDispatchInfo;
+
+    type GetConvertedTimestamp: timestamp::GetConvertedTimestamp<
+        <Self as pallet_timestamp::Config>::Moment,
+    >;
 }
 
 decl_storage! {

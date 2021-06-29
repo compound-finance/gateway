@@ -10,7 +10,7 @@ pub type Reporter = [u8; 20];
 
 /// Type for representing time since current Unix epoch in milliseconds.
 #[type_alias("Oracle__")]
-pub type Timestamp = u64;
+pub type Timestamp = timestamp::Timestamp; //u64;
 
 /// Type for representing a price, potentially for any symbol.
 #[type_alias]

@@ -41,7 +41,6 @@ use our_std::{
 };
 use sp_core::crypto::AccountId32;
 use sp_runtime::{
-    traits::Convert,
     transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidity},
     Percent,
 };
@@ -101,8 +100,10 @@ pub trait Config:
         + UnfilteredDispatchable<Origin = Self::Origin>
         + GetDispatchInfo;
 
-    /// Convert implementation for Moment -> Timestamp.
-    type TimeConverter: Convert<<Self as pallet_timestamp::Config>::Moment, Timestamp>;
+    /// Gets the most recent timestamp and converts it from a moment
+    type GetConvertedTimestamp: timestamp::GetConvertedTimestamp<
+        <Self as pallet_timestamp::Config>::Moment,
+    >;
 
     /// Placate substrate's `HandleLifetime` trait.
     type AccountStore: StoredMap<SubstrateId, ()>;

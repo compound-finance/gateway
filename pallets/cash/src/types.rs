@@ -37,7 +37,7 @@ pub type Nonce = u32;
 
 /// Type for representing time since current Unix epoch in milliseconds.
 #[type_alias]
-pub type Timestamp = u64;
+pub type Timestamp = timestamp::Timestamp; //u64;
 
 /// Type of the largest possible signed integer.
 #[type_alias]

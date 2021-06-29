@@ -15,6 +15,7 @@ use crate::{
 use crate::{Config, PriceReporters, PriceTimes, Prices, ORACLE_POLL_INTERVAL_BLOCKS};
 use our_std::convert::TryInto;
 use our_std::{collections::btree_map::BTreeMap, str::FromStr, vec::Vec, RuntimeDebug};
+use timestamp::GetConvertedTimestamp;
 
 pub const MAX_PRICE_FUTURE_MS: Timestamp = 100000u64; //100 seconds
 
@@ -205,14 +206,19 @@ pub fn get_and_check_parsed_price<T: Config>(
     let parsed = parse_message(payload)?;
     let ticker = Ticker::from_str(&parsed.key)?;
 
+    let current_timestamp = T::GetConvertedTimestamp::get_recent_timestamp()
+        .map_err(|_| OracleError::InvalidTimestamp)?;
+    let time_to_parsed_price = parsed
+        .timestamp
+        .checked_sub(current_timestamp)
+        .ok_or(OracleError::InvalidTimestamp)?;
     if let Some(last_updated) = PriceTimes::get(&ticker) {
         if parsed.timestamp <= last_updated {
             Err(OracleError::StalePrice)?;
-        } else if parsed.timestamp - last_updated > MAX_PRICE_FUTURE_MS {
+        } else if time_to_parsed_price > MAX_PRICE_FUTURE_MS {
             Err(OracleError::TimestampTooHigh)?;
         }
     }
-
     Ok((parsed, ticker))
 }
 pub fn post_price<T: Config>(payload: Vec<u8>, signature: Vec<u8>) -> Result<(), OracleError> {
@@ -338,14 +344,18 @@ pub mod tests {
     fn test_check_price_future_timestamp() {
         new_test_ext().execute_with(|| {
             let ticker = Ticker::new("ETH");
-            PriceTimes::insert(ticker, 0);
+            let start_timestamp = 2u64;
 
             let kind = ethabi::Token::String(String::from("prices"));
-            let timestamp = ethabi::Token::Uint((MAX_PRICE_FUTURE_MS + 1).into());
+            // posting a price from too far in the future
+            let timestamp = ethabi::Token::Uint((MAX_PRICE_FUTURE_MS + start_timestamp + 1).into());
             let key = ethabi::Token::String(String::from("ETH"));
             let value = ethabi::Token::Uint(100u64.into());
 
             let v = ethabi::encode(&vec![kind, timestamp, key, value]);
+
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(start_timestamp);
+            PriceTimes::insert(ticker, start_timestamp);
 
             assert_eq!(
                 get_and_check_parsed_price::<Test>(&v),

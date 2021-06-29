@@ -147,6 +147,7 @@ impl pallet_timestamp::Config for Test {
 impl pallet_oracle::Config for Test {
     type Call = Call;
     type Event = Event;
+    type GetConvertedTimestamp = timestamp::TimeConverter<Self>;
 }
 
 impl frame_system::offchain::SigningTypes for Test {
@@ -157,7 +158,7 @@ impl frame_system::offchain::SigningTypes for Test {
 impl Config for Test {
     type Event = Event;
     type Call = Call;
-    type TimeConverter = crate::converters::TimeConverter<Self>;
+    type GetConvertedTimestamp = timestamp::TimeConverter<Self>;
     type AccountStore = System;
     type SessionInterface = Self;
     type WeightInfo = ();

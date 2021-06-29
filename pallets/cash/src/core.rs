@@ -34,36 +34,13 @@ use frame_support::{
     },
     traits::UnfilteredDispatchable,
 };
+use timestamp::GetConvertedTimestamp;
 
 // Public helper functions //
 
-/// Return the recent timestamp (from the FREEZE_TIME file).
-#[cfg(all(feature = "freeze-time", feature = "std"))]
 pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
-    use std::{env, fs};
-    if let Ok(filename) = env::var("FREEZE_TIME") {
-        if let Ok(contents) = fs::read_to_string(filename) {
-            if let Ok(time) = contents.parse::<u64>() {
-                println!("Freeze Time: {}", time);
-                if time > 0 {
-                    return Ok(time);
-                }
-            }
-        }
-    }
-    return Err(Reason::TimestampMissing);
-}
-
-/// Return the recent timestamp (from the timestamp pallet).
-#[cfg(not(all(feature = "freeze-time", feature = "std")))]
-pub fn get_recent_timestamp<T: Config>() -> Result<Timestamp, Reason> {
-    use sp_runtime::traits::Convert;
-    let ts = <pallet_timestamp::Pallet<T>>::get();
-    let time = T::TimeConverter::convert(ts);
-    if time > 0 {
-        return Ok(time);
-    }
-    return Err(Reason::TimestampMissing);
+    return <T as Config>::GetConvertedTimestamp::get_recent_timestamp()
+        .map_err(|_| Reason::TimestampMissing);
 }
 
 /// Return the event ingression queue for the underlying chain.
