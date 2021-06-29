@@ -26,6 +26,7 @@ node_modules
 integration/.repl_history
 integration/chainSpec.json
 integration/*.xml
+integration/repl.log
 
 # Builds Ethereum contracts
 ethereum/.build/contracts.json

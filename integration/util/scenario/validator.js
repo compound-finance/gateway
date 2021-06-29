@@ -112,6 +112,8 @@ class Validator {
     this.extraVersions = extraVersions;
     this.chainSpecFile = chainSpecFile;
     this.ethProxy = ethProxy;
+    this.wsUrl = `ws://localhost:${wsPort}`;
+    this.rpcUrl = `http://localhost:${rpcPort}`;
     this.wsProvider = null;
     this.api = null;
     this.ps = null;
@@ -285,7 +287,7 @@ class Validator {
   }
 
   async buildApi() {
-    const wsProvider = new WsProvider(`ws://localhost:${this.wsPort}`);
+    const wsProvider = new WsProvider(this.wsUrl);
     let types = await this.version.loadTypes();
     for (let version of this.extraVersions) {
       types = {

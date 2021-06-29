@@ -1,0 +1,35 @@
+{
+  "chain_opts": {
+    "eth": {
+      "name": "eth",
+      "provider": "https://ropsten-eth.compound.finance",
+      "block_number": 10407037
+    }
+  },
+  "eth_supply_cap": null,
+  "validators": ["alice", "bob", "charlie", "dave"],
+  "starport": {
+    "existing": {
+      "proxy_admin": "0xd418B3A7c4a2b9d60fF8dDf9E94a8b75Aa3f60A5",
+      "proxy": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613",
+      "starport": "0xD905AbBA1C5Ea48c0598bE9F3f8ae31290B58613",
+      "starport_impl": "0xaa39fd81E66Eb9DbEEf3253319516A7317829Eb0"
+    }
+  },
+  "cash_token": {
+    "existing": {
+      "proxy_admin": "0xd418B3A7c4a2b9d60fF8dDf9E94a8b75Aa3f60A5",
+      "proxy": "0xc65a4A1855d314033530A29Ab993A1717879E5BF",
+      "cash_token": "0xc65a4A1855d314033530A29Ab993A1717879E5BF",
+      "cash_impl": "0x1ffe465b3c82499e1C637c02EFECD128B7B454CF"
+    }
+  },
+  "tokens": {
+    "zrx": {
+      "build": "zrx.json",
+      "contract": "ZRXToken",
+      "address": "0xc0e2d7d9279846b80eacdea57220ab2333bc049d",
+      "supply_cap": null
+    }
+  }
+}
