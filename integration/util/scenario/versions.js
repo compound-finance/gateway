@@ -183,6 +183,7 @@ class Version {
       'full-cli-args': (v) => v >= 9,
       'eth-starport-parent-block': (v) => v >= 9,
       'new-artifacts': (v) => v >= 10,
+      'generic-cli-args': (v) => v >= 12, // todo: not sure exactly what this should be
     };
 
     if (!versionMap.hasOwnProperty(t)) {

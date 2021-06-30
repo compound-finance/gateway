@@ -133,12 +133,7 @@ pub fn run() -> sc_cli::Result<()> {
         }
         None => {
             let runner = cli.create_runner(&cli.run)?;
-            runtime_interfaces::initialize_validator_config(
-                cli.gateway.eth_key_id.clone(),
-                cli.gateway.eth_rpc_url.clone(),
-                cli.gateway.miner.clone(),
-                cli.gateway.opf_url.clone(),
-            );
+            runtime_interfaces::initialize_validator_config(cli.gateway.parse_cli_mapping());
             Ok(runner.run_node_until_exit(|config| async move {
                 match config.role {
                     Role::Light => service::new_light(config),
