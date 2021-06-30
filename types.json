@@ -90,7 +90,8 @@
   "CashAmount": "Uint",
   "CashExtractionNotice": {
     "_enum": {
-      "Eth": "CashExtractionNoticeEth"
+      "Eth": "CashExtractionNoticeEth",
+      "Matic": "CashExtractionNoticeMatic"
     }
   },
   "CashExtractionNoticeEth": {
@@ -98,6 +99,12 @@
     "parent": "Ethereum__Chain__Hash",
     "account": "Ethereum__Chain__Address",
     "principal": "Ethereum__Chain__Amount"
+  },
+  "CashExtractionNoticeMatic": {
+    "id": "NoticeId",
+    "parent": "Polygon__Chain__Hash",
+    "account": "Polygon__Chain__Address",
+    "principal": "Polygon__Chain__Amount"
   },
   "CashIndex": "Uint",
   "CashOrChainAsset": {
@@ -115,42 +122,50 @@
     "_enum": {
       "Gate": "Gateway__Chain__Address",
       "Eth": "Ethereum__Chain__Address",
-      "Dot": "Polkadot__Chain__Address"
+      "Dot": "Polkadot__Chain__Address",
+      "Matic": "Polygon__Chain__Address"
     }
   },
   "ChainAccountSignature": {
     "_enum": {
       "Gate": "ChainAccountSignatureGate",
       "Eth": "ChainAccountSignatureEth",
-      "Dot": "ChainAccountSignatureDot"
+      "Dot": "ChainAccountSignatureDot",
+      "Matic": "ChainAccountSignatureMatic"
     }
   },
   "ChainAccountSignatureDot": "(Polkadot__Chain__Address,Polkadot__Chain__Signature)",
   "ChainAccountSignatureEth": "(Ethereum__Chain__Address,Ethereum__Chain__Signature)",
   "ChainAccountSignatureGate": "(Gateway__Chain__Address,Gateway__Chain__Signature)",
+  "ChainAccountSignatureMatic": "(Polygon__Chain__Address,Polygon__Chain__Signature)",
   "ChainAsset": {
     "_enum": {
       "Gate": "Reserved",
       "Eth": "Ethereum__Chain__Address",
-      "Dot": "Reserved"
+      "Dot": "Reserved",
+      "Matic": "Polygon__Chain__Address"
     }
   },
   "ChainBlock": {
     "_enum": {
-      "Eth": "Ethereum__Chain__Block"
+      "Eth": "Ethereum__Chain__Block",
+      "Matic": "Polygon__Chain__Block"
     }
   },
   "ChainBlockEvent": {
     "_enum": {
       "Reserved": "",
-      "Eth": "ChainBlockEventEth"
+      "Eth": "ChainBlockEventEth",
+      "Matic": "ChainBlockEventMatic"
     }
   },
   "ChainBlockEventEth": "(ChainBlockNumber,Ethereum__Chain__Event)",
+  "ChainBlockEventMatic": "(ChainBlockNumber,Polygon__Chain__Event)",
   "ChainBlockEvents": {
     "_enum": {
       "Reserved": "",
-      "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>"
+      "Eth": "Vec<(ChainBlockNumber,Ethereum__Chain__Event)>",
+      "Matic": "Vec<(ChainBlockNumber,Polygon__Chain__Event)>"
     }
   },
   "ChainBlockNumber": "u64",
@@ -161,26 +176,30 @@
   },
   "ChainBlocks": {
     "_enum": {
-      "Eth": "Vec<Ethereum__Chain__Block>"
+      "Eth": "Vec<Ethereum__Chain__Block>",
+      "Matic": "Vec<Polygon__Chain__Block>"
     }
   },
   "ChainHash": {
     "_enum": {
       "Gate": "Gateway__Chain__Hash",
       "Eth": "Ethereum__Chain__Hash",
-      "Dot": "Polkadot__Chain__Hash"
+      "Dot": "Polkadot__Chain__Hash",
+      "Matic": "Polygon__Chain__Hash"
     }
   },
   "ChainId": {
     "_enum": {
       "Gate": "",
       "Eth": "",
-      "Dot": ""
+      "Dot": "",
+      "Matic": ""
     }
   },
   "ChainReorg": {
     "_enum": {
-      "Eth": "ChainReorgEth"
+      "Eth": "ChainReorgEth",
+      "Matic": "ChainReorgMatic"
     }
   },
   "ChainReorgEth": {
@@ -188,6 +207,12 @@
     "to_hash": "Ethereum__Chain__Hash",
     "reverse_blocks": "Vec<Ethereum__Chain__Block>",
     "forward_blocks": "Vec<Ethereum__Chain__Block>"
+  },
+  "ChainReorgMatic": {
+    "from_hash": "Polygon__Chain__Hash",
+    "to_hash": "Polygon__Chain__Hash",
+    "reverse_blocks": "Vec<Polygon__Chain__Block>",
+    "forward_blocks": "Vec<Polygon__Chain__Block>"
   },
   "ChainReorgTally": {
     "reorg": "ChainReorg",
@@ -197,26 +222,34 @@
     "_enum": {
       "Gate": "Gateway__Chain__Signature",
       "Eth": "Ethereum__Chain__Signature",
-      "Dot": "Polkadot__Chain__Signature"
+      "Dot": "Polkadot__Chain__Signature",
+      "Matic": "Polygon__Chain__Signature"
     }
   },
   "ChainSignatureList": {
     "_enum": {
       "Gate": "Reserved",
       "Eth": "Vec<(Ethereum__Chain__Address,Ethereum__Chain__Signature)>",
-      "Dot": "Vec<(Polkadot__Chain__Address,Polkadot__Chain__Signature)>"
+      "Dot": "Vec<(Polkadot__Chain__Address,Polkadot__Chain__Signature)>",
+      "Matic": "Vec<(Polygon__Chain__Address,Polygon__Chain__Signature)>"
     }
   },
   "ChainStarport": "ChainAccount",
   "ChangeAuthorityNotice": {
     "_enum": {
-      "Eth": "ChangeAuthorityNoticeEth"
+      "Eth": "ChangeAuthorityNoticeEth",
+      "Matic": "ChangeAuthorityNoticeMatic"
     }
   },
   "ChangeAuthorityNoticeEth": {
     "id": "NoticeId",
     "parent": "Ethereum__Chain__Hash",
     "new_authorities": "Vec<Ethereum__Chain__Address>"
+  },
+  "ChangeAuthorityNoticeMatic": {
+    "id": "NoticeId",
+    "parent": "Polygon__Chain__Hash",
+    "new_authorities": "Vec<Polygon__Chain__Address>"
   },
   "CodeHash": "Ethereum__Chain__Hash",
   "CryptoError": {
@@ -310,12 +343,14 @@
       "NoStarportAddress": "",
       "EthereumClientError": "EthereumClientError",
       "ErrorDecodingHex": "",
-      "InvalidBlockchain": ""
+      "PolygonClientError": "EthereumClientError",
+      "ActionNotSupported": ""
     }
   },
   "ExtractionNotice": {
     "_enum": {
-      "Eth": "ExtractionNoticeEth"
+      "Eth": "ExtractionNoticeEth",
+      "Matic": "ExtractionNoticeMatic"
     }
   },
   "ExtractionNoticeEth": {
@@ -325,10 +360,18 @@
     "account": "Ethereum__Chain__Address",
     "amount": "Ethereum__Chain__Amount"
   },
+  "ExtractionNoticeMatic": {
+    "id": "NoticeId",
+    "parent": "Polygon__Chain__Hash",
+    "asset": "Polygon__Chain__Address",
+    "account": "Polygon__Chain__Address",
+    "amount": "Polygon__Chain__Amount"
+  },
   "Factor": "Uint",
   "FutureYieldNotice": {
     "_enum": {
-      "Eth": "FutureYieldNoticeEth"
+      "Eth": "FutureYieldNoticeEth",
+      "Matic": "FutureYieldNoticeMatic"
     }
   },
   "FutureYieldNoticeEth": {
@@ -337,6 +380,13 @@
     "next_cash_yield": "Ethereum__Chain__Rate",
     "next_cash_index": "Ethereum__Chain__CashIndex",
     "next_cash_yield_start": "Ethereum__Chain__Timestamp"
+  },
+  "FutureYieldNoticeMatic": {
+    "id": "NoticeId",
+    "parent": "Polygon__Chain__Hash",
+    "next_cash_yield": "Polygon__Chain__Rate",
+    "next_cash_index": "Polygon__Chain__CashIndex",
+    "next_cash_yield_start": "Polygon__Chain__Timestamp"
   },
   "Gateway__Chain__Address": "[u8; 32]",
   "Gateway__Chain__Amount": "u128",
@@ -443,6 +493,16 @@
   "Polkadot__Chain__Rate": "u128",
   "Polkadot__Chain__Signature": "[u8; 65]",
   "Polkadot__Chain__Timestamp": "u64",
+  "Polygon__Chain__Address": "[u8; 20]",
+  "Polygon__Chain__Amount": "u128",
+  "Polygon__Chain__Block": "EthereumBlock",
+  "Polygon__Chain__CashIndex": "u128",
+  "Polygon__Chain__Event": "EthereumEvent",
+  "Polygon__Chain__Hash": "[u8; 32]",
+  "Polygon__Chain__PublicKey": "[u8; 64]",
+  "Polygon__Chain__Rate": "u128",
+  "Polygon__Chain__Signature": "[u8; 65]",
+  "Polygon__Chain__Timestamp": "u64",
   "Portfolio": {
     "cash": "Balance",
     "positions": "Vec<(AssetInfo,Balance)>"
@@ -466,7 +526,6 @@
   },
   "Reason": {
     "_enum": {
-      "AssetExtractionNotSupported": "",
       "AssetNotSupported": "",
       "BadAccount": "",
       "BadAddress": "",
@@ -542,7 +601,8 @@
   },
   "SetSupplyCapNotice": {
     "_enum": {
-      "Eth": "SetSupplyCapNoticeEth"
+      "Eth": "SetSupplyCapNoticeEth",
+      "Matic": "SetSupplyCapNoticeMatic"
     }
   },
   "SetSupplyCapNoticeEth": {
@@ -550,6 +610,12 @@
     "parent": "Ethereum__Chain__Hash",
     "asset": "Ethereum__Chain__Address",
     "cap": "Ethereum__Chain__Amount"
+  },
+  "SetSupplyCapNoticeMatic": {
+    "id": "NoticeId",
+    "parent": "Polygon__Chain__Hash",
+    "asset": "Polygon__Chain__Address",
+    "cap": "Polygon__Chain__Amount"
   },
   "SetYieldNextError": {
     "_enum": {

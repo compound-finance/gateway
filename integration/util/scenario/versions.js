@@ -181,9 +181,10 @@ class Version {
   supports(t) {
     let versionMap = {
       'full-cli-args': (v) => v >= 9,
-      'eth-starport-parent-block': (v) => v >= 9,
+      'starport-parent-block': (v) => v >= 9,
       'new-artifacts': (v) => v >= 10,
-      'generic-cli-args': (v) => v >= 12, // todo: not sure exactly what this should be
+      'matic': (v) => v >= 12,
+      'generic-cli-args': (v) => v >= 12,
     };
 
     if (!versionMap.hasOwnProperty(t)) {

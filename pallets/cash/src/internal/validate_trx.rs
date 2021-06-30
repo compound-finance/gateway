@@ -84,6 +84,8 @@ pub fn validate_unsigned<T: Config>(
         .build()),
 
         Call::receive_chain_blocks(blocks, signature) => {
+            let chain_id = blocks.chain_id();
+
             let validator = recover_validator::<T>(&blocks.encode(), *signature)
                 .map_err(|_| ValidationError::InvalidValidator)?;
 
@@ -93,7 +95,8 @@ pub fn validate_unsigned<T: Config>(
                 .propagate(true);
 
             for block_number in blocks.block_numbers() {
-                validity = validity.and_provides((validator.substrate_id.clone(), block_number));
+                validity =
+                    validity.and_provides((validator.substrate_id.clone(), block_number, chain_id));
             }
 
             Ok(validity.build())
@@ -160,7 +163,7 @@ pub fn validate_unsigned<T: Config>(
                     ValidTransaction::with_tag_prefix("Gateway::publish_signature")
                         .priority(UNSIGNED_TXS_PRIORITY)
                         .longevity(UNSIGNED_TXS_LONGEVITY)
-                        .and_provides(signature)
+                        .and_provides((chain_id, notice_id, signature))
                         .propagate(true)
                         .build(),
                 )
@@ -333,9 +336,9 @@ mod tests {
                 .priority(100)
                 .longevity(32)
                 .propagate(true)
-                .and_provides((substrate_id.clone(), 1u64))
-                .and_provides((substrate_id.clone(), 2u64))
-                .and_provides((substrate_id.clone(), 3u64))
+                .and_provides((substrate_id.clone(), 1u64, ChainId::Eth))
+                .and_provides((substrate_id.clone(), 2u64, ChainId::Eth))
+                .and_provides((substrate_id.clone(), 3u64, ChainId::Eth))
                 .build();
 
             assert_eq!(
@@ -627,7 +630,7 @@ mod tests {
             let exp = ValidTransaction::with_tag_prefix("Gateway::publish_signature")
                 .priority(UNSIGNED_TXS_PRIORITY)
                 .longevity(UNSIGNED_TXS_LONGEVITY)
-                .and_provides(signature)
+                .and_provides((chain_id, notice_id, signature))
                 .propagate(true)
                 .build();
 

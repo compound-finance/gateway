@@ -21,8 +21,7 @@ class Starport {
   }
 
   chainAddressStr() {
-    // xxx todo:wn parameterize by chain
-    return `ETH:${this.ethAddress()}`;
+    return `${this.chain.name.toUpperCase()}:${this.ethAddress()}`;
   }
 
   chainAddress() {
@@ -128,8 +127,8 @@ class Starport {
 
   async invoke(notice, signaturePairs) {
     let encoded = notice.EncodedNotice;
-    let signatures = signaturePairs.map(([signer, sig]) => sig.toHex());
-    let sendOpts = { from: this.ctx.eth.defaultFrom, gas: 5000000 };
+    let signatures = signaturePairs.map(([_, sig]) => sig);
+    let sendOpts = { from: this.chain.defaultFrom, gas: 5000000 };
     return await this.starport.methods.invoke(encoded, signatures).send(sendOpts);
   }
 
@@ -201,21 +200,22 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashT
   } else {
     // Deploy Proxies and Starport
     let proxyAdmin = cashToken.proxyAdmin;
-    let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root()]);
+    let starportImpl = await chain.__deploy('Starport', [cashToken.ethAddress(), chain.root(), web3.utils.asciiToHex(chain.nameAsUpperCase()), web3.utils.asciiToHex(chain.nameAsStarportHeader())]);
     let proxy = await chain.__deploy('TransparentUpgradeableProxy', [
       starportImpl._address,
       proxyAdmin._address,
       "0x"
-    ], { from: chain.root() });
+    ], {from: chain.root()});
     let starport = await chain.__getContractAt('Starport', proxy._address);
     if (validators.length > 0) {
-      await starport.methods.changeAuthorities(validators).send({ from: chain.root(), gas: 4_000_00 });
+      await starport.methods.changeAuthorities(validators).send({from: chain.root(), gas: 400_000});
     }
 
     let starportTopics = Object.fromEntries(starport
       ._jsonInterface
       .filter(e => e.type === 'event')
-      .map(e => [e.name, e.signature]));
+      .map(e => [e.name, e.signature])
+    );
 
     return new Starport(starport, proxyAdmin, starportImpl, proxy, starportTopics, cashToken, ctx, chain);
   }

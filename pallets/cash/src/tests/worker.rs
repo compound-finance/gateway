@@ -98,6 +98,7 @@ fn test_offchain_worker() {
                         }
                     )
                 }
+                _ => unreachable!(),
             }
 
             assert_eq!(PendingChainBlocks::get(ChainId::Eth), vec![]); // XXX how to execute extrinsic?

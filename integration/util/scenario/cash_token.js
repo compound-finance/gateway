@@ -73,6 +73,11 @@ class CashToken extends Token {
     return await this.cashToken.methods.symbol().call();
   }
 
+  async getLiquidityFactor() {
+    return 1;
+  }
+
+
   async upgrade(impl, upgradeCall = null) {
     if (upgradeCall) {
       await this.proxyAdmin.methods.upgradeAndCall(

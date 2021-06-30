@@ -1,5 +1,5 @@
 use crate::{
-    chains::{Chain, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum},
+    chains::{Chain, ChainHash, ChainId, ChainSignature, ChainSignatureList, Ethereum, Polygon},
     reason::Reason,
 };
 use codec::{Decode, Encode};
@@ -63,6 +63,13 @@ pub enum ExtractionNotice {
         account: <Ethereum as Chain>::Address,
         amount: <Ethereum as Chain>::Amount,
     },
+    Matic {
+        id: NoticeId,
+        parent: <Polygon as Chain>::Hash,
+        asset: <Polygon as Chain>::Address,
+        account: <Polygon as Chain>::Address,
+        amount: <Polygon as Chain>::Amount,
+    },
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
@@ -72,6 +79,12 @@ pub enum CashExtractionNotice {
         parent: <Ethereum as Chain>::Hash,
         account: <Ethereum as Chain>::Address,
         principal: <Ethereum as Chain>::Amount,
+    },
+    Matic {
+        id: NoticeId,
+        parent: <Polygon as Chain>::Hash,
+        account: <Polygon as Chain>::Address,
+        principal: <Polygon as Chain>::Amount,
     },
 }
 
@@ -84,6 +97,13 @@ pub enum FutureYieldNotice {
         next_cash_index: <Ethereum as Chain>::CashIndex,
         next_cash_yield_start: <Ethereum as Chain>::Timestamp,
     },
+    Matic {
+        id: NoticeId,
+        parent: <Polygon as Chain>::Hash,
+        next_cash_yield: <Polygon as Chain>::Rate,
+        next_cash_index: <Polygon as Chain>::CashIndex,
+        next_cash_yield_start: <Polygon as Chain>::Timestamp,
+    },
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
@@ -94,6 +114,12 @@ pub enum SetSupplyCapNotice {
         asset: <Ethereum as Chain>::Address,
         cap: <Ethereum as Chain>::Amount,
     },
+    Matic {
+        id: NoticeId,
+        parent: <Polygon as Chain>::Hash,
+        asset: <Polygon as Chain>::Address,
+        cap: <Polygon as Chain>::Amount,
+    },
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
@@ -102,6 +128,11 @@ pub enum ChangeAuthorityNotice {
         id: NoticeId,
         parent: <Ethereum as Chain>::Hash,
         new_authorities: Vec<<Ethereum as Chain>::Address>,
+    },
+    Matic {
+        id: NoticeId,
+        parent: <Polygon as Chain>::Hash,
+        new_authorities: Vec<<Polygon as Chain>::Address>,
     },
 }
 
@@ -123,18 +154,23 @@ impl Notice {
         match self {
             Notice::ExtractionNotice(n) => match n {
                 ExtractionNotice::Eth { .. } => ChainId::Eth,
+                ExtractionNotice::Matic { .. } => ChainId::Matic,
             },
             Notice::CashExtractionNotice(n) => match n {
                 CashExtractionNotice::Eth { .. } => ChainId::Eth,
+                CashExtractionNotice::Matic { .. } => ChainId::Matic,
             },
             Notice::FutureYieldNotice(n) => match n {
                 FutureYieldNotice::Eth { .. } => ChainId::Eth,
+                FutureYieldNotice::Matic { .. } => ChainId::Matic,
             },
             Notice::SetSupplyCapNotice(n) => match n {
                 SetSupplyCapNotice::Eth { .. } => ChainId::Eth,
+                SetSupplyCapNotice::Matic { .. } => ChainId::Matic,
             },
             Notice::ChangeAuthorityNotice(n) => match n {
                 ChangeAuthorityNotice::Eth { .. } => ChainId::Eth,
+                ChangeAuthorityNotice::Matic { .. } => ChainId::Matic,
             },
         }
     }
@@ -149,14 +185,16 @@ pub trait EncodeNotice {
 }
 
 const ETH_CHAIN_IDENT: &'static [u8] = b"ETH:";
+const MATIC_CHAIN_IDENT: &'static [u8] = b"MAT:";
 
-fn encode_notice_params(
+fn encode_notice_params_eth_like(
     id: &NoticeId,
     parent: &<Ethereum as Chain>::Hash,
     signature: <Ethereum as Chain>::Hash,
     tokens: &[ethabi::Token],
+    header: Vec<u8>,
 ) -> Vec<u8> {
-    let mut result: Vec<u8> = ETH_CHAIN_IDENT.to_vec();
+    let mut result = header;
     let header_encoded = ethabi::encode(&[
         Token::Uint(id.era_id().into()),
         Token::Uint(id.era_index().into()),
@@ -179,7 +217,7 @@ impl EncodeNotice for ExtractionNotice {
                 asset,
                 account,
                 amount,
-            } => encode_notice_params(
+            } => encode_notice_params_eth_like(
                 id,
                 parent,
                 *UNLOCK_SIG,
@@ -188,6 +226,24 @@ impl EncodeNotice for ExtractionNotice {
                     Token::Uint((*amount).into()),
                     Token::Address(account.into()),
                 ],
+                ETH_CHAIN_IDENT.to_vec(),
+            ),
+            ExtractionNotice::Matic {
+                id,
+                parent,
+                asset,
+                account,
+                amount,
+            } => encode_notice_params_eth_like(
+                id,
+                parent,
+                *UNLOCK_SIG,
+                &[
+                    Token::Address(asset.into()),
+                    Token::Uint((*amount).into()),
+                    Token::Address(account.into()),
+                ],
+                MATIC_CHAIN_IDENT.to_vec(),
             ),
         }
     }
@@ -201,7 +257,7 @@ impl EncodeNotice for CashExtractionNotice {
                 parent,
                 account,
                 principal,
-            } => encode_notice_params(
+            } => encode_notice_params_eth_like(
                 id,
                 parent,
                 *UNLOCK_CASH_SIG,
@@ -209,6 +265,22 @@ impl EncodeNotice for CashExtractionNotice {
                     Token::Address(account.into()),
                     Token::Uint((*principal).into()),
                 ],
+                ETH_CHAIN_IDENT.to_vec(),
+            ),
+            CashExtractionNotice::Matic {
+                id,
+                parent,
+                account,
+                principal,
+            } => encode_notice_params_eth_like(
+                id,
+                parent,
+                *UNLOCK_CASH_SIG,
+                &[
+                    Token::Address(account.into()),
+                    Token::Uint((*principal).into()),
+                ],
+                MATIC_CHAIN_IDENT.to_vec(),
             ),
         }
     }
@@ -223,7 +295,7 @@ impl EncodeNotice for FutureYieldNotice {
                 next_cash_yield,
                 next_cash_yield_start,
                 next_cash_index,
-            } => encode_notice_params(
+            } => encode_notice_params_eth_like(
                 id,
                 parent,
                 *SET_FUTURE_YIELD_SIG,
@@ -232,6 +304,24 @@ impl EncodeNotice for FutureYieldNotice {
                     Token::Uint((*next_cash_index).into()),
                     Token::Uint((*next_cash_yield_start).into()),
                 ],
+                ETH_CHAIN_IDENT.to_vec(),
+            ),
+            FutureYieldNotice::Matic {
+                id,
+                parent,
+                next_cash_yield,
+                next_cash_yield_start,
+                next_cash_index,
+            } => encode_notice_params_eth_like(
+                id,
+                parent,
+                *SET_FUTURE_YIELD_SIG,
+                &[
+                    Token::Uint((*next_cash_yield).into()),
+                    Token::Uint((*next_cash_index).into()),
+                    Token::Uint((*next_cash_yield_start).into()),
+                ],
+                MATIC_CHAIN_IDENT.to_vec(),
             ),
         }
     }
@@ -245,11 +335,24 @@ impl EncodeNotice for SetSupplyCapNotice {
                 parent,
                 asset,
                 cap,
-            } => encode_notice_params(
+            } => encode_notice_params_eth_like(
                 id,
                 parent,
                 *SET_SUPPLY_CAP_SIG,
                 &[Token::Address(asset.into()), Token::Uint((*cap).into())],
+                ETH_CHAIN_IDENT.to_vec(),
+            ),
+            SetSupplyCapNotice::Matic {
+                id,
+                parent,
+                asset,
+                cap,
+            } => encode_notice_params_eth_like(
+                id,
+                parent,
+                *SET_SUPPLY_CAP_SIG,
+                &[Token::Address(asset.into()), Token::Uint((*cap).into())],
+                MATIC_CHAIN_IDENT.to_vec(),
             ),
         }
     }
@@ -262,7 +365,7 @@ impl EncodeNotice for ChangeAuthorityNotice {
                 id,
                 parent,
                 new_authorities,
-            } => encode_notice_params(
+            } => encode_notice_params_eth_like(
                 id,
                 parent,
                 *CHANGE_AUTHORITIES_SIG,
@@ -272,6 +375,23 @@ impl EncodeNotice for ChangeAuthorityNotice {
                         .map(|auth| Token::Address(auth.into()))
                         .collect(),
                 )],
+                ETH_CHAIN_IDENT.to_vec(),
+            ),
+            ChangeAuthorityNotice::Matic {
+                id,
+                parent,
+                new_authorities,
+            } => encode_notice_params_eth_like(
+                id,
+                parent,
+                *CHANGE_AUTHORITIES_SIG,
+                &[Token::Array(
+                    new_authorities
+                        .iter()
+                        .map(|auth| Token::Address(auth.into()))
+                        .collect(),
+                )],
+                MATIC_CHAIN_IDENT.to_vec(),
             ),
         }
     }
@@ -293,18 +413,23 @@ pub fn default_notice_signatures(notice: &Notice) -> ChainSignatureList {
     match notice {
         Notice::ExtractionNotice(n) => match n {
             ExtractionNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+            ExtractionNotice::Matic { .. } => ChainSignatureList::Matic(vec![]),
         },
         Notice::CashExtractionNotice(n) => match n {
             CashExtractionNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+            CashExtractionNotice::Matic { .. } => ChainSignatureList::Matic(vec![]),
         },
         Notice::FutureYieldNotice(n) => match n {
             FutureYieldNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+            FutureYieldNotice::Matic { .. } => ChainSignatureList::Matic(vec![]),
         },
         Notice::SetSupplyCapNotice(n) => match n {
             SetSupplyCapNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+            SetSupplyCapNotice::Matic { .. } => ChainSignatureList::Matic(vec![]),
         },
         Notice::ChangeAuthorityNotice(n) => match n {
             ChangeAuthorityNotice::Eth { .. } => ChainSignatureList::Eth(vec![]),
+            ChangeAuthorityNotice::Matic { .. } => ChainSignatureList::Matic(vec![]),
         },
     }
 }

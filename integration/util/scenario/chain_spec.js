@@ -64,8 +64,10 @@ async function baseChainSpec(codeSubstitutes, validatorsInfoHash, tokensInfoHash
       eth_address: v.eth_account
   }));
 
-  let assets = tokens.all().map((token) => ({
-    asset: `Eth:${token.ethAddress()}`,
+  let assets = tokens.all()
+      .filter(token => token.symbol.toUpperCase() !== 'CASH')
+      .map((token) => ({
+    asset: token.toTrxArg(),
     decimals: token.decimals,
     symbol: token.symbol.toUpperCase(),
     ticker: token.priceTicker,
@@ -100,15 +102,9 @@ async function baseChainSpec(codeSubstitutes, validatorsInfoHash, tokensInfoHash
   let reporters = ctx.__reporters();
 
   let cashGenesis = {};
-  if (genesisVersion.supports('eth-starport-parent-block')) {
-    cashGenesis.genesisBlocks = [{
-      Eth: {
-        hash: ctx.eth.blockInfo.hash.slice(2),
-        parent_hash: ctx.eth.blockInfo.parentHash.slice(2),
-        number: ctx.eth.blockInfo.number,
-      }
-    }];
-    cashGenesis.starports = [ctx.starport.chainAddressStr()];
+  if (genesisVersion.supports('starport-parent-block')) {
+    cashGenesis.genesisBlocks = ctx.chains.genesisBlocksForChainSpec();
+    cashGenesis.starports = ctx.deployments.starportsForChainSpec();
   }
 
   let extraSpec = {};

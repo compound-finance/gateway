@@ -228,6 +228,9 @@ class Validator {
           `MINER=Eth:${this.ethAccount}`,
           `OPF_URL=${this.ctx.__opfUrl()}`
         ];
+        if (this.version.supports('matic') && this.ctx.matic) {
+          newCliArgs.push(`MATIC_RPC_URL=${this.ctx.matic.web3Url}`);
+        }
       } else {
         newCliArgs = [
           '--eth-rpc-url', ethRpcUrl,

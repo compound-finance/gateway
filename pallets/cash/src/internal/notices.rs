@@ -39,6 +39,17 @@ pub fn dispatch_extraction_notice<T: Config>(
                     account: eth_account,
                     amount: amount.value,
                 },
+                (
+                    ChainAsset::Matic(eth_asset),
+                    ChainAccount::Matic(eth_account),
+                    ChainHash::Matic(eth_parent_hash),
+                ) => ExtractionNotice::Matic {
+                    id: notice_id,
+                    parent: eth_parent_hash,
+                    asset: eth_asset,
+                    account: eth_account,
+                    amount: amount.value,
+                },
 
                 _ => panic!("XXX not implemented"), // generate these w/ macros?
             })
@@ -64,6 +75,14 @@ pub fn dispatch_cash_extraction_notice<T: Config>(
                         principal: principal.0,
                     }
                 }
+                (ChainAccount::Matic(eth_account), ChainHash::Matic(eth_parent_hash)) => {
+                    CashExtractionNotice::Matic {
+                        id: notice_id,
+                        parent: eth_parent_hash,
+                        account: eth_account,
+                        principal: principal.0,
+                    }
+                }
 
                 _ => panic!("XXX not implemented"), // generate these w/ macros?
             })
@@ -80,6 +99,14 @@ pub fn dispatch_supply_cap_notice<T: Config>(chain_asset: ChainAsset, cap: Asset
             Notice::SetSupplyCapNotice(match (chain_asset, parent_hash) {
                 (ChainAsset::Eth(eth_asset), ChainHash::Eth(eth_parent_hash)) => {
                     SetSupplyCapNotice::Eth {
+                        id: notice_id,
+                        parent: eth_parent_hash,
+                        asset: eth_asset,
+                        cap,
+                    }
+                }
+                (ChainAsset::Matic(eth_asset), ChainHash::Matic(eth_parent_hash)) => {
+                    SetSupplyCapNotice::Matic {
                         id: notice_id,
                         parent: eth_parent_hash,
                         asset: eth_asset,
@@ -112,6 +139,21 @@ pub fn dispatch_future_yield_notice<T: Config>(
 
             _ => panic!("XXX not implemented"), // generate these w/ macros?
         })
+    });
+
+    let chain_id = ChainId::Matic;
+    dispatch_notice::<T>(chain_id, None, true, &|notice_id, parent_hash| {
+        Notice::FutureYieldNotice(match parent_hash {
+            ChainHash::Matic(eth_parent_hash) => FutureYieldNotice::Matic {
+                id: notice_id,
+                parent: eth_parent_hash,
+                next_cash_yield: next_yield.0,
+                next_cash_index: next_yield_index.0,
+                next_cash_yield_start: next_yield_start,
+            },
+
+            _ => panic!("XXX not implemented"), // generate these w/ macros?
+        })
     })
 }
 
@@ -128,7 +170,20 @@ pub fn dispatch_change_authority_notice<T: Config>(validators: Vec<ValidatorKeys
 
             _ => panic!("XXX not implemented"), // generate these w/ macros?
         })
-    })
+    });
+
+    let chain_id = ChainId::Matic;
+    dispatch_notice::<T>(chain_id, None, true, &|notice_id, parent_hash| {
+        Notice::ChangeAuthorityNotice(match parent_hash {
+            ChainHash::Matic(eth_parent_hash) => ChangeAuthorityNotice::Matic {
+                id: notice_id,
+                parent: eth_parent_hash,
+                new_authorities: validators.iter().map(|x| x.eth_address).collect::<Vec<_>>(),
+            },
+
+            _ => panic!("XXX not implemented"), // generate these w/ macros?
+        })
+    });
 }
 
 /// Add a notice to the queue and all the secondary indices.

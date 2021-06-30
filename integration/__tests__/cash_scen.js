@@ -31,7 +31,7 @@ buildScenarios('Cash Scenarios', cash_scen_info, [
   },
   {
     name: 'Collateral Borrowed Interest Lump Sum',
-    scenario: async ({ ashley, bert, chuck, cash, chain, usdc, zrx }) => {
+    scenario: async ({ bert, chuck, cash, chain, usdc, zrx }) => {
       await chain.setFixedRate(usdc, 500); // 5% APY fixed
       await bert.lock(1000000, zrx);
       await bert.transfer(1000, usdc, chuck);

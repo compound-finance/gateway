@@ -29,6 +29,10 @@ class Deployments {
     cashTokens() {
         return this.deployments.map(deployment => deployment.cashToken)
     }
+
+    starportsForChainSpec() {
+        return this.starports().map(starport => starport.chainAddressStr());
+    }
 }
 
 async function buildDeployment(scenInfo, chain, ctx) {
