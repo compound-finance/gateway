@@ -199,6 +199,17 @@ pub fn eth_hash_string(eth_hash: &[u8; 32]) -> String {
     format!("0x{}", hex::encode(eth_hash))
 }
 
+pub fn gateway_str_to_address(address_str: &str) -> Option<[u8; 32]> {
+    if address_str.len() == 66 && &address_str[0..2] == "0x" {
+        if let Ok(bytes) = hex::decode(&address_str[2..66]) {
+            if let Ok(hex_address) = bytes.try_into() {
+                return Some(hex_address);
+            }
+        }
+    }
+    return None;
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

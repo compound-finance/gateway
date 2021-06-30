@@ -410,15 +410,19 @@ mod tests {
     fn test_get_accounts() -> Result<(), Reason> {
         let jared = ChainAccount::from_str("Eth:0x18c8F1222083997405F2E482338A4650ac02e1d6")?;
         let geoff = ChainAccount::from_str("Eth:0x8169522c2c57883e8ef80c498aab7820da539806")?;
+        let alice_bytes: [u8; 32] = [6; 32];
+        let alice = ChainAccount::Gate(alice_bytes);
+
         new_test_ext().execute_with(|| {
             AssetsWithNonZeroBalance::insert(&jared, &Uni, ());
             AssetsWithNonZeroBalance::insert(&jared, &Wbtc, ());
 
             // geoff only cash
             CashPrincipals::insert(&geoff, CashPrincipal::from_nominal("1"));
+            CashPrincipals::insert(&alice, CashPrincipal::from_nominal("1"));
 
             let accounts: Vec<ChainAccount> = super::get_accounts::<Test>()?;
-            assert_eq!(accounts, vec![jared, geoff]);
+            assert_eq!(accounts, vec![alice, jared, geoff]);
 
             Ok(())
         })

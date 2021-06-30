@@ -362,7 +362,8 @@ where
             .get_accounts(&at)
             .map_err(runtime_err)?
             .map_err(chain_err)?;
-        Ok(accounts) // XXX try_into?
+
+        Ok(accounts)
     }
 
     fn chain_assets_meta(&self, at: Option<<B as BlockT>::Hash>) -> RpcResult<ApiAssetMeta> {
