@@ -30,11 +30,8 @@ mod tests {
     use super::*;
     use trx_request;
 
-    const ALAN: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-    const ETH: [u8; 20] = [
-        238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238,
-        238, 238,
-    ];
+    const ALAN: [u8; 20] = [1; 20];
+    const ETH: [u8; 20] = [238; 20];
 
     #[test]
     fn test_account_to_chain_account() {

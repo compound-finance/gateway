@@ -840,7 +840,7 @@ impl<T: Config> Module<T> {
         Ok(internal::assets::get_assets::<T>()?)
     }
 
-    /// Get the rates for the given asset.
+    /// Get the a list of all chain accounts
     pub fn get_accounts() -> Result<Vec<ChainAccount>, Reason> {
         Ok(core::get_accounts::<T>()?)
     }

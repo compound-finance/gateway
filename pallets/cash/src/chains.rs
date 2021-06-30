@@ -131,7 +131,7 @@ impl FromStr for ChainAccount {
 impl From<ChainAccount> for String {
     fn from(asset: ChainAccount) -> String {
         match asset {
-            ChainAccount::Gate(_) => String::from("GATE"), // XXX
+            ChainAccount::Gate(address) => format!("GATE:0x{}", hex::encode(address)),
             ChainAccount::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
             ChainAccount::Dot(_) => String::from("DOT"), // XXX
         }
@@ -338,6 +338,7 @@ impl FromStr for ChainId {
         match s.to_ascii_uppercase().as_str() {
             "ETH" => Ok(ChainId::Eth),
             "DOT" => Ok(ChainId::Dot),
+            "GATE" => Ok(ChainId::Gate),
             _ => Err(Reason::BadChainId),
         }
     }
@@ -809,7 +810,10 @@ impl Chain for Gateway {
     }
 
     fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
+        match gateway_crypto::gateway_str_to_address(_addr) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadAddress),
+        }
     }
 
     fn address_string(_address: &Self::Address) -> String {
