@@ -4,12 +4,9 @@ import {
   sendTransaction,
   deployContractByName,
   getTransactionCode,
-  getContractAddress,
-  getAccountAddress,
-  mintFlow,
-  getScriptCode,
-  executeScript,
-} from "flow-js-testing";
+} from "flow-js-testing/dist";
+import { getContractAddress } from "flow-js-testing/dist/utils/contract";
+import { getAccountAddress } from "flow-js-testing/dist/utils/account";
 import {
   UFix64,
   UInt256,
@@ -18,6 +15,9 @@ import {
   Array as fArray,
   Address,
 } from "@onflow/types";
+import { mintFlow } from "flow-js-testing/dist";
+import { getScriptCode } from "flow-js-testing/dist/utils/file";
+import { executeScript } from "flow-js-testing/dist/utils/interaction";
 import { signWithKey } from "./flow.signer";
 
 const basePath = path.resolve(__dirname, "../cadence");
@@ -28,7 +28,7 @@ const AUTHORITIES_DATA = [
     publicKey:
       "3668a8e41cfede2cbfd40dae4b22cff39c8795b53194b5a921d1d5d41fda370f26c37e4de564f780a95d6253e20e0866c5fe6b418b7ade867e2f1119a216716c",
     privateKey:
-      "b3a88b1465c1f27b42485b8b178828ba34636d88b1edf2a45606d23872072454",
+      "b3a88b1465c1f27b42485b8b178828ba34636d88b1edf2a45606d23872072454"
   },
   {
     publicKey:
@@ -86,10 +86,7 @@ async function prepareForUnlock(userName) {
   // User deposits Flow token to Starport
   await depositFlowTokens(user, "100.000000");
 
-  const authorities = [
-    AUTHORITIES_DATA[0].publicKey,
-    AUTHORITIES_DATA[1].publicKey,
-  ];
+  const authorities = [AUTHORITIES_DATA[0].publicKey, AUTHORITIES_DATA[1].publicKey];
   await runTransaction("starport/change_authorities_admin", address.Starport, [
     [authorities, fArray(fString)],
   ]);
@@ -726,4 +723,5 @@ describe("Starport Tests", () => {
       "Notice must use existing era or start next era"
     );
   });
+
 });

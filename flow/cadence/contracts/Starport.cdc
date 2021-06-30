@@ -197,7 +197,7 @@ pub contract Starport {
             let keylist = Crypto.KeyList()
             let publicKey = PublicKey(
                 publicKey: authority.decodeHex(),
-                signatureAlgorithm: SignatureAlgorithm.ECDSA_secp256k1
+                signatureAlgorithm: SignatureAlgorithm.ECDSA_Secp256k1
             )
 
             keylist.add(
@@ -220,7 +220,7 @@ pub contract Starport {
 
             var i = 0
             for keyList in authoritiesList {
-                if keyList.verify(signatureSet: signatureSet, signedData: message) {
+                if keyList.isValid(signatureSet: signatureSet, signedData: message) {
                     if !validSigs.contains(i) {
                         validSigs.append(i)
                         break
