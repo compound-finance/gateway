@@ -4,7 +4,7 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct GatewayCmd {
-    #[structopt(long = "gateway-args", help = "set validator specific settings")]
+    #[structopt(short = "e", long = "env", help = "set validator specific settings")]
     /// The currently available options are
     ///
     /// ETH_KEY_ID
@@ -12,35 +12,29 @@ pub struct GatewayCmd {
     /// MINER
     /// OPF_URL
     ///
-    /// example ./gateway .... --gateway-args eth-key-id abc/def-ghi eth-rpc-url https... miner 0xeeee....ee opf_url https..
-    ///
-    pub gateway_args: Vec<String>,
+    /// example ./gateway .... --env ETH_RPC_URL=http://... ETH_KEY_ID=.. MINER=Eth:0x01234567890123456789 OPF_URL=http://....
+    pub env: Vec<String>,
 }
 
 impl GatewayCmd {
-    fn kebab_with_leading_dashes_to_screaming_snake(s: &str) -> String {
-        let range = if s.starts_with("--") { 2.. } else { 0.. };
-        s[range].replace("-", "_").to_uppercase()
-    }
-
+    /// Convert the CLI mapping given into a
     pub fn parse_cli_mapping(self) -> HashMap<String, String> {
-        if self.gateway_args.len() % 2 != 0 {
-            // note it is ok to panic here because this is a critical part of the booting up
-            // process of the node and is not expected to result in a bad state
-            panic!("odd number of arguments provided to gateway key value pair configuration.")
-        }
-
-        let mut return_value = HashMap::with_capacity(self.gateway_args.len() / 2);
-
-        for i in (0..self.gateway_args.len()).step_by(2) {
-            let raw_key = &self.gateway_args[i];
-            // note - we don't worry about going out of bounds because we know we
-            // have an even number of elements from above
-            let value = &self.gateway_args[i + 1];
-
-            let key = GatewayCmd::kebab_with_leading_dashes_to_screaming_snake(raw_key);
-
-            return_value.insert(key, value.clone());
+        let mut return_value = HashMap::with_capacity(self.env.len());
+        for e in self.env {
+            if let Some(i) = e.find("=") {
+                let (key, value) = e.split_at(i);
+                // value still has `=` in front
+                if key.len() == 0 {
+                    panic!("Empty validator configuration key detected");
+                }
+                if value.len() == 1 {
+                    panic!("Empty value for key {}", key);
+                }
+                // strip the = from the front of `value`
+                return_value.insert(key.to_string(), value[1..].to_string());
+            } else {
+                panic!("The value `{}` supplied as a validator configuration should be a key and value separated by `=`.", e);
+            }
         }
 
         return_value
@@ -93,59 +87,15 @@ pub mod test {
     use super::GatewayCmd;
 
     #[test]
-    fn test_kebab_to_screaming_snake() {
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("--abc-def-ghi"),
-            "ABC_DEF_GHI".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("abc-def-ghi"),
-            "ABC_DEF_GHI".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("--abc--def-ghi"),
-            "ABC__DEF_GHI".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("ABC_DEF_GHI"),
-            "ABC_DEF_GHI".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("--abc-def-GHI"),
-            "ABC_DEF_GHI".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("--"),
-            "".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake(""),
-            "".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("---"),
-            "_".to_string()
-        );
-        assert_eq!(
-            GatewayCmd::kebab_with_leading_dashes_to_screaming_snake("----"),
-            "__".to_string()
-        );
-    }
-
-    #[test]
     fn test_parse_cli_mapping() {
         let args: Vec<String> = Vec::from([
-            "--eth-rpc-url".into(),
-            "expected eth rpc url".into(),
-            "--miner".into(),
-            "expected miner".into(),
-            "--eth-key-id".into(),
-            "expected eth key id".into(),
-            "--opf-url".into(),
-            "expected opf url".into(),
+            "ETH_RPC_URL=expected eth rpc url".into(),
+            "MINER=expected miner".into(),
+            "ETH_KEY_ID=expected eth key id".into(),
+            "OPF_URL=expected opf url".into(),
         ]);
 
-        let unit_under_test = GatewayCmd { gateway_args: args };
+        let unit_under_test = GatewayCmd { env: args };
 
         let mut actual = unit_under_test.parse_cli_mapping();
 

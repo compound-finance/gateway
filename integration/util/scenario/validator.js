@@ -222,11 +222,11 @@ class Validator {
     if (this.version.supports('full-cli-args')) {
       if (this.version.supports('generic-cli-args')) {
         newCliArgs = [
-          '--gateway-args',
-          'eth-rpc-url', ethRpcUrl,
-          'eth-key-id', "my_eth_key_id",
-          'miner', `Eth:${this.ethAccount}`,
-          'opf-url', this.ctx.__opfUrl(),
+          '--env',
+          `ETH_RPC_URL=${ethRpcUrl}`,
+          'ETH_KEY_ID=my_eth_key_id',
+          `MINER=Eth:${this.ethAccount}`,
+          `OPF_URL=${this.ctx.__opfUrl()}`
         ];
       } else {
         newCliArgs = [
