@@ -376,7 +376,7 @@ pub mod tests {
             let value = ethabi::Token::Uint(100u64.into());
 
             let v = ethabi::encode(&vec![kind, timestamp, key, value]);
-
+            <pallet_timestamp::Pallet<Test>>::set_timestamp(500);
             assert_ok!(get_and_check_parsed_price::<Test>(&v));
         });
     }
