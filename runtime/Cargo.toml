@@ -50,7 +50,7 @@ pallet-session = { default-features = false, git = 'https://github.com/compound-
 pallet-cash = { path = '../pallets/cash', default-features = false }
 pallet-cash-runtime-api = { path = '../pallets/cash/runtime-api', default-features = false }
 pallet-oracle = { path = '../pallets/oracle', default-features = false }
-
+timestamp = { path = '../timestamp', default-features = false }
 our-std = { path = '../our-std', default-features = false }
 
 [features]

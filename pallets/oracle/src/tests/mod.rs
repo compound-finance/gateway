@@ -56,6 +56,7 @@ fn test_post_price_happy_path() {
     let test_signature = hex::decode("41a3f89a526dee766049f3699e9e975bfbabda4db677c9f5c41fbcc0730fccb84d08b2208c4ffae0b87bb162e2791cc305ee4e9a1d936f9e6154356154e9a8e9000000000000000000000000000000000000000000000000000000000000001c").unwrap();
     new_test_ext().execute_with(|| {
         initialize_storage(); // sets up ETH
+        <pallet_timestamp::Pallet<Test>>::set_timestamp(500);
         OracleModule::post_price(Origin::none(), test_payload, test_signature).unwrap();
         let eth_price = OracleModule::price(ETH_TICKER);
         let eth_price_time = OracleModule::price_time(ETH_TICKER);
@@ -97,6 +98,7 @@ fn test_post_price_stale_price() {
     let test_payload = hex::decode("0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000005fec975800000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000002baa48a00000000000000000000000000000000000000000000000000000000000000006707269636573000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034554480000000000000000000000000000000000000000000000000000000000").unwrap();
     let test_signature = hex::decode("41a3f89a526dee766049f3699e9e975bfbabda4db677c9f5c41fbcc0730fccb84d08b2208c4ffae0b87bb162e2791cc305ee4e9a1d936f9e6154356154e9a8e9000000000000000000000000000000000000000000000000000000000000001c").unwrap();
     new_test_ext().execute_with(|| {
+        <pallet_timestamp::Pallet<Test>>::set_timestamp(500);
         initialize_storage(); // sets up ETH
                               // post once
         OracleModule::post_price(Origin::none(), test_payload.clone(), test_signature.clone())

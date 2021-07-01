@@ -1,0 +1,12 @@
+[package]
+name = "timestamp"
+version = "0.1.0"
+authors = ['Compound <https://compound.finance>']
+edition = "2018"
+
+[dependencies]
+pallet-timestamp = { default-features = false, git = 'https://github.com/compound-finance/substrate.git', branch = 'jflatow/compound' }
+sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+frame-system = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
+our-std = { path = '../our-std', default-features = false }
+sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound'  }

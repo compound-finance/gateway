@@ -46,6 +46,7 @@ runtime-interfaces = { path = '../runtime-interfaces', default-features = false 
 ethereum-client = { path = '../../ethereum-client', default-features = false }
 gateway-crypto = { path = '../../gateway-crypto', default-features = false }
 trx-request = { path = '../../trx-request', default-features = false }
+timestamp = { path = '../../timestamp', default-features = false }
 our-std = { path = '../../our-std', default-features = false }
 
 types-derive = { path = '../../types-derive' }

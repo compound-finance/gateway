@@ -17,4 +17,5 @@ members = [
     'test-utils/open-oracle-mock-reporter',
     'trx-request',
     'types-derive',
+    'timestamp'
 ]

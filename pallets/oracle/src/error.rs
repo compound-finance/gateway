@@ -25,6 +25,7 @@ pub enum OracleError {
     SubmitError,
     NoPrice,
     InvalidValue,
+    TimestampTooHigh,
 }
 
 impl From<CryptoError> for OracleError {
@@ -53,6 +54,7 @@ impl From<OracleError> for frame_support::dispatch::DispatchError {
             OracleError::SubmitError => (14, 0, "SubmitError"),
             OracleError::NoPrice => (15, 0, "NoPrice"),
             OracleError::InvalidValue => (16, 0, "InvalidValue"),
+            OracleError::TimestampTooHigh => (17, 0, "TimestampTooHigh"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,

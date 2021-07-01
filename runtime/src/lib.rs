@@ -26,6 +26,8 @@ use sp_version::RuntimeVersion;
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{FixedPointNumber, Perbill, Permill, Perquintill};
 
+use timestamp;
+
 pub use frame_support::{
     construct_runtime, debug, parameter_types,
     traits::{KeyOwnerProofSystem, Randomness},
@@ -278,13 +280,14 @@ impl pallet_session::Config for Runtime {
 impl pallet_oracle::Config for Runtime {
     type Call = Call;
     type Event = Event;
+    type GetConvertedTimestamp = timestamp::TimeConverter<Self>;
 }
 
 /// Configure the CASH pallet in pallets/cash.
 impl pallet_cash::Config for Runtime {
     type Event = Event;
     type Call = Call;
-    type TimeConverter = pallet_cash::converters::TimeConverter<Self>;
+    type GetConvertedTimestamp = timestamp::TimeConverter<Self>;
     type AccountStore = System;
     type SessionInterface = Self;
     type WeightInfo = pallet_cash::weights::SubstrateWeight<Runtime>;

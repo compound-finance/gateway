@@ -2488,6 +2488,7 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
+ "timestamp",
 ]
 
 [[package]]
@@ -4814,6 +4815,7 @@ dependencies = [
  "sp-std",
  "sp-tracing",
  "test-env-log",
+ "timestamp",
  "tiny-keccak 2.0.2",
  "trx-request",
  "types-derive",
@@ -4880,6 +4882,7 @@ dependencies = [
  "sp-inherents",
  "sp-io",
  "sp-runtime",
+ "timestamp",
  "tiny-keccak 2.0.2",
  "trx-request",
  "types-derive",
@@ -8871,6 +8874,17 @@ dependencies = [
  "quote 1.0.9",
  "standback",
  "syn 1.0.73",
+]
+
+[[package]]
+name = "timestamp"
+version = "0.1.0"
+dependencies = [
+ "frame-system",
+ "our-std",
+ "pallet-timestamp",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

@@ -35,6 +35,13 @@ pub mod opaque {
     pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
 }
 
+pub const MILLISECS_PER_BLOCK: types::Timestamp = 6000;
+pub const SLOT_DURATION: types::Timestamp = MILLISECS_PER_BLOCK;
+
+frame_support::parameter_types! {
+    pub const MinimumPeriod: types::Timestamp = SLOT_DURATION / 2;
+}
+
 frame_support::construct_runtime!(
     pub enum Test where
     Block = Block,
@@ -42,6 +49,7 @@ frame_support::construct_runtime!(
     UncheckedExtrinsic = UncheckedExtrinsic,
     {
         System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
         Oracle: pallet_oracle::{Pallet, Call, Config, Storage, Event, Inherent},
     }
 );
@@ -85,6 +93,14 @@ impl frame_system::offchain::SigningTypes for Test {
 impl Config for Test {
     type Event = Event;
     type Call = Call;
+    type GetConvertedTimestamp = timestamp::TimeConverter<Self>;
+}
+impl pallet_timestamp::Config for Test {
+    /// A timestamp: milliseconds since the unix epoch.
+    type Moment = types::Timestamp;
+    type OnTimestampSet = ();
+    type MinimumPeriod = MinimumPeriod;
+    type WeightInfo = ();
 }
 
 impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
