@@ -165,6 +165,7 @@ pub fn initialize_storage_with_blocks(genesis_blocks: Vec<ChainBlock>) {
     CashModule::initialize_validators(vec![val_a(), val_b()]);
     CashModule::initialize_starports(vec![ChainStarport::Eth(ETH_STARPORT_ADDR)]);
     CashModule::initialize_genesis_blocks(genesis_blocks);
+    <pallet_timestamp::Pallet<Test>>::set_timestamp(500);
 }
 
 pub fn validator_a_sign(data: &[u8]) -> Result<ChainSignature, Reason> {
