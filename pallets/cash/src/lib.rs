@@ -765,6 +765,11 @@ impl<T: Config> Module<T> {
     /// Initializes the set of supported assets from a config value.
     fn initialize_assets(assets: Vec<AssetInfo>) {
         for asset in assets {
+            log!("Adding assset {:?}", asset);
+            assert!(
+                SupportedAssets::get(&asset.asset) == None,
+                "Duplicate asset in genesis config"
+            );
             SupportedAssets::insert(&asset.asset, asset);
         }
     }
