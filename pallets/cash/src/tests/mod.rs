@@ -1,7 +1,7 @@
 #![allow(non_upper_case_globals)]
 
 pub use codec::{Decode, Encode};
-use ethereum_client::encode_block_hex;
+use ethereum_client::{encode_block_hash_hex, encode_block_number_hex};
 pub use frame_support::{assert_err, assert_ok, dispatch::DispatchError};
 pub use hex_literal::hex;
 pub use our_std::convert::TryInto;
@@ -209,28 +209,59 @@ pub fn all_receive_chain_blocks(blocks: &ChainBlocks) -> Result<(), DispatchErro
     b_receive_chain_blocks(blocks)
 }
 
+pub fn gen_mock_call_block_by_hash_fail(
+    block: &ethereum_client::EthereumBlock,
+) -> testing::PendingRequest {
+    let block_hash_str = encode_block_hash_hex(block.hash);
+    let get_block_params: Vec<serde_json::Value> =
+        vec![block_hash_str.clone().into(), false.into()];
+    let get_block_data = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "eth_getBlockByHash",
+        "params": get_block_params,
+        "id": 1
+    });
+    let get_block_result = serde_json::json!({
+        "error": {
+            "message": "fail",
+            "code": 1,
+        }
+    });
+
+    testing::PendingRequest {
+        method: "POST".into(),
+        uri: "https://ropsten-eth.compound.finance".into(),
+        headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+        body: serde_json::to_vec(&get_block_data).unwrap(),
+        response: Some(serde_json::to_vec(&get_block_result).unwrap()),
+        sent: true,
+        ..Default::default()
+    }
+}
+
 pub fn gen_mock_calls(
     blocks: &[ethereum_client::EthereumBlock],
     starport_address: <Ethereum as Chain>::Address,
 ) -> Vec<testing::PendingRequest> {
     let mut calls = vec![];
     for block in blocks {
-        let block_str = encode_block_hex(block.number);
-        let block_hash_str = format!("0x{}", hex::encode(block.hash));
+        let block_num_str = encode_block_number_hex(block.number);
+        let block_hash_str = encode_block_hash_hex(block.hash);
 
-        let get_block_params: Vec<serde_json::Value> = vec![block_str.clone().into(), false.into()];
+        let get_block_params: Vec<serde_json::Value> =
+            vec![block_num_str.clone().into(), false.into()];
 
         let get_block_data = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "eth_getBlockByNumber",
             "params": get_block_params,
-            "id":1
+            "id": 1
         });
 
         let get_block_result = serde_json::json!({
             "result": {
-                "hash":format!("0x{}", hex::encode(&block.hash[..])),
-                "number": block_str,
+                "hash": format!("0x{}", hex::encode(&block.hash[..])),
+                "number": block_num_str,
                 "parentHash": format!("0x{}", hex::encode(&block.parent_hash[..])),
             }
         });
@@ -254,7 +285,7 @@ pub fn gen_mock_calls(
             "jsonrpc": "2.0",
             "method": "eth_getLogs",
             "params": get_logs_params,
-            "id":1
+            "id": 1
         });
 
         let get_logs = testing::PendingRequest {
