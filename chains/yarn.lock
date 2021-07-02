@@ -2971,7 +2971,7 @@ component-emitter@^1.2.1:
 
 "compound-config@https://github.com/compound-finance/compound-config.git":
   version "0.0.0"
-  resolved "https://github.com/compound-finance/compound-config.git#c17a69aa035dc7eb242e3977df9dd0c7f298a6c6"
+  resolved "https://github.com/compound-finance/compound-config.git#bc588c1559fa60aa96e6df9ecebd1b20d4cc6dae"
 
 concat-map@0.0.1:
   version "0.0.1"

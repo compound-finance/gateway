@@ -49,6 +49,12 @@ And to upgrade to m4:
 yarn script deploy:m4 -n ropsten 0x2079A734292094702f4D7D64A59e980c20652Cae
 ```
 
+Goerli:
+
+```
+yarn script deploy -n goerli 0xE4a892476d366A1AE55bf53463a367892E885cEE 300
+```
+
 ## Console
 
 You can connect to a repl for deployed contracts with the following command:

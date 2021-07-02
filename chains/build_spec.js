@@ -6,9 +6,10 @@ const getopts = require('getopts');
 const chalk = require('chalk');
 const types = require('@polkadot/types');
 const Contract = require('web3-eth-contract');
+const os = require('os');
 
 function getEthProvider(network) {
-  if (['ropsten'].includes(network)) {
+  if (['ropsten', 'goerli'].includes(network)) {
     return `https://${network}-eth.compound.finance`;
   } else {
     throw new Error(`Unknown or unsupported eth network: "${network}"`);
@@ -65,9 +66,8 @@ async function buildGateway() {
   return await exec("cargo", ["build", "--release"]);
 }
 
-async function execGateway(args) {
+async function execGateway(bin, args) {
   console.log(chalk.yellow(`Running Gateway with args ${JSON.stringify(args)}...`));
-  let bin = process.env['CHAIN_BIN'] || path.join(__dirname, '..', 'target', 'release', 'gateway');
   return await exec(bin, args);
 }
 
@@ -204,13 +204,21 @@ async function setReporters(chainSpec, chainConfig, opts) {
 }
 
 async function buildSpec(opts) {
-  if (!opts.skip_build) {
-    await buildGateway();
+  let bin;
+  if (opts.release) {
+    bin = path.join(__dirname, '..', 'releases', opts.release, `gateway-${os.platform()}-${os.arch()}`);
+  } else {
+    if (!opts.skip_build) {
+      await buildGateway();
+    }
+
+    bin = process.env['CHAIN_BIN'] || path.join(__dirname, '..', 'target', 'release', 'gateway');
   }
+
   let chain = opts.chain;
 
   let chainConfig = JSON.parse(await readFile(chain, 'chain-config.json'));
-  let chainSpec = JSON.parse(await execGateway(["build-spec", "--disable-default-bootnode", "--chain", chainConfig.base_chain]));
+  let chainSpec = JSON.parse(await execGateway(bin, ["build-spec", "--disable-default-bootnode", "--chain", chainConfig.base_chain]));
   await setAuthorities(chainSpec, chainConfig, opts);
   await setAssetInfo(chainSpec, chainConfig, opts);
   await setReporters(chainSpec, chainConfig, opts);
@@ -223,7 +231,7 @@ async function buildSpec(opts) {
   let chainSpecFile = await writeFile(chain, 'chain-spec.json', JSON.stringify(chainSpec, null, 2));
 
   // Next, build raw spec
-  let raw = JSON.parse(await execGateway(["build-spec", "--chain", chainSpecFile, "--raw", "--disable-default-bootnode"]));
+  let raw = JSON.parse(await execGateway(bin, ["build-spec", "--chain", chainSpecFile, "--raw", "--disable-default-bootnode"]));
 
   // Next, build
   await writeFile(chain, 'chain-spec-raw.json', JSON.stringify(raw, null, 2));
@@ -232,7 +240,8 @@ async function buildSpec(opts) {
 const options = getopts(process.argv.slice(2), {
   alias: {
     chain: "c",
-    skip_build: "s"
+    skip_build: "s",
+    release: "r"
   }
 });
 
