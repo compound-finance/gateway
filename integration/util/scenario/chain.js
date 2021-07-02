@@ -53,8 +53,13 @@ class Chain {
 
   // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingChainBlockEvent` event
   async waitForEthProcessEvent(pallet, eventName, onFinalize = true, autoMine = true) {
+    return this.waitForL1ProcessEvent(this.ctx.eth, pallet, eventName, onFinalize, autoMine)
+  }
+
+  // Similar to wait for event, but will reject if it sees a `cash:FailedProcessingChainBlockEvent` event
+  async waitForL1ProcessEvent(layer1, pallet, eventName, onFinalize = true, autoMine = true) {
     if (autoMine && this.ctx.__blockTime() === null) {
-      await this.ctx.eth.mine(100); // Just mine some blocks if we're waiting on an eth event to make things move
+      await layer1.mine(100); // Just mine some blocks if we're waiting on an eth event to make things move
     }
     return this.waitForEvent(pallet, eventName, { failureEvent: ['cash', 'FailedProcessingChainBlockEvent'] });
   }
@@ -148,13 +153,17 @@ class Chain {
     }
     let noticeStatePending = noticeState.asPending;
 
-    let signaturePairs = noticeStatePending.signature_pairs;
+    let signaturePairs = noticeStatePending.signature_pairs.toJSON();
 
-    if (!signaturePairs.asEth) {
-      throw new Error("Unexpected signature pairs (not eth)");
+    if (!signaturePairs.eth && !signaturePairs.matic) {
+      throw new Error("Unexpected signature pairs (not eth or matic)");
     }
-    let signaturePairsEth = signaturePairs.asEth;
-    let pairs = signaturePairsEth.map((k) => k);
+    let pairs;
+    if (signaturePairs.eth) {
+      pairs = signaturePairs.eth;
+    } else if (signaturePairs.matic) {
+      pairs = signaturePairs.matic;
+    }
 
     if (pairs.length < opts.signatures) {
       if (opts.retries > 0) {

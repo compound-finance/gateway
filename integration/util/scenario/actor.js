@@ -16,7 +16,7 @@ class Actor {
   }
 
   chain() {
-    return this.ctx.chains.find(this.chainName());
+    return this.ctx.chains.find(this.chainName);
   }
 
   show() {
@@ -32,11 +32,13 @@ class Actor {
   }
 
   toChainAccount() {
-    return { Eth: this.ethAddress() };
+    const returnValue = {};
+    returnValue[this.chain().nameAsPascalCase()] = this.ethAddress();
+    return returnValue;
   }
 
   toTrxArg() {
-    return `Eth:${this.ethAddress()}`;
+    return `${this.chain().nameAsPascalCase()}:${this.ethAddress()}`;
   }
 
   declareInfo() {
@@ -59,14 +61,16 @@ class Actor {
   }
 
   async sign(data) {
-    return await this.ctx.eth.sign(data, this);
+    return await this.chain().sign(data, this);
   }
 
   async signWithNonce(data) {
     let currentNonce = await this.nonce();
     let signature = await this.sign(`${currentNonce}:${data}`);
+    const signatureData = {};
+    signatureData[this.chain().nameAsPascalCase()] = [this.ethAddress(), signature];
 
-    return [ { Eth: [ this.ethAddress(), signature ] }, currentNonce ];
+    return [ signatureData, currentNonce ];
   }
 
   async runTrxRequest(trxReq) {
@@ -77,7 +81,7 @@ class Actor {
   }
 
   async ethBalance() {
-    return await this.ctx.eth.ethBalance(this);
+    return await this.chain().ethBalance(this);
   }
 
   async tokenBalance(tokenLookup) {
@@ -138,19 +142,28 @@ class Actor {
     return Number(balance) / 1e6;
   }
 
-  async liquidityForToken(token) {
+  async balanceForToken(token) {
     let assetBalance = await this.ctx.getApi().query.cash.assetBalances(token.toChainAsset(), this.toChainAccount());
+    if (assetBalance === 0) {
+      return 0;
+    }
+
+    return token.toTokenAmount(assetBalance.toBigInt());
+  }
+
+  async liquidityForToken(token) {
+    let assetBalance = await this.balanceForToken(token);
     let price = await token.getPrice();
     let liquidityFactor = await token.getLiquidityFactor();
 
-    if (assetBalance == 0) {
+    if (assetBalance === 0) {
       return 0;
     } else if (assetBalance > 0) {
       // AssetBalance • LiquidityFactor_Asset • Price_Asset
-      return token.toTokenAmount(assetBalance.toBigInt()) * price * liquidityFactor;
+      return assetBalance * price * liquidityFactor;
     } else {
       // AssetBalance ÷ LiquidityFactor_Asset • Price_Asset
-      return token.toTokenAmount(assetBalance.toBigInt()) * price / liquidityFactor;
+      return assetBalance * price / liquidityFactor;
     }
   }
 
@@ -167,10 +180,12 @@ class Actor {
     };
 
     return await this.declare("lock", [amount, asset], async () => {
-      let tx = await asset.chain().starport.lock(this, amount, asset);
+      const chain = asset.chain();
+      let tx = await chain.starport.lock(this, amount, asset);
+
       let event;
       if (opts.awaitEvent) {
-        event = await this.ctx.chain.waitForEthProcessEvent('cash', asset.lockEventName());
+        event = await this.ctx.chain.waitForL1ProcessEvent(chain, 'cash', asset.lockEventName());
       }
       return {
         event,
@@ -284,6 +299,10 @@ function actorInfoMap(keyring) {
     darlene: {
       chainName: 'matic',
       key_uri: '//Darlene'
+    },
+    edward: {
+      chainName: 'matic',
+      key_uri: '//Edward'
     }
   };
 }

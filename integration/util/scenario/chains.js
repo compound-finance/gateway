@@ -47,9 +47,22 @@ class Chain {
     await this.blockInfo.update();
   }
 
+  nameAsPascalCase() {
+    return this.name.charAt(0).toUpperCase() + this.name.slice(1);
+  }
+
+  nameAsUpperCase() {
+    return this.name.toUpperCase();
+  }
+
+  // first 3 chars then a : - for matic - MAT:
+  nameAsStarportHeader() {
+    return this.nameAsUpperCase().substring(0, 3) + ":"
+  }
+
   genesisBlock() {
     return {
-      Eth: {
+      [this.nameAsPascalCase()]: {
         hash: this.blockInfo.hash,
         parentHash: this.blockInfo.parentHash,
         number: this.blockInfo.number,
@@ -57,6 +70,19 @@ class Chain {
       }
     };
   }
+
+  genesisBlockForChainSpec() {
+    const block = this.genesisBlock();
+    const name = this.nameAsPascalCase();
+    return {
+      [name]: {
+        hash: block[name].hash.slice(2),
+        parent_hash: block[name].parentHash.slice(2),
+        number: block[name].number,
+      }
+    };
+  }
+
 
   sendAsync(method, params = []) {
     let id = this.asyncId++;
@@ -232,6 +258,10 @@ class Chains {
       deployment.chain.starport = deployment.starport;
       deployment.chain.cashToken = deployment.cashToken;
     });
+  }
+
+  genesisBlocksForChainSpec() {
+    return this.all().map(chain => chain.genesisBlockForChainSpec());
   }
 }
 

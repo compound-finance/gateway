@@ -79,6 +79,27 @@ pub fn risk_adjusted_value<T: Config>(
 
             _ => Ok(Quantity::new(0, USD)),
         },
+        ChainBlockEvent::Matic(_block_num, eth_event) => match eth_event {
+            EthereumEvent::Lock { asset, amount, .. } => {
+                let quantity = get_quantity::<T>(ChainAsset::Matic(*asset), *amount)?;
+                let usd_quantity = get_value::<T>(quantity)?;
+                debug!("matic lock detected usd_quantity={:?}", usd_quantity);
+                Ok(usd_quantity.decay(elapsed_blocks)?)
+            }
+
+            EthereumEvent::LockCash { principal, .. } => {
+                let quantity = get_cash_quantity::<T>(CashPrincipalAmount(*principal))?;
+                let usd_quantity = get_value::<T>(quantity)?;
+                Ok(usd_quantity.decay(elapsed_blocks)?)
+            }
+
+            EthereumEvent::ExecuteProposal { .. } => {
+                let usd_quantity = get_value::<T>(INGRESS_LARGE)?;
+                Ok(usd_quantity.decay(elapsed_blocks)?)
+            }
+
+            _ => Ok(Quantity::new(0, USD)),
+        },
     }
 }
 
@@ -86,15 +107,23 @@ pub fn risk_adjusted_value<T: Config>(
 pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     let deadline = Duration::from_millis(120_000);
     let mut lock = StorageLock::<Time>::with_deadline(b"cash::track_chain_events", deadline);
-    let result = match lock.try_lock() {
-        Ok(_guard) => {
-            // Note: chains could be parallelized
-            track_chain_events_on::<T>(ChainId::Eth)
-        }
+    // note that drop will release the lock at the end of this function
+    lock.try_lock().map_err(|_| Reason::WorkerBusy)?;
+    // Note: chains could be parallelized
+    track_chain_events_on::<T>(ChainId::Eth)?;
+    // note: here we check that the starport is available before tracking events as we do not want
+    // an unavailable starport to be an "error" in this situation we just consider that as matic
+    // being "not yet enabled" or "feature switched off"
+    if is_starport_available::<T>(ChainId::Matic) {
+        track_chain_events_on::<T>(ChainId::Matic)?;
+    }
 
-        _ => Err(Reason::WorkerBusy),
-    };
-    result
+    Ok(())
+}
+
+/// Detect if a starport is available for the given chain_id. This is useful for feature
+fn is_starport_available<T: Config>(chain_id: ChainId) -> bool {
+    get_starport::<T>(chain_id).is_ok()
 }
 
 /// Perform the next step of tracking events from an underlying chain.
@@ -308,12 +337,14 @@ pub fn formulate_reorg<T: Config>(
                 .into_iter()
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
+                    ChainBlock::Matic(block) => Some(block),
                 })
                 .collect(),
             forward_blocks: drawrof_blocks
                 .into_iter()
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
+                    ChainBlock::Matic(block) => Some(block),
                 })
                 .collect_rev(),
         }),
@@ -604,6 +635,7 @@ mod tests {
                         new_chain.iter().map(|x| x.hash).collect::<Vec<_>>()
                     );
                 }
+                _ => unreachable!(),
             }
         });
     }
@@ -699,6 +731,7 @@ mod tests {
                         new_chain.iter().map(|x| x.hash).collect::<Vec<_>>()
                     );
                 }
+                _ => unreachable!(),
             }
         });
     }

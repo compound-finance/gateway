@@ -16,22 +16,25 @@ pub enum MaxAmount {
     Max,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Chain {
     Gate,
     Eth,
+    Matic,
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Asset {
     Cash,
     Eth([u8; 20]),
+    Matic([u8; 20]),
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Account {
     Gate([u8; 32]),
     Eth([u8; 20]),
+    Matic([u8; 20]),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -74,6 +77,7 @@ fn parse_chain<'a>(chain: &'a str) -> Result<Chain, ParseError<'a>> {
     match chain {
         "Gate" => Ok(Chain::Gate),
         "Eth" => Ok(Chain::Eth),
+        "Matic" => Ok(Chain::Matic),
         _ => Err(ParseError::InvalidChain(chain)),
     }
 }
@@ -92,24 +96,33 @@ fn parse_gate_address<'a>(account: &'a str) -> Result<[u8; 32], ParseError<'a>> 
     }
 }
 
-fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
+fn parse_eth_like_address<'a>(account: &'a str, chain: Chain) -> Result<[u8; 20], ParseError<'a>> {
     if account.len() < 2 || &account[0..2] != "0x" {
-        Err(ParseError::InvalidChainAccount(Chain::Eth))?;
+        Err(ParseError::InvalidChainAccount(chain))?;
     }
 
     let account_vec: Vec<u8> =
-        hex::decode(&account[2..]).map_err(|_| ParseError::InvalidChainAccount(Chain::Eth))?;
+        hex::decode(&account[2..]).map_err(|_| ParseError::InvalidChainAccount(chain))?;
     let chain_account: [u8; 20] = account_vec
         .try_into()
-        .map_err(|_| ParseError::InvalidChainAccount(Chain::Eth))?;
+        .map_err(|_| ParseError::InvalidChainAccount(chain))?;
 
     Ok(chain_account)
+}
+
+fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
+    parse_eth_like_address(account, Chain::Eth)
+}
+
+fn parse_matic_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
+    parse_eth_like_address(account, Chain::Matic)
 }
 
 fn parse_chain_account<'a>(chain: Chain, address: &'a str) -> Result<Account, ParseError<'a>> {
     match chain {
         Chain::Gate => Ok(Account::Gate(parse_gate_address(address)?)),
         Chain::Eth => Ok(Account::Eth(parse_eth_address(address)?)),
+        Chain::Matic => Ok(Account::Matic(parse_matic_address(address)?)),
     }
 }
 
@@ -117,6 +130,7 @@ fn parse_chain_asset<'a>(chain: Chain, address: &'a str) -> Result<Asset, ParseE
     match chain {
         Chain::Gate => Err(ParseError::InvalidAsset),
         Chain::Eth => Ok(Asset::Eth(parse_eth_address(address)?)),
+        Chain::Matic => Ok(Asset::Matic(parse_matic_address(address)?)),
     }
 }
 

@@ -71,6 +71,7 @@ pub mod trx_req;
 pub mod types;
 
 pub mod weights;
+use ethereum_client::EthereumBlock;
 pub use weights::WeightInfo;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -514,6 +515,47 @@ fn get_exec_req_weights<T: Config>(request: Vec<u8>) -> frame_support::weights::
     }
 }
 
+fn get_chain_reorg_weights_eth_like<T: Config>(
+    reorg: &ChainReorg,
+    signature: &ChainSignature,
+    forward_blocks: &Vec<EthereumBlock>,
+    reverse_blocks: &Vec<EthereumBlock>,
+    chain_id: ChainId,
+) -> Result<frame_support::weights::Weight, Reason> {
+    let forward_event_count: u64 = forward_blocks
+        .iter()
+        .fold(0usize, |acc, x| acc.checked_add(x.events.len()).unwrap())
+        .try_into()
+        .unwrap();
+    let reverse_event_count: u64 = reverse_blocks
+        .iter()
+        .fold(0usize, |acc, x| acc.checked_add(x.events.len()).unwrap())
+        .try_into()
+        .unwrap();
+    let event_count = forward_event_count + reverse_event_count;
+
+    if let Some(prior) = PendingChainReorgs::get(chain_id)
+        .iter_mut()
+        .find(|r| r.reorg == *reorg)
+    {
+        let validator = core::recover_validator::<T>(&reorg.encode(), *signature)?;
+        // if reorg would get applied, just estimate gas by counting the number of reorged events
+        if prior.would_have_enough_support(&prior.support, &validator) {
+            let avg_weight = <T as Config>::WeightInfo::exec_trx_request_extract();
+            // TODO: only count forward weight if we have passed than min_event_blocks
+            Ok(event_count * avg_weight)
+        } else {
+            Ok(<T as Config>::WeightInfo::receive_chain_reorg_pending(
+                event_count.try_into().unwrap(),
+            ))
+        }
+    } else {
+        Ok(<T as Config>::WeightInfo::receive_chain_reorg_pending(
+            event_count.try_into().unwrap(),
+        ))
+    }
+}
+
 fn get_chain_reorg_weights<T: Config>(
     reorg: &ChainReorg,
     signature: &ChainSignature,
@@ -524,40 +566,25 @@ fn get_chain_reorg_weights<T: Config>(
             to_hash: _,
             forward_blocks,
             reverse_blocks,
-        } => {
-            let forward_event_count: u64 = forward_blocks
-                .iter()
-                .fold(0usize, |acc, x| acc.checked_add(x.events.len()).unwrap())
-                .try_into()
-                .unwrap();
-            let reverse_event_count: u64 = reverse_blocks
-                .iter()
-                .fold(0usize, |acc, x| acc.checked_add(x.events.len()).unwrap())
-                .try_into()
-                .unwrap();
-            let event_count = forward_event_count + reverse_event_count;
-
-            if let Some(prior) = PendingChainReorgs::get(ChainId::Eth)
-                .iter_mut()
-                .find(|r| r.reorg == *reorg)
-            {
-                let validator = core::recover_validator::<T>(&reorg.encode(), *signature)?;
-                // if reorg would get applied, just estimate gas by counting the number of reorged events
-                if prior.would_have_enough_support(&prior.support, &validator) {
-                    let avg_weight = <T as Config>::WeightInfo::exec_trx_request_extract();
-                    // TODO: only count forward weight if we have passed than min_event_blocks
-                    Ok(event_count * avg_weight)
-                } else {
-                    Ok(<T as Config>::WeightInfo::receive_chain_reorg_pending(
-                        event_count.try_into().unwrap(),
-                    ))
-                }
-            } else {
-                Ok(<T as Config>::WeightInfo::receive_chain_reorg_pending(
-                    event_count.try_into().unwrap(),
-                ))
-            }
-        }
+        } => get_chain_reorg_weights_eth_like::<T>(
+            reorg,
+            signature,
+            forward_blocks,
+            reverse_blocks,
+            ChainId::Eth,
+        ),
+        ChainReorg::Matic {
+            from_hash: _,
+            to_hash: _,
+            forward_blocks,
+            reverse_blocks,
+        } => get_chain_reorg_weights_eth_like::<T>(
+            reorg,
+            signature,
+            forward_blocks,
+            reverse_blocks,
+            ChainId::Matic,
+        ),
     }
 }
 

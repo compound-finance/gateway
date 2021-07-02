@@ -12,6 +12,16 @@ function getNoticeChainId(notice) {
     return 'Eth';
   } else if (notice.Notice.changeAuthorityNotice && notice.Notice.changeAuthorityNotice.eth) {
     return 'Eth';
+  } else if (notice.Notice.extractionNotice && notice.Notice.extractionNotice.matic) {
+    return 'Matic';
+  } else if (notice.Notice.cashExtractionNotice && notice.Notice.cashExtractionNotice.matic) {
+    return 'Matic';
+  } else if (notice.Notice.futureYieldNotice && notice.Notice.futureYieldNotice.matic) {
+    return 'Matic';
+  } else if (notice.Notice.setSupplyCapNotice && notice.Notice.setSupplyCapNotice.matic) {
+    return 'Matic';
+  } else if (notice.Notice.changeAuthorityNotice && notice.Notice.changeAuthorityNotice.matic) {
+    return 'Matic';
   } else {
     throw `Unknown notice chain in getNoticeChainId: ${JSON.stringify(notice.Notice)}`;
   }

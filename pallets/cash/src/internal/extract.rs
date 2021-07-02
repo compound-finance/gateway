@@ -9,6 +9,7 @@ use crate::{
     Config, Event, GlobalCashIndex, Module,
 };
 use frame_support::storage::StorageValue;
+use our_std::log;
 
 pub fn extract_internal<T: Config>(
     asset: AssetInfo,
@@ -16,6 +17,7 @@ pub fn extract_internal<T: Config>(
     recipient: ChainAccount,
     quantity: AssetQuantity,
 ) -> Result<(), Reason> {
+    log!("extract_cash_principal_internal");
     require_min_tx_value!(internal::assets::get_value::<T>(quantity)?);
 
     CashPipeline::new()

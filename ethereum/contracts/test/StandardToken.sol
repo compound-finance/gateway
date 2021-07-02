@@ -132,7 +132,7 @@ contract FaucetToken is StandardToken {
  * @title Fee ERC20 token
  */
 contract FeeToken is BaseToken {
-    uint256 constant FEE_BPS = 500; // 50%
+    uint256 constant FEE_BPS = 500; // 5%
 
     constructor(uint256 _initialAmount, string memory _tokenName, uint8 _decimalUnits, string memory _tokenSymbol) BaseToken(_initialAmount, _tokenName, _decimalUnits, _tokenSymbol) {
     }

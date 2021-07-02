@@ -1,5 +1,5 @@
 use crate::{
-    chains::{Chain, ChainAccount, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId, Ethereum},
+    chains::{ChainAccount, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId},
     debug,
     reason::Reason,
 };
@@ -15,6 +15,8 @@ pub enum EventError {
     NoStarportAddress,
     EthereumClientError(EthereumClientError),
     ErrorDecodingHex,
+    PolygonClientError(EthereumClientError),
+    ActionNotSupported,
 }
 
 /// Fetch a block from the underlying chain.
@@ -27,6 +29,9 @@ pub fn fetch_chain_block(
         (ChainId::Gate, _) => Err(Reason::Unreachable),
         (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
             Ok(fetch_eth_block(number, &eth_starport_address).map(ChainBlock::Eth)?)
+        }
+        (ChainId::Matic, ChainAccount::Matic(starport_address)) => {
+            Ok(fetch_matic_block(number, &starport_address).map(ChainBlock::Matic)?)
         }
         (ChainId::Dot, _) => Err(Reason::Unreachable),
         _ => Err(Reason::Unreachable),
@@ -44,6 +49,9 @@ pub fn fetch_chain_blocks(
         (ChainId::Gate, _) => Err(Reason::Unreachable),
         (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
             Ok(fetch_eth_blocks(from, to, &eth_starport_address)?)
+        }
+        (ChainId::Matic, ChainAccount::Matic(starport_address)) => {
+            Ok(fetch_matic_blocks(from, to, &starport_address)?)
         }
         (ChainId::Dot, _) => Err(Reason::Unreachable),
         _ => Err(Reason::Unreachable),
@@ -63,28 +71,84 @@ fn fetch_eth_block(
     Ok(eth_block)
 }
 
+/// Fetch a single block from the Etherum Starport.
+fn fetch_matic_block(
+    number: ChainBlockNumber,
+    starport_address: &[u8; 20],
+) -> Result<EthereumBlock, EventError> {
+    let rpc_url = runtime_interfaces::validator_config_interface::get_matic_rpc_url()
+        .ok_or(EventError::NoRpcUrl)?;
+    let block = ethereum_client::get_block(&rpc_url, starport_address, number)
+        .map_err(EventError::PolygonClientError)?;
+    Ok(block)
+}
+
+/// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
+fn fetch_eth_like_blocks<
+    F: FnMut(ChainBlockNumber, &[u8; 20]) -> Result<EthereumBlock, EventError>,
+    G: FnMut(Vec<EthereumBlock>) -> ChainBlocks,
+>(
+    chain_id: ChainId,
+    from: ChainBlockNumber,
+    to: ChainBlockNumber,
+    starport_address: &[u8; 20],
+    mut fetch_block_fn: F,
+    no_result_error: EventError,
+    mut chain_blocks_fn: G,
+) -> Result<ChainBlocks, EventError> {
+    debug!(
+        "Fetching Blocks chain_id={:?}, from_block={}, to_block={}",
+        chain_id, from, to
+    );
+    let mut acc: Vec<EthereumBlock> = vec![];
+    for block_number in from..to {
+        match fetch_block_fn(block_number, starport_address) {
+            Ok(block) => {
+                acc.push(block);
+            }
+            Err(err) => {
+                if err == no_result_error {
+                    break;
+                }
+                return Err(err);
+            }
+        }
+    }
+    Ok(chain_blocks_fn(acc))
+}
+
 /// Fetch blocks from the Ethereum Starport, return up to `slack` blocks to add to the event queue.
 fn fetch_eth_blocks(
     from: ChainBlockNumber,
     to: ChainBlockNumber,
     eth_starport_address: &[u8; 20],
 ) -> Result<ChainBlocks, EventError> {
-    debug!("Fetching Eth Blocks [{}-{})", from, to);
-    let mut acc: Vec<<Ethereum as Chain>::Block> = vec![];
-    for block_number in from..to {
-        match fetch_eth_block(block_number, eth_starport_address) {
-            Ok(block) => {
-                acc.push(block);
-            }
-            Err(EventError::EthereumClientError(EthereumClientError::NoResult)) => {
-                break; // done
-            }
-            Err(err) => {
-                return Err(err);
-            }
-        }
-    }
-    Ok(ChainBlocks::Eth(acc))
+    fetch_eth_like_blocks(
+        ChainId::Eth,
+        from,
+        to,
+        eth_starport_address,
+        fetch_eth_block,
+        EventError::EthereumClientError(EthereumClientError::NoResult),
+        ChainBlocks::Eth,
+    )
+}
+
+/// Fetch blocks from the Polygon Starport, return up to `slack` blocks to add to the event queue.
+fn fetch_matic_blocks(
+    from: ChainBlockNumber,
+    to: ChainBlockNumber,
+    starport_address: &[u8; 20],
+) -> Result<ChainBlocks, EventError> {
+    fetch_eth_like_blocks(
+        ChainId::Matic,
+        from,
+        to,
+        starport_address,
+        fetch_matic_block,
+        EventError::PolygonClientError(EthereumClientError::NoResult),
+        ChainBlocks::Matic,
+    )
 }
 
 #[cfg(test)]
@@ -127,6 +191,7 @@ mod tests {
                         assert_eq!(actual.number, expected.number);
                     }
                 }
+                _ => panic!("unreachable"),
             }
         });
 

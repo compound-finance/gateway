@@ -312,6 +312,7 @@ pub fn decode_event(topics: Vec<String>, data: String) -> Result<EthereumEvent, 
         .iter()
         .map(|topic| decode_topic(topic).ok_or(EventError::InvalidTopic))
         .collect::<Result<Vec<ethabi::Hash>, _>>()?;
+
     match topic_hashes.first().ok_or(EventError::InvalidTopic)? {
         t if *t == *LOCK_EVENT_TOPIC => {
             let log: ethabi::Log = LOCK_EVENT

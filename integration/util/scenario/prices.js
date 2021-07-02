@@ -21,7 +21,8 @@ class Price {
   async post() {
     this.ctx.log(`Setting price of ${this.key}...`);
     let call = this.ctx.getApi().tx.oracle.postPrice(this.priceInfo.payload, this.priceInfo.signature);
-    let events = await this.ctx.eventTracker.sendAndWaitForEvents(call, { onFinalize: true, rejectOnFailure: false });
+    let events = await this.ctx.eventTracker.sendAndWaitForEvents(call, { onFinalize: true, rejectOnFailure: true });
+    this.ctx.log(`Price posted! ${this.key}...`);
   }
 }
 
@@ -182,7 +183,8 @@ async function buildPrices(pricesInfoHash, tokensInfoHash, ctx) {
     ...pricesInfoHash
   };
   let tokensInfo = await getTokensInfo(tokensInfoHash, ctx);
-  let symbols = tokensInfo.map(([symbol, _]) => symbol.toUpperCase());
+
+  let symbols = tokensInfo.map(([symbol, tokenInfo]) => tokenInfo.price_ticker ? tokenInfo.price_ticker : symbol.toUpperCase());
   let entries = Object.entries(pricesInfo.prices).filter(([k, v]) => k == 'ETH' || symbols.includes(k));
   let runServer = pricesInfo.server;
   let serverPort = pricesInfo.server_port || genPort();

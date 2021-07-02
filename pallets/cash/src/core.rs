@@ -12,7 +12,7 @@ pub use our_std::{
 use crate::{
     chains::{
         self, Chain, ChainAccount, ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents,
-        ChainHash, ChainId, ChainSignature, Ethereum,
+        ChainHash, ChainId, ChainSignature, Ethereum, Polygon,
     },
     internal, log, pipeline,
     portfolio::Portfolio,
@@ -35,6 +35,9 @@ use frame_support::{
     traits::UnfilteredDispatchable,
 };
 use timestamp::GetConvertedTimestamp;
+
+use crate::events::EventError;
+pub use our_std::debug;
 
 // Public helper functions //
 
@@ -217,6 +220,14 @@ pub fn recover_validator<T: Config>(
                 }
             }
         }
+        ChainSignature::Matic(eth_sig) => {
+            let eth_address = <Polygon as Chain>::recover_address(data, eth_sig)?;
+            for (_, validator) in Validators::iter() {
+                if validator.eth_address == eth_address {
+                    return Ok(validator);
+                }
+            }
+        }
 
         _ => {
             // this is a placeholder for future variants, which should be kept minimal
@@ -296,6 +307,57 @@ pub fn apply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Result<
                 result.to_vec(),
             ),
         },
+        ChainBlockEvent::Matic(_block_num, eth_event) => match eth_event {
+            ethereum_client::EthereumEvent::Lock {
+                asset,
+                sender,
+                chain,
+                recipient,
+                amount,
+            } => internal::lock::lock_internal::<T>(
+                internal::assets::get_asset::<T>(ChainAsset::Matic(*asset))?,
+                ChainAccount::Matic(*sender),
+                chains::get_chain_account(chain.to_string(), *recipient)?,
+                internal::assets::get_quantity::<T>(ChainAsset::Matic(*asset), *amount)?,
+            ),
+
+            ethereum_client::EthereumEvent::LockCash {
+                sender,
+                chain,
+                recipient,
+                principal,
+                ..
+            } => internal::lock::lock_cash_principal_internal::<T>(
+                ChainAccount::Matic(*sender),
+                chains::get_chain_account(chain.to_string(), *recipient)?,
+                CashPrincipalAmount(*principal),
+            ),
+
+            ethereum_client::EthereumEvent::ExecuteProposal { .. } => {
+                Err(EventError::ActionNotSupported)?
+            }
+
+            ethereum_client::EthereumEvent::ExecTrxRequest {
+                account,
+                trx_request,
+            } => internal::exec_trx_request::exec_trx_request::<T>(
+                &trx_request[..],
+                ChainAccount::Matic(*account),
+                None,
+            ),
+
+            ethereum_client::EthereumEvent::NoticeInvoked {
+                era_id,
+                era_index,
+                notice_hash,
+                result,
+            } => internal::notices::handle_notice_invoked::<T>(
+                ChainId::Matic,
+                NoticeId(*era_id, *era_index),
+                ChainHash::Matic(*notice_hash),
+                result.to_vec(),
+            ),
+        },
     }
 }
 
@@ -327,6 +389,34 @@ pub fn unapply_chain_event_internal<T: Config>(event: &ChainBlockEvent) -> Resul
                 ..
             } => internal::lock::undo_lock_cash_principal_internal::<T>(
                 ChainAccount::Eth(*sender),
+                chains::get_chain_account(chain.to_string(), *recipient)?,
+                CashPrincipalAmount(*principal),
+            ),
+
+            _ => Ok(()),
+        },
+        ChainBlockEvent::Matic(_block_num, eth_event) => match eth_event {
+            ethereum_client::EthereumEvent::Lock {
+                asset,
+                sender,
+                chain,
+                recipient,
+                amount,
+            } => internal::lock::undo_lock_internal::<T>(
+                internal::assets::get_asset::<T>(ChainAsset::Matic(*asset))?,
+                ChainAccount::Matic(*sender),
+                chains::get_chain_account(chain.to_string(), *recipient)?,
+                internal::assets::get_quantity::<T>(ChainAsset::Matic(*asset), *amount)?,
+            ),
+
+            ethereum_client::EthereumEvent::LockCash {
+                sender,
+                chain,
+                recipient,
+                principal,
+                ..
+            } => internal::lock::undo_lock_cash_principal_internal::<T>(
+                ChainAccount::Matic(*sender),
                 chains::get_chain_account(chain.to_string(), *recipient)?,
                 CashPrincipalAmount(*principal),
             ),

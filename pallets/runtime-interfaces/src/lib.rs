@@ -43,12 +43,14 @@ pub fn initialize_validator_config(map: HashMap<String, String>) {
 
 const ETH_KEY_ID_ENV_VAR: &str = "ETH_KEY_ID";
 const ETH_RPC_URL_ENV_VAR: &str = "ETH_RPC_URL";
+const MATIC_RPC_URL_ENV_VAR: &str = "MATIC_RPC_URL";
 const MINER_ENV_VAR: &str = "MINER";
 const OPF_URL_ENV_VAR: &str = "OPF_URL";
 
 const ETH_KEY_ID_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
 const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
+const MATIC_RPC_URL_DEFAULT: &str = "";
 const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 
 fn validator_config_interface_get_internal(key: &str) -> Option<String> {
@@ -100,6 +102,11 @@ pub trait ValidatorConfigInterface {
     /// Get the Ethereum node RPC URL
     fn get_eth_rpc_url() -> Option<String> {
         validator_config_interface_get_internal(ETH_RPC_URL_ENV_VAR)
+    }
+
+    /// Get the Matic node RPC URL
+    fn get_matic_rpc_url() -> Option<String> {
+        validator_config_interface_get_internal(MATIC_RPC_URL_ENV_VAR)
     }
 
     /// Get the open price feed URLs

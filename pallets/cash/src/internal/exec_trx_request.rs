@@ -62,6 +62,7 @@ pub fn exec_trx_request<T: Config>(
     sender: ChainAccount,
     nonce_opt: Option<Nonce>,
 ) -> Result<(), Reason> {
+    log!("exec_trx_request: {}", request_str);
     // Match TrxReq against known Transaction Requests
     let trx_request = trx_request::parse_request(request_str)?;
 
