@@ -3,6 +3,14 @@
 
 This folder contains information about known Gateway chains and provides the ability to generate chain specs.
 
+## Building a new spec
+
+To build a new spec on <stablenet> with release <m16> from `chains/stablenet/chain-config.json` which will generate `chains/stablenet/chain-spec.json` and `chains/stablenet/chain-spec-raw.json`, run:
+
+```sh
+./build_spec.js -c stablenet -r m16
+```
+
 ## Repl
 
 To connect to a chain via the REPL, run:

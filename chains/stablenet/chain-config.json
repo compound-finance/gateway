@@ -6,7 +6,7 @@
   "validators": [
     {
       "substrate_id": "5H6Wzjt1nQ5aFx5E4FDVnpYDCWb1JHcQSwHgdqUyiiZUdbc9",
-      "eth_address": "0xA051d2543AFC78b082832d6ef495e62Bb86490eb",
+      "eth_address": "0x9687EB285292cbA14a60a0c77dfD36dD95B93889",
       "session_keys": {
         "aura": "5H6Wzjt1nQ5aFx5E4FDVnpYDCWb1JHcQSwHgdqUyiiZUdbc9",
         "grandpa": "5Hc4K1H9QHxAd2zzeRfMveQBECjgEapS6FJdegj3xn9qcteZ"
