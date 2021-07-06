@@ -247,7 +247,7 @@ mod tests {
             let mut s = state.write();
             s.expect_request(
                 testing::PendingRequest {
-                    method: "GET".into(),
+                    method: "POST".into(),
                     uri: "https://mainnet-flow-fetcher/block".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                     body: br#"{"height":34944396}"#.to_vec(),
@@ -257,7 +257,7 @@ mod tests {
             });
             s.expect_request(
                 testing::PendingRequest {
-                    method: "GET".into(),
+                    method: "POST".into(),
                     uri: "https://mainnet-flow-fetcher/events".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                     body: br#"{"topic":"A.c8873a26b148ed14.Starport.Lock","startHeight":34944396,"endHeight":34944396}"#.to_vec(),
@@ -274,21 +274,25 @@ mod tests {
                 "Lock",
             );
             let block = result.unwrap();
-            assert_eq!(
-                block.blockId,
-                "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289"
-            );
-            assert_eq!(
-                block.parentBlockId,
-                "35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d"
-            );
+            let blockId_res: FlowHash =
+                hex::decode("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289")
+                    .unwrap()
+                    .try_into()
+                    .unwrap();
+            let parentBlockId_res: FlowHash =
+                hex::decode("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d")
+                    .unwrap()
+                    .try_into()
+                    .unwrap();
+            assert_eq!(block.blockId, blockId_res);
+            assert_eq!(block.parentBlockId, parentBlockId_res);
             assert_eq!(block.height, 34944396);
 
             assert_eq!(
                 block.events,
                 vec![FlowEvent::Lock {
-                    asset: String::from("FLOW"),
-                    recipient: String::from("fc6346ab93540e97"),
+                    asset: [70, 76, 79, 87, 0, 0, 0, 0], // FLOW asset
+                    recipient: hex::decode("fc6346ab93540e97").unwrap().try_into().unwrap(),
                     amount: 1000000000
                 }]
             );
@@ -304,7 +308,7 @@ mod tests {
         {
             let mut s = state.write();
             s.expect_request(testing::PendingRequest {
-                method: "GET".into(),
+                method: "POST".into(),
                 uri: "https://mainnet-flow-fetcher/latest_block_number".into(),
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                 body: br#"{}"#.to_vec(),
@@ -329,7 +333,7 @@ mod tests {
             let mut s = state.write();
             s.expect_request(
                 testing::PendingRequest {
-                    method: "GET".into(),
+                    method: "POST".into(),
                     uri: "https://mainnet-flow-fetcher/block".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                     body: br#"{"height":34944396}"#.to_vec(),

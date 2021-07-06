@@ -72,8 +72,8 @@ mod tests {
         assert_eq!(
             decode_event(topic, data),
             Ok(FlowEvent::Lock {
-                asset: String::from("FLOW"),
-                recipient: String::from("fc6346ab93540e97"),
+                asset: [70, 76, 79, 87, 0, 0, 0, 0], // "FLOW" asset
+                recipient: hex::decode("fc6346ab93540e97").unwrap().try_into().unwrap(),
                 amount: 1000000000
             })
         )

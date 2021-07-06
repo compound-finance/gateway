@@ -189,6 +189,9 @@ mod tests {
                         assert_eq!(actual.number, expected.number);
                     }
                 }
+                ChainBlocks::Flow(_) => {
+                    assert!(false)
+                }
             }
         });
 
