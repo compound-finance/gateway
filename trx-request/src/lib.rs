@@ -25,13 +25,13 @@ pub enum Chain {
 pub enum Asset {
     Cash,
     Eth([u8; 20]),
-    Flow([u8; 16]),
+    Flow([u8; 8]),
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Account {
     Eth([u8; 20]),
-    Flow([u8; 16]),
+    Flow([u8; 8]),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -91,10 +91,10 @@ fn parse_eth_address<'a>(account: &'a str) -> Result<[u8; 20], ParseError<'a>> {
     Ok(chain_account)
 }
 
-fn parse_flow_address<'a>(account: &'a str) -> Result<[u8; 16], ParseError<'a>> {
+fn parse_flow_address<'a>(account: &'a str) -> Result<[u8; 8], ParseError<'a>> {
     let account_vec: Vec<u8> =
         hex::decode(&account[..]).map_err(|_| ParseError::InvalidChainAccount(Chain::Flow))?;
-    let chain_account: [u8; 16] = account_vec
+    let chain_account: [u8; 8] = account_vec
         .try_into()
         .map_err(|_| ParseError::InvalidChainAccount(Chain::Flow))?;
 

@@ -14,7 +14,7 @@ pub use crate::events::FlowEvent;
 pub type FlowBlockNumber = u64;
 
 #[type_alias]
-pub type FlowHash = [u8; 64];
+pub type FlowHash = [u8; 32];
 
 const FLOW_FETCH_DEADLINE: u64 = 10_000;
 
@@ -22,14 +22,12 @@ const FLOW_FETCH_DEADLINE: u64 = 10_000;
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 #[allow(non_snake_case)]
 pub struct FlowBlock {
-    // XXX TODO check if I need ConstHexForm
     #[serde(with = "ConstHexForm")]
     pub blockId: FlowHash,
-    // pub blockId: [u8; 64],
     #[serde(with = "ConstHexForm")]
     pub parentBlockId: FlowHash,
-    // pub parentBlockId: [u8; 64],
     pub height: FlowBlockNumber,
+    #[serde(skip)]
     pub events: Vec<FlowEvent>,
 }
 
@@ -117,12 +115,11 @@ pub fn send_request(server: &str, path: &str, data: &str) -> Result<String, Flow
 
     debug!("Request {}, with data {}", request_url, data);
 
-    let request = http::Request::get(&request_url);
+    let request = http::Request::post(&request_url, vec![data.to_string()]);
 
     let pending = request
         .deadline(deadline)
         .add_header("Content-Type", "application/json")
-        .body(vec![data.as_bytes()])
         .send()
         .map_err(|_| FlowClientError::HttpIoError)?;
 
@@ -154,8 +151,11 @@ pub fn get_block(
     block_num: FlowBlockNumber,
     topic: &str, // Lock
 ) -> Result<FlowBlock, FlowClientError> {
+    debug!(
+        "flow_starport_address: {:X?}, block_num {:?}, topic {:?}",
+        flow_starport_address, block_num, topic
+    );
     let block_obj = get_block_object(server, block_num)?;
-    debug!("flow_starport_address: {:X?}", flow_starport_address);
     let get_logs_params = serde_json::json!({
         "topic": format!("A.{}.Starport.{}", flow_starport_address, topic),
         "startHeight": block_num,
@@ -193,18 +193,18 @@ pub fn get_block(
     }
 
     Ok(FlowBlock {
-        blockId: block_obj
-            .blockId
-            .ok_or(FlowClientError::DecodeError)?
-            .as_bytes()
+        blockId: hex::decode(block_obj.blockId.ok_or(FlowClientError::DecodeError)?)
+            .map_err(|_| FlowClientError::DecodeError)?
             .try_into()
             .map_err(|_| FlowClientError::DecodeError)?,
-        parentBlockId: block_obj
-            .parentBlockId
-            .ok_or(FlowClientError::DecodeError)?
-            .as_bytes()
-            .try_into()
-            .map_err(|_| FlowClientError::DecodeError)?,
+        parentBlockId: hex::decode(
+            block_obj
+                .parentBlockId
+                .ok_or(FlowClientError::DecodeError)?,
+        )
+        .map_err(|_| FlowClientError::DecodeError)?
+        .try_into()
+        .map_err(|_| FlowClientError::DecodeError)?,
         height: block_obj.height.ok_or(FlowClientError::DecodeError)?,
         events,
     })

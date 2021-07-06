@@ -51,7 +51,7 @@ const ETH_KEY_ID_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
 const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
 const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
-const FLOW_SERVER_URL_DEFAULT: &str = "http://localhost:8089/";
+const FLOW_SERVER_URL_DEFAULT: &str = "http://localhost:8089";
 
 /// The ValidatorConfigInterface is designed to be modified as needed by the validators. This means
 /// that each validator should be modifying the values here. For example, the ETH_KEY_ID is set

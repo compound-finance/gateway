@@ -15,9 +15,9 @@ struct Lock {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types, Serialize, Deserialize)]
 pub enum FlowEvent {
     Lock {
-        asset: [u8; 16],
+        asset: [u8; 8],
         // sender: String,
-        recipient: [u8; 16],
+        recipient: [u8; 8],
         amount: u128,
     }, // NoticeInvoked {
        //     era_id: u32,
@@ -39,16 +39,19 @@ pub fn decode_event(topic: &str, data: &str) -> Result<FlowEvent, EventError> {
             let event_res: serde_json::error::Result<Lock> = serde_json::from_str(&data);
             let event = event_res.map_err(|_| EventError::ErrorParsingData)?;
 
+            let mut asset_res: [u8; 8] = [0; 8];
+            for (i, elem) in event.asset.as_bytes().iter().enumerate() {
+                asset_res[i] = *elem;
+                if i == 7 {
+                    break;
+                }
+            }
+
             Ok(FlowEvent::Lock {
-                asset: event
-                    .asset
-                    .as_bytes()
-                    .try_into()
-                    .map_err(|_| EventError::ErrorParsingData)?,
+                asset: asset_res,
                 // sender: event.sender,
-                recipient: event
-                    .recipient
-                    .as_bytes()
+                recipient: hex::decode(event.recipient)
+                    .map_err(|_| EventError::ErrorParsingData)?
                     .try_into()
                     .map_err(|_| EventError::ErrorParsingData)?,
                 amount: event.amount,

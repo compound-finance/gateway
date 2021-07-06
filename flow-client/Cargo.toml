@@ -8,6 +8,7 @@ edition = '2018'
 
 [dependencies]
 codec = { package = 'parity-scale-codec', version = '2.0.0', default-features = false, features = ['derive'] }
+hex = { version = '0.4.2', default-features = false }
 serde = { version = '1.0.125', features = ['derive'], default-features = false }
 serde_json = { version = '1.0.64', features = ['alloc'], default-features = false }
 sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound'}

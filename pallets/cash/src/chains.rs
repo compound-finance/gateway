@@ -356,6 +356,7 @@ impl FromStr for ChainId {
         match s.to_ascii_uppercase().as_str() {
             "ETH" => Ok(ChainId::Eth),
             "DOT" => Ok(ChainId::Dot),
+            "FLOW" => Ok(ChainId::Flow),
             _ => Err(Reason::BadChainId),
         }
     }
@@ -1082,7 +1083,7 @@ impl Chain for Flow {
     const ID: ChainId = ChainId::Flow;
 
     #[type_alias("Flow__Chain__")]
-    type Address = [u8; 16];
+    type Address = [u8; 8];
 
     #[type_alias("Flow__Chain__")]
     type Amount = u128;
@@ -1097,7 +1098,7 @@ impl Chain for Flow {
     type Timestamp = u64;
 
     #[type_alias("Flow__Chain__")]
-    type Hash = [u8; 64];
+    type Hash = [u8; 32];
 
     #[type_alias("Flow__Chain__")]
     type PublicKey = ();
@@ -1112,7 +1113,7 @@ impl Chain for Flow {
     type Block = FlowBlock;
 
     fn zero_hash() -> Self::Hash {
-        [0u8; 64]
+        [0u8; 32]
     }
 
     fn hash_bytes(_data: &[u8]) -> Self::Hash {
@@ -1138,8 +1139,11 @@ impl Chain for Flow {
         panic!("XXX not implemented");
     }
 
-    fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
-        panic!("XXX not implemented");
+    fn str_to_address(addr: &str) -> Result<Self::Address, Reason> {
+        match gateway_crypto::flow_str_to_address(addr) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadAddress),
+        }
     }
 
     fn address_string(_address: &Self::Address) -> String {
