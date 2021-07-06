@@ -51,3 +51,6 @@ pub const ERROR_WEIGHT: u64 = 100_000_000;
 
 /// The void account from whence miner CASH is transferred out of.
 pub const GATEWAY_VOID: ChainAccount = ChainAccount::Gate([0u8; 32]);
+
+/// The maximum length of a trx request
+pub const MAX_TRX_REQUEST_LEN: usize = 2048;

@@ -74,6 +74,7 @@ pub enum Reason {
     MissingBlock,
     StarportMissing,
     InvalidChainBlock,
+    TrxRequestTooLong,
 }
 
 impl From<Reason> for frame_support::dispatch::DispatchError {
@@ -144,6 +145,7 @@ impl From<Reason> for frame_support::dispatch::DispatchError {
             Reason::MissingBlock => (39, 0, "cannot find expected starport block"),
             Reason::StarportMissing => (40, 0, "starport address not set"),
             Reason::InvalidChainBlock => (41, 0, "invalid chain block"),
+            Reason::TrxRequestTooLong => (42, 0, "the trx request was too long"),
         };
         frame_support::dispatch::DispatchError::Module {
             index,
