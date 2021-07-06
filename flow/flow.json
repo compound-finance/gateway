@@ -1,0 +1,31 @@
+{
+	"emulators": {
+		"default": {
+			"port": 3569,
+			"serviceAccount": "emulator-account"
+		}
+	},
+	"contracts": {
+		"Starport": "./cadence/contracts/Starport.cdc"
+	},
+	"networks": {
+		"emulator": "127.0.0.1:3569",
+		"mainnet": "access.mainnet.nodes.onflow.org:9000",
+		"testnet": "access.devnet.nodes.onflow.org:9000"
+	},
+	"accounts": {
+		"emulator-account": {
+			"address": "f8d6e0586b0a20c7",
+			"keys": "4ee4450749579c24b6e051c4439608e8182ef255fc1fde4aada3c4c7563bc3dc"
+		},
+		"my-testnet-account": {
+			"address": "c8873a26b148ed14",
+			"keys": "3a47b62d3f777b59336f9ff949a79cb5bd4cfdce6a97e70559b267a1efc51b06"
+		}
+	},
+	"deployments": {
+		"testnet": {
+			"my-testnet-account": ["Starport"]
+		}
+	}
+}

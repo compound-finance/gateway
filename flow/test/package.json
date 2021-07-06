@@ -1,0 +1,26 @@
+{
+  "name": "flow",
+  "version": "0.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "init-flow": "flow init",
+    "start-emulator": "flow emulator start -v",
+    "test": "jest",
+    "format": "prettier --write '**/*.{ts,js,css,json,md}'"
+  },
+  "dependencies": {
+    "@babel/core": "^7.12.10",
+    "@babel/preset-env": "^7.12.11",
+    "@onflow/types": "^0.0.4",
+    "babel-jest": "^27.0.6",
+    "elliptic": "^6.5.4",
+    "flow-js-testing": "^0.1.11",
+    "google-protobuf": "^3.14.0",
+    "jest": "^27.0.6",
+    "sha3": "^2.1.4"
+  },
+  "devDependencies": {
+    "prettier": "^2.3.0"
+  }
+}
