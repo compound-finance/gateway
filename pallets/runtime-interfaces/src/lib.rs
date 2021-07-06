@@ -50,7 +50,6 @@ const OPF_URL_ENV_VAR: &str = "OPF_URL";
 const ETH_KEY_ID_DEFAULT: &str = gateway_crypto::ETH_KEY_ID_ENV_VAR_DEV_DEFAULT;
 const MINER_DEFAULT: &str = "Eth:0x0000000000000000000000000000000000000000";
 const ETH_RPC_URL_DEFAULT: &str = "https://ropsten-eth.compound.finance";
-const MATIC_RPC_URL_DEFAULT: &str = "";
 const OPF_URL_DEFAULT: &str = "https://prices.compound.finance/coinbase";
 
 fn validator_config_interface_get_internal(key: &str) -> Option<String> {
@@ -63,7 +62,9 @@ fn validator_config_interface_get_internal(key: &str) -> Option<String> {
     // check config
     if let Ok(config) = VALIDATOR_CONFIG.lock() {
         if let Some(inner) = config.as_ref() {
-            return inner.map.get(key).map(Clone::clone);
+            if let Some(x) = inner.map.get(key) {
+                return Some(x.clone());
+            }
         }
     }
     // try default
@@ -189,4 +190,25 @@ pub trait PriceFeedInterface {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config() {
+        initialize_validator_config(HashMap::from_iter([(
+            MINER_ENV_VAR.to_string(),
+            "my miner".to_string(),
+        )]));
+
+        // supplied value works and overrides
+        let actual_miner = validator_config_interface_get_internal(MINER_ENV_VAR).unwrap();
+        assert_eq!(actual_miner, "my miner".to_string());
+
+        // default value works
+        let actual_eth_key_id =
+            validator_config_interface_get_internal(ETH_KEY_ID_ENV_VAR).unwrap();
+        assert_eq!(actual_eth_key_id, "my_eth_key_id".to_string());
+
+        // nonsense value is none
+        let actual_nonsense = validator_config_interface_get_internal("nonsense");
+        assert!(actual_nonsense.is_none());
+    }
 }
