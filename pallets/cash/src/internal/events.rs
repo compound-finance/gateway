@@ -103,27 +103,33 @@ pub fn risk_adjusted_value<T: Config>(
     }
 }
 
-/// Incrementally perform the next step of tracking events from all the underlying chains.
-pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
-    let deadline = Duration::from_millis(120_000);
-    let mut lock = StorageLock::<Time>::with_deadline(b"cash::track_chain_events", deadline);
-    // note that drop will release the lock at the end of this function
-    lock.try_lock().map_err(|_| Reason::WorkerBusy)?;
-    // Note: chains could be parallelized
-    track_chain_events_on::<T>(ChainId::Eth)?;
-    // note: here we check that the starport is available before tracking events as we do not want
-    // an unavailable starport to be an "error" in this situation we just consider that as matic
-    // being "not yet enabled" or "feature switched off"
-    if is_starport_available::<T>(ChainId::Matic) {
-        track_chain_events_on::<T>(ChainId::Matic)?;
-    }
-
-    Ok(())
+/// Detect if a starport is enabled for the given chain_id.
+/// If a starport isn't available, we consider the chain disabled, instead of erring.
+fn is_starport_enabled<T: Config>(chain_id: ChainId) -> bool {
+    get_starport::<T>(chain_id).is_ok()
 }
 
-/// Detect if a starport is available for the given chain_id. This is useful for feature
-fn is_starport_available<T: Config>(chain_id: ChainId) -> bool {
-    get_starport::<T>(chain_id).is_ok()
+/// Incrementally perform the next step of tracking events from all the underlying chains.
+pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
+    // Note: The way this is written might look pointless, but its very important to the lock
+    //  Do not modify lightly and without discussion / further testing.
+    let deadline = Duration::from_millis(120_000);
+    let mut lock = StorageLock::<Time>::with_deadline(b"cash::track_chain_events", deadline);
+    let result = match lock.try_lock() {
+        Ok(_guard) => {
+            // Note: chains could be parallelized
+            track_chain_events_on::<T>(ChainId::Eth)?;
+
+            if is_starport_enabled::<T>(ChainId::Matic) {
+                track_chain_events_on::<T>(ChainId::Matic)?;
+            }
+
+            Ok(())
+        }
+
+        _ => Err(Reason::WorkerBusy),
+    };
+    result
 }
 
 /// Perform the next step of tracking events from an underlying chain.
