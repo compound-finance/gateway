@@ -1,5 +1,6 @@
 use codec::{Decode, Encode};
-use our_std::{Deserialize, Serialize, RuntimeDebug};
+use our_std::convert::TryInto;
+use our_std::{Deserialize, RuntimeDebug, Serialize};
 
 use types_derive::Types;
 
@@ -14,17 +15,16 @@ struct Lock {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types, Serialize, Deserialize)]
 pub enum FlowEvent {
     Lock {
-        asset: String,
-       // sender: String,
-        recipient: String,
+        asset: [u8; 8],
+        // sender: String,
+        recipient: [u8; 8],
         amount: u128,
-    }
-    // NoticeInvoked {
-    //     era_id: u32,
-    //     era_index: u32,
-    //     notice_hash: [u8; 32],
-    //     result: Vec<u8>,
-    // },
+    }, // NoticeInvoked {
+       //     era_id: u32,
+       //     era_index: u32,
+       //     notice_hash: [u8; 32],
+       //     result: Vec<u8>,
+       // }
 }
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
@@ -38,15 +38,19 @@ pub fn decode_event(topic: &str, data: &str) -> Result<FlowEvent, EventError> {
         "Lock" => {
             let event_res: serde_json::error::Result<Lock> = serde_json::from_str(&data);
             let event = event_res.map_err(|_| EventError::ErrorParsingData)?;
+            let asset_res = gateway_crypto::flow_asset_str_to_address(&event.asset);
 
             Ok(FlowEvent::Lock {
-                asset: event.asset,
+                asset: asset_res.ok_or(EventError::ErrorParsingData)?,
                 // sender: event.sender,
-                recipient: event.recipient,
+                recipient: hex::decode(event.recipient)
+                    .map_err(|_| EventError::ErrorParsingData)?
+                    .try_into()
+                    .map_err(|_| EventError::ErrorParsingData)?,
                 amount: event.amount,
             })
         }
-        _ => Err(EventError::UnknownEventTopic(topic.to_string()))
+        _ => Err(EventError::UnknownEventTopic(topic.to_string())),
     }
 }
 
@@ -61,8 +65,8 @@ mod tests {
         assert_eq!(
             decode_event(topic, data),
             Ok(FlowEvent::Lock {
-                asset: String::from("FLOW"),
-                recipient: String::from("fc6346ab93540e97"),
+                asset: [70, 76, 79, 87, 0, 0, 0, 0], // "FLOW" asset
+                recipient: hex::decode("fc6346ab93540e97").unwrap().try_into().unwrap(),
                 amount: 1000000000
             })
         )

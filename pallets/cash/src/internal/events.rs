@@ -81,16 +81,19 @@ pub fn risk_adjusted_value<T: Config>(
 
             _ => Ok(Quantity::new(0, USD)),
         },
+        _ => return Err(Reason::Unreachable),
     }
 }
 
 /// Incrementally perform the next step of tracking events from all the underlying chains.
 pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
     let mut lock = StorageLock::<Time>::new(b"cash::track_chain_events");
+    // XXX TODO optimize results here
     let result = match lock.try_lock() {
         Ok(_guard) => {
             // Note: chains could be parallelized
-            track_chain_events_on::<T>(ChainId::Eth)
+            track_chain_events_on::<T>(ChainId::Eth);
+            track_chain_events_on::<T>(ChainId::Flow)
         }
 
         _ => Err(Reason::WorkerBusy),
@@ -100,7 +103,9 @@ pub fn track_chain_events<T: Config>() -> Result<(), Reason> {
 
 /// Perform the next step of tracking events from an underlying chain.
 pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason> {
+    debug!("Track chain events on {:?}", chain_id);
     let starport = get_starport::<T>(chain_id)?;
+    debug!("Starport {:?} on {:?}", starport, chain_id);
     let me = get_current_validator::<T>()?;
     let last_block = get_last_block::<T>(chain_id)?;
     let true_block = fetch_chain_block(chain_id, last_block.number(), starport)?;
@@ -325,16 +330,17 @@ pub fn formulate_reorg<T: Config>(
                 .take_while(|b| b.hash() != common_ancestor)
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
+                    ChainBlock::Flow(_) => panic!("unreachable"),
                 })
                 .collect(),
             forward_blocks: drawrof_blocks
                 .into_iter()
                 .filter_map(|b| match b {
                     ChainBlock::Eth(eth_block) => Some(eth_block),
+                    ChainBlock::Flow(_) => panic!("unreachable"),
                 })
                 .collect_rev(),
         }),
-
         _ => return Err(Reason::Unreachable),
     }
 }

@@ -136,6 +136,7 @@ pub fn run() -> sc_cli::Result<()> {
             runtime_interfaces::initialize_validator_config(
                 cli.gateway.eth_key_id.clone(),
                 cli.gateway.eth_rpc_url.clone(),
+                cli.gateway.flow_server_url.clone(),
                 cli.gateway.miner.clone(),
                 cli.gateway.opf_url.clone(),
             );

@@ -36,7 +36,7 @@ func EventsHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Re
 			return
 		}
 
-		if r.Method != "GET" {
+		if r.Method != "POST" {
 			http.Error(w, "Method is not supported.", http.StatusNotFound)
 			return
 		}
@@ -61,14 +61,20 @@ func EventsHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Re
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
+
+		if len(events) == 0 {
+			w.Write([]byte("{\"result\":[]}"))
+			return
+		}
+
 		js, err := json.Marshal(events)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		res := fmt.Sprintf("{\"result\":%s}", js)
 
-		w.Header().Set("Content-Type", "application/json")
+		res := fmt.Sprintf("{\"result\":%s}", js)
 		w.Write([]byte(res))
 	}
 }
@@ -84,7 +90,7 @@ func BlockHandler(flowClient *client.Client) func(http.ResponseWriter, *http.Req
 			return
 		}
 
-		if r.Method != "GET" {
+		if r.Method != "POST" {
 			http.Error(w, "Method is not supported.", http.StatusNotFound)
 			return
 		}
@@ -132,7 +138,7 @@ func LatestBlockNumberHandler(flowClient *client.Client) func(http.ResponseWrite
 			return
 		}
 
-		if r.Method != "GET" {
+		if r.Method != "POST" {
 			http.Error(w, "Method is not supported.", http.StatusNotFound)
 			return
 		}
