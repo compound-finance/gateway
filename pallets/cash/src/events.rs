@@ -1,10 +1,13 @@
 use crate::{
-    chains::{ChainAccount, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId},
+    chains::{
+        Chain, ChainBlock, ChainBlockNumber, ChainBlocks, ChainHash, ChainId, ChainStarport,
+        Ethereum,
+    },
     debug,
     reason::Reason,
 };
 use codec::{Decode, Encode};
-use ethereum_client::{EthereumBlock, EthereumClientError};
+use ethereum_client::{EthereumBlock, EthereumBlockId, EthereumClientError};
 use our_std::RuntimeDebug;
 use types_derive::Types;
 
@@ -19,18 +22,34 @@ pub enum EventError {
     ActionNotSupported,
 }
 
+/// Fetch a block from the underlying chain by hash.
+pub fn fetch_chain_block_by_hash(
+    chain_id: ChainId,
+    hash: ChainHash,
+    starport: ChainStarport,
+) -> Result<ChainBlock, Reason> {
+    match (chain_id, hash, starport) {
+        (ChainId::Gate, _, _) => Err(Reason::Unreachable),
+        (ChainId::Eth, ChainHash::Eth(eth_hash), ChainStarport::Eth(eth_starport_address)) => {
+            Ok(fetch_eth_block_by_hash(eth_hash, &eth_starport_address).map(ChainBlock::Eth)?)
+        }
+        (ChainId::Dot, _, _) => Err(Reason::Unreachable),
+        _ => Err(Reason::Unreachable),
+    }
+}
+
 /// Fetch a block from the underlying chain.
 pub fn fetch_chain_block(
     chain_id: ChainId,
     number: ChainBlockNumber,
-    starport: ChainAccount,
+    starport: ChainStarport,
 ) -> Result<ChainBlock, Reason> {
     match (chain_id, starport) {
         (ChainId::Gate, _) => Err(Reason::Unreachable),
-        (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
+        (ChainId::Eth, ChainStarport::Eth(eth_starport_address)) => {
             Ok(fetch_eth_block(number, &eth_starport_address).map(ChainBlock::Eth)?)
         }
-        (ChainId::Matic, ChainAccount::Matic(starport_address)) => {
+        (ChainId::Matic, ChainStarport::Matic(starport_address)) => {
             Ok(fetch_matic_block(number, &starport_address).map(ChainBlock::Matic)?)
         }
         (ChainId::Dot, _) => Err(Reason::Unreachable),
@@ -43,19 +62,36 @@ pub fn fetch_chain_blocks(
     chain_id: ChainId,
     from: ChainBlockNumber,
     to: ChainBlockNumber,
-    starport: ChainAccount,
+    starport: ChainStarport,
 ) -> Result<ChainBlocks, Reason> {
     match (chain_id, starport) {
         (ChainId::Gate, _) => Err(Reason::Unreachable),
-        (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
+        (ChainId::Eth, ChainStarport::Eth(eth_starport_address)) => {
             Ok(fetch_eth_blocks(from, to, &eth_starport_address)?)
         }
-        (ChainId::Matic, ChainAccount::Matic(starport_address)) => {
+        (ChainId::Matic, ChainStarport::Matic(starport_address)) => {
             Ok(fetch_matic_blocks(from, to, &starport_address)?)
         }
         (ChainId::Dot, _) => Err(Reason::Unreachable),
         _ => Err(Reason::Unreachable),
     }
+}
+
+/// Fetch a single block from the Etherum Starport by hash.
+fn fetch_eth_block_by_hash(
+    hash: <Ethereum as Chain>::Hash,
+    eth_starport_address: &[u8; 20],
+) -> Result<EthereumBlock, EventError> {
+    debug!("Fetching Eth Block {:?}", hash);
+    let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
+        .ok_or(EventError::NoRpcUrl)?;
+    let eth_block = ethereum_client::get_block(
+        &eth_rpc_url,
+        eth_starport_address,
+        EthereumBlockId::Hash(hash),
+    )
+    .map_err(EventError::EthereumClientError)?;
+    Ok(eth_block)
 }
 
 /// Fetch a single block from the Etherum Starport.
@@ -66,20 +102,28 @@ fn fetch_eth_block(
     debug!("Fetching Eth Block {}", number);
     let eth_rpc_url = runtime_interfaces::validator_config_interface::get_eth_rpc_url()
         .ok_or(EventError::NoRpcUrl)?;
-    let eth_block = ethereum_client::get_block(&eth_rpc_url, eth_starport_address, number)
-        .map_err(EventError::EthereumClientError)?;
+    let eth_block = ethereum_client::get_block(
+        &eth_rpc_url,
+        eth_starport_address,
+        EthereumBlockId::Number(number),
+    )
+    .map_err(EventError::EthereumClientError)?;
     Ok(eth_block)
 }
 
 /// Fetch a single block from the Etherum Starport.
 fn fetch_matic_block(
     number: ChainBlockNumber,
-    starport_address: &[u8; 20],
+    matic_starport_address: &[u8; 20],
 ) -> Result<EthereumBlock, EventError> {
-    let rpc_url = runtime_interfaces::validator_config_interface::get_matic_rpc_url()
+    let matic_rpc_url = runtime_interfaces::validator_config_interface::get_matic_rpc_url()
         .ok_or(EventError::NoRpcUrl)?;
-    let block = ethereum_client::get_block(&rpc_url, starport_address, number)
-        .map_err(EventError::PolygonClientError)?;
+    let block = ethereum_client::get_block(
+        &matic_rpc_url,
+        matic_starport_address,
+        EthereumBlockId::Number(number),
+    )
+    .map_err(EventError::PolygonClientError)?;
     Ok(block)
 }
 

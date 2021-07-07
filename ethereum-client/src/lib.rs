@@ -23,6 +23,12 @@ pub type EthereumHash = [u8; 32];
 
 const ETH_FETCH_DEADLINE: u64 = 10_000;
 
+#[derive(Clone, RuntimeDebug)]
+pub enum EthereumBlockId {
+    Hash(EthereumHash),
+    Number(EthereumBlockNumber),
+}
+
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 pub struct EthereumBlock {
@@ -131,9 +137,7 @@ fn deserialize_get_logs_response(response: &str) -> Result<GetLogsResponse, Ethe
     Ok(result.map_err(|_| parse_error(response))?)
 }
 
-fn deserialize_get_block_by_number_response(
-    response: &str,
-) -> Result<BlockResponse, EthereumClientError> {
+fn deserialize_get_block_response(response: &str) -> Result<BlockResponse, EthereumClientError> {
     let result: serde_json::error::Result<BlockResponse> = serde_json::from_str(response);
     Ok(result.map_err(|_| parse_error(response))?)
 }
@@ -145,7 +149,11 @@ fn deserialize_block_number_response(
     Ok(result.map_err(|_| parse_error(response))?)
 }
 
-pub fn encode_block_hex(block_number: EthereumBlockNumber) -> String {
+pub fn encode_block_hash_hex(block_hash: EthereumHash) -> String {
+    format!("0x{}", ::hex::encode(&block_hash))
+}
+
+pub fn encode_block_number_hex(block_number: EthereumBlockNumber) -> String {
     format!("{:#X}", block_number)
 }
 
@@ -197,10 +205,9 @@ pub fn send_rpc(
 pub fn get_block(
     server: &str,
     eth_starport_address: &[u8; 20],
-    block_num: EthereumBlockNumber,
+    block_id: EthereumBlockId,
 ) -> Result<EthereumBlock, EthereumClientError> {
-    let block_str = encode_block_hex(block_num);
-    let block_obj = get_block_object(server, &block_str)?;
+    let block_obj = get_block_object(server, block_id.clone())?;
     let get_logs_params = vec![serde_json::json!({
         "address": format!("0x{}", ::hex::encode(&eth_starport_address[..])),
         "blockHash": &block_obj.hash
@@ -214,12 +221,12 @@ pub fn get_block(
 
     if event_objects.len() > 0 {
         info!(
-            "Found {} events for Eth block {}",
+            "Found {} events for Eth block {:?}",
             event_objects.len(),
-            block_num
+            block_id
         );
     } else {
-        debug!("Found no events for Eth block {}", block_num);
+        debug!("Found no events for Eth block {:?}", block_id);
     }
 
     let mut events = Vec::with_capacity(event_objects.len());
@@ -253,10 +260,22 @@ pub fn get_block(
     })
 }
 
-pub fn get_block_object(server: &str, block_num: &str) -> Result<BlockObject, EthereumClientError> {
-    let params = vec![block_num.into(), false.into()];
-    let response_str: String = send_rpc(server, "eth_getBlockByNumber".into(), params)?;
-    let response = deserialize_get_block_by_number_response(&response_str)?;
+pub fn get_block_object(
+    server: &str,
+    block_id: EthereumBlockId,
+) -> Result<BlockObject, EthereumClientError> {
+    let response_str: String = match block_id {
+        EthereumBlockId::Hash(hash) => {
+            let params = vec![encode_block_hash_hex(hash).into(), false.into()];
+            send_rpc(server, "eth_getBlockByHash".into(), params)?
+        }
+
+        EthereumBlockId::Number(number) => {
+            let params = vec![encode_block_number_hex(number).into(), false.into()];
+            send_rpc(server, "eth_getBlockByNumber".into(), params)?
+        }
+    };
+    let response = deserialize_get_block_response(&response_str)?;
     response.result.ok_or(EthereumClientError::NoResult)
 }
 
@@ -310,7 +329,7 @@ mod tests {
                     58, 39, 86, 85, 88, 106, 4, 159, 232, 96, 190, 134, 125, 16, 205, 174, 47, 252,
                     15, 51,
                 ],
-                1286,
+                EthereumBlockId::Number(1286),
             );
             let block = result.unwrap();
             assert_eq!(
@@ -395,7 +414,10 @@ mod tests {
                 });
         }
         t.execute_with(|| {
-            let result = get_block_object("https://mainnet-eth.compound.finance", "0x506");
+            let result = get_block_object(
+                "https://mainnet-eth.compound.finance",
+                EthereumBlockId::Number(0x506),
+            );
             let block = result.unwrap();
             assert_eq!(block.difficulty, Some("0xb9e274f7969f5".into()));
             assert_eq!(block.number, Some("0x506".into()));
@@ -505,7 +527,15 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_block_hex() {
-        assert_eq!(encode_block_hex(0xb27467 + 1), "0xB27468");
+    fn test_encode_block_hash_hex() {
+        assert_eq!(
+            encode_block_hash_hex([0u8; 32]),
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
+
+    #[test]
+    fn test_encode_block_number_hex() {
+        assert_eq!(encode_block_number_hex(0xb27467 + 1), "0xB27468");
     }
 }

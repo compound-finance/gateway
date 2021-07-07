@@ -2,14 +2,14 @@ use crate::{
     chains::{
         ChainAsset, ChainBlock, ChainBlockEvent, ChainBlockEvents, ChainBlockNumber,
         ChainBlockTally, ChainBlocks, ChainHash, ChainId, ChainReorg, ChainReorgTally,
-        ChainSignature,
+        ChainSignature, ChainStarport,
     },
     core::{
         self, get_current_validator, get_event_queue, get_first_block, get_last_block,
         get_starport, get_validator_set, recover_validator, validator_sign,
     },
     debug, error,
-    events::{fetch_chain_block, fetch_chain_blocks},
+    events::{fetch_chain_block, fetch_chain_block_by_hash, fetch_chain_blocks},
     internal::assets::{get_cash_quantity, get_quantity, get_value},
     log,
     params::{INGRESS_LARGE, INGRESS_QUOTA, INGRESS_SLACK, MAX_EVENT_BLOCKS, MIN_EVENT_BLOCKS},
@@ -283,12 +283,19 @@ pub fn memorize_chain_blocks<T: Config>(blocks: &ChainBlocks) -> Result<(), Reas
 }
 
 /// Walk backwards through the locally stored blocks, in order to formulate a reorg path.
-pub fn recall_chain_block<T: Config>(hash: ChainHash) -> Result<ChainBlock, Reason> {
+pub fn recall_chain_block<T: Config>(
+    chain_id: ChainId,
+    hash: ChainHash,
+    starport: ChainStarport,
+) -> Result<ChainBlock, Reason> {
     let key = format!("cash::memorize_chain_blocks::{}", hash);
     let krf = StorageValueRef::persistent(key.as_bytes());
     match krf.get::<ChainBlock>() {
         Some(Some(block)) => Ok(block),
-        _ => Err(Reason::MissingBlock),
+        _ => match fetch_chain_block_by_hash(chain_id, hash, starport) {
+            Ok(block) => Ok(block),
+            Err(_) => Err(Reason::MissingBlock),
+        },
     }
 }
 
@@ -318,7 +325,8 @@ pub fn formulate_reorg<T: Config>(
             .number()
             .checked_sub(1)
             .ok_or(MathError::Underflow)?;
-        reverse_block_next = recall_chain_block::<T>(reverse_block_next.parent_hash())?;
+        reverse_block_next =
+            recall_chain_block::<T>(chain_id, reverse_block_next.parent_hash(), starport)?;
         drawrof_block_next = fetch_chain_block(chain_id, next_block_number, starport)?;
 
         reverse_blocks.push(reverse_block_next.clone());
@@ -681,7 +689,8 @@ mod tests {
         let true_block = new_chain.last().unwrap().clone();
 
         let fetched_blocks = new_chain[7..8].iter().rev().cloned().collect::<Vec<_>>();
-        let calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
+        let mut calls = gen_mock_calls(&fetched_blocks, ETH_STARPORT_ADDR);
+        calls.push(gen_mock_call_block_by_hash_fail(&old_chain[7]));
         let (mut t, _, _) = new_test_ext_with_http_calls(calls);
 
         t.execute_with(|| {
