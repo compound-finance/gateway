@@ -44,6 +44,10 @@ pub fn is_minimally_valid_trx_request<T: Config>(
     signature: ChainAccountSignature,
     nonce: Nonce,
 ) -> Result<(ChainAccount, Nonce), Reason> {
+    if request.len() > crate::params::MAX_TRX_REQUEST_LEN {
+        return Err(Reason::TrxRequestTooLong);
+    }
+
     // Basic request validity checks - valid symbols and parsable request
     let request_str: &str = str::from_utf8(&request[..]).map_err(|_| Reason::InvalidUTF8)?;
     trx_request::parse_request(request_str)?;
@@ -245,6 +249,17 @@ mod tests {
         types::*,
         *,
     };
+
+    fn get_empty_signature() -> ChainAccountSignature {
+        ChainAccountSignature::Eth([0u8; 20], [0u8; 65])
+    }
+
+    #[test]
+    fn test_is_minimally_valid_trx_request_fails_when_too_long() {
+        let request = [0; crate::params::MAX_TRX_REQUEST_LEN + 1].into();
+        let result = is_minimally_valid_trx_request::<Test>(request, get_empty_signature(), 0);
+        assert_eq!(result, Err(Reason::TrxRequestTooLong));
+    }
 
     #[test]
     fn exec_trx_request_extract_cash_principal_internal() {
