@@ -109,10 +109,7 @@ pub fn track_chain_events_on<T: Config>(chain_id: ChainId) -> Result<(), Reason>
     let me = get_current_validator::<T>()?;
     let last_block = get_last_block::<T>(chain_id)?;
     let true_block = fetch_chain_block(chain_id, last_block.number(), starport)?;
-    debug!("Last block {:?} on {:?}", last_block, chain_id);
-    debug!("True block {:?} on {:?}", true_block, chain_id);
     if last_block.hash() == true_block.hash() {
-        println!("Inside submitting block for {:?}", chain_id);
         let pending_blocks = PendingChainBlocks::get(chain_id);
         let event_queue = get_event_queue::<T>(chain_id)?;
         let slack = queue_slack(&event_queue) as u64;

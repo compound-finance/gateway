@@ -38,17 +38,10 @@ pub fn decode_event(topic: &str, data: &str) -> Result<FlowEvent, EventError> {
         "Lock" => {
             let event_res: serde_json::error::Result<Lock> = serde_json::from_str(&data);
             let event = event_res.map_err(|_| EventError::ErrorParsingData)?;
-
-            let mut asset_res: [u8; 8] = [0; 8];
-            for (i, elem) in event.asset.as_bytes().iter().enumerate() {
-                asset_res[i] = *elem;
-                if i == 7 {
-                    break;
-                }
-            }
+            let asset_res = gateway_crypto::flow_asset_str_to_address(&event.asset);
 
             Ok(FlowEvent::Lock {
-                asset: asset_res,
+                asset: asset_res.ok_or(EventError::ErrorParsingData)?,
                 // sender: event.sender,
                 recipient: hex::decode(event.recipient)
                     .map_err(|_| EventError::ErrorParsingData)?

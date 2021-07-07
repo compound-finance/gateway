@@ -8,7 +8,7 @@ types_json="./types.json"
 
 cp "$types_json" "$types_json.bak"
 
-projects=("gateway" "pallet-cash" "pallet-oracle" "ethereum-client" "gateway-crypto")
+projects=("gateway" "pallet-cash" "pallet-oracle" "ethereum-client" "gateway-crypto" "flow-client")
 
 set -x
 

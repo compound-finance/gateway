@@ -44,7 +44,7 @@ impl ChainId {
             ChainId::Gate => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Err(Reason::NotImplemented),
-            ChainId::Flow => Ok(ChainAsset::Flow(Flow::str_to_address(addr)?)),
+            ChainId::Flow => Ok(ChainAsset::Flow(Flow::asset_str_to_address(addr)?)),
         }
     }
 
@@ -799,6 +799,7 @@ pub trait Chain {
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
     fn signer_address() -> Result<Self::Address, Reason>;
     fn str_to_address(addr: &str) -> Result<Self::Address, Reason>;
+    fn asset_str_to_address(addr: &str) -> Result<Self::Address, Reason>;
     fn address_string(address: &Self::Address) -> String;
     fn str_to_hash(hash: &str) -> Result<Self::Hash, Reason>;
     fn hash_string(hash: &Self::Hash) -> String;
@@ -882,6 +883,10 @@ impl Chain for Gateway {
     }
 
     fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn asset_str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
@@ -986,6 +991,11 @@ impl Chain for Ethereum {
         }
     }
 
+    // No need for this method, `str_to_address` is used for th asset
+    fn asset_str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
     fn address_string(address: &Self::Address) -> String {
         gateway_crypto::eth_address_string(address)
     }
@@ -1066,6 +1076,10 @@ impl Chain for Polkadot {
         panic!("XXX not implemented");
     }
 
+    fn asset_str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
     fn address_string(_address: &Self::Address) -> String {
         panic!("XXX not implemented");
     }
@@ -1140,7 +1154,14 @@ impl Chain for Flow {
     }
 
     fn str_to_address(addr: &str) -> Result<Self::Address, Reason> {
-        match gateway_crypto::flow_str_to_address(addr) {
+        match gateway_crypto::flow_addr_str_to_address(addr) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadAddress),
+        }
+    }
+
+    fn asset_str_to_address(addr: &str) -> Result<Self::Address, Reason> {
+        match gateway_crypto::flow_asset_str_to_address(addr) {
             Some(s) => Ok(s),
             None => Err(Reason::BadAddress),
         }

@@ -335,12 +335,42 @@
     "amount": "Ethereum__Chain__Amount"
   },
   "Factor": "Uint",
-  "Flow__Chain__Address": "[u8; 16]",
+  "FlowBlock": {
+    "blockId": "FlowHash",
+    "parentBlockId": "FlowHash",
+    "height": "FlowBlockNumber",
+    "events": "Vec<FlowEvent>"
+  },
+  "FlowBlockNumber": "u64",
+  "FlowClientError": {
+    "_enum": {
+      "DecodeError": "",
+      "HttpIoError": "",
+      "HttpTimeout": "",
+      "HttpErrorCode": "u16",
+      "InvalidUTF8": "",
+      "JsonParseError": "",
+      "NoResult": "",
+      "BadResponse": ""
+    }
+  },
+  "FlowEvent": {
+    "_enum": {
+      "Lock": "FlowEventLock"
+    }
+  },
+  "FlowEventLock": {
+    "asset": "[u8; 8]",
+    "recipient": "[u8; 8]",
+    "amount": "u128"
+  },
+  "FlowHash": "[u8; 32]",
+  "Flow__Chain__Address": "[u8; 8]",
   "Flow__Chain__Amount": "u128",
   "Flow__Chain__Block": "FlowBlock",
   "Flow__Chain__CashIndex": "u128",
   "Flow__Chain__Event": "FlowEvent",
-  "Flow__Chain__Hash": "[u8; 64]",
+  "Flow__Chain__Hash": "[u8; 32]",
   "Flow__Chain__PublicKey": "()",
   "Flow__Chain__Rate": "u128",
   "Flow__Chain__Signature": "()",
@@ -392,6 +422,11 @@
   },
   "Keys": "SessionKeys",
   "LiquidityFactor": "Factor",
+  "Lock": {
+    "asset": "String",
+    "recipient": "String",
+    "amount": "u128"
+  },
   "LookupSource": "MultiAddress",
   "MathError": {
     "_enum": {

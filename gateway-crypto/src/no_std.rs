@@ -199,13 +199,27 @@ pub fn eth_hash_string(eth_hash: &[u8; 32]) -> String {
     format!("0x{}", hex::encode(eth_hash))
 }
 
-pub fn flow_str_to_address(address_str: &str) -> Option<[u8; 8]> {
+pub fn flow_addr_str_to_address(address_str: &str) -> Option<[u8; 8]> {
     if address_str.len() == 18 && &address_str[0..2] == "0x" {
         if let Ok(bytes) = hex::decode(&address_str[2..18]) {
             if let Ok(flow_address) = bytes.try_into() {
                 return Some(flow_address);
             }
         }
+    }
+    return None;
+}
+
+pub fn flow_asset_str_to_address(asset_str: &str) -> Option<[u8; 8]> {
+    if asset_str.len() <= 8 {
+        let mut flow_asset: [u8; 8] = [0; 8];
+        for (i, elem) in asset_str.as_bytes().iter().enumerate() {
+            flow_asset[i] = *elem;
+            if i == 7 {
+                break;
+            }
+        }
+        return Some(flow_asset);
     }
     return None;
 }

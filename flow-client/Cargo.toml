@@ -9,6 +9,7 @@ edition = '2018'
 [dependencies]
 codec = { package = 'parity-scale-codec', version = '2.0.0', default-features = false, features = ['derive'] }
 hex = { version = '0.4.2', default-features = false }
+hex-buffer-serde = { version = "0.3.0", default-features = false, features = ['alloc', 'const_len'] }
 serde = { version = '1.0.125', features = ['derive'], default-features = false }
 serde_json = { version = '1.0.64', features = ['alloc'], default-features = false }
 sp-io = { default-features = false, features = ['disable_oom', 'disable_panic_handler'], git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound'}
@@ -16,11 +17,9 @@ sp-core = { default-features = false, git = 'https://github.com/compound-finance
 sp-runtime = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 sp-runtime-interface = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
 sp-std = { default-features = false, git = 'https://github.com/compound-finance/substrate', branch = 'jflatow/compound' }
-hex-buffer-serde = { version = "0.3.0", default-features = false, features = ['alloc', 'const_len'] }
-
 our-std = { path = '../our-std', default-features = false }
-
 types-derive = { path = '../types-derive' }
+gateway-crypto = { path = '../gateway-crypto', default-features = false }
 
 [features]
 default = ['std']
@@ -34,5 +33,6 @@ std = [
     'sp-runtime-interface/std',
     'sp-std/std',
     'our-std/std',
+    'gateway-crypto/std',
 ]
 runtime-debug = ['our-std/runtime-debug']

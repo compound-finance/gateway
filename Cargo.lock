@@ -1918,6 +1918,7 @@ dependencies = [
 name = "flow-client"
 version = "0.1.0"
 dependencies = [
+ "gateway-crypto",
  "hex",
  "hex-buffer-serde",
  "our-std",
