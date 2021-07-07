@@ -39,7 +39,6 @@ mod tests {
         Notices, ValidatorKeys,
     };
     use frame_support::storage::{IterableStorageDoubleMap, StorageDoubleMap, StorageMap};
-    use mock::opaque::MockSessionKeys;
 
     #[test]
     fn test_change_validators() {
@@ -60,7 +59,7 @@ mod tests {
             };
             let val_keyses = vec![val_keys];
             let val_account = ChainAccount::Gate(substrate_id.clone().into());
-            let session_keys = MockSessionKeys { dummy: 1u64.into() };
+            let session_keys = opaque::MockSessionKeys { dummy: 1u64.into() };
 
             // Min balance needed for account existence, to set session keys
             let min_amount = MIN_PRINCIPAL_GATE.amount_withdrawable().unwrap();
@@ -122,7 +121,7 @@ mod tests {
             let mut events_iter = System::events().into_iter();
             let new_account_event = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::frame_system(SysEvent::NewAccount(substrate_id)),
+                mocks::Event::frame_system(SysEvent::NewAccount(substrate_id)),
                 new_account_event.event
             );
             let _locked_cash_event = events_iter.next().unwrap();
@@ -130,7 +129,7 @@ mod tests {
             // Check emitted `ChangeValidators` event
             let change_validators_event = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::ChangeValidators(val_keyses.clone())),
+                mocks::Event::pallet_cash(crate::Event::ChangeValidators(val_keyses.clone())),
                 change_validators_event.event
             );
 
@@ -138,7 +137,7 @@ mod tests {
             let notice_event = events_iter.next().unwrap();
             let expected_notice_encoded = expected_notice.encode_notice();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Notice(
+                mocks::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice.clone(),
                     expected_notice_encoded

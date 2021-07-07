@@ -12,7 +12,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 trx-request = { path = '../../../trx-request', default-features = false }
-pallet-cash = { path = ".." }
+pallet-cash = { path = "..", features = ["std", "mocks"] }
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -29,7 +29,3 @@ name = "trx"
 path = "fuzz_targets/trx.rs"
 test = false
 doc = false
-
-[features]
-default = ["mocks"]
-mocks = []

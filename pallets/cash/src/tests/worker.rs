@@ -69,7 +69,7 @@ fn test_offchain_worker() {
 
         assert_eq!(ex1.signature, None);
 
-        if let mock::Call::Cash(crate::Call::receive_chain_blocks(blocks, _signature)) = ex1.call {
+        if let mocks::Call::Cash(crate::Call::receive_chain_blocks(blocks, _signature)) = ex1.call {
             assert_eq!(blocks.chain_id(), ChainId::Eth);
             assert_eq!(blocks.len(), 2);
             match blocks {

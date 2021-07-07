@@ -59,7 +59,7 @@ mod tests {
             let set_supply_cap_event = events_post.into_iter().next().unwrap();
 
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::AssetModified(new_asset_info)),
+                mocks::Event::pallet_cash(crate::Event::AssetModified(new_asset_info)),
                 set_supply_cap_event.event
             );
 

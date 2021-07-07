@@ -70,7 +70,7 @@ mod tests {
             let allowed_next_code_hash_event = events_post.into_iter().next().unwrap();
 
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::AllowedNextCodeHash([1u8; 32])),
+                mocks::Event::pallet_cash(crate::Event::AllowedNextCodeHash([1u8; 32])),
                 allowed_next_code_hash_event.event
             );
         });
@@ -110,7 +110,7 @@ mod tests {
             // Check emitted `AttemptedSetCodeByHash` event
             let attempted_set_code_event = events_post.into_iter().last().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::AttemptedSetCodeByHash(hash, Ok(()))),
+                mocks::Event::pallet_cash(crate::Event::AttemptedSetCodeByHash(hash, Ok(()))),
                 attempted_set_code_event.event
             );
         });

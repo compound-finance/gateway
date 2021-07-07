@@ -205,11 +205,11 @@ mod tests {
             let _transfer_cash_event_2 = events_iter.next().unwrap();
             let miner_paid_event_2 = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::MinerPaid(miner, CashPrincipalAmount(0))),
+                mocks::Event::pallet_cash(crate::Event::MinerPaid(miner, CashPrincipalAmount(0))),
                 miner_paid_event_1.event
             );
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::MinerPaid(miner, shares)),
+                mocks::Event::pallet_cash(crate::Event::MinerPaid(miner, shares)),
                 miner_paid_event_2.event
             );
         });

@@ -69,7 +69,7 @@ pub fn transfer_cash_principal_internal<T: Config>(
 mod tests {
     use super::*;
     use crate::{
-        tests::{assets::*, common::*, mock::*},
+        tests::{assets::*, common::*, *},
         types::*,
         *,
     };

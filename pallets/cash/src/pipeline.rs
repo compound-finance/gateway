@@ -718,7 +718,7 @@ mod tests {
     use super::*;
     use crate::{
         chains::*,
-        tests::{assert_ok, assets::*, common::*, mock::*},
+        tests::{assert_ok, assets::*, common::*, *},
         types::*,
     };
     use our_std::convert::TryInto;

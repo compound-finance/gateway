@@ -143,7 +143,7 @@ pub fn liquidate_cash_collateral_internal<T: Config>(
 mod tests {
     use super::*;
     use crate::{
-        tests::{assert_ok, assets::*, common::*, mock::*},
+        tests::{assert_ok, assets::*, common::*, *},
         types::*,
         *,
     };

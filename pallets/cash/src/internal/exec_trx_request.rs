@@ -239,7 +239,6 @@ mod tests {
     use crate::{
         chains::*,
         reason::TrxReqParseError,
-        tests::mock::*,
         tests::{common::*, *},
         types::*,
         *,
@@ -294,7 +293,7 @@ mod tests {
             let notice_event = events_iter.next().unwrap();
             let expected_notice_encoded = expected_notice.encode_notice();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Notice(
+                mocks::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice.clone(),
                     expected_notice_encoded
@@ -306,7 +305,7 @@ mod tests {
             let extract_cash_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::ExtractCash(
+                mocks::Event::pallet_cash(crate::Event::ExtractCash(
                     account,
                     ChainAccount::Eth([1; 20]),
                     index
@@ -368,7 +367,7 @@ mod tests {
             let notice_event = events_iter.next().unwrap();
             let expected_notice_encoded = expected_notice.encode_notice();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Notice(
+                mocks::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice.clone(),
                     expected_notice_encoded
@@ -380,7 +379,7 @@ mod tests {
             let extract_cash_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::ExtractCash(
+                mocks::Event::pallet_cash(crate::Event::ExtractCash(
                     account,
                     ChainAccount::Eth([1; 20]),
                     index
@@ -447,7 +446,7 @@ mod tests {
             let notice_event = events_iter.next().unwrap();
             let expected_notice_encoded = expected_notice.encode_notice();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Notice(
+                mocks::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice.clone(),
                     expected_notice_encoded
@@ -458,7 +457,7 @@ mod tests {
             // Check emitted `Extract` event
             let extract_event = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Extract(
+                mocks::Event::pallet_cash(crate::Event::Extract(
                     asset,
                     account,
                     ChainAccount::Eth([1; 20]),
@@ -513,7 +512,7 @@ mod tests {
             let miner_paid_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Transfer(
+                mocks::Event::pallet_cash(crate::Event::Transfer(
                     asset,
                     account,
                     ChainAccount::Eth([1; 20]),
@@ -523,7 +522,7 @@ mod tests {
             );
             // Check emitted `TransferCash` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCash(
+                mocks::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap(),
@@ -533,7 +532,7 @@ mod tests {
             );
             // Check emitted `MinerPaid` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::MinerPaid(
+                mocks::Event::pallet_cash(crate::Event::MinerPaid(
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap()
                 )),
@@ -578,7 +577,7 @@ mod tests {
             let miner_paid_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCash(
+                mocks::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     ChainAccount::Eth([1; 20]),
                     index
@@ -590,7 +589,7 @@ mod tests {
             );
             // Check emitted `TransferCash` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCash(
+                mocks::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap(),
@@ -600,7 +599,7 @@ mod tests {
             );
             // Check emitted `MinerPaid` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::MinerPaid(
+                mocks::Event::pallet_cash(crate::Event::MinerPaid(
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap()
                 )),
@@ -644,7 +643,7 @@ mod tests {
             let transfer_cash_fee_event = events_iter.next().unwrap();
             let index = GlobalCashIndex::get();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCash(
+                mocks::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     ChainAccount::Eth([1; 20]),
                     index
@@ -656,7 +655,7 @@ mod tests {
             );
             // Check emitted `TransferCash` event
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::TransferCash(
+                mocks::Event::pallet_cash(crate::Event::TransferCash(
                     account,
                     miner,
                     index.cash_principal_amount(TRANSFER_FEE).unwrap(),
@@ -831,7 +830,7 @@ mod tests {
             let liquidate_event = System::events().into_iter().next().unwrap();
             assert_eq!(
                 //[asset, liquidator, borrower, amount]
-                mock::Event::pallet_cash(crate::Event::LiquidateCashCollateral(
+                mocks::Event::pallet_cash(crate::Event::LiquidateCashCollateral(
                     eth_asset,
                     liquidator_account,
                     borrower_account,
@@ -916,7 +915,7 @@ mod tests {
             let index = GlobalCashIndex::get();
             let liquidate_event = System::events().into_iter().next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::LiquidateCash(
+                mocks::Event::pallet_cash(crate::Event::LiquidateCash(
                     eth_asset,
                     liquidator_account,
                     borrower_account,
@@ -1065,7 +1064,7 @@ mod tests {
             // Check emitted `Liquidate` event
             let liquidate_event = System::events().into_iter().next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Liquidate(
+                mocks::Event::pallet_cash(crate::Event::Liquidate(
                     wbtc_asset,
                     eth_asset,
                     liquidator_account,

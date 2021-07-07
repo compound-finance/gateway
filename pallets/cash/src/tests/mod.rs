@@ -11,16 +11,14 @@ use sp_core::offchain::testing;
 
 pub mod assets;
 pub mod common;
-pub mod mock;
 pub mod protocol;
 pub mod testdata;
 pub mod worker;
 
 pub use assets::*;
-pub use mock::*;
 
 pub use crate::{
-    chains::*, core::*, factor::*, notices::*, params::*, rates::*, reason::*, symbol::*, types::*,
+    chains::*, core::*, factor::*, mocks::*, notices::*, params::*, rates::*, reason::*, symbol::*, types::*,
     *,
 };
 

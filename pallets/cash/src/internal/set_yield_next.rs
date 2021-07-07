@@ -144,14 +144,14 @@ mod tests {
             let mut events_iter = System::events().into_iter();
             let yield_next_event = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::SetYieldNext(APR(100), 86400500)),
+                mocks::Event::pallet_cash(crate::Event::SetYieldNext(APR(100), 86400500)),
                 yield_next_event.event
             );
             // Check emitted `Notice` event
             let notice_event = events_iter.next().unwrap();
             let expected_notice_encoded = expected_notice.encode_notice();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Notice(
+                mocks::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice.clone(),
                     expected_notice_encoded

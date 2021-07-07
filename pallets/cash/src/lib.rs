@@ -78,8 +78,10 @@ pub use weights::WeightInfo;
 #[cfg(feature = "runtime-benchmarks")]
 pub mod benchmarking;
 
-#[cfg_attr(test, feature = "mocks")]
-#[cfg(feature = "mocks")]
+#[cfg(any(test, feature = "mocks"))]
+pub mod mocks;
+
+#[cfg(test)]
 mod tests;
 
 /// Type for linking sessions to validators.

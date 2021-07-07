@@ -103,8 +103,9 @@ pub fn get_assets<T: Config>() -> Result<Vec<AssetInfo>, Reason> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        mocks,
         rates::*,
-        tests::{assert_ok, assets::*, common::*, mock::*, *},
+        tests::{assert_ok, assets::*, common::*, *},
         types::*,
         *,
     };
@@ -177,7 +178,7 @@ mod tests {
             let events_post: Vec<_> = System::events().into_iter().collect();
             let asset_modified_event = events_post.into_iter().next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::AssetModified(eth)),
+                mocks::Event::pallet_cash(crate::Event::AssetModified(eth)),
                 asset_modified_event.event
             );
         })

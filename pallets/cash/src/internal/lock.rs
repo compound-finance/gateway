@@ -163,7 +163,7 @@ mod tests {
             let index = GlobalCashIndex::get();
             let locked_cash_event = System::events().into_iter().next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::LockedCash(
+                mocks::Event::pallet_cash(crate::Event::LockedCash(
                     GEOFF,
                     JARED,
                     once_principal_amount,
@@ -199,7 +199,7 @@ mod tests {
             let locked_cash_event = events_post.into_iter().next().unwrap();
 
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::LockedCash(
+                mocks::Event::pallet_cash(crate::Event::LockedCash(
                     GEOFF,
                     JARED,
                     once_principal_amount,
@@ -236,7 +236,7 @@ mod tests {
             let mut events_iter = System::events().into_iter();
             let jared_locked_cash_event = events_iter.next().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::LockedCash(
+                mocks::Event::pallet_cash(crate::Event::LockedCash(
                     jared,
                     jared,
                     lock_principal,
@@ -262,7 +262,7 @@ mod tests {
             // Check emitted `LockedCash` event
             let geoff_locked_cash_event = System::events().into_iter().last().unwrap();
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::LockedCash(
+                mocks::Event::pallet_cash(crate::Event::LockedCash(
                     geoff,
                     geoff,
                     lock_principal,

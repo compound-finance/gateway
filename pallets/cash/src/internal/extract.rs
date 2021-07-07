@@ -237,7 +237,7 @@ mod tests {
             assert_eq!((recipient, vec![expected_notice_id]), account_notice);
 
             assert_eq!(
-                mock::Event::pallet_cash(crate::Event::Notice(
+                mocks::Event::pallet_cash(crate::Event::Notice(
                     expected_notice_id,
                     expected_notice,
                     expected_notice_encoded

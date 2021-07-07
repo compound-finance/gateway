@@ -144,7 +144,7 @@ pub fn set_miner<T: Config>(miner: ChainAccount) {
 mod tests {
     use super::*;
     use crate::{
-        tests::{mock::*, *},
+        tests::*,
         *,
     };
 
