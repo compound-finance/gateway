@@ -58,6 +58,7 @@ test-env-log = "*"
 
 [features]
 default = ['std']
+mocks = []
 std = [
     'codec/std',
     'serde/std',

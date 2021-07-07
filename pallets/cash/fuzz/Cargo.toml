@@ -11,6 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+trx-request = { path = '../../../trx-request', default-features = false }
 pallet-cash = { path = ".." }
 
 # Prevent this from interfering with workspaces
@@ -22,3 +23,13 @@ name = "chain_account_from_str_fuzz"
 path = "fuzz_targets/chain_account_from_str_fuzz.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "trx"
+path = "fuzz_targets/trx.rs"
+test = false
+doc = false
+
+[features]
+default = ["mocks"]
+mocks = []
