@@ -262,7 +262,7 @@ Note: this is *only* necessary if you are deploying a new chain, the chain spec 
 The WASM blob in the chain spec should be updated via:
 
 ```
-$ CHAIN_BIN=target/<MILESTONE TAG>/gateway-<PLATFORM> chains/build_spec.js -s -c testnet
+$ CHAIN_BIN=releases/<MILESTONE TAG>/gateway-<PLATFORM> chains/build_spec.js -s -c testnet
 ```
 
 Where `<PLATFORM>` is your local platform used to name the binary build.
