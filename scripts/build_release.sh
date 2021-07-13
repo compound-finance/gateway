@@ -12,7 +12,7 @@ if [ -z "$version" ]; then
 	exit 1
 fi
 
-echo "*** Building release $version ***"
+echo "*** Building release $version on $machine ***"
 
 cd $(dirname ${BASH_SOURCE[0]})/..
 
