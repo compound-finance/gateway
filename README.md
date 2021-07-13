@@ -266,7 +266,7 @@ Create a tag and push to this repo:
 
 ```sh
 $ git tag -a <MILESTONE TAG> <OPTIONAL COMMIT HASH>
-$ git push origin <MILESTON TAG>
+$ git push origin <MILESTONE TAG>
 ```
 
 ### Manual Release Process
