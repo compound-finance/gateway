@@ -239,21 +239,10 @@ A scenario test should be written to show that things work as expected after the
 The goal is to not break things on release.
 
 Releases should be cut from the `develop` (default) branch on [Github](https://github.com/compound-finance/gateway).
-For now, here's the manual process we follow for cutting releases:
 
 ### Bump Spec Version
 
 First increment the spec version in `runtime/src/lib.rs`.
-
-### Build Release Artifacts
-
-Build the release artifacts using the included script:
-
-```
-$ scripts/build_release.sh <MILESTONE TAG>
-```
-
-Where `<MILESTONE TAG>` should be a sequentially increasing counter beginning with `m`, followed by the spec version, e.g. `m7`, `m8`, `m9`.
 
 ### Update Chain Spec
 
@@ -267,7 +256,34 @@ $ CHAIN_BIN=target/<MILESTONE TAG>/gateway-<PLATFORM> chains/build_spec.js -s -c
 
 Where `<PLATFORM>` is your local platform used to name the binary build.
 
-### Upload Release Artifacts
+### Using Github Workflows Release Process (Easier -- Recommended)
+
+Github actions have been created to respond to git tags that are pushed to the repo that begin with `m`, followed by the spec version, e.g. `m3`.
+
+This process will create a draft/prerelease that can be modified and published on github once ready.
+
+Create a tag and push to this repo:
+
+```sh
+$ git tag -a <MILESTONE TAG> <OPTIONAL COMMIT HASH>
+$ git push origin <MILESTON TAG>
+```
+
+### Manual Release Process
+
+Cutting a release can also be accomplished manually by following the steps below.
+
+#### Build Release Artifacts
+
+Build the release artifacts using the included script:
+
+```
+$ scripts/build_release.sh <MILESTONE TAG>
+```
+
+Where `<MILESTONE TAG>` should be a sequentially increasing counter beginning with `m`, followed by the spec version, e.g. `m7`, `m8`, `m9`.
+
+#### Upload Release Artifacts
 
 The changes above should be committed to the `develop` branch and included in the version that is tagged in the repository below.
 
