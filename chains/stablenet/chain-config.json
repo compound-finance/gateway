@@ -1,15 +1,15 @@
 {
-  "eth_network": "ropsten",
+  "eth_network": "goerli",
   "base_chain": "testnet",
-  "websocket": "wss://alice.compound.cash",
-  "rpc": "https://brr-rpc.compound.cash",
+  "websocket": "wss://sarge.compound.cash",
+  "rpc": "http://sarge-rpc.compound.cash:5000",
   "validators": [
     {
-      "substrate_id": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-      "eth_address": "0x55413a2d4908d130c908ccf2f298b235bacd427a",
+      "substrate_id": "5H6Wzjt1nQ5aFx5E4FDVnpYDCWb1JHcQSwHgdqUyiiZUdbc9",
+      "eth_address": "0x9687EB285292cbA14a60a0c77dfD36dD95B93889",
       "session_keys": {
-        "aura": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-        "grandpa": "5FA9nQDVg267DEd8m1ZypXLBnvN7SFxYwV7ndqSYGiN9TTpu"
+        "aura": "5H6Wzjt1nQ5aFx5E4FDVnpYDCWb1JHcQSwHgdqUyiiZUdbc9",
+        "grandpa": "5Hc4K1H9QHxAd2zzeRfMveQBECjgEapS6FJdegj3xn9qcteZ"
       }
     }
   ],
@@ -38,12 +38,6 @@
       "rate_model": "Kink_500_2000",
       "miner_shares": 0.01
     },
-    "USDT": {
-      "ticker": "USD",
-      "liquidity_factor": 0.7,
-      "rate_model": "Kink_500_2000",
-      "miner_shares": 0.01
-    },
     "USDC": {
       "ticker": "USD",
       "liquidity_factor": 0.8,
@@ -62,11 +56,6 @@
       "miner_shares": 0.01
     },
     "COMP": {
-      "liquidity_factor": 0.8,
-      "rate_model": "Kink_500_2000",
-      "miner_shares": 0.01
-    },
-    "UNI": {
       "liquidity_factor": 0.8,
       "rate_model": "Kink_500_2000",
       "miner_shares": 0.01

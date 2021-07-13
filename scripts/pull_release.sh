@@ -21,7 +21,7 @@ release_dir="./releases/$version"
 
 mkdir -p "$release_dir"
 
-files=("gateway_runtime.compact.wasm" "gateway_runtime.checksum" "types.json" "rpc.json" "contracts.json")
+files=("contracts.json" "gateway-darwin-arm64" "gateway-darwin-arm64.checksum" "gateway-linux-x86" "gateway.wasm" "gateway.wasm.checksum" "rpc.json" "types.json")
 
 for file in ${files[@]}; do
   echo "Retreiving ${file}..."
