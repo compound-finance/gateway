@@ -115,12 +115,16 @@ pub fn initialize_block<T: Config>(now: Timestamp) -> Result<(), Reason> {
         }
     }
 
-    <Module<T>>::deposit_event(Event::TransferCash(
-        GATEWAY_VOID,
-        last_miner,
-        last_miner_share_principal,
-        cash_index_new,
-    ));
+    if last_miner_share_principal != CashPrincipalAmount::ZERO {
+        // No need to emit events when nothing happens
+        <Module<T>>::deposit_event(Event::TransferCash(
+            GATEWAY_VOID,
+            last_miner,
+            last_miner_share_principal,
+            cash_index_new,
+        ));
+    }
+
     <Module<T>>::deposit_event(Event::MinerPaid(last_miner, last_miner_share_principal));
 
     Ok(())
@@ -164,6 +168,7 @@ mod tests {
 
             let result = initialize_block::<Test>(now);
             let shares = CashPrincipalAmount(242097062);
+            let cash_index = CashIndex::from_nominal("1.192441828000000000");
             assert_eq!(result, Ok(()));
 
             assert_eq!(
@@ -178,10 +183,7 @@ mod tests {
             // note - the cash index number below is quite round due to the polynomial nature of
             // our approximation and the fact that the ratio in this case worked out to be a
             // base 10 number that terminates in that many digits.
-            assert_eq!(
-                GlobalCashIndex::get(),
-                CashIndex::from_nominal("1.192441828000000000")
-            );
+            assert_eq!(GlobalCashIndex::get(), cash_index);
             assert_eq!(
                 TotalCashPrincipal::get(),
                 CashPrincipalAmount::from_nominal("462104.853072")
@@ -200,18 +202,28 @@ mod tests {
             assert_eq!(MinerCumulative::get(&miner), shares);
 
             let mut events_iter = System::events().into_iter();
-            let _transfer_cash_event_1 = events_iter.next().unwrap();
             let miner_paid_event_1 = events_iter.next().unwrap();
-            let _transfer_cash_event_2 = events_iter.next().unwrap();
+            let transfer_cash_event_1 = events_iter.next().unwrap();
             let miner_paid_event_2 = events_iter.next().unwrap();
             assert_eq!(
                 mock::Event::pallet_cash(crate::Event::MinerPaid(miner, CashPrincipalAmount(0))),
                 miner_paid_event_1.event
             );
             assert_eq!(
+                mock::Event::pallet_cash(crate::Event::TransferCash(
+                    GATEWAY_VOID,
+                    miner,
+                    shares,
+                    cash_index
+                )),
+                transfer_cash_event_1.event
+            );
+            assert_eq!(
                 mock::Event::pallet_cash(crate::Event::MinerPaid(miner, shares)),
                 miner_paid_event_2.event
             );
+            // should be exactly 3 events
+            assert!(events_iter.next().is_none());
         });
     }
 
