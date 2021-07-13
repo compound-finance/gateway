@@ -36,7 +36,7 @@ jobs:
         run: |
           set -eo pipefail
           ./scripts/get_substrate.sh --fast
-          cargo build --release
+          ./scripts/build_release.sh mRelease
 
       - name: Upload Release Asset
         id: upload-gateway
@@ -45,9 +45,31 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: target/release/gateway
-          asset_name: gateway-x86_64-linux
+          asset_path: releases/mRelease
+          asset_name: gateway-linux-x64
           asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset
+        id: upload-gateway-checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: releases/mRelease
+          asset_name: gateway-linux-x64.checksum
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset
+        id: upload-contracts
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: releases/mRelease
+          asset_name: contracts.json
+          asset_content_type: application/json
 
       - name: Upload Release Asset
         id: upload-types
@@ -56,7 +78,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: types.json
+          asset_path: releases/mRelease
           asset_name: types.json
           asset_content_type: application/json
 
@@ -67,7 +89,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: rpc.json
+          asset_path: releases/mRelease
           asset_name: rpc.json
           asset_content_type: application/json
 
@@ -81,16 +103,48 @@ jobs:
         run: |
           set -eo pipefail
           ./scripts/get_substrate.sh --fast
-          cargo build --release
+          ./scripts/build_release.sh mRelease
 
       - name: Upload Release Asset
-        id: upload-release-asset
+        id: upload-gateway-darwin
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: target/release/gateway
-          asset_name: gateway-x86_64-macos
+          asset_path: releases/mRelease
+          asset_name: gateway-darwin-x64
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset
+        id: upload-gateway-darwin-checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: releases/mRelease
+          asset_name: gateway-darwin-x64.checksum
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset
+        id: upload-gateway-wasm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: releases/mRelease
+          asset_name: gateway.wasm
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset
+        id: upload-gateway-wasm-checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: releases/mRelease
+          asset_name: gateway.wasm.checksum
           asset_content_type: application/octet-stream
