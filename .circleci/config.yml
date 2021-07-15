@@ -41,22 +41,22 @@ jobs:
             ls -la
             find ./target
             [ ! -f ./target/release/gateway ] && echo "Missing gateway build" && exit 1
-            cat ./target/release/gateway
-      # - restore_cache:
-      #     # See the configuration reference documentation for more details on using restore_cache and save_cache steps
-      #     # https://circleci.com/docs/2.0/configuration-reference/?section=reference#save_cache
-      #     keys:
-      #       - node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
-      # - run:
-      #     name: install packages
-      #     command: npm ci
-      # - save_cache:
-      #     key: node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
-      #     paths:
-      #       - ~/.npm
-      # - run:
-      #     name: Run Tests
-      #     command: npm run test
+      - restore_cache:
+          # See the configuration reference documentation for more details on using restore_cache and save_cache steps
+          # https://circleci.com/docs/2.0/configuration-reference/?section=reference#save_cache
+          keys:
+            - node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
+      - run:
+          name: install packages
+          command: yarn install
+      - save_cache:
+          key: node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
+          paths:
+            - ~/.yarn
+            - ./node_modules
+      - run:
+          name: Run Tests
+          command: yarn test __tests__/extract_scen.js
 
 workflows:
   integration_test:
