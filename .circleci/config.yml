@@ -13,7 +13,7 @@ jobs:
       - run:
           name: Build release
           command: |
-            WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration
+            WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly build --release --features integration
       - save_cache:
           key: cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
           paths:
