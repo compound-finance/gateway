@@ -13,7 +13,7 @@ jobs:
           name: Build release
           command: |
             mkdir -p ./target/release
-            echo "hello world 2" > ./target/release/gateway
+            echo "hello world 3" > ./target/release/gateway
             ls -la
             # WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration
       - save_cache:
@@ -22,7 +22,7 @@ jobs:
             - ./target
             - ~/.cargo
       - save_cache:
-          key: gateway
+          key: gateway-{{ .BuildNum }}
           paths:
             - ./target/release/gateway
 
@@ -33,7 +33,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - gateway
+            - gateway-{{ .BuildNum }}
       - run:
           name: check for gateway binary
           command: |
