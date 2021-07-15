@@ -13,6 +13,7 @@ jobs:
       - run:
           name: Build release
           command: |
+            export IS_CIRCLE_CI=true
             ./scripts/get_substrate.sh --fast
             WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly-2021-06-01 build --release --features integration
       - save_cache:
