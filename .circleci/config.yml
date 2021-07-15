@@ -13,6 +13,7 @@ jobs:
       - run:
           name: Build release
           command: |
+            rustup toolchain install nightly
             WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly build --release --features integration
       - save_cache:
           key: cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
