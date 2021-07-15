@@ -9,7 +9,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
+            - cargo-build-{{ .Revision }}-v1
       - run:
           name: Get substrate
           command: ./scripts/get_substrate.sh --fast
@@ -18,7 +18,7 @@ jobs:
           command: |
             WASM_BUILD_RUSTFLAGS='--cfg feature="integration"' cargo +nightly-2021-06-01 build --release --features integration
       - save_cache:
-          key: cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
+          key: cargo-build-{{ .Revision }}-v1
           paths:
             - ./target
             - ~/.cargo
@@ -40,7 +40,7 @@ jobs:
           command: |
             ls -la
             find ./target
-            [ ! -f ./target/release/gateway ] && echo "Missing gateway build" && exit 1
+            [ -f ./target/release/gateway ] || ( echo "Missing gateway build" && exit 1 )
       - restore_cache:
           # See the configuration reference documentation for more details on using restore_cache and save_cache steps
           # https://circleci.com/docs/2.0/configuration-reference/?section=reference#save_cache
