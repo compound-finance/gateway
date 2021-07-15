@@ -1,0 +1,62 @@
+version: 2.1
+
+jobs:
+  build_integration_target:
+    docker:
+      - image: cimg/node:15.1
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
+      - run:
+          name: Build release
+          command: |
+            mkdir -p ./target/release
+            echo "hello world" > ./target/release/gateway
+            # WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration
+      - save_cache:
+          key: cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
+          paths:
+            - ./target
+            - ~/.cargo
+      - save_cache:
+          key: gateway-{{ .Commit }}
+          paths:
+            - ./target/release/gateway
+
+  integration_test:
+    docker:
+      - image: cimg/node:15.1
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gateway-{{ .Commit }}
+      - run:
+          name: check for gateway binary
+          run: |
+            find ./target
+            [ ! -f ./target/release/gateway ] && echo "Missing gateway build" && exit 1
+            cat ./target/release/gateway
+      # - restore_cache:
+      #     # See the configuration reference documentation for more details on using restore_cache and save_cache steps
+      #     # https://circleci.com/docs/2.0/configuration-reference/?section=reference#save_cache
+      #     keys:
+      #       - node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
+      # - run:
+      #     name: install packages
+      #     command: npm ci
+      # - save_cache:
+      #     key: node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
+      #     paths:
+      #       - ~/.npm
+      # - run:
+      #     name: Run Tests
+      #     command: npm run test
+
+workflows:
+  integration_test:
+    jobs:
+      - build_integration_target
+      - integration_test
