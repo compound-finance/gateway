@@ -119,6 +119,7 @@ class EventTracker {
   }
 
   sendAndWaitForEvents(call, opts = {}) {
+    let stackTrace = new Error().stack;
     opts = {
       onFinalize: true,
       rejectOnFailure: true,
@@ -180,6 +181,7 @@ class EventTracker {
         ];
 
         if (opts.rejectOnFailure && failures.length > 0) {
+          failures[0].stack = stackTrace; // Use original stacktrace
           reject(failures[0]);
         } else {
           resolve(events);
