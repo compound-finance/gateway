@@ -11,7 +11,7 @@
     "postinstall": "cd node_modules/solidity-parser-antlr && yarn install && yarn build",
     "compile": "npx saddle compile",
     "test": "npx saddle compile && npx saddle test",
-    "coverage": "npx saddle compile --trace && npx saddle coverage && npx istanbul report --root=./coverage lcov json",
+    "coverage": "BUILD_FILE=.build/contracts-trace.json npx saddle compile --trace && npx saddle coverage && npx istanbul report --root=./coverage lcov json",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console",
     "script": "npx saddle script"
   },
