@@ -36,6 +36,7 @@ jobs:
       - run:
           name: check for gateway binary
           command: |
+            ls -la
             find ./target
             [ ! -f ./target/release/gateway ] && echo "Missing gateway build" && exit 1
             cat ./target/release/gateway
