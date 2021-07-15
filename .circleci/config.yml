@@ -45,18 +45,18 @@ jobs:
           # See the configuration reference documentation for more details on using restore_cache and save_cache steps
           # https://circleci.com/docs/2.0/configuration-reference/?section=reference#save_cache
           keys:
-            - node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
+            - node-deps-v1-{{ .Branch }}-{{checksum "integration/package-lock.json"}}
       - run:
           name: install packages
-          command: yarn install
+          command: cd integration && yarn install
       - save_cache:
-          key: node-deps-v1-{{ .Branch }}-{{checksum "package-lock.json"}}
+          key: node-deps-v1-{{ .Branch }}-{{checksum "integration/package-lock.json"}}
           paths:
             - ~/.yarn
-            - ./node_modules
+            - ./integration/node_modules
       - run:
           name: Run Tests
-          command: yarn test __tests__/extract_scen.js
+          command: cd integration && yarn test __tests__/extract_scen.js
 
 workflows:
   integration_test:
