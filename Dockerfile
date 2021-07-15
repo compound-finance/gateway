@@ -10,7 +10,7 @@ RUN git clone --depth 1 https://github.com/compound-finance/gateway.git -b hayes
 WORKDIR /code/gateway
 
 RUN scripts/pull_release.sh m16
-RUN chmod +x releases/m16/gateway-linux-x86 
+RUN chmod +x releases/m16/gateway-linux-x86
 
 CMD releases/m16/gateway-linux-x86 \
   --chain chains/stablenet/chain-spec-raw.json \

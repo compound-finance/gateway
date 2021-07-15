@@ -1,8 +1,8 @@
 {
   "eth_network": "goerli",
   "base_chain": "testnet",
-  "websocket": "wss://sarge.compound.cash",
-  "rpc": "http://sarge-rpc.compound.cash:5000",
+  "websocket": "wss://sally.compound.cash",
+  "rpc": "http://sally-rpc.compound.cash:2095",
   "validators": [
     {
       "substrate_id": "5H6Wzjt1nQ5aFx5E4FDVnpYDCWb1JHcQSwHgdqUyiiZUdbc9",

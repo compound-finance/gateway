@@ -25,6 +25,12 @@ Then:
 yarn repl -c testnet
 ```
 
+Or:
+
+```sh
+yarn repl -c stablenet
+```
+
 This will connect you to a REPL to testnet, including to the Ethereum contracts.
 
 ### Repl Examples
