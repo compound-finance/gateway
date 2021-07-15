@@ -13,7 +13,7 @@ jobs:
           name: Build release
           command: |
             mkdir -p ./target/release
-            echo "hello world 3" > ./target/release/gateway
+            echo "hello world 4" > ./target/release/gateway
             ls -la
             # WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration
       - save_cache:
