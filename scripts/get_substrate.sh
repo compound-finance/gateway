@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright 2015-2020 Parity Technologies (UK) Ltd.
 
-if [[ ! which rustup >/dev/null 2>&1 || -v $IS_CIRCLE_CI ]]; then
+if ! which rustup >/dev/null 2>&1 || [[ ! -z $IS_CIRCLE_CI ]]; then
     if [[ "$OSTYPE" == "linux-gnu" ]]; then
 	set -e
 	if [[ $(whoami) == "root" ]]; then
