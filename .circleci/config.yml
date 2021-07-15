@@ -2,7 +2,7 @@ version: 2.1
 
 jobs:
   build_integration_target:
-    resource_class: 2xlarge+
+    resource_class: xlarge
     docker:
       - image: cimg/node:15.1
     steps:
