@@ -27,8 +27,6 @@ jobs:
             - ./target/release/gateway
 
   integration_test:
-    requires: 
-      - build_integration_target
     docker:
       - image: cimg/node:15.1
     steps:
@@ -63,4 +61,7 @@ workflows:
   integration_test:
     jobs:
       - build_integration_target
-      - integration_test
+      - name: integration_test
+        requires: 
+          - build_integration_target
+
