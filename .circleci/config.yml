@@ -14,7 +14,7 @@ jobs:
           name: Build release
           command: |
             ./scripts/get_substrate.sh --fast
-            WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly build --release --features integration
+            WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly-2021-06-01 build --release --features integration
       - save_cache:
           key: cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
           paths:
