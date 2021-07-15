@@ -29,17 +29,17 @@ Once the development environment is set up, build Gateway. This command will bui
 [native](https://substrate.dev/docs/en/knowledgebase/advanced/executor#native-execution) code:
 
 ```bash
-cargo +nightly build --release
+cargo build --release
 ```
 
-Note that we require the rust `nightly` toolchain as we rely on unstable features (notably `const_generics`).
+Note: that we require the rust `nightly` toolchain as we rely on unstable features (notably `const_generics`). You should make `nightly` your default rust toolchain.
 
 ## Test
 
 To test, run:
 
 ```sh
-SKIP_WASM_BUILD=true cargo test --features stubnet
+cargo test -- -Z unstable-options --test-threads 1
 ```
 
 ## Run
@@ -206,34 +206,25 @@ A FRAME pallet is compromised of a number of blockchain primitives:
 
 ### Run in Docker
 
-First, install [Docker](https://docs.docker.com/get-docker/) and
-[Docker Compose](https://docs.docker.com/compose/install/).
+First, install [Docker](https://docs.docker.com/get-docker/).
 
-Then run the following command to start a single node development chain.
+Then build the Dockerfile:
 
-```bash
-./scripts/docker_run.sh
+```sh
+docker build -t gateway .
 ```
 
-This command will firstly compile your code, and then start a local development network. You can
-also replace the default command (`cargo +nightly build --release && ./target/release/gateway --dev --ws-external`)
-by appending your own. A few useful ones are as follow.
+Next, start your chain:
 
-```bash
-# Run Substrate node without re-compiling
-./scripts/docker_run.sh ./target/release/gateway --dev --ws-external
-
-# Purge the local dev chain
-./scripts/docker_run.sh ./target/release/gateway purge-chain --dev
-
-# Check whether the code is compilable
-./scripts/docker_run.sh cargo +nightly check
+```sh
+docker run --rm -it gateway -- /bin/sh
 ```
 
 ## Release Process
 
 All upgrades to Gateway should happen via the release process.
 We need to track which features were included in the release, usually including a changelog that covers each PR that was merged.
+
 Proper release management is important here, especially since releases include many varieties of breaking changes.
 A scenario test should be written to show that things work as expected after the upgrade takes place.
 The goal is to not break things on release.
@@ -244,67 +235,44 @@ Releases should be cut from the `develop` (default) branch on [Github](https://g
 
 First increment the spec version in `runtime/src/lib.rs`.
 
+### Build Your Release Version
+
+```sh
+scripts/build_release.sh m88 # replace with your milestone version
+```
+
+### Update the Dockerfile
+
+Replace the release in the Dockerfile, using your tag (e.g. here `m88`):
+
+```diff
+- RUN scripts/pull_release.sh m16
+- RUN chmod +x releases/m16/gateway-linux-x86
++ RUN scripts/pull_release.sh m88
++ RUN chmod +x releases/m88/gateway-linux-x86
+```
+
 ### Update Chain Spec
 
 Note: this is *only* necessary if you are deploying a new chain, the chain spec is defined at genesis.
 
-The WASM blob in the chain spec should be updated via:
-
 ```
-$ CHAIN_BIN=target/<MILESTONE TAG>/gateway-<PLATFORM> chains/build_spec.js -s -c testnet
+$ gateway> chains/build_spec.js -r m88 -c stablenet # replace m88 with your version
 ```
 
-Where `<PLATFORM>` is your local platform used to name the binary build.
+### Using Github Workflows Release Process
 
-### Using Github Workflows Release Process (Easier -- Recommended)
+Github actions have been created to respond to git tags that are pushed to the repo that begin with `m`, followed by the spec version, e.g. `m88`.
 
-Github actions have been created to respond to git tags that are pushed to the repo that begin with `m`, followed by the spec version, e.g. `m3`.
-
-This process will create a draft/prerelease that can be modified and published on github once ready.
+This process will create a draft / pre-release that can be modified and published on github once ready.
 
 Create a tag and push to this repo:
 
 ```sh
-$ git tag -a <MILESTONE TAG> <OPTIONAL COMMIT HASH>
-$ git push origin <MILESTONE TAG>
+$ git tag -a m88 # use your milestone tag
+$ git push origin m88
 ```
 
-### Manual Release Process
+### Contributing
 
-Cutting a release can also be accomplished manually by following the steps below.
-
-#### Build Release Artifacts
-
-Build the release artifacts using the included script:
-
-```
-$ scripts/build_release.sh <MILESTONE TAG>
-```
-
-Where `<MILESTONE TAG>` should be a sequentially increasing counter beginning with `m`, followed by the spec version, e.g. `m7`, `m8`, `m9`.
-
-#### Upload Release Artifacts
-
-The changes above should be committed to the `develop` branch and included in the version that is tagged in the repository below.
-
-Draft a [new release on GitHub](https://github.com/compound-finance/gateway/releases/new).
-Tag it with the appropriate milestone tag.
-Title it in a style similar to other releases, describing its purpose.
-Put any other context or information describing what it does in the description.
-
-Attach the following files to the release, from the repository where you built the release artifacts:
-
-```
-contracts.json
-gateway-darwin-arm64           # optional
-gateway-darwin-arm64.checksum  # optional
-gateway-testnet.wasm
-gateway-testnet.wasm.checksum
-rpc.json
-types.json
-```
-
-These files should all exist in the `releases/<MILESTONE TAG>` directory of the repository you built from,
- you should be able to simply drag and drop them.
-
-This will, in the future, be automated by the process of merging certain release branches into the main development branch.
+Contributors are welcome, and will be held to a high standard. Please consider making an issue to discuss larger changes before making pull requests. All contributions will fall under the license on this repo, which **currently does not grant open permission of use**. Additionally, **you agree that your code will be subject to any license which is later attached to this repository as if it had been initially licensed thusly**.
