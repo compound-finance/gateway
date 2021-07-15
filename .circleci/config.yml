@@ -35,7 +35,7 @@ jobs:
             - gateway-{{ .Commit }}
       - run:
           name: check for gateway binary
-          run: |
+          command: |
             find ./target
             [ ! -f ./target/release/gateway ] && echo "Missing gateway build" && exit 1
             cat ./target/release/gateway
