@@ -65,6 +65,5 @@ workflows:
 
       - integration_test:
           name: "Integration Test"
-          requires: 
-            - build_integration_target
-
+          requires:
+            - "Build Integration Target"
