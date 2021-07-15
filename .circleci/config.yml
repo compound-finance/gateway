@@ -60,8 +60,11 @@ jobs:
 workflows:
   integration_test:
     jobs:
-      - build_integration_target
-      - name: integration_test
-        requires: 
-          - build_integration_target
+      - build_integration_target:
+          name: "Build Integration Target"
+
+      - integration_test:
+          name: "Integration Test"
+          requires: 
+            - build_integration_target
 
