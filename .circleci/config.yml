@@ -13,10 +13,7 @@ jobs:
       - run:
           name: Build release
           command: |
-            mkdir -p ./target/release
-            echo "hello world 6" > ./target/release/gateway
-            ls -la
-            # WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration
+            WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration
       - save_cache:
           key: cargo-build-{{ .Branch }}-{{checksum "Cargo.lock"}}-v1
           paths:
