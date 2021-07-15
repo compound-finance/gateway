@@ -21,7 +21,7 @@ jobs:
             - ./target
             - ~/.cargo
       - save_cache:
-          key: gateway-{{ .Commit }}
+          key: gateway-{{ .BuildNum }}
           paths:
             - ./target/release/gateway
 
@@ -32,7 +32,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - gateway-{{ .Commit }}
+            - gateway-{{ .BuildNum }}
       - run:
           name: check for gateway binary
           command: |
