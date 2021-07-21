@@ -1,10 +1,13 @@
 use crate::{
-    chains::{Chain, ChainAccount, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId, Ethereum},
+    chains::{
+        Chain, ChainAccount, ChainBlock, ChainBlockNumber, ChainBlocks, ChainId, Ethereum, Flow,
+    },
     debug,
     reason::Reason,
 };
 use codec::{Decode, Encode};
 use ethereum_client::{EthereumBlock, EthereumClientError};
+use flow_client::{FlowBlock, FlowClientError};
 use our_std::RuntimeDebug;
 use types_derive::Types;
 
@@ -14,7 +17,9 @@ pub enum EventError {
     NoRpcUrl,
     NoStarportAddress,
     EthereumClientError(EthereumClientError),
+    FlowClientError(FlowClientError),
     ErrorDecodingHex,
+    NoFlowServerUrl,
 }
 
 /// Fetch a block from the underlying chain.
@@ -28,6 +33,11 @@ pub fn fetch_chain_block(
         (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
             Ok(fetch_eth_block(number, &eth_starport_address).map(ChainBlock::Eth)?)
         }
+        (ChainId::Flow, ChainAccount::Flow(flow_starport_address)) => Ok(fetch_flow_block(
+            number,
+            &hex::encode(&flow_starport_address),
+        )
+        .map(ChainBlock::Flow)?),
         (ChainId::Dot, _) => Err(Reason::Unreachable),
         _ => Err(Reason::Unreachable),
     }
@@ -45,6 +55,11 @@ pub fn fetch_chain_blocks(
         (ChainId::Eth, ChainAccount::Eth(eth_starport_address)) => {
             Ok(fetch_eth_blocks(from, to, &eth_starport_address)?)
         }
+        (ChainId::Flow, ChainAccount::Flow(flow_starport_address)) => Ok(fetch_flow_blocks(
+            from,
+            to,
+            &hex::encode(&flow_starport_address),
+        )?),
         (ChainId::Dot, _) => Err(Reason::Unreachable),
         _ => Err(Reason::Unreachable),
     }
@@ -85,6 +100,45 @@ fn fetch_eth_blocks(
         }
     }
     Ok(ChainBlocks::Eth(acc))
+}
+
+// Fetch a single block from the Flow Starport.
+fn fetch_flow_block(
+    number: ChainBlockNumber,
+    flow_starport_address: &str,
+) -> Result<FlowBlock, EventError> {
+    debug!("Fetching Flow Block {}", number);
+    let flow_server_url = runtime_interfaces::validator_config_interface::get_flow_server_url()
+        .ok_or(EventError::NoFlowServerUrl)?;
+    // TODO XXX Find a way to move topic out of here
+    let flow_block =
+        flow_client::get_block(&flow_server_url, flow_starport_address, number, "Lock")
+            .map_err(EventError::FlowClientError)?;
+    Ok(flow_block)
+}
+
+/// Fetch blocks from the Flow Starport, return up to `slack` blocks to add to the event queue.
+fn fetch_flow_blocks(
+    from: ChainBlockNumber,
+    to: ChainBlockNumber,
+    flow_starport_address: &str,
+) -> Result<ChainBlocks, EventError> {
+    debug!("Fetching Flow Blocks [{}-{})", from, to);
+    let mut acc: Vec<<Flow as Chain>::Block> = vec![];
+    for block_number in from..to {
+        match fetch_flow_block(block_number, flow_starport_address) {
+            Ok(block) => {
+                acc.push(block);
+            }
+            Err(EventError::FlowClientError(FlowClientError::NoResult)) => {
+                break; // done
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        }
+    }
+    Ok(ChainBlocks::Flow(acc))
 }
 
 #[cfg(test)]
@@ -134,6 +188,9 @@ mod tests {
                         assert_eq!(actual.parent_hash, expected.parent_hash);
                         assert_eq!(actual.number, expected.number);
                     }
+                }
+                ChainBlocks::Flow(_) => {
+                    assert!(false)
                 }
             }
         });

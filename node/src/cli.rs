@@ -11,6 +11,10 @@ pub struct GatewayCmd {
     #[structopt(long = "eth-rpc-url")]
     pub eth_rpc_url: Option<String>,
 
+    /// Set the Flow Server Url for interfacing with Flow fetch server
+    #[structopt(long = "flow-server-url")]
+    pub flow_server_url: Option<String>,
+
     /// Set the miner address (only useful for validator)
     #[structopt(long = "miner")]
     pub miner: Option<String>,

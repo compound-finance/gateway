@@ -1,5 +1,6 @@
 use codec::{Decode, Encode};
 use ethereum_client::{EthereumBlock, EthereumEvent};
+use flow_client::{FlowBlock, FlowEvent};
 use gateway_crypto::public_key_bytes_to_eth_address;
 use our_std::vec::Vec;
 use our_std::{
@@ -25,6 +26,7 @@ pub enum ChainId {
     Gate,
     Eth,
     Dot,
+    Flow,
 }
 
 impl ChainId {
@@ -33,6 +35,7 @@ impl ChainId {
             ChainId::Gate => Ok(ChainAccount::Gate(Gateway::str_to_address(addr)?)),
             ChainId::Eth => Ok(ChainAccount::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Ok(ChainAccount::Dot(Polkadot::str_to_address(addr)?)),
+            ChainId::Flow => Ok(ChainAccount::Flow(Flow::str_to_address(addr)?)),
         }
     }
 
@@ -41,6 +44,7 @@ impl ChainId {
             ChainId::Gate => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainAsset::Eth(Ethereum::str_to_address(addr)?)),
             ChainId::Dot => Err(Reason::NotImplemented),
+            ChainId::Flow => Ok(ChainAsset::Flow(Flow::asset_str_to_address(addr)?)),
         }
     }
 
@@ -49,6 +53,7 @@ impl ChainId {
             ChainId::Gate => Ok(ChainHash::Gate(Gateway::str_to_hash(hash)?)),
             ChainId::Eth => Ok(ChainHash::Eth(Ethereum::str_to_hash(hash)?)),
             ChainId::Dot => Ok(ChainHash::Dot(Polkadot::str_to_hash(hash)?)),
+            ChainId::Flow => Err(Reason::NotImplemented),
         }
     }
 
@@ -57,6 +62,7 @@ impl ChainId {
             ChainId::Gate => Ok(ChainAccount::Gate(<Gateway as Chain>::signer_address()?)),
             ChainId::Eth => Ok(ChainAccount::Eth(<Ethereum as Chain>::signer_address()?)),
             ChainId::Dot => Ok(ChainAccount::Dot(<Polkadot as Chain>::signer_address()?)),
+            ChainId::Flow => Err(Reason::NotImplemented),
         }
     }
 
@@ -65,6 +71,7 @@ impl ChainId {
             ChainId::Gate => ChainHash::Gate(<Gateway as Chain>::hash_bytes(data)),
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::hash_bytes(data)),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::hash_bytes(data)),
+            ChainId::Flow => ChainHash::Flow(<Flow as Chain>::hash_bytes(data)),
         }
     }
 
@@ -79,6 +86,7 @@ impl ChainId {
             ChainId::Dot => Ok(ChainSignature::Dot(<Polkadot as Chain>::sign_message(
                 message,
             )?)),
+            ChainId::Flow => Err(Reason::NotImplemented),
         }
     }
 
@@ -87,6 +95,7 @@ impl ChainId {
             ChainId::Gate => ChainHash::Gate(<Gateway as Chain>::zero_hash()),
             ChainId::Eth => ChainHash::Eth(<Ethereum as Chain>::zero_hash()),
             ChainId::Dot => ChainHash::Dot(<Polkadot as Chain>::zero_hash()),
+            ChainId::Flow => ChainHash::Flow(<Flow as Chain>::zero_hash()),
         }
     }
 }
@@ -100,6 +109,7 @@ pub enum ChainAccount {
     Gate(<Gateway as Chain>::Address),
     Eth(<Ethereum as Chain>::Address),
     Dot(<Polkadot as Chain>::Address),
+    Flow(<Flow as Chain>::Address),
 }
 
 impl ChainAccount {
@@ -108,6 +118,7 @@ impl ChainAccount {
             ChainAccount::Gate(_) => ChainId::Gate,
             ChainAccount::Eth(_) => ChainId::Eth,
             ChainAccount::Dot(_) => ChainId::Dot,
+            ChainAccount::Flow(_) => ChainId::Flow,
         }
     }
 }
@@ -134,6 +145,7 @@ impl From<ChainAccount> for String {
             ChainAccount::Gate(_) => String::from("GATE"), // XXX
             ChainAccount::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
             ChainAccount::Dot(_) => String::from("DOT"), // XXX
+            ChainAccount::Flow(address) => format!("FLOW:0x{}", hex::encode(address)),
         }
     }
 }
@@ -144,6 +156,7 @@ pub enum ChainAsset {
     Gate(Reserved),
     Eth(<Ethereum as Chain>::Address),
     Dot(Reserved),
+    Flow(<Flow as Chain>::Address),
 }
 
 // For serialize (which we don't really use, but are required to implement)
@@ -153,6 +166,7 @@ impl ChainAsset {
             ChainAsset::Gate(_) => ChainId::Gate,
             ChainAsset::Eth(_) => ChainId::Eth,
             ChainAsset::Dot(_) => ChainId::Dot,
+            ChainAsset::Flow(_) => ChainId::Flow,
         }
     }
 }
@@ -178,6 +192,7 @@ impl From<ChainAsset> for String {
             ChainAsset::Gate(_) => String::from("GATE"), // XXX
             ChainAsset::Eth(address) => format!("ETH:0x{}", hex::encode(address)),
             ChainAsset::Dot(_) => String::from("DOT"), // XXX
+            ChainAsset::Flow(name) => format!("FLOW:0x{}", hex::encode(name)),
         }
     }
 }
@@ -225,6 +240,7 @@ pub enum ChainHash {
     Gate(<Gateway as Chain>::Hash),
     Eth(<Ethereum as Chain>::Hash),
     Dot(<Polkadot as Chain>::Hash),
+    Flow(<Flow as Chain>::Hash),
 }
 
 // Display so we can format local storage keys.
@@ -234,6 +250,7 @@ impl our_std::fmt::Display for ChainHash {
             ChainHash::Gate(gate_hash) => write!(f, "GATE#{:X?}", gate_hash),
             ChainHash::Eth(eth_hash) => write!(f, "ETH#{:X?}", eth_hash),
             ChainHash::Dot(dot_hash) => write!(f, "DOT#{:X?}", dot_hash),
+            ChainHash::Flow(flow_hash) => write!(f, "FLOW#{:X?}", flow_hash),
         }
     }
 }
@@ -259,6 +276,7 @@ impl From<ChainHash> for String {
             ChainHash::Gate(_) => format!("GATE"), // XXX
             ChainHash::Eth(eth_hash) => <Ethereum as Chain>::hash_string(&eth_hash),
             ChainHash::Dot(_) => format!("DOT"), // XXX
+            ChainHash::Flow(_) => format!("FLOW"),
         }
     }
 }
@@ -338,6 +356,7 @@ impl FromStr for ChainId {
         match s.to_ascii_uppercase().as_str() {
             "ETH" => Ok(ChainId::Eth),
             "DOT" => Ok(ChainId::Dot),
+            "FLOW" => Ok(ChainId::Flow),
             _ => Err(Reason::BadChainId),
         }
     }
@@ -348,39 +367,52 @@ impl FromStr for ChainId {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlock {
     Eth(<Ethereum as Chain>::Block),
+    Flow(<Flow as Chain>::Block),
 }
 
 impl ChainBlock {
     pub fn chain_id(&self) -> ChainId {
         match self {
             ChainBlock::Eth(_) => ChainId::Eth,
+            ChainBlock::Flow(_) => ChainId::Flow,
         }
     }
 
     pub fn hash(&self) -> ChainHash {
         match self {
             ChainBlock::Eth(block) => ChainHash::Eth(block.hash),
+            ChainBlock::Flow(block) => ChainHash::Flow(block.blockId),
         }
     }
 
     pub fn parent_hash(&self) -> ChainHash {
         match self {
             ChainBlock::Eth(block) => ChainHash::Eth(block.parent_hash),
+            ChainBlock::Flow(block) => ChainHash::Flow(block.parentBlockId),
         }
     }
 
     pub fn number(&self) -> ChainBlockNumber {
         match self {
             ChainBlock::Eth(block) => block.number,
+            ChainBlock::Flow(block) => block.height,
         }
     }
 
-    pub fn events(&self) -> impl Iterator<Item = ChainBlockEvent> + '_ {
+    pub fn events(&self) -> Box<dyn Iterator<Item = ChainBlockEvent> + '_> {
         match self {
-            ChainBlock::Eth(block) => block
-                .events
-                .iter()
-                .map(move |e| ChainBlockEvent::Eth(block.number, e.clone())),
+            ChainBlock::Eth(block) => Box::new(
+                block
+                    .events
+                    .iter()
+                    .map(move |e| ChainBlockEvent::Eth(block.number, e.clone())),
+            ),
+            ChainBlock::Flow(block) => Box::new(
+                block
+                    .events
+                    .iter()
+                    .map(move |e| ChainBlockEvent::Flow(block.height, e.clone())),
+            ),
         }
     }
 }
@@ -389,30 +421,37 @@ impl ChainBlock {
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum ChainBlocks {
     Eth(Vec<<Ethereum as Chain>::Block>),
+    Flow(Vec<<Flow as Chain>::Block>),
 }
 
 impl ChainBlocks {
     pub fn chain_id(&self) -> ChainId {
         match self {
             ChainBlocks::Eth(_) => ChainId::Eth,
+            ChainBlocks::Flow(_) => ChainId::Flow,
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
             ChainBlocks::Eth(blocks) => blocks.len(),
+            ChainBlocks::Flow(blocks) => blocks.len(),
         }
     }
 
-    pub fn blocks(&self) -> impl Iterator<Item = ChainBlock> + '_ {
+    pub fn blocks(&self) -> Box<dyn Iterator<Item = ChainBlock> + '_> {
         match self {
-            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| ChainBlock::Eth(b.clone())),
+            ChainBlocks::Eth(blocks) => Box::new(blocks.iter().map(|b| ChainBlock::Eth(b.clone()))),
+            ChainBlocks::Flow(blocks) => {
+                Box::new(blocks.iter().map(|b| ChainBlock::Flow(b.clone())))
+            }
         }
     }
 
-    pub fn block_numbers(&self) -> impl Iterator<Item = u64> + '_ {
+    pub fn block_numbers(&self) -> Box<dyn Iterator<Item = u64> + '_> {
         match self {
-            ChainBlocks::Eth(blocks) => blocks.iter().map(|b| b.number),
+            ChainBlocks::Eth(blocks) => Box::new(blocks.iter().map(|b| b.number)),
+            ChainBlocks::Flow(blocks) => Box::new(blocks.iter().map(|b| b.height)),
         }
     }
 
@@ -433,6 +472,17 @@ impl ChainBlocks {
                     })
                     .collect(),
             ),
+            ChainBlocks::Flow(blocks) => ChainBlocks::Flow(
+                blocks
+                    .into_iter()
+                    .filter(|block| {
+                        !pending_blocks.iter().any(|t| {
+                            t.block.hash() == ChainHash::Flow(block.blockId)
+                                && t.has_supporter(signer)
+                        })
+                    })
+                    .collect(),
+            ),
         }
     }
 }
@@ -441,6 +491,7 @@ impl From<ChainBlock> for ChainBlocks {
     fn from(block: ChainBlock) -> Self {
         match block {
             ChainBlock::Eth(block) => ChainBlocks::Eth(vec![block]),
+            ChainBlock::Flow(block) => ChainBlocks::Flow(vec![block]),
         }
     }
 }
@@ -593,6 +644,7 @@ impl ChainReorgTally {
 pub enum ChainBlockEvent {
     Reserved,
     Eth(ChainBlockNumber, <Ethereum as Chain>::Event),
+    Flow(ChainBlockNumber, <Flow as Chain>::Event),
 }
 
 impl ChainBlockEvent {
@@ -600,6 +652,7 @@ impl ChainBlockEvent {
         match self {
             ChainBlockEvent::Reserved => panic!("reserved"),
             ChainBlockEvent::Eth(..) => ChainId::Eth,
+            ChainBlockEvent::Flow(..) => ChainId::Flow,
         }
     }
 
@@ -607,6 +660,7 @@ impl ChainBlockEvent {
         match self {
             ChainBlockEvent::Reserved => panic!("reserved"),
             ChainBlockEvent::Eth(block_num, _) => *block_num,
+            ChainBlockEvent::Flow(block_num, _) => *block_num,
         }
     }
 
@@ -620,6 +674,7 @@ impl ChainBlockEvent {
 pub enum ChainBlockEvents {
     Reserved,
     Eth(Vec<(ChainBlockNumber, <Ethereum as Chain>::Event)>),
+    Flow(Vec<(ChainBlockNumber, <Flow as Chain>::Event)>),
 }
 
 impl ChainBlockEvents {
@@ -629,6 +684,7 @@ impl ChainBlockEvents {
             ChainId::Gate => Err(Reason::Unreachable),
             ChainId::Eth => Ok(ChainBlockEvents::Eth(vec![])),
             ChainId::Dot => Err(Reason::NotImplemented),
+            ChainId::Flow => Ok(ChainBlockEvents::Flow(vec![])),
         }
     }
 
@@ -637,6 +693,7 @@ impl ChainBlockEvents {
         match self {
             ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => eth_block_events.len(),
+            ChainBlockEvents::Flow(flow_block_events) => flow_block_events.len(),
         }
     }
 
@@ -650,6 +707,17 @@ impl ChainBlockEvents {
                         eth_block_events.push((eth_block.number, event.clone()));
                     }
                 }
+                // Added to make it compile, doesn't look good
+                ChainBlock::Flow(_) => panic!("unreachable"),
+            },
+            ChainBlockEvents::Flow(flow_block_events) => match block {
+                ChainBlock::Flow(flow_block) => {
+                    for event in flow_block.events.iter() {
+                        flow_block_events.push((flow_block.height, event.clone()));
+                    }
+                }
+                // Added to make it compile, doesn't look good
+                ChainBlock::Eth(_) => panic!("unreachable"),
             },
         }
     }
@@ -664,6 +732,9 @@ impl ChainBlockEvents {
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.retain(|(b, e)| f(&ChainBlockEvent::Eth(*b, e.clone())));
             }
+            ChainBlockEvents::Flow(flow_block_events) => {
+                flow_block_events.retain(|(b, e)| f(&ChainBlockEvent::Flow(*b, e.clone())));
+            }
         }
     }
 
@@ -676,6 +747,16 @@ impl ChainBlockEvents {
                 ChainBlockEvent::Eth(block_num, eth_block) => eth_block_events
                     .iter()
                     .position(|(b, e)| *b == *block_num && *e == *eth_block),
+                // Added to make it compile, doesn't look good
+                ChainBlockEvent::Flow(_, _) => panic!("unreachable"),
+            },
+            ChainBlockEvents::Flow(flow_block_events) => match event {
+                ChainBlockEvent::Reserved => panic!("unreachable"),
+                ChainBlockEvent::Flow(block_num, flow_block) => flow_block_events
+                    .iter()
+                    .position(|(b, e)| *b == *block_num && *e == *flow_block),
+                // Added to make it compile, doesn't look good
+                ChainBlockEvent::Eth(_, _) => panic!("unreachable"),
             },
         }
     }
@@ -686,6 +767,9 @@ impl ChainBlockEvents {
             ChainBlockEvents::Reserved => panic!("reserved"),
             ChainBlockEvents::Eth(eth_block_events) => {
                 eth_block_events.remove(pos);
+            }
+            ChainBlockEvents::Flow(flow_block_events) => {
+                flow_block_events.remove(pos);
             }
         }
     }
@@ -715,6 +799,7 @@ pub trait Chain {
     fn sign_message(message: &[u8]) -> Result<Self::Signature, Reason>;
     fn signer_address() -> Result<Self::Address, Reason>;
     fn str_to_address(addr: &str) -> Result<Self::Address, Reason>;
+    fn asset_str_to_address(addr: &str) -> Result<Self::Address, Reason>;
     fn address_string(address: &Self::Address) -> String;
     fn str_to_hash(hash: &str) -> Result<Self::Hash, Reason>;
     fn hash_string(hash: &Self::Hash) -> String;
@@ -728,6 +813,9 @@ pub struct Ethereum {}
 
 #[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
 pub struct Polkadot {}
+
+#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug)]
+pub struct Flow {}
 
 impl Chain for Gateway {
     const ID: ChainId = ChainId::Gate;
@@ -795,6 +883,10 @@ impl Chain for Gateway {
     }
 
     fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn asset_str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
     }
 
@@ -899,6 +991,11 @@ impl Chain for Ethereum {
         }
     }
 
+    // No need for this method, `str_to_address` is used for th asset
+    fn asset_str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
     fn address_string(address: &Self::Address) -> String {
         gateway_crypto::eth_address_string(address)
     }
@@ -977,6 +1074,97 @@ impl Chain for Polkadot {
 
     fn str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
         panic!("XXX not implemented");
+    }
+
+    fn asset_str_to_address(_addr: &str) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn address_string(_address: &Self::Address) -> String {
+        panic!("XXX not implemented");
+    }
+
+    fn str_to_hash(_hash: &str) -> Result<Self::Hash, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn hash_string(_hash: &Self::Hash) -> String {
+        panic!("XXX not implemented");
+    }
+}
+
+impl Chain for Flow {
+    const ID: ChainId = ChainId::Flow;
+
+    #[type_alias("Flow__Chain__")]
+    type Address = [u8; 8];
+
+    #[type_alias("Flow__Chain__")]
+    type Amount = u128;
+
+    #[type_alias("Flow__Chain__")]
+    type CashIndex = u128;
+
+    #[type_alias("Flow__Chain__")]
+    type Rate = u128;
+
+    #[type_alias("Flow__Chain__")]
+    type Timestamp = u64;
+
+    #[type_alias("Flow__Chain__")]
+    type Hash = [u8; 32];
+
+    #[type_alias("Flow__Chain__")]
+    type PublicKey = ();
+
+    #[type_alias("Flow__Chain__")]
+    type Signature = ();
+
+    #[type_alias("Flow__Chain__")]
+    type Event = FlowEvent;
+
+    #[type_alias("Flow__Chain__")]
+    type Block = FlowBlock;
+
+    fn zero_hash() -> Self::Hash {
+        [0u8; 32]
+    }
+
+    fn hash_bytes(_data: &[u8]) -> Self::Hash {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_user_address(
+        _data: &[u8],
+        _signature: Self::Signature,
+    ) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn recover_address(_data: &[u8], _signature: Self::Signature) -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn sign_message(_message: &[u8]) -> Result<Self::Signature, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn signer_address() -> Result<Self::Address, Reason> {
+        panic!("XXX not implemented");
+    }
+
+    fn str_to_address(addr: &str) -> Result<Self::Address, Reason> {
+        match gateway_crypto::flow_addr_str_to_address(addr) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadAddress),
+        }
+    }
+
+    fn asset_str_to_address(addr: &str) -> Result<Self::Address, Reason> {
+        match gateway_crypto::flow_asset_str_to_address(addr) {
+            Some(s) => Ok(s),
+            None => Err(Reason::BadAddress),
+        }
     }
 
     fn address_string(_address: &Self::Address) -> String {

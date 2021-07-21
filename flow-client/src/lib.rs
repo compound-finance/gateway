@@ -1,8 +1,9 @@
 use codec::{Decode, Encode};
+use hex_buffer_serde::{ConstHex, ConstHexForm};
+use our_std::convert::TryInto;
+use our_std::{debug, error, info, warn, Deserialize, RuntimeDebug, Serialize};
 use sp_runtime::offchain::{http, Duration};
 use sp_runtime_interface::pass_by::PassByCodec;
-
-use our_std::{debug, warn, error, info, Deserialize, RuntimeDebug, Serialize};
 use types_derive::{type_alias, Types};
 
 pub mod events;
@@ -12,19 +13,25 @@ pub use crate::events::FlowEvent;
 #[type_alias]
 pub type FlowBlockNumber = u64;
 
+#[type_alias]
+pub type FlowHash = [u8; 32];
+
 const FLOW_FETCH_DEADLINE: u64 = 10_000;
 
 #[derive(Serialize, Deserialize)] // used in config
 #[derive(Clone, Eq, PartialEq, Encode, Decode, PassByCodec, RuntimeDebug, Types)]
 #[allow(non_snake_case)]
 pub struct FlowBlock {
-    pub blockId: String,
-    pub parentBlockId: String,
+    #[serde(with = "ConstHexForm")]
+    pub blockId: FlowHash,
+    #[serde(with = "ConstHexForm")]
+    pub parentBlockId: FlowHash,
     pub height: FlowBlockNumber,
+    #[serde(skip)]
     pub events: Vec<FlowEvent>,
 }
 
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
+#[derive(Copy, Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, Types)]
 pub enum FlowClientError {
     DecodeError,
     HttpIoError,
@@ -33,7 +40,7 @@ pub enum FlowClientError {
     InvalidUTF8,
     JsonParseError,
     NoResult,
-    BadResponse
+    BadResponse,
 }
 
 // #[derive(Deserialize, RuntimeDebug, PartialEq)]
@@ -45,13 +52,13 @@ pub enum FlowClientError {
 #[derive(Clone, Deserialize, RuntimeDebug, PartialEq)]
 #[allow(non_snake_case)]
 pub struct LogObject {
-   blockId: Option<String>,
-   blockHeight: Option<FlowBlockNumber>,
-   transactionId: Option<String>,
-   transactionIndex: Option<u8>,
-   eventIndex: Option<u8>,
-   topic: Option<String>,
-   data: Option<String>,
+    blockId: Option<String>,
+    blockHeight: Option<FlowBlockNumber>,
+    transactionId: Option<String>,
+    transactionIndex: Option<u8>,
+    eventIndex: Option<u8>,
+    topic: Option<String>,
+    data: Option<String>,
 }
 
 #[derive(Deserialize, RuntimeDebug, PartialEq)]
@@ -102,22 +109,17 @@ fn deserialize_block_number_response(
 }
 
 // TODO think about optional data here???
-pub fn send_request(
-    server: &str,
-    path: &str,
-    data: &str,
-) -> Result<String, FlowClientError> {
+pub fn send_request(server: &str, path: &str, data: &str) -> Result<String, FlowClientError> {
     let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(FLOW_FETCH_DEADLINE));
     let request_url = format!("{}/{}", server, path);
 
     debug!("Request {}, with data {}", request_url, data);
 
-    let request = http::Request::get(&request_url);
+    let request = http::Request::post(&request_url, vec![data.to_string()]);
 
     let pending = request
         .deadline(deadline)
         .add_header("Content-Type", "application/json")
-        .body(vec![data.as_bytes()])
         .send()
         .map_err(|_| FlowClientError::HttpIoError)?;
 
@@ -143,22 +145,25 @@ pub fn send_request(
     Ok(String::from(body_str))
 }
 
-// {"topic": "A.c8873a26b148ed14.Starport.Lock", "startHeight": 34944396, "endHeight": 34944396}
 pub fn get_block(
     server: &str,
     flow_starport_address: &str,
     block_num: FlowBlockNumber,
     topic: &str, // Lock
 ) -> Result<FlowBlock, FlowClientError> {
+    debug!(
+        "flow_starport_address: {:X?}, block_num {:?}, topic {:?}",
+        flow_starport_address, block_num, topic
+    );
     let block_obj = get_block_object(server, block_num)?;
-    debug!("flow_starport_address: {:X?}", flow_starport_address);
     let get_logs_params = serde_json::json!({
         "topic": format!("A.{}.Starport.{}", flow_starport_address, topic),
         "startHeight": block_num,
         "endHeight": block_num,
     });
     debug!("get_logs_params: {:?}", get_logs_params.clone());
-    let get_logs_response_str: String = send_request(server, "events", &get_logs_params.to_string())?;
+    let get_logs_response_str: String =
+        send_request(server, "events", &get_logs_params.to_string())?;
     let get_logs_response = deserialize_get_logs_response(&get_logs_response_str)?;
     let event_objects = get_logs_response
         .result
@@ -174,9 +179,7 @@ pub fn get_block(
 
     let mut events = Vec::with_capacity(event_objects.len());
     for ev_obj in event_objects {
-        let data = ev_obj
-            .data
-            .ok_or_else(|| FlowClientError::BadResponse)?;
+        let data = ev_obj.data.ok_or_else(|| FlowClientError::BadResponse)?;
         match events::decode_event(topic, &data) {
             Ok(event) => events.push(event),
             Err(events::EventError::UnknownEventTopic(topic)) => {
@@ -190,14 +193,27 @@ pub fn get_block(
     }
 
     Ok(FlowBlock {
-        blockId: block_obj.blockId.ok_or(FlowClientError::DecodeError)?,
-        parentBlockId: block_obj.parentBlockId.ok_or(FlowClientError::DecodeError)?,
+        blockId: hex::decode(block_obj.blockId.ok_or(FlowClientError::DecodeError)?)
+            .map_err(|_| FlowClientError::DecodeError)?
+            .try_into()
+            .map_err(|_| FlowClientError::DecodeError)?,
+        parentBlockId: hex::decode(
+            block_obj
+                .parentBlockId
+                .ok_or(FlowClientError::DecodeError)?,
+        )
+        .map_err(|_| FlowClientError::DecodeError)?
+        .try_into()
+        .map_err(|_| FlowClientError::DecodeError)?,
         height: block_obj.height.ok_or(FlowClientError::DecodeError)?,
         events,
     })
 }
 
-pub fn get_block_object(server: &str, block_num: FlowBlockNumber) -> Result<BlockObject, FlowClientError> {
+pub fn get_block_object(
+    server: &str,
+    block_num: FlowBlockNumber,
+) -> Result<BlockObject, FlowClientError> {
     let get_block_params = serde_json::json!({
         "height": block_num,
     });
@@ -231,7 +247,7 @@ mod tests {
             let mut s = state.write();
             s.expect_request(
                 testing::PendingRequest {
-                    method: "GET".into(),
+                    method: "POST".into(),
                     uri: "https://mainnet-flow-fetcher/block".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                     body: br#"{"height":34944396}"#.to_vec(),
@@ -241,7 +257,7 @@ mod tests {
             });
             s.expect_request(
                 testing::PendingRequest {
-                    method: "GET".into(),
+                    method: "POST".into(),
                     uri: "https://mainnet-flow-fetcher/events".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                     body: br#"{"topic":"A.c8873a26b148ed14.Starport.Lock","startHeight":34944396,"endHeight":34944396}"#.to_vec(),
@@ -255,18 +271,28 @@ mod tests {
                 "https://mainnet-flow-fetcher",
                 "c8873a26b148ed14", // Starport address
                 34944396,
-                "Lock"
+                "Lock",
             );
             let block = result.unwrap();
-            assert_eq!(block.blockId, "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289");
-            assert_eq!(block.parentBlockId, "35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d");
+            let blockId_res: FlowHash =
+                hex::decode("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289")
+                    .unwrap()
+                    .try_into()
+                    .unwrap();
+            let parentBlockId_res: FlowHash =
+                hex::decode("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d")
+                    .unwrap()
+                    .try_into()
+                    .unwrap();
+            assert_eq!(block.blockId, blockId_res);
+            assert_eq!(block.parentBlockId, parentBlockId_res);
             assert_eq!(block.height, 34944396);
 
             assert_eq!(
                 block.events,
                 vec![FlowEvent::Lock {
-                    asset: String::from("FLOW"),
-                    recipient: String::from("fc6346ab93540e97"),
+                    asset: [70, 76, 79, 87, 0, 0, 0, 0], // FLOW asset
+                    recipient: hex::decode("fc6346ab93540e97").unwrap().try_into().unwrap(),
                     amount: 1000000000
                 }]
             );
@@ -282,7 +308,7 @@ mod tests {
         {
             let mut s = state.write();
             s.expect_request(testing::PendingRequest {
-                method: "GET".into(),
+                method: "POST".into(),
                 uri: "https://mainnet-flow-fetcher/latest_block_number".into(),
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                 body: br#"{}"#.to_vec(),
@@ -307,7 +333,7 @@ mod tests {
             let mut s = state.write();
             s.expect_request(
                 testing::PendingRequest {
-                    method: "GET".into(),
+                    method: "POST".into(),
                     uri: "https://mainnet-flow-fetcher/block".into(),
                     headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                     body: br#"{"height":34944396}"#.to_vec(),
@@ -319,10 +345,19 @@ mod tests {
         t.execute_with(|| {
             let result = get_block_object("https://mainnet-flow-fetcher", 34944396);
             let block = result.unwrap();
-            assert_eq!(block.blockId, Some("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289".into()));
-            assert_eq!(block.parentBlockId, Some("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d".into()));
+            assert_eq!(
+                block.blockId,
+                Some("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289".into())
+            );
+            assert_eq!(
+                block.parentBlockId,
+                Some("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d".into())
+            );
             assert_eq!(block.height, Some(34944396));
-            assert_eq!(block.timestamp, Some("2021-06-09 21:16:57.510218679 +0000 UTC".into()));
+            assert_eq!(
+                block.timestamp,
+                Some("2021-06-09 21:16:57.510218679 +0000 UTC".into())
+            );
         });
     }
 
@@ -343,18 +378,22 @@ mod tests {
     }"#;
         let result = deserialize_get_logs_response(RESPONSE);
         let expected = GetLogsResponse {
-            result: Some(vec![
-                LogObject {
-                    blockId: Some(String::from("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289")),
-                    blockHeight: Some(34944396),
-                    transactionId: Some(String::from("f4d331583dd5ddc1e57e72ca02197d7ff365bde7b2ca9f3114d8c44d248d1c6c")),
-                    transactionIndex: Some(0),
-                    eventIndex: Some(2),
-                    topic: Some(String::from("A.c8873a26b148ed14.Starport.Lock")),
-                    data: Some(String::from("{\"asset\":\"FLOW\",\"recipient\":\"fc6346ab93540e97\",\"amount\":1000000000}"))
-                }
-            ]),
-           // error: None,
+            result: Some(vec![LogObject {
+                blockId: Some(String::from(
+                    "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289",
+                )),
+                blockHeight: Some(34944396),
+                transactionId: Some(String::from(
+                    "f4d331583dd5ddc1e57e72ca02197d7ff365bde7b2ca9f3114d8c44d248d1c6c",
+                )),
+                transactionIndex: Some(0),
+                eventIndex: Some(2),
+                topic: Some(String::from("A.c8873a26b148ed14.Starport.Lock")),
+                data: Some(String::from(
+                    "{\"asset\":\"FLOW\",\"recipient\":\"fc6346ab93540e97\",\"amount\":1000000000}",
+                )),
+            }]),
+            // error: None,
         };
         assert_eq!(result.unwrap(), expected)
     }
@@ -372,12 +411,16 @@ mod tests {
         let result = deserialize_get_block_by_number_response(RESPONSE);
         let expected = BlockResponse {
             result: Some(BlockObject {
-                blockId: Some(String::from("4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289")),
-                parentBlockId: Some(String::from("35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d")),
+                blockId: Some(String::from(
+                    "4ac2583773d9d3e994e76ac2432f6a3b3641410894c5ff7616f6ce244b35b289",
+                )),
+                parentBlockId: Some(String::from(
+                    "35afa24cc7ea92585b11a4e220c8226b5613556c8deb9f24d008acbdcf24c80d",
+                )),
                 height: Some(34944396),
                 timestamp: Some(String::from("2021-06-09 21:16:57.510218679 +0000 UTC")),
             }),
-           // error: None,
+            // error: None,
         };
         assert_eq!(result.unwrap(), expected)
     }
@@ -388,7 +431,7 @@ mod tests {
         let result = deserialize_block_number_response(RESPONSE);
         let expected = BlockNumberResponse {
             result: Some(35705489),
-           // error: None,
+            // error: None,
         };
         assert_eq!(result.unwrap(), expected)
     }
