@@ -30,7 +30,7 @@ pub contract Starport {
     // Private vault with public deposit function
     access(self) var vault: @FlowToken.Vault
 
-    // TODO check if there is a way to store Starport keylist
+    // TODO Find a way to store Starport keylist when it's available
     access(self) var authorities: [String]
 
     access(self) var eraId: UInt256
@@ -96,7 +96,6 @@ pub contract Starport {
         }
 
         pub fun changeAuthorities(newAuthorities: [String]) {
-            //TODO post checks here?
             pre {
                 newAuthorities.length > 0: "New authority set can not be empty"
             }
@@ -162,7 +161,7 @@ pub contract Starport {
 
         // Withdraw Flow tokens to the temporary vault
         let temporaryVault <- Starport.vault.withdraw(amount: amount)
-        // TODO - do we need this event?
+
         emit TokensWithdrawn(asset: "FLOW", amount: amount)
 
         // Deposit Flow tokens to receiver from the temporary vault
