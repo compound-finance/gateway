@@ -241,6 +241,17 @@ async function loadTypes(version) {
   }
 }
 
+async function loadRpc(version) {
+  let releaseTypesFile = path.join(__dirname, '..', 'releases', `m${Number(version)}`, 'rpc.json');
+  let baseTypesFile = path.join(__dirname, '..', 'rpc.json');
+  if (await fileExists(releaseTypesFile)) {
+    return JSON.parse(await fs.readFile(releaseTypesFile, 'utf8'));
+  } else {
+    console.warn(chalk.yellow(`Cannot find release m${version} rpc file at ${releaseTypesFile}, using base rpc.json. Please pull release m${version} with \`scripts/pull_release.sh m${version}\``));
+    return JSON.parse(await fs.readFile(baseTypesFile, 'utf8'));
+  }
+}
+
 async function rpc(chain, chainConfig, section, method, params=[]) {
   if (!chainConfig.rpc) {
     throw new Error(`No websocket config for chain ${chain}`);
@@ -279,21 +290,25 @@ async function connect(chain, chainConfig, websocket = undefined) {
   let runtimeVersion = await getRuntimeVersion(chain, chainConfig);
   let { specVersion } = runtimeVersion;
   let typesJson = await loadTypes(specVersion);
+  let rpcJson = await loadRpc(specVersion);
 
   const wsProvider = new WsProvider(ws);
   let api = await ApiPromise.create({
     provider: wsProvider,
-    types: typesJson
+    types: typesJson,
+    rpc: rpcJson
   });
 
   let keyring = new Keyring();
   let types = Types;
+  let encodeValidatorSetForProposal = o => { return _encodeValidatorSetForProposal(keyring, o) };
 
   return {
     wsProvider,
     api,
     keyring,
-    types
+    types,
+    encodeValidatorSetForProposal
   };
 }
 
@@ -305,6 +320,22 @@ function defineKeys(r, obj) {
       value
     });
   });
+}
+
+function _encodeValidatorSetForProposal(keyring, arrayOfValidatorAddressObjects) {
+  let result = '';
+
+  // breaks somewhere over 100k validators
+  const prepend = '0x0' + (0x50100 + (arrayOfValidatorAddressObjects.length * 4)).toString(16);
+
+  result += prepend;
+
+  arrayOfValidatorAddressObjects.forEach((validator) => {
+    result += Buffer.from(keyring.decodeAddress(validator.substrate_id)).toString('hex');
+    result += validator.eth_address.substring(2, 42);
+  });
+
+  return result;
 }
 
 async function startConsole(input, chain, options) {
