@@ -1,7 +1,6 @@
 const ganache = require('ganache-core');
 const Web3 = require('web3');
 const RLP = require('rlp');
-const { execSync }= require('child_process');
 const { readContractsFile, deployContract, getContractAt } = require('../ethereum');
 const { genPort } = require('../util');
 
@@ -264,19 +263,6 @@ async function buildChain(chainInfo, ctx) {
 
     // We'll enumerate accounts early so we don't need to repeat often.
     accounts = await web3.eth.personal.getAccounts();
-  } else if (provider == 'flow') {
-     // Start Flow emulator
-     ctx.log(`Starting Flow emulator ...`);
-     const output = execSync('ls', { encoding: 'utf-8' });
-     console.log('Output was:\n', output);
-
-     let version = chainInfo.version ? ctx.versions.mustFind(chainInfo.version) : ctx.versions.current;
-     let accounts = ["0xc8873a26b148ed14"]
-     return new Chain(chainInfo, web3, web3Url, accounts, null, ganacheServer, version, ctx);
-     // const emulator = spawn("flow emulator", ["-v"]);
-
-     // TODO add more actions with emulator
-
   } else {
     web3Url = provider;
     web3 = new Web3(provider);

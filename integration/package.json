@@ -21,7 +21,7 @@
     "test": "PROFILE=release QUIET_SCENARIOS=true node --experimental-vm-modules node_modules/.bin/jest",
     "build": "yarn build:ethereum && yarn build:cargo",
     "build:ethereum": "(cd ../ethereum && yarn && yarn compile)",
-    "build:cargo": "WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo +nightly-2021-05-24 build --release --features integration",
+    "build:cargo": "WASM_BUILD_RUSTFLAGS='--cfg feature=\"integration\"' cargo build --release --features integration",
     "console": "NODE_OPTIONS='--experimental-repl-await' npx saddle console"
   },
   "resolutions": {

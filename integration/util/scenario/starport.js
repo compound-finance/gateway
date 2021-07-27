@@ -226,11 +226,6 @@ async function buildStarport(starportInfo, validatorsInfoHash, ctx, chain, cashT
   }
 }
 
-async function buildFlowStarport() {
-  
-
-}
-
 module.exports = {
   buildStarport,
   Starport

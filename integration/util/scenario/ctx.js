@@ -337,10 +337,6 @@ async function buildCtx(scenInfo={}) {
   return ctx;
 }
 
-async function buildFlowCtx(scenInfo={}) {
-  
-}
-
 module.exports = {
   Ctx,
   buildCtx,
