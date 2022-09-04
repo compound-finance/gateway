@@ -13,7 +13,7 @@ Because of this, changes should be kept to a minimum and discussed before making
 
 **The best way to get a change accepted as quickly as possible is to discuss with the community early and often**.
 
-Finally, for larger changes, it may be advised that an audit is conducted for the changes. Please discuss in [Discord](https://discord.gg/wMNpCBN4) or the [forums](https://www.comp.xyz/) for recommended auditors.
+Finally, for larger changes, it may be advised that an audit is conducted for the changes. Please discuss in [Discord](https://compound.finance/discord) or the [forums](https://www.comp.xyz/) for recommended auditors.
 
 ## Development Process
 
